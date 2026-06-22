@@ -7,7 +7,7 @@ module.exports = {
       args: "start -p 3020",
       env: {
         NODE_ENV: "production",
-        NEXT_PUBLIC_API_URL: "http://localhost:8010",
+        BACKEND_API_URL: "http://127.0.0.1:8010",
       },
     },
     {

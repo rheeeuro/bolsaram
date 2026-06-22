@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8010";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const CURRENT_YEAR = new Date().getFullYear();
 const statuses = ["등록됨", "소개 가능", "검토 중", "제안 완료", "수락", "연락처 교환", "만남 예정", "만남 완료", "거절", "보류", "매칭 완료"];
 const emptyCandidate = {
