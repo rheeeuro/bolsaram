@@ -62,7 +62,12 @@ npm --prefix frontend run build
 - Python 실행으로 추적 중인 `__pycache__` 파일이 변경되면 마무리 전에 원래 내용으로 복구합니다.
 - 새 라이브러리를 도입하기보다 `BolsaramApp.jsx`와 `globals.css`의 기존 패턴을 우선합니다.
 - 방 접근 흐름을 바꿀 때는 프론트엔드 화면 흐름과 백엔드 권한/API 구조를 함께 맞춥니다.
-- PM2를 재시작한 뒤에는 `bolsaram-fe`, `bolsaram-be`가 모두 online인지 확인하고 HTTP 응답까지 점검합니다.
+- 작업 마무리 시 실행 중인 운영 앱에 반영해야 하는 변경이라면, 변경 범위에 맞는 PM2 프로세스를 재시작합니다.
+- 프론트엔드 변경(`frontend/`, Next 설정 등)은 `pm2 restart bolsaram-fe`를 실행합니다.
+- 백엔드 변경(`backend/`, `sql/`, API 동작 등)은 `pm2 restart bolsaram-be`를 실행합니다.
+- 프론트엔드와 백엔드 모두에 영향이 있거나 `ecosystem.config.cjs`, 루트 실행 설정을 바꿨다면 `pm2 restart bolsaram-fe bolsaram-be`를 실행합니다.
+- PM2를 재시작한 뒤에는 해당 프로세스가 online인지 확인하고 관련 HTTP 응답까지 점검합니다. 프론트엔드는 `curl -I http://127.0.0.1:3020`, 백엔드는 `curl http://127.0.0.1:8010/health`를 사용합니다.
+- 문서만 수정한 경우처럼 런타임 반영이 필요 없는 변경은 PM2를 재시작하지 않습니다.
 
 ## 도메인 규칙
 

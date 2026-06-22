@@ -50,6 +50,19 @@ async function api(path, options = {}) {
   return payload;
 }
 
+function roomUrl(roomId) {
+  return `/rooms/${roomId}`;
+}
+
+function roomIdFromPath(pathname) {
+  return pathname.match(/^\/rooms\/([^/]+)\/?$/)?.[1] || "";
+}
+
+function updateBrowserUrl(path, replace = false) {
+  if (typeof window === "undefined" || window.location.pathname === path) return;
+  window.history[replace ? "replaceState" : "pushState"]({}, "", path);
+}
+
 function normalize(value) {
   return String(value || "").toLowerCase().replace(/\s/g, "");
 }
@@ -170,7 +183,7 @@ function shareMessage(candidate, tone) {
   return lines[tone].join("\n");
 }
 
-export default function BolsaramApp({ initialInviteCode = "" }) {
+export default function BolsaramApp({ initialInviteCode = "", initialRoomId = "" }) {
   const [authMode, setAuthMode] = useState("login");
   const [auth, setAuth] = useState({ name: "", email: "", password: "" });
   const [user, setUser] = useState(null);
@@ -196,19 +209,21 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
     window.setTimeout(() => setToast(""), 2200);
   };
 
-  const loadRoomState = async (roomId) => {
+  const loadRoomState = async (roomId, options = {}) => {
     const payload = await api(`/api/rooms/${roomId}/state`);
     setRoom(payload.room);
     setCandidates(payload.candidates);
     setLogs(payload.logs);
     setSelectedId((current) => (payload.candidates.some((candidate) => candidate.id === current) ? current : payload.candidates[0]?.id || null));
+    if (options.syncUrl !== false) updateBrowserUrl(roomUrl(payload.room.id));
   };
 
-  const clearRoomState = () => {
+  const clearRoomState = (options = {}) => {
     setRoom(null);
     setCandidates([]);
     setLogs([]);
     setSelectedId(null);
+    if (options.syncUrl !== false) updateBrowserUrl("/");
   };
 
   const loadRooms = async (preferredRoomId = null, openPreferred = false) => {
@@ -232,7 +247,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
     loadPublicRooms().catch((error) => notify(error.message));
   };
 
-  const startApp = async (currentUser, code = joinCode) => {
+  const startApp = async (currentUser, code = joinCode, roomId = initialRoomId) => {
     setUser(currentUser);
     if (code) {
       try {
@@ -245,7 +260,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
         notify(error.message);
       }
     }
-    await loadRooms();
+    await loadRooms(roomId || null, Boolean(roomId));
   };
 
   useEffect(() => {
@@ -253,7 +268,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
     api("/api/me")
       .then(async ({ user: currentUser }) => {
         if (!alive) return;
-        if (currentUser) await startApp(currentUser, initialInviteCode);
+        if (currentUser) await startApp(currentUser, initialInviteCode, initialRoomId);
       })
       .catch((error) => notify(error.message))
       .finally(() => alive && setLoading(false));
@@ -261,6 +276,23 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const syncFromLocation = () => {
+      const pathRoomId = roomIdFromPath(window.location.pathname);
+      setModal(null);
+      if (pathRoomId) {
+        loadRoomState(pathRoomId, { syncUrl: false }).catch((error) => notify(error.message));
+      } else {
+        clearRoomState({ syncUrl: false });
+      }
+    };
+
+    window.addEventListener("popstate", syncFromLocation);
+    return () => window.removeEventListener("popstate", syncFromLocation);
+  }, [user]);
 
   const selected = useMemo(() => candidates.find((candidate) => candidate.id === selectedId) || candidates[0] || null, [candidates, selectedId]);
 
@@ -373,7 +405,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
         await loadRoomState(targetRoom.id);
         return;
       }
-      const payload = await api("/api/rooms/join-public", { method: "POST", body: { roomId: Number(targetRoom.id) } });
+      const payload = await api("/api/rooms/join-public", { method: "POST", body: { roomId: targetRoom.id } });
       setModal(null);
       await loadRooms(payload.room.id, true);
       notify("공개방에 입장했습니다.");
@@ -446,7 +478,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
           <form className="auth-form" onSubmit={submitAuth}>
             <div>
               <h2>{isSignup ? "회원가입" : "로그인"}</h2>
-              <p>{isSignup ? "가입하면 기본 공개방이 자동으로 생성됩니다." : initialInviteCode ? `비공개방 코드 ${initialInviteCode}로 입장하려면 먼저 로그인해 주세요.` : "계정으로 입장해 방별 후보 데이터를 관리하세요."}</p>
+              <p>{isSignup ? "가입하면 기본 공개방이 자동으로 생성됩니다." : initialInviteCode ? `비공개방 코드 ${initialInviteCode}로 입장하려면 먼저 로그인해 주세요.` : initialRoomId ? `방 ${initialRoomId}로 입장하려면 먼저 로그인해 주세요.` : "계정으로 입장해 방별 후보 데이터를 관리하세요."}</p>
             </div>
             {isSignup && <Field label="이름"><input value={auth.name} onChange={(event) => setAuth({ ...auth, name: event.target.value })} required autoComplete="name" placeholder="홍길동" /></Field>}
             <Field label="이메일"><input type="email" value={auth.email} onChange={(event) => setAuth({ ...auth, email: event.target.value })} required autoComplete="email" placeholder="you@example.com" /></Field>
@@ -518,12 +550,13 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
       </header>
 
       <div className="room-meta">
+        <span>방 아이디 <strong>{room.id}</strong></span><span className="meta-divider">{`${typeof window !== "undefined" ? window.location.origin : ""}${roomUrl(room.id)}`}</span>
         {room?.visibility === "private" ? <><span>입장 코드 <strong>{room.inviteCode}</strong></span><span className="meta-divider">{`${typeof window !== "undefined" ? window.location.origin : ""}${room.inviteUrl}`}</span>{room.role === "owner" && <button className="text-button" type="button" onClick={async () => {
           const payload = await api(`/api/rooms/${room.id}/regenerate-code`, { method: "POST" });
           setRoom(payload.room);
           setRooms((items) => items.map((item) => item.id === payload.room.id ? payload.room : item));
           notify("입장 코드를 재발급했습니다.");
-        }}>코드 재발급</button>}</> : "공개방입니다. 로그인한 사용자가 방 목록에서 선택해 입장할 수 있습니다."}
+        }}>코드 재발급</button>}</> : <span>공개방입니다.</span>}
       </div>
 
       <main className="workspace">

@@ -31,6 +31,8 @@ DB_CONFIG = {
 
 SESSION_COOKIE = "bolsaram_session"
 SESSION_MAX_AGE = 14 * 24 * 60 * 60
+ROOM_ID_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+ROOM_ID_ALPHABET = f"{ROOM_ID_LETTERS}23456789"
 STATUSES = [
     "등록됨",
     "소개 가능",
@@ -159,7 +161,7 @@ class JoinPayload(BaseModel):
 
 
 class PublicRoomJoinPayload(BaseModel):
-    roomId: int = Field(gt=0)
+    roomId: str = Field(min_length=1, max_length=32)
 
 
 class CandidatePayload(BaseModel):
@@ -263,6 +265,18 @@ def random_invite_code() -> str:
     return secrets.token_urlsafe(8).replace("-", "").replace("_", "")[:8].upper()
 
 
+def random_room_public_id() -> str:
+    return secrets.choice(ROOM_ID_LETTERS) + "".join(secrets.choice(ROOM_ID_ALPHABET) for _ in range(6))
+
+
+def unique_room_public_id() -> str:
+    for _ in range(16):
+        public_id = random_room_public_id()
+        if not fetch_one("SELECT id FROM rooms WHERE public_id = %s LIMIT 1", (public_id,)):
+            return public_id
+    raise HTTPException(status_code=500, detail="방 아이디를 생성하지 못했습니다.")
+
+
 def unique_invite_code() -> str:
     for _ in range(8):
         code = random_invite_code()
@@ -277,7 +291,7 @@ def public_user(user: dict[str, Any]) -> dict[str, str]:
 
 def serialize_room(row: dict[str, Any]) -> dict[str, Any]:
     return {
-        "id": str(row["id"]),
+        "id": row["public_id"],
         "ownerId": str(row["owner_id"]),
         "name": row["name"],
         "visibility": row["visibility"],
@@ -381,9 +395,12 @@ def require_user(token: str | None) -> dict[str, Any]:
 
 
 def get_room(room_id: int | str, user_id: int | str) -> dict[str, Any] | None:
+    db_room_id = resolve_room_db_id(room_id)
+    if not db_room_id:
+        return None
     row = fetch_one(
         """
-        SELECT r.id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
+        SELECT r.id, r.public_id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
                CASE WHEN rm.user_id IS NULL THEN 0 ELSE 1 END AS is_member,
                (SELECT COUNT(*) FROM room_members count_rm WHERE count_rm.room_id = r.id) AS member_count,
                (SELECT COUNT(*) FROM candidates count_c WHERE count_c.room_id = r.id) AS candidate_count
@@ -392,9 +409,21 @@ def get_room(room_id: int | str, user_id: int | str) -> dict[str, Any] | None:
          WHERE r.id = %s
          LIMIT 1
         """,
-        (user_id, room_id),
+        (user_id, db_room_id),
     )
     return serialize_room(row) if row else None
+
+
+def resolve_room_db_id(room_ref: int | str) -> int | None:
+    room_text = str(room_ref).strip().upper()
+    row = fetch_one("SELECT id FROM rooms WHERE public_id = %s LIMIT 1", (room_text,))
+    if row:
+        return int(row["id"])
+    if room_text.isdigit():
+        row = fetch_one("SELECT id FROM rooms WHERE id = %s LIMIT 1", (room_text,))
+        if row:
+            return int(row["id"])
+    return None
 
 
 def get_accessible_room(room_id: int | str, user_id: int | str) -> dict[str, Any]:
@@ -402,6 +431,16 @@ def get_accessible_room(room_id: int | str, user_id: int | str) -> dict[str, Any
     if not room or not room["isMember"]:
         raise HTTPException(status_code=403, detail="입장 권한이 없는 방입니다.")
     return room
+
+
+def get_accessible_room_id(room_id: int | str, user_id: int | str) -> tuple[int, dict[str, Any]]:
+    db_room_id = resolve_room_db_id(room_id)
+    if not db_room_id:
+        raise HTTPException(status_code=404, detail="방을 찾을 수 없습니다.")
+    room = get_room(db_room_id, user_id)
+    if not room or not room["isMember"]:
+        raise HTTPException(status_code=403, detail="입장 권한이 없는 방입니다.")
+    return db_room_id, room
 
 
 def create_session(response: Response, user_id: int) -> None:
@@ -431,6 +470,22 @@ def ensure_schema() -> None:
         with connection.cursor() as cursor:
             for statement in load_schema_statements():
                 cursor.execute(statement)
+            cursor.execute("SHOW COLUMNS FROM rooms LIKE 'public_id'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE rooms ADD COLUMN public_id CHAR(7) NULL AFTER id")
+    backfill_room_public_ids()
+
+
+def backfill_room_public_ids() -> None:
+    rows = fetch_all("SELECT id FROM rooms WHERE public_id IS NULL OR public_id = '' ORDER BY id")
+    for row in rows:
+        execute("UPDATE rooms SET public_id = %s WHERE id = %s", (unique_room_public_id(), row["id"]))
+    with db() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SHOW INDEX FROM rooms WHERE Column_name = 'public_id' AND Non_unique = 0")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE rooms ADD UNIQUE KEY rooms_public_id_unique (public_id)")
+            cursor.execute("ALTER TABLE rooms MODIFY public_id CHAR(7) NOT NULL")
 
 
 @app.on_event("startup")
@@ -463,8 +518,8 @@ def signup(payload: SignupPayload, response: Response) -> dict[str, Any]:
                 )
                 user_id = int(cursor.lastrowid)
                 cursor.execute(
-                    "INSERT INTO rooms (owner_id, name, visibility) VALUES (%s, %s, 'public')",
-                    (user_id, f"{payload.name.strip()}님의 공개방"),
+                    "INSERT INTO rooms (public_id, owner_id, name, visibility) VALUES (%s, %s, %s, 'public')",
+                    (unique_room_public_id(), user_id, f"{payload.name.strip()}님의 공개방"),
                 )
                 room_id = int(cursor.lastrowid)
                 cursor.execute(
@@ -504,7 +559,7 @@ def rooms(bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]
     user = require_user(bolsaram_session)
     rows = fetch_all(
         """
-        SELECT r.id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
+        SELECT r.id, r.public_id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
                1 AS is_member,
                (SELECT COUNT(*) FROM room_members count_rm WHERE count_rm.room_id = r.id) AS member_count,
                (SELECT COUNT(*) FROM candidates count_c WHERE count_c.room_id = r.id) AS candidate_count
@@ -522,7 +577,7 @@ def public_rooms(bolsaram_session: str | None = Cookie(default=None)) -> dict[st
     user = require_user(bolsaram_session)
     rows = fetch_all(
         """
-        SELECT r.id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
+        SELECT r.id, r.public_id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
                CASE WHEN rm.user_id IS NULL THEN 0 ELSE 1 END AS is_member,
                (SELECT COUNT(*) FROM room_members count_rm WHERE count_rm.room_id = r.id) AS member_count,
                (SELECT COUNT(*) FROM candidates count_c WHERE count_c.room_id = r.id) AS candidate_count
@@ -542,8 +597,8 @@ def create_room(payload: RoomPayload, bolsaram_session: str | None = Cookie(defa
     visibility = "private" if payload.visibility == "private" else "public"
     invite_code = unique_invite_code() if visibility == "private" else None
     room_id = execute(
-        "INSERT INTO rooms (owner_id, name, visibility, invite_code) VALUES (%s, %s, %s, %s)",
-        (user["id"], payload.name.strip(), visibility, invite_code),
+        "INSERT INTO rooms (public_id, owner_id, name, visibility, invite_code) VALUES (%s, %s, %s, %s, %s)",
+        (unique_room_public_id(), user["id"], payload.name.strip(), visibility, invite_code),
     )
     execute("INSERT INTO room_members (room_id, user_id, role) VALUES (%s, %s, 'owner')", (room_id, user["id"]))
     return {"room": get_room(room_id, user["id"])}
@@ -563,7 +618,8 @@ def join_room(payload: JoinPayload, bolsaram_session: str | None = Cookie(defaul
 @app.post("/api/rooms/join-public")
 def join_public_room(payload: PublicRoomJoinPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    room = fetch_one("SELECT id FROM rooms WHERE id = %s AND visibility = 'public' LIMIT 1", (payload.roomId,))
+    db_room_id = resolve_room_db_id(payload.roomId)
+    room = fetch_one("SELECT id FROM rooms WHERE id = %s AND visibility = 'public' LIMIT 1", (db_room_id,)) if db_room_id else None
     if not room:
         raise HTTPException(status_code=404, detail="입장 가능한 공개방이 아닙니다.")
     execute("INSERT IGNORE INTO room_members (room_id, user_id, role) VALUES (%s, %s, 'member')", (room["id"], user["id"]))
@@ -571,29 +627,30 @@ def join_public_room(payload: PublicRoomJoinPayload, bolsaram_session: str | Non
 
 
 @app.get("/api/rooms/{room_id}/state")
-def room_state(room_id: int, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+def room_state(room_id: str, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    room = get_accessible_room(room_id, user["id"])
-    candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (room_id,))
-    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (room_id,))
+    db_room_id, room = get_accessible_room_id(room_id, user["id"])
+    candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
+    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
     return {"room": room, "candidates": [serialize_candidate(row) for row in candidates], "logs": [serialize_log(row) for row in logs]}
 
 
 @app.post("/api/rooms/{room_id}/regenerate-code")
-def regenerate_code(room_id: int, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+def regenerate_code(room_id: str, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
     room = get_room(room_id, user["id"])
     if not room or room["role"] != "owner" or room["visibility"] != "private":
         raise HTTPException(status_code=403, detail="비공개방 소유자만 코드를 재발급할 수 있습니다.")
     code = unique_invite_code()
-    execute("UPDATE rooms SET invite_code = %s WHERE id = %s", (code, room_id))
+    db_room_id = resolve_room_db_id(room_id)
+    execute("UPDATE rooms SET invite_code = %s WHERE id = %s", (code, db_room_id))
     return {"room": get_room(room_id, user["id"])}
 
 
 @app.post("/api/rooms/{room_id}/candidates", status_code=201)
-def create_candidate(room_id: int, payload: CandidatePayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+def create_candidate(room_id: str, payload: CandidatePayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    get_accessible_room(room_id, user["id"])
+    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
     candidate = normalize_candidate(payload)
     candidate_id = execute(
         """
@@ -602,7 +659,7 @@ def create_candidate(room_id: int, payload: CandidatePayload, bolsaram_session: 
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
-            room_id,
+            db_room_id,
             candidate["alias"],
             candidate["gender"],
             candidate["birth_year"],
@@ -628,15 +685,15 @@ def create_candidate(room_id: int, payload: CandidatePayload, bolsaram_session: 
 
 
 @app.post("/api/rooms/{room_id}/sample")
-def sample(room_id: int, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+def sample(room_id: str, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    get_accessible_room(room_id, user["id"])
+    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
     with db() as connection:
         connection.begin()
         try:
             with connection.cursor() as cursor:
-                cursor.execute("DELETE FROM match_logs WHERE room_id = %s", (room_id,))
-                cursor.execute("DELETE FROM candidates WHERE room_id = %s", (room_id,))
+                cursor.execute("DELETE FROM match_logs WHERE room_id = %s", (db_room_id,))
+                cursor.execute("DELETE FROM candidates WHERE room_id = %s", (db_room_id,))
                 for item in SAMPLE_CANDIDATES:
                     candidate = normalize_candidate(item)
                     cursor.execute(
@@ -646,7 +703,7 @@ def sample(room_id: int, bolsaram_session: str | None = Cookie(default=None)) ->
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
-                            room_id,
+                            db_room_id,
                             candidate["alias"],
                             candidate["gender"],
                             candidate["birth_year"],
@@ -671,7 +728,7 @@ def sample(room_id: int, bolsaram_session: str | None = Cookie(default=None)) ->
         except Exception:
             connection.rollback()
             raise
-    candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (room_id,))
+    candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
     return {"candidates": [serialize_candidate(row) for row in candidates], "logs": []}
 
 
@@ -695,14 +752,14 @@ def update_status(candidate_id: int, payload: StatusPayload, bolsaram_session: s
 
 
 @app.post("/api/rooms/{room_id}/logs", status_code=201)
-def create_log(room_id: int, payload: LogPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+def create_log(room_id: str, payload: LogPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    get_accessible_room(room_id, user["id"])
-    candidate = fetch_one("SELECT id FROM candidates WHERE room_id = %s AND id = %s", (room_id, payload.candidateId))
+    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
+    candidate = fetch_one("SELECT id FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, payload.candidateId))
     if not candidate:
         raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
     if payload.otherId:
-        other = fetch_one("SELECT id FROM candidates WHERE room_id = %s AND id = %s", (room_id, payload.otherId))
+        other = fetch_one("SELECT id FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, payload.otherId))
         if not other:
             raise HTTPException(status_code=404, detail="상대 후보를 찾을 수 없습니다.")
     execute("UPDATE candidates SET status = '검토 중' WHERE id = %s", (payload.candidateId,))
@@ -711,8 +768,8 @@ def create_log(room_id: int, payload: LogPayload, bolsaram_session: str | None =
         INSERT INTO match_logs (room_id, candidate_id, other_candidate_id, status, log_date, memo)
         VALUES (%s, %s, %s, '검토 중', %s, '추천 후보 검토 등록')
         """,
-        (room_id, payload.candidateId, payload.otherId, today_label()),
+        (db_room_id, payload.candidateId, payload.otherId, today_label()),
     )
     log = fetch_one("SELECT * FROM match_logs WHERE id = %s", (log_id,))
-    candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (room_id,))
+    candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
     return {"log": serialize_log(log), "candidates": [serialize_candidate(row) for row in candidates]}

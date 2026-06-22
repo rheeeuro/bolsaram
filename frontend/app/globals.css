@@ -647,12 +647,16 @@ dl {
   width: min(900px, calc(100vw - 32px));
   border: 0;
   border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
   padding: 0;
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 
 .candidate-form {
+  background: var(--surface);
   padding: 18px;
 }
 
