@@ -158,6 +158,10 @@ class JoinPayload(BaseModel):
     code: str = Field(min_length=1, max_length=32)
 
 
+class PublicRoomJoinPayload(BaseModel):
+    roomId: int = Field(gt=0)
+
+
 class CandidatePayload(BaseModel):
     alias: str = Field(min_length=1, max_length=120)
     gender: str = "여"
@@ -281,6 +285,8 @@ def serialize_room(row: dict[str, Any]) -> dict[str, Any]:
         "inviteUrl": f"/join/{row['invite_code']}" if row.get("invite_code") else None,
         "isMember": bool(row.get("is_member")),
         "role": row.get("role"),
+        "memberCount": int(row.get("member_count") or 0),
+        "candidateCount": int(row.get("candidate_count") or 0),
         "createdAt": iso(row["created_at"]),
     }
 
@@ -378,7 +384,9 @@ def get_room(room_id: int | str, user_id: int | str) -> dict[str, Any] | None:
     row = fetch_one(
         """
         SELECT r.id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
-               CASE WHEN rm.user_id IS NULL THEN 0 ELSE 1 END AS is_member
+               CASE WHEN rm.user_id IS NULL THEN 0 ELSE 1 END AS is_member,
+               (SELECT COUNT(*) FROM room_members count_rm WHERE count_rm.room_id = r.id) AS member_count,
+               (SELECT COUNT(*) FROM candidates count_c WHERE count_c.room_id = r.id) AS candidate_count
           FROM rooms r
           LEFT JOIN room_members rm ON rm.room_id = r.id AND rm.user_id = %s
          WHERE r.id = %s
@@ -391,7 +399,7 @@ def get_room(room_id: int | str, user_id: int | str) -> dict[str, Any] | None:
 
 def get_accessible_room(room_id: int | str, user_id: int | str) -> dict[str, Any]:
     room = get_room(room_id, user_id)
-    if not room or (room["visibility"] == "private" and not room["isMember"]):
+    if not room or not room["isMember"]:
         raise HTTPException(status_code=403, detail="입장 권한이 없는 방입니다.")
     return room
 
@@ -497,11 +505,31 @@ def rooms(bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]
     rows = fetch_all(
         """
         SELECT r.id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
-               CASE WHEN rm.user_id IS NULL THEN 0 ELSE 1 END AS is_member
+               1 AS is_member,
+               (SELECT COUNT(*) FROM room_members count_rm WHERE count_rm.room_id = r.id) AS member_count,
+               (SELECT COUNT(*) FROM candidates count_c WHERE count_c.room_id = r.id) AS candidate_count
+          FROM rooms r
+          JOIN room_members rm ON rm.room_id = r.id AND rm.user_id = %s
+         ORDER BY rm.created_at DESC, r.created_at DESC
+        """,
+        (user["id"],),
+    )
+    return {"rooms": [serialize_room(row) for row in rows]}
+
+
+@app.get("/api/rooms/public")
+def public_rooms(bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    rows = fetch_all(
+        """
+        SELECT r.id, r.owner_id, r.name, r.visibility, r.invite_code, r.created_at, rm.role,
+               CASE WHEN rm.user_id IS NULL THEN 0 ELSE 1 END AS is_member,
+               (SELECT COUNT(*) FROM room_members count_rm WHERE count_rm.room_id = r.id) AS member_count,
+               (SELECT COUNT(*) FROM candidates count_c WHERE count_c.room_id = r.id) AS candidate_count
           FROM rooms r
           LEFT JOIN room_members rm ON rm.room_id = r.id AND rm.user_id = %s
-         WHERE r.visibility = 'public' OR rm.user_id IS NOT NULL
-         ORDER BY r.created_at DESC
+         WHERE r.visibility = 'public'
+         ORDER BY rm.user_id IS NULL DESC, r.created_at DESC
         """,
         (user["id"],),
     )
@@ -528,6 +556,16 @@ def join_room(payload: JoinPayload, bolsaram_session: str | None = Cookie(defaul
     room = fetch_one("SELECT id FROM rooms WHERE invite_code = %s AND visibility = 'private' LIMIT 1", (code,))
     if not room:
         raise HTTPException(status_code=404, detail="유효한 비공개방 코드가 아닙니다.")
+    execute("INSERT IGNORE INTO room_members (room_id, user_id, role) VALUES (%s, %s, 'member')", (room["id"], user["id"]))
+    return {"room": get_room(room["id"], user["id"])}
+
+
+@app.post("/api/rooms/join-public")
+def join_public_room(payload: PublicRoomJoinPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    room = fetch_one("SELECT id FROM rooms WHERE id = %s AND visibility = 'public' LIMIT 1", (payload.roomId,))
+    if not room:
+        raise HTTPException(status_code=404, detail="입장 가능한 공개방이 아닙니다.")
     execute("INSERT IGNORE INTO room_members (room_id, user_id, role) VALUES (%s, %s, 'member')", (room["id"], user["id"]))
     return {"room": get_room(room["id"], user["id"])}
 

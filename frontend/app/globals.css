@@ -942,3 +942,152 @@ select:disabled {
   cursor: not-allowed;
   opacity: 0.52;
 }
+
+
+.room-home {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+.room-home-head,
+.room-card-top,
+.room-card-stats,
+.room-home-actions,
+.public-room-row {
+  display: flex;
+  align-items: center;
+}
+
+.room-home-head {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.room-home-head h2 {
+  font-size: 24px;
+}
+
+.room-home-head p,
+.room-card-top,
+.room-card-stats,
+.public-room-row p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.room-home-actions {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.room-card,
+.room-empty,
+.public-room-row {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.room-card {
+  display: grid;
+  gap: 14px;
+  min-height: 156px;
+  padding: 16px;
+  color: inherit;
+  text-align: left;
+}
+
+.room-card:hover {
+  border-color: rgba(47, 125, 105, 0.65);
+  box-shadow: 0 12px 28px rgba(35, 44, 39, 0.09);
+}
+
+.room-card-top,
+.room-card-stats {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.room-card h3,
+.public-room-row h3,
+.room-empty h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.room-card-stats {
+  align-self: end;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.room-empty {
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  min-height: 240px;
+  padding: 22px;
+  text-align: center;
+}
+
+.room-empty.compact-empty {
+  min-height: 140px;
+}
+
+.join-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border-radius: var(--radius);
+  background: #e7e7df;
+}
+
+.public-room-list {
+  display: grid;
+  gap: 10px;
+}
+
+.public-room-row {
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 76px;
+  padding: 12px;
+}
+
+.public-room-row p {
+  margin-top: 4px;
+}
+
+@media (max-width: 760px) {
+  .room-home {
+    width: auto;
+    padding: 20px 16px 36px;
+  }
+
+  .room-home-head,
+  .public-room-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-home-actions,
+  .public-room-row .primary-button,
+  .public-room-row .secondary-button {
+    width: 100%;
+  }
+
+  .room-home-actions .primary-button,
+  .room-home-actions .secondary-button {
+    flex: 1 1 160px;
+  }
+}

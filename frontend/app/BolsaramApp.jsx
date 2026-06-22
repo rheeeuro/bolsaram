@@ -175,6 +175,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
   const [auth, setAuth] = useState({ name: "", email: "", password: "" });
   const [user, setUser] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [publicRooms, setPublicRooms] = useState([]);
   const [room, setRoom] = useState(null);
   const [candidates, setCandidates] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -184,6 +185,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
   const [candidateDraft, setCandidateDraft] = useState(emptyCandidate);
   const [roomDraft, setRoomDraft] = useState({ name: "", visibility: "public" });
   const [joinCode, setJoinCode] = useState(initialInviteCode);
+  const [joinMode, setJoinMode] = useState("public");
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
   const [tone, setTone] = useState("clean");
@@ -202,17 +204,32 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
     setSelectedId((current) => (payload.candidates.some((candidate) => candidate.id === current) ? current : payload.candidates[0]?.id || null));
   };
 
-  const loadRooms = async (preferredRoomId = null) => {
+  const clearRoomState = () => {
+    setRoom(null);
+    setCandidates([]);
+    setLogs([]);
+    setSelectedId(null);
+  };
+
+  const loadRooms = async (preferredRoomId = null, openPreferred = false) => {
     const payload = await api("/api/rooms");
     setRooms(payload.rooms);
-    const selected = payload.rooms.find((item) => item.id === preferredRoomId) || payload.rooms.find((item) => item.id === room?.id) || payload.rooms[0];
-    if (selected) await loadRoomState(selected.id);
-    else {
-      setRoom(null);
-      setCandidates([]);
-      setLogs([]);
-      setSelectedId(null);
+    if (openPreferred && preferredRoomId) {
+      await loadRoomState(preferredRoomId);
+    } else if (room && !payload.rooms.some((item) => item.id === room.id)) {
+      clearRoomState();
     }
+  };
+
+  const loadPublicRooms = async () => {
+    const payload = await api("/api/rooms/public");
+    setPublicRooms(payload.rooms);
+  };
+
+  const openJoinModal = () => {
+    setJoinMode("public");
+    setModal("join");
+    loadPublicRooms().catch((error) => notify(error.message));
   };
 
   const startApp = async (currentUser, code = joinCode) => {
@@ -221,7 +238,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
       try {
         const joined = await api("/api/rooms/join", { method: "POST", body: { code } });
         setJoinCode("");
-        await loadRooms(joined.room.id);
+        await loadRooms(joined.room.id, true);
         notify("비공개방에 입장했습니다.");
         return;
       } catch (error) {
@@ -329,7 +346,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
       const payload = await api("/api/rooms", { method: "POST", body: roomDraft });
       setModal(null);
       setRoomDraft({ name: "", visibility: "public" });
-      await loadRooms(payload.room.id);
+      await loadRooms(payload.room.id, true);
       notify(payload.room.visibility === "private" ? `비공개방 코드 ${payload.room.inviteCode}가 발급됐습니다.` : "공개방을 생성했습니다.");
     } catch (error) {
       notify(error.message);
@@ -340,9 +357,26 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
     event.preventDefault();
     try {
       const payload = await api("/api/rooms/join", { method: "POST", body: { code: joinCode } });
+      setJoinCode("");
       setModal(null);
-      await loadRooms(payload.room.id);
+      await loadRooms(payload.room.id, true);
       notify("비공개방에 입장했습니다.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const joinPublicRoom = async (targetRoom) => {
+    try {
+      if (targetRoom.isMember) {
+        setModal(null);
+        await loadRoomState(targetRoom.id);
+        return;
+      }
+      const payload = await api("/api/rooms/join-public", { method: "POST", body: { roomId: Number(targetRoom.id) } });
+      setModal(null);
+      await loadRooms(payload.room.id, true);
+      notify("공개방에 입장했습니다.");
     } catch (error) {
       notify(error.message);
     }
@@ -395,6 +429,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
     await api("/api/auth/logout", { method: "POST" });
     setUser(null);
     setRooms([]);
+    setPublicRooms([]);
     setRoom(null);
     setCandidates([]);
     setLogs([]);
@@ -425,11 +460,35 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
     );
   }
 
+  if (!room) {
+    return (
+      <div className="app-shell">
+        <header className="topbar">
+          <Brand caption={`${user.name}님 · ${user.email}`} />
+          <div className="room-bar">
+            <button className="secondary-button" type="button" onClick={() => setModal("room")}>방 생성</button>
+            <button className="primary-button" type="button" onClick={openJoinModal}>새로운 방 참가하기</button>
+          </div>
+          <div className="top-actions">
+            <button className="text-button" type="button" onClick={logout}>로그아웃</button>
+          </div>
+        </header>
+
+        <RoomHome rooms={rooms} onOpen={(targetRoom) => loadRoomState(targetRoom.id).catch((error) => notify(error.message))} onCreate={() => setModal("room")} onJoin={openJoinModal} />
+
+        {modal === "room" && <Modal title="방 생성" description="공개방은 로그인 사용자에게 보이고, 비공개방은 링크나 코드로 입장합니다." onClose={() => setModal(null)}><form onSubmit={createRoom}><Field label="방 이름"><input value={roomDraft.name} onChange={(event) => setRoomDraft({ ...roomDraft, name: event.target.value })} required placeholder="30대 초중반 소개팅방" /></Field><Field label="공개 설정"><select value={roomDraft.visibility} onChange={(event) => setRoomDraft({ ...roomDraft, visibility: event.target.value })}><option value="public">공개방</option><option value="private">비공개방</option></select></Field><div className="dialog-footer"><button className="text-button" type="button" onClick={() => setModal(null)}>취소</button><button className="primary-button" type="submit">생성</button></div></form></Modal>}
+        {modal === "join" && <JoinRoomModal mode={joinMode} setMode={setJoinMode} publicRooms={publicRooms} joinCode={joinCode} setJoinCode={setJoinCode} onJoinPrivate={joinRoom} onJoinPublic={joinPublicRoom} onRefreshPublic={loadPublicRooms} onClose={() => setModal(null)} />}
+        <Toast message={toast} />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
         <Brand caption={`${user.name}님 · ${user.email}`} />
         <div className="room-bar">
+          <button className="secondary-button" type="button" onClick={clearRoomState}>방 목록</button>
           <label className="room-select-label">
             <span>방</span>
             <select value={room?.id || ""} onChange={(event) => loadRoomState(event.target.value).catch((error) => notify(error.message))} disabled={!rooms.length}>
@@ -438,7 +497,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
           </label>
           <span className={`room-badge ${room?.visibility === "private" ? "private" : ""}`}>{room?.visibility === "private" ? "비공개" : "공개"}</span>
           <button className="secondary-button" type="button" onClick={() => setModal("room")}>방 생성</button>
-          <button className="secondary-button" type="button" onClick={() => setModal("join")}>비공개 입장</button>
+          <button className="secondary-button" type="button" onClick={openJoinModal}>새로운 방 참가하기</button>
           <button className="icon-button" type="button" disabled={!room || room.visibility !== "private"} title="입장 링크 복사" onClick={() => {
             navigator.clipboard.writeText(`${window.location.origin}${room.inviteUrl}`);
             notify(`입장 링크와 코드 ${room.inviteCode}를 복사했습니다.`);
@@ -506,7 +565,7 @@ export default function BolsaramApp({ initialInviteCode = "" }) {
 
       {modal === "candidate" && <Modal title="후보 등록" description="오픈채팅 문장을 붙여넣으면 주요 필드를 채웁니다." onClose={() => setModal(null)}><CandidateForm draft={candidateDraft} setDraft={setCandidateDraft} duplicate={duplicatePreview} onSubmit={saveCandidate} /></Modal>}
       {modal === "room" && <Modal title="방 생성" description="공개방은 로그인 사용자에게 보이고, 비공개방은 링크나 코드로 입장합니다." onClose={() => setModal(null)}><form onSubmit={createRoom}><Field label="방 이름"><input value={roomDraft.name} onChange={(event) => setRoomDraft({ ...roomDraft, name: event.target.value })} required placeholder="30대 초중반 소개팅방" /></Field><Field label="공개 설정"><select value={roomDraft.visibility} onChange={(event) => setRoomDraft({ ...roomDraft, visibility: event.target.value })}><option value="public">공개방</option><option value="private">비공개방</option></select></Field><div className="dialog-footer"><button className="text-button" type="button" onClick={() => setModal(null)}>취소</button><button className="primary-button" type="submit">생성</button></div></form></Modal>}
-      {modal === "join" && <Modal title="비공개방 입장" description="초대 링크의 코드 또는 전달받은 입장 코드를 입력하세요." onClose={() => setModal(null)}><form onSubmit={joinRoom}><Field label="입장 코드"><input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} required placeholder="AB12CD34" /></Field><div className="dialog-footer"><button className="text-button" type="button" onClick={() => setModal(null)}>취소</button><button className="primary-button" type="submit">입장</button></div></form></Modal>}
+      {modal === "join" && <JoinRoomModal mode={joinMode} setMode={setJoinMode} publicRooms={publicRooms} joinCode={joinCode} setJoinCode={setJoinCode} onJoinPrivate={joinRoom} onJoinPublic={joinPublicRoom} onRefreshPublic={loadPublicRooms} onClose={() => setModal(null)} />}
       <Toast message={toast} />
     </div>
   );
@@ -522,6 +581,61 @@ function Field({ label, children }) {
 
 function Stat({ label, value }) {
   return <div className="stat-row"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function RoomHome({ rooms, onOpen, onCreate, onJoin }) {
+  return <main className="room-home">
+    <section className="room-home-head">
+      <div>
+        <h2>입장중인 방</h2>
+        <p>{rooms.length}개 방</p>
+      </div>
+      <div className="room-home-actions">
+        <button className="secondary-button" type="button" onClick={onCreate}>방 생성</button>
+        <button className="primary-button" type="button" onClick={onJoin}>새로운 방 참가하기</button>
+      </div>
+    </section>
+    {rooms.length ? <div className="room-grid">
+      {rooms.map((item) => <button key={item.id} className="room-card" type="button" onClick={() => onOpen(item)}>
+        <div className="room-card-top">
+          <span className={`room-badge ${item.visibility === "private" ? "private" : ""}`}>{item.visibility === "private" ? "비공개" : "공개"}</span>
+          <span>{item.role === "owner" ? "소유자" : "멤버"}</span>
+        </div>
+        <h3>{item.name}</h3>
+        <div className="room-card-stats">
+          <span>후보 {item.candidateCount || 0}</span>
+          <span>멤버 {item.memberCount || 0}</span>
+        </div>
+      </button>)}
+    </div> : <div className="room-empty">
+      <h3>입장중인 방이 없습니다.</h3>
+      <div className="room-home-actions">
+        <button className="secondary-button" type="button" onClick={onCreate}>방 생성</button>
+        <button className="primary-button" type="button" onClick={onJoin}>새로운 방 참가하기</button>
+      </div>
+    </div>}
+  </main>;
+}
+
+function JoinRoomModal({ mode, setMode, publicRooms, joinCode, setJoinCode, onJoinPrivate, onJoinPublic, onRefreshPublic, onClose }) {
+  return <Modal title="새로운 방 참가하기" description="공개방 또는 비공개방" onClose={onClose}>
+    <div className="join-tabs">
+      <button className={`tab-button ${mode === "public" ? "active" : ""}`} type="button" onClick={() => { setMode("public"); onRefreshPublic().catch(() => {}); }}>공개방</button>
+      <button className={`tab-button ${mode === "private" ? "active" : ""}`} type="button" onClick={() => setMode("private")}>비공개방</button>
+    </div>
+    {mode === "public" ? <div className="public-room-list">
+      {publicRooms.length ? publicRooms.map((item) => <div key={item.id} className="public-room-row">
+        <div>
+          <h3>{item.name}</h3>
+          <p>후보 {item.candidateCount || 0} · 멤버 {item.memberCount || 0}</p>
+        </div>
+        <button className={item.isMember ? "secondary-button" : "primary-button"} type="button" onClick={() => onJoinPublic(item)}>{item.isMember ? "열기" : "입장"}</button>
+      </div>) : <div className="room-empty compact-empty"><h3>공개방이 없습니다.</h3><button className="secondary-button" type="button" onClick={() => onRefreshPublic().catch(() => {})}>새로고침</button></div>}
+    </div> : <form onSubmit={onJoinPrivate}>
+      <Field label="방 코드"><input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} required placeholder="AB12CD34" /></Field>
+      <div className="dialog-footer"><button className="text-button" type="button" onClick={onClose}>취소</button><button className="primary-button" type="submit">입장</button></div>
+    </form>}
+  </Modal>;
 }
 
 function InfoBlock({ title, rows }) {
