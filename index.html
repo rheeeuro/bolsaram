@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>볼사람(bolsaram)</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">M</div>
+          <div>
+            <h1>볼사람</h1>
+            <p>후보 구조화 · 조건 검토 · 진행 관리</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" id="resetButton" type="button" aria-label="샘플 데이터 복원" title="샘플 데이터 복원">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v6h6" /></svg>
+          </button>
+          <button class="primary-button" id="newCandidateButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+            후보 등록
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="filter-panel" aria-label="후보 필터">
+          <div class="panel-heading">
+            <h2>필터</h2>
+            <button class="text-button" id="clearFiltersButton" type="button">초기화</button>
+          </div>
+
+          <label class="field">
+            <span>검색</span>
+            <input id="searchInput" type="search" placeholder="지역, 직업, 취미, 메모" />
+          </label>
+
+          <label class="field">
+            <span>성별</span>
+            <select id="genderFilter">
+              <option value="all">전체</option>
+              <option value="남">남</option>
+              <option value="여">여</option>
+            </select>
+          </label>
+
+          <div class="range-grid">
+            <label class="field">
+              <span>최소 나이</span>
+              <input id="minAgeFilter" type="number" min="20" max="60" placeholder="30" />
+            </label>
+            <label class="field">
+              <span>최대 나이</span>
+              <input id="maxAgeFilter" type="number" min="20" max="60" placeholder="38" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>최소 키</span>
+            <input id="minHeightFilter" type="number" min="140" max="210" placeholder="160" />
+          </label>
+
+          <label class="field">
+            <span>지역</span>
+            <input id="regionFilter" type="text" placeholder="강남, 분당, 서울" />
+          </label>
+
+          <label class="field">
+            <span>직업군</span>
+            <select id="jobFilter">
+              <option value="all">전체</option>
+              <option value="금융">금융권</option>
+              <option value="대기업">대기업</option>
+              <option value="공무원">공무원</option>
+              <option value="IT">IT</option>
+              <option value="전문직">전문직</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>종교</span>
+            <select id="religionFilter">
+              <option value="all">전체</option>
+              <option value="무교">무교</option>
+              <option value="기독교">기독교</option>
+              <option value="천주교">천주교</option>
+              <option value="불교">불교</option>
+            </select>
+          </label>
+
+          <label class="field check-field">
+            <input id="nonSmokerFilter" type="checkbox" />
+            <span>비흡연만</span>
+          </label>
+
+          <label class="field">
+            <span>활동 상태</span>
+            <select id="statusFilter">
+              <option value="all">전체</option>
+              <option value="등록됨">등록됨</option>
+              <option value="소개 가능">소개 가능</option>
+              <option value="검토 중">검토 중</option>
+              <option value="제안 완료">제안 완료</option>
+              <option value="수락">수락</option>
+              <option value="연락처 교환">연락처 교환</option>
+              <option value="만남 예정">만남 예정</option>
+              <option value="만남 완료">만남 완료</option>
+              <option value="거절">거절</option>
+              <option value="보류">보류</option>
+              <option value="매칭 완료">매칭 완료</option>
+            </select>
+          </label>
+
+          <div class="stats-strip" id="statsStrip"></div>
+        </aside>
+
+        <section class="list-panel" aria-label="후보 리스트">
+          <div class="panel-heading">
+            <div>
+              <h2>후보자</h2>
+              <p id="resultCount">0명</p>
+            </div>
+            <div class="view-tabs" role="tablist" aria-label="리스트 보기">
+              <button class="tab-button active" type="button" data-sort="recent">최근</button>
+              <button class="tab-button" type="button" data-sort="score">추천순</button>
+            </div>
+          </div>
+          <div class="candidate-list" id="candidateList"></div>
+        </section>
+
+        <section class="detail-panel" aria-label="상세 관리">
+          <div class="detail-empty" id="emptyState">
+            <div class="empty-asset" aria-hidden="true">
+              <svg viewBox="0 0 180 120">
+                <rect x="18" y="18" width="64" height="84" rx="8" />
+                <rect x="98" y="28" width="64" height="64" rx="8" />
+                <path d="M48 47a13 13 0 1 0 0 .1" />
+                <path d="M32 84c8-16 25-16 33 0" />
+                <path d="M114 76h31" />
+                <path d="M114 55h25" />
+              </svg>
+            </div>
+            <h2>후보를 선택하세요</h2>
+          </div>
+
+          <div class="detail-content hidden" id="detailContent">
+            <div class="profile-header">
+              <div class="avatar large" id="detailAvatar"></div>
+              <div>
+                <div class="status-row">
+                  <h2 id="detailName"></h2>
+                  <span class="status-pill" id="detailStatus"></span>
+                </div>
+                <p id="detailSummary"></p>
+                <div class="tag-row" id="detailTags"></div>
+              </div>
+            </div>
+
+            <div class="detail-grid">
+              <div class="info-block">
+                <h3>프로필</h3>
+                <dl id="profileFacts"></dl>
+              </div>
+              <div class="info-block">
+                <h3>운영 체크</h3>
+                <div id="operatorChecks" class="check-list"></div>
+              </div>
+            </div>
+
+            <div class="status-editor">
+              <label class="field">
+                <span>진행 상태</span>
+                <select id="statusSelect"></select>
+              </label>
+              <button class="secondary-button" id="saveStatusButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                저장
+              </button>
+            </div>
+
+            <div class="section-heading">
+              <h3>추천 후보</h3>
+              <span>검토용 점수</span>
+            </div>
+            <div class="recommendation-list" id="recommendationList"></div>
+
+            <div class="section-heading">
+              <h3>진행 로그</h3>
+              <button class="secondary-button compact" id="addReviewLogButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+                검토 등록
+              </button>
+            </div>
+            <div class="timeline" id="timeline"></div>
+
+            <div class="section-heading">
+              <h3>카톡 공유글</h3>
+              <select id="toneSelect" class="compact-select">
+                <option value="clean">깔끔한 정보형</option>
+                <option value="natural">자연스러운 소개형</option>
+                <option value="openchat">오픈채팅용</option>
+                <option value="formal">격식 있는 소개형</option>
+              </select>
+            </div>
+            <textarea id="shareText" class="share-text" rows="8"></textarea>
+            <button class="primary-button full-width" id="copyShareButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              공유글 복사
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="candidate-dialog" id="candidateDialog">
+      <form method="dialog" class="candidate-form" id="candidateForm">
+        <div class="dialog-heading">
+          <div>
+            <h2>후보 등록</h2>
+            <p>오픈채팅 문장을 붙여넣으면 주요 필드를 채웁니다.</p>
+          </div>
+          <button class="icon-button" type="button" id="closeDialogButton" aria-label="닫기" title="닫기">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        </div>
+
+        <label class="field">
+          <span>카톡 원문</span>
+          <textarea id="rawTextInput" rows="4" placeholder="95년생 / 김포공항쪽 거주 / 키 163 / 연세대 학부졸 / 현대자동차 7년차 / ESFJ / 취미 헬스, 수영, 러닝"></textarea>
+        </label>
+        <div class="form-actions">
+          <button class="secondary-button" id="parseButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 16 4 4 14-14" /><path d="M4 4h7" /><path d="M4 9h4" /></svg>
+            자동 분리
+          </button>
+          <span id="duplicateNotice" class="notice"></span>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>이름 또는 별칭</span>
+            <input id="aliasInput" required placeholder="95년생 여성 A" />
+          </label>
+          <label class="field">
+            <span>성별</span>
+            <select id="genderInput" required>
+              <option value="여">여</option>
+              <option value="남">남</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>출생연도</span>
+            <input id="birthYearInput" type="number" min="1970" max="2006" required />
+          </label>
+          <label class="field">
+            <span>키</span>
+            <input id="heightInput" type="number" min="140" max="210" />
+          </label>
+          <label class="field">
+            <span>거주지</span>
+            <input id="locationInput" placeholder="김포공항역 인근" />
+          </label>
+          <label class="field">
+            <span>직장/직업</span>
+            <input id="jobInput" placeholder="현대자동차 7년차" />
+          </label>
+          <label class="field">
+            <span>학력</span>
+            <input id="educationInput" placeholder="연세대 학부졸" />
+          </label>
+          <label class="field">
+            <span>종교</span>
+            <select id="religionInput">
+              <option value="미입력">미입력</option>
+              <option value="무교">무교</option>
+              <option value="기독교">기독교</option>
+              <option value="천주교">천주교</option>
+              <option value="불교">불교</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>흡연</span>
+            <select id="smokeInput">
+              <option value="미입력">미입력</option>
+              <option value="비흡연">비흡연</option>
+              <option value="흡연">흡연</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>음주</span>
+            <select id="drinkInput">
+              <option value="미입력">미입력</option>
+              <option value="안함">안함</option>
+              <option value="가끔">가끔</option>
+              <option value="자주">자주</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>MBTI</span>
+            <input id="mbtiInput" placeholder="ESFJ" />
+          </label>
+          <label class="field">
+            <span>공개 범위</span>
+            <select id="privacyInput">
+              <option value="그룹 내 공개">그룹 내 공개</option>
+              <option value="전체 공개">전체 공개</option>
+              <option value="비공개">비공개</option>
+            </select>
+          </label>
+          <label class="field wide">
+            <span>성격</span>
+            <input id="personalityInput" placeholder="외향적, 긍정적" />
+          </label>
+          <label class="field wide">
+            <span>취미</span>
+            <input id="hobbiesInput" placeholder="헬스, 수영, 러닝" />
+          </label>
+          <label class="field wide">
+            <span>이상형</span>
+            <input id="idealInput" placeholder="배려심 있고 선한 사람" />
+          </label>
+          <label class="field wide">
+            <span>소개 메모</span>
+            <textarea id="memoInput" rows="3"></textarea>
+          </label>
+        </div>
+
+        <div class="dialog-footer">
+          <button class="text-button" type="button" id="cancelDialogButton">취소</button>
+          <button class="primary-button" value="default" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8" /><path d="M7 3v5h8" /></svg>
+            저장
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./src/app.js"></script>
+  </body>
+</html>
