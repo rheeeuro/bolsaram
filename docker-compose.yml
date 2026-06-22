@@ -1,0 +1,22 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: bolsaram_mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: bolsaram
+      MARIADB_USER: bolsaram_user
+      MARIADB_PASSWORD: bolsaram0711
+      MARIADB_ROOT_PASSWORD: root0711
+    ports:
+      - "0.0.0.0:3308:3306"
+    volumes:
+      - bolsaram_mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+volumes:
+  bolsaram_mariadb_data:

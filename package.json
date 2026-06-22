@@ -2,12 +2,16 @@
   "name": "bolsaram",
   "version": "0.1.0",
   "private": true,
-  "description": "볼사람(bolsaram): 소개팅 주선자를 위한 후보 정보 관리, 추천, 진행 상태 체크 프로토타입",
+  "description": "볼사람(bolsaram): Next.js와 FastAPI 기반 소개팅 후보 관리 웹 애플리케이션",
   "type": "module",
   "scripts": {
-    "start": "node scripts/server.mjs",
-    "dev": "node scripts/server.mjs",
-    "check": "node --check src/app.js && node --check scripts/server.mjs"
+    "db:up": "docker compose up -d mariadb",
+    "db:logs": "docker compose logs -f mariadb",
+    "dev": "npm --prefix frontend run dev",
+    "dev:api": "backend/.venv/bin/python -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8010",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "check": "backend/.venv/bin/python -m py_compile backend/app/main.py && npm --prefix frontend run build"
   },
   "keywords": [
     "bolsaram",

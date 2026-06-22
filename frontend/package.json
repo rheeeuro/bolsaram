@@ -1,0 +1,20 @@
+{
+  "name": "bolsaram-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "볼사람(bolsaram) Next.js frontend",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3020",
+    "build": "next build",
+    "start": "next start -p 3020"
+  },
+  "dependencies": {
+    "next": "^16.2.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
+  }
+}
