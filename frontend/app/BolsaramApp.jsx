@@ -23,7 +23,6 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
   const [editingId, setEditingId] = useState(null);
   const [roomDraft, setRoomDraft] = useState({ name: "", visibility: "public" });
   const [joinCode, setJoinCode] = useState(initialInviteCode);
-  const [joinMode, setJoinMode] = useState("public");
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
   const [tone, setTone] = useState("clean");
@@ -68,12 +67,6 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
   const loadPublicRooms = async () => {
     const payload = await api("/api/rooms/public");
     setPublicRooms(payload.rooms);
-  };
-
-  const openJoinModal = () => {
-    setJoinMode("public");
-    setModal("join");
-    loadPublicRooms().catch((error) => notify(error.message));
   };
 
   const startApp = async (currentUser, code = joinCode, roomId = initialRoomId) => {
@@ -443,10 +436,18 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
       <div className="app-shell">
         <AppBar user={user} onLogout={logout} />
 
-        <RoomHome rooms={rooms} onOpen={(targetRoom) => loadRoomState(targetRoom.id).catch((error) => notify(error.message))} onCreate={() => setModal("room")} onJoin={openJoinModal} />
+        <RoomHome
+          rooms={rooms}
+          publicRooms={publicRooms}
+          onOpen={(targetRoom) => loadRoomState(targetRoom.id).catch((error) => notify(error.message))}
+          onEnterPublic={joinPublicRoom}
+          onLoadPublic={() => loadPublicRooms().catch((error) => notify(error.message))}
+          onCreate={() => setModal("room")}
+          onJoinPrivate={() => setModal("joinPrivate")}
+        />
 
         {modal === "room" && <Modal title="방 생성" description="공개방은 로그인 사용자에게 보이고, 비공개방은 링크나 코드로 입장합니다." onClose={() => setModal(null)}><form onSubmit={createRoom}><Field label="방 이름"><input value={roomDraft.name} onChange={(event) => setRoomDraft({ ...roomDraft, name: event.target.value })} required placeholder="30대 초중반 소개팅방" /></Field><Field label="공개 설정"><select value={roomDraft.visibility} onChange={(event) => setRoomDraft({ ...roomDraft, visibility: event.target.value })}><option value="public">공개방</option><option value="private">비공개방</option></select></Field><div className="dialog-footer"><button className="text-button" type="button" onClick={() => setModal(null)}>취소</button><button className="primary-button" type="submit">생성</button></div></form></Modal>}
-        {modal === "join" && <JoinRoomModal mode={joinMode} setMode={setJoinMode} publicRooms={publicRooms} joinCode={joinCode} setJoinCode={setJoinCode} onJoinPrivate={joinRoom} onJoinPublic={joinPublicRoom} onRefreshPublic={loadPublicRooms} onClose={() => setModal(null)} />}
+        {modal === "joinPrivate" && <PrivateJoinModal joinCode={joinCode} setJoinCode={setJoinCode} onSubmit={joinRoom} onClose={() => setModal(null)} />}
         <Toast message={toast} />
       </div>
     );
@@ -541,8 +542,6 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
 
       {modal === "candidate" && <Modal title={editingId ? "후보 수정" : "후보 등록"} description={editingId ? "후보 정보를 수정합니다." : "오픈채팅 문장을 붙여넣으면 주요 필드를 채웁니다."} onClose={() => { setModal(null); setEditingId(null); setCandidateDraft(emptyCandidate); }}><CandidateForm draft={candidateDraft} setDraft={setCandidateDraft} duplicate={duplicatePreview} onSubmit={saveCandidate} editing={Boolean(editingId)} /></Modal>}
       {modal === "members" && <MembersModal members={members} isOwner={room?.role === "owner"} onChangeRole={changeRole} onClose={() => setModal(null)} />}
-      {modal === "room" && <Modal title="방 생성" description="공개방은 로그인 사용자에게 보이고, 비공개방은 링크나 코드로 입장합니다." onClose={() => setModal(null)}><form onSubmit={createRoom}><Field label="방 이름"><input value={roomDraft.name} onChange={(event) => setRoomDraft({ ...roomDraft, name: event.target.value })} required placeholder="30대 초중반 소개팅방" /></Field><Field label="공개 설정"><select value={roomDraft.visibility} onChange={(event) => setRoomDraft({ ...roomDraft, visibility: event.target.value })}><option value="public">공개방</option><option value="private">비공개방</option></select></Field><div className="dialog-footer"><button className="text-button" type="button" onClick={() => setModal(null)}>취소</button><button className="primary-button" type="submit">생성</button></div></form></Modal>}
-      {modal === "join" && <JoinRoomModal mode={joinMode} setMode={setJoinMode} publicRooms={publicRooms} joinCode={joinCode} setJoinCode={setJoinCode} onJoinPrivate={joinRoom} onJoinPublic={joinPublicRoom} onRefreshPublic={loadPublicRooms} onClose={() => setModal(null)} />}
       <Toast message={toast} />
     </div>
   );
@@ -576,37 +575,91 @@ function Stat({ label, value }) {
   return <div className="stat-row"><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function RoomHome({ rooms, onOpen, onCreate, onJoin }) {
+function RoomHome({ rooms, publicRooms, onOpen, onEnterPublic, onLoadPublic, onCreate, onJoinPrivate }) {
+  const [tab, setTab] = useState("mine");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("candidates");
+
+  useEffect(() => {
+    if (tab === "explore") onLoadPublic();
+  }, [tab]);
+
+  const filteredPublic = useMemo(() => {
+    const rows = publicRooms.filter((item) => !search || normalize(item.name).includes(normalize(search)));
+    return [...rows].sort((a, b) => {
+      if (sort === "members") return (b.memberCount || 0) - (a.memberCount || 0);
+      if (sort === "name") return a.name.localeCompare(b.name);
+      return (b.candidateCount || 0) - (a.candidateCount || 0);
+    });
+  }, [publicRooms, search, sort]);
+
   return <main className="room-home">
     <section className="room-home-head">
       <div>
-        <h2>입장중인 방</h2>
-        <p>{rooms.length}개 방</p>
+        <h2>방</h2>
+        <p>입장 중인 방을 열거나 새 공개방을 탐색하세요</p>
       </div>
       <div className="room-home-actions">
-        <button className="secondary-button" type="button" onClick={onCreate}>방 생성</button>
-        <button className="primary-button" type="button" onClick={onJoin}>새로운 방 참가하기</button>
+        <button className="ghost-button" type="button" onClick={onJoinPrivate}>코드로 입장</button>
+        <button className="primary-button" type="button" onClick={onCreate}>＋ 방 생성</button>
       </div>
     </section>
-    {rooms.length ? <div className="room-grid">
-      {rooms.map((item) => <button key={item.id} className="room-card" type="button" onClick={() => onOpen(item)}>
-        <div className="room-card-top">
-          <span className={`room-badge ${item.visibility === "private" ? "private" : ""}`}>{item.visibility === "private" ? "비공개" : "공개"}</span>
-          <span>{item.role === "owner" ? "소유자" : "멤버"}</span>
+
+    <div className="room-tabs">
+      <button className={`tab-button ${tab === "mine" ? "active" : ""}`} type="button" onClick={() => setTab("mine")}>방 목록 <span className="tab-count">{rooms.length}</span></button>
+      <button className={`tab-button ${tab === "explore" ? "active" : ""}`} type="button" onClick={() => setTab("explore")}>탐색</button>
+    </div>
+
+    {tab === "mine" ? (
+      rooms.length ? <div className="room-grid">
+        {rooms.map((item) => <button key={item.id} className="room-card" type="button" onClick={() => onOpen(item)}>
+          <div className="room-card-top">
+            <span className={`room-badge ${item.visibility === "private" ? "private" : ""}`}>{item.visibility === "private" ? "🔒 비공개" : "공개"}</span>
+            <span>{item.role === "owner" ? "소유자" : ROLE_LABELS[item.role] || "멤버"}</span>
+          </div>
+          <h3>{item.name}</h3>
+          <div className="room-card-stats">
+            <span>후보 {item.candidateCount || 0}</span>
+            <span>멤버 {item.memberCount || 0}</span>
+          </div>
+        </button>)}
+      </div> : <div className="room-empty">
+        <h3>입장 중인 방이 없습니다.</h3>
+        <p>방을 새로 만들거나 탐색 탭에서 공개방에 입장하세요.</p>
+        <div className="room-home-actions">
+          <button className="ghost-button" type="button" onClick={() => setTab("explore")}>공개방 탐색</button>
+          <button className="primary-button" type="button" onClick={onCreate}>＋ 방 생성</button>
         </div>
-        <h3>{item.name}</h3>
-        <div className="room-card-stats">
-          <span>후보 {item.candidateCount || 0}</span>
-          <span>멤버 {item.memberCount || 0}</span>
-        </div>
-      </button>)}
-    </div> : <div className="room-empty">
-      <h3>입장중인 방이 없습니다.</h3>
-      <div className="room-home-actions">
-        <button className="secondary-button" type="button" onClick={onCreate}>방 생성</button>
-        <button className="primary-button" type="button" onClick={onJoin}>새로운 방 참가하기</button>
       </div>
-    </div>}
+    ) : (
+      <>
+        <div className="explore-bar">
+          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="공개방 이름 검색" />
+          <select value={sort} onChange={(event) => setSort(event.target.value)}>
+            <option value="candidates">후보 많은 순</option>
+            <option value="members">멤버 많은 순</option>
+            <option value="name">이름순</option>
+          </select>
+        </div>
+        {filteredPublic.length ? <div className="room-grid">
+          {filteredPublic.map((item) => <div key={item.id} className="room-card explore-card">
+            <div className="room-card-top">
+              <span className="room-badge">공개</span>
+              {item.isMember && <span>입장됨</span>}
+            </div>
+            <h3>{item.name}</h3>
+            <div className="room-card-stats">
+              <span>후보 {item.candidateCount || 0}</span>
+              <span>멤버 {item.memberCount || 0}</span>
+            </div>
+            <button className={`${item.isMember ? "secondary-button" : "primary-button"} full-width`} type="button" onClick={() => onEnterPublic(item)}>{item.isMember ? "열기" : "입장"}</button>
+          </div>)}
+        </div> : <div className="room-empty compact-empty">
+          <h3>{search ? "검색 결과가 없습니다." : "공개방이 없습니다."}</h3>
+          <button className="ghost-button" type="button" onClick={onLoadPublic}>새로고침</button>
+        </div>}
+      </>
+    )}
   </main>;
 }
 
@@ -708,24 +761,12 @@ function MatchBoard({ matches, candidates, onStatus, onOpenCandidates, canWrite 
   </main>;
 }
 
-function JoinRoomModal({ mode, setMode, publicRooms, joinCode, setJoinCode, onJoinPrivate, onJoinPublic, onRefreshPublic, onClose }) {
-  return <Modal title="새로운 방 참가하기" description="공개방 또는 비공개방" onClose={onClose}>
-    <div className="join-tabs">
-      <button className={`tab-button ${mode === "public" ? "active" : ""}`} type="button" onClick={() => { setMode("public"); onRefreshPublic().catch(() => {}); }}>공개방</button>
-      <button className={`tab-button ${mode === "private" ? "active" : ""}`} type="button" onClick={() => setMode("private")}>비공개방</button>
-    </div>
-    {mode === "public" ? <div className="public-room-list">
-      {publicRooms.length ? publicRooms.map((item) => <div key={item.id} className="public-room-row">
-        <div>
-          <h3>{item.name}</h3>
-          <p>후보 {item.candidateCount || 0} · 멤버 {item.memberCount || 0}</p>
-        </div>
-        <button className={item.isMember ? "secondary-button" : "primary-button"} type="button" onClick={() => onJoinPublic(item)}>{item.isMember ? "열기" : "입장"}</button>
-      </div>) : <div className="room-empty compact-empty"><h3>공개방이 없습니다.</h3><button className="secondary-button" type="button" onClick={() => onRefreshPublic().catch(() => {})}>새로고침</button></div>}
-    </div> : <form onSubmit={onJoinPrivate}>
+function PrivateJoinModal({ joinCode, setJoinCode, onSubmit, onClose }) {
+  return <Modal title="코드로 입장" description="비공개방 입장 코드 또는 초대 링크의 코드를 입력하세요." onClose={onClose}>
+    <form onSubmit={onSubmit}>
       <Field label="방 코드"><input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} required placeholder="AB12CD34" /></Field>
       <div className="dialog-footer"><button className="text-button" type="button" onClick={onClose}>취소</button><button className="primary-button" type="submit">입장</button></div>
-    </form>}
+    </form>
   </Modal>;
 }
 

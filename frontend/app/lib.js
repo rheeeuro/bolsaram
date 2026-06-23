@@ -170,35 +170,133 @@ export function detectPrivacyRisks(text) {
   return PRIVACY_CHECKS.filter((check) => check.re.test(value)).map((check) => check.label);
 }
 
+// "라벨 : 값" 형식에서 라벨을 인식하기 위한 매핑. 앞쪽 항목이 우선합니다.
+const PROFILE_LABELS = [
+  { field: "location", keys: ["거주지", "거주", "사는곳", "지역", "위치", "동네"] },
+  { field: "job", keys: ["직장", "직업", "회사", "하는일", "업종", "근무"] },
+  { field: "education", keys: ["학력", "학교", "전공", "최종학력"] },
+  { field: "height", keys: ["키", "신장"] },
+  { field: "birthYear", keys: ["나이", "출생연도", "출생", "생년", "연령"] },
+  { field: "mbti", keys: ["mbti", "엠비티아이"] },
+  { field: "ideal", keys: ["이상형", "선호스타일", "원하는상대", "선호"] },
+  { field: "hobbies", keys: ["취미", "관심사"] },
+  { field: "personality", keys: ["성격", "성향"] },
+  { field: "religion", keys: ["종교"] },
+  { field: "smoke", keys: ["흡연", "담배"] },
+  { field: "drink", keys: ["음주", "술"] },
+  { field: "gender", keys: ["성별"] },
+  { field: "alias", keys: ["이름", "별칭", "닉네임", "별명"] },
+  { field: "contact", keys: ["연락처", "전화번호", "전화", "카톡아이디", "연락"] },
+  { field: "memo", keys: ["메모", "특이사항", "비고", "기타"] },
+];
+
+function birthYearFromValue(value) {
+  const explicit = value.match(/(\d{4})\s*년?생?/);
+  if (explicit) return Number(explicit[1]);
+  const short = value.match(/(\d{2})\s*년생/);
+  if (short) {
+    const year = Number(short[1]);
+    return year > 40 ? 1900 + year : 2000 + year;
+  }
+  const ageMatch = value.match(/(\d{1,2})\s*(?:세|살)?/);
+  if (ageMatch) return CURRENT_YEAR - Number(ageMatch[1]);
+  return null;
+}
+
+function assignProfileField(result, field, rawValue) {
+  const value = String(rawValue).trim();
+  if (!value) return;
+  switch (field) {
+    case "height": {
+      const match = value.match(/(\d{2,3})/);
+      if (match) result.height = Number(match[1]);
+      break;
+    }
+    case "birthYear": {
+      const year = birthYearFromValue(value);
+      if (year) result.birthYear = year;
+      break;
+    }
+    case "religion":
+      result.religion = value.match(/무교|기독교|천주교|불교/)?.[0] || value;
+      break;
+    case "smoke":
+      result.smoke = /비흡연|안\s*피|금연/.test(value) ? "비흡연" : "흡연";
+      break;
+    case "drink":
+      result.drink = /안\s*함|안\s*마|못\s*마|금주/.test(value) ? "안함" : /자주|즐/.test(value) ? "자주" : "가끔";
+      break;
+    case "gender":
+      if (/남/.test(value)) result.gender = "남";
+      else if (/여/.test(value)) result.gender = "여";
+      break;
+    case "mbti": {
+      const match = value.match(/[EI][NS][FT][JP]/i);
+      result.mbti = match ? match[0].toUpperCase() : value.toUpperCase();
+      break;
+    }
+    default:
+      result[field] = value;
+  }
+}
+
 export function parseRawProfile(raw) {
   const text = raw.replace(/\n/g, " / ");
   const chunks = text.split("/").map((chunk) => chunk.trim()).filter(Boolean);
   const result = {};
-  const yearMatch = text.match(/(\d{2,4})\s*년생/);
-  if (yearMatch) {
-    const year = Number(yearMatch[1]);
-    result.birthYear = year < 100 ? (year > 40 ? 1900 + year : 2000 + year) : year;
-  } else {
-    const ageMatch = text.match(/(\d{2})\s*세/);
-    if (ageMatch) result.birthYear = CURRENT_YEAR - Number(ageMatch[1]);
-  }
-  const heightMatch = text.match(/(?:^|[^\d])(?:키\s*)?(\d{3})(?!\d)\s*(?:cm|센치)?/i);
-  if (heightMatch) result.height = Number(heightMatch[1]);
-  const mbtiMatch = text.match(/\b[EI][NS][FT][JP]\b/i);
-  if (mbtiMatch) result.mbti = mbtiMatch[0].toUpperCase();
-  if (/남성| 남 |남자/.test(text)) result.gender = "남";
-  if (/여성| 여 |여자/.test(text)) result.gender = "여";
+  const unlabeled = [];
 
+  // 1) "라벨 : 값" 형식 우선 처리
   chunks.forEach((chunk) => {
-    if (/거주|인근|쪽|[가-힣]동(?![가-힣])|[가-힣]구(?![가-힣])|역|분당|판교|강남|마포|김포/.test(chunk)) result.location = chunk.replace(/거주\s*중?|거주|인근/g, "").trim();
-    else if (/[가-힣]대(?![가-힣])|학부|졸|석사|박사|학과/.test(chunk)) result.education = chunk;
-    else if (/취미/.test(chunk)) result.hobbies = chunk.replace(/취미[:\s]*/g, "").trim();
-    else if (/성격|외향|내향|긍정|차분|신중|밝|다정/.test(chunk)) result.personality = chunk.replace(/성격|인|이고|적인|편/g, " ").replace(/\s+/g, " ").trim();
-    else if (/무교|기독교|천주교|불교/.test(chunk)) result.religion = chunk.match(/무교|기독교|천주교|불교/)?.[0];
-    else if (/흡연|비흡연/.test(chunk)) result.smoke = chunk.includes("비흡연") ? "비흡연" : "흡연";
-    else if (/음주|술/.test(chunk)) result.drink = /안\s*함|안\s*마|못\s*마/.test(chunk) ? "안함" : /자주|즐/.test(chunk) ? "자주" : "가끔";
-    else if (/년차|은행|자동차|보험|공무원|회사|개발|기획|변호사|로펌|직장/.test(chunk)) result.job = chunk;
+    const match = chunk.match(/^([^:：]{1,12})[:：]\s*(.+)$/);
+    if (match) {
+      const label = normalize(match[1]);
+      const entry = PROFILE_LABELS.find((item) => item.keys.some((key) => label.includes(normalize(key))));
+      if (entry) {
+        assignProfileField(result, entry.field, match[2]);
+        return;
+      }
+    }
+    unlabeled.push(chunk);
   });
+
+  // 2) 라벨이 없는 부분에서 전체 추출(이미 채워진 값은 보존)
+  const restText = unlabeled.join(" / ");
+  if (!result.birthYear) {
+    const yearMatch = restText.match(/(\d{2,4})\s*년생/);
+    if (yearMatch) {
+      const year = Number(yearMatch[1]);
+      result.birthYear = year < 100 ? (year > 40 ? 1900 + year : 2000 + year) : year;
+    } else {
+      const ageMatch = restText.match(/(\d{1,2})\s*(?:세|살)/);
+      if (ageMatch) result.birthYear = CURRENT_YEAR - Number(ageMatch[1]);
+    }
+  }
+  if (!result.height) {
+    const heightMatch = restText.match(/(?:^|[^\d])(?:키\s*)?(\d{3})(?!\d)\s*(?:cm|센치)?/i);
+    if (heightMatch) result.height = Number(heightMatch[1]);
+  }
+  if (!result.mbti) {
+    const mbtiMatch = restText.match(/\b[EI][NS][FT][JP]\b/i);
+    if (mbtiMatch) result.mbti = mbtiMatch[0].toUpperCase();
+  }
+  if (!result.gender) {
+    if (/남성| 남 |남자/.test(text)) result.gender = "남";
+    if (/여성| 여 |여자/.test(text)) result.gender = "여";
+  }
+
+  // 3) 라벨 없는 조각의 키워드 기반 분류(이미 채워진 값은 보존)
+  unlabeled.forEach((chunk) => {
+    if (!result.location && /거주|인근|쪽|[가-힣]동(?![가-힣])|[가-힣]구(?![가-힣])|역|분당|판교|강남|마포|김포/.test(chunk)) result.location = chunk.replace(/거주\s*중?|인근/g, "").trim();
+    else if (!result.education && /[가-힣]대(?![가-힣])|학부|졸|석사|박사|학과/.test(chunk)) result.education = chunk;
+    else if (!result.hobbies && /취미/.test(chunk)) result.hobbies = chunk.replace(/취미[:\s]*/g, "").trim();
+    else if (!result.personality && /성격|외향|내향|긍정|차분|신중|밝|다정/.test(chunk)) result.personality = chunk.replace(/성격|인|이고|적인|편/g, " ").replace(/\s+/g, " ").trim();
+    else if (!result.religion && /무교|기독교|천주교|불교/.test(chunk)) result.religion = chunk.match(/무교|기독교|천주교|불교/)?.[0];
+    else if (!result.smoke && /흡연|비흡연/.test(chunk)) result.smoke = chunk.includes("비흡연") ? "비흡연" : "흡연";
+    else if (!result.drink && /음주|술/.test(chunk)) result.drink = /안\s*함|안\s*마|못\s*마/.test(chunk) ? "안함" : /자주|즐/.test(chunk) ? "자주" : "가끔";
+    else if (!result.job && /년차|은행|자동차|보험|공무원|회사|개발|기획|변호사|로펌|직장/.test(chunk)) result.job = chunk;
+  });
+
   if (!result.alias && result.birthYear) result.alias = `${String(result.birthYear).slice(2)}년생 ${result.gender || "여"}성 신규`;
   return result;
 }
