@@ -6,49 +6,49 @@
   color-scheme: light;
 
   /* 배경 / 표면 */
-  --bg: #f5f1e8;
-  --bg-grad: radial-gradient(1200px 600px at 12% -8%, #fbf6ec 0%, rgba(251, 246, 236, 0) 60%),
-             radial-gradient(1000px 560px at 100% 0%, #f1efe9 0%, rgba(241, 239, 233, 0) 55%),
-             #f5f1e8;
+  --bg: #f5f4ef;
+  --bg-grad: radial-gradient(1200px 620px at 14% -10%, #f9f8f3 0%, rgba(249, 248, 243, 0) 60%),
+             radial-gradient(1000px 560px at 100% 0%, #eef4f1 0%, rgba(238, 244, 241, 0) 55%),
+             #f5f4ef;
   --surface: #ffffff;
-  --surface-2: #faf7f0;
-  --surface-3: #f2eee3;
+  --surface-2: #f5f7f3;
+  --surface-3: #e9ebe2;
 
   /* 텍스트 */
-  --ink: #2a2620;
-  --ink-soft: #514b41;
-  --muted: #8b8475;
-  --faint: #aaa291;
+  --ink: #202521;
+  --ink-soft: #46504a;
+  --muted: #667066;
+  --faint: #98a298;
 
   /* 경계선 */
-  --line: #ebe5d8;
-  --line-strong: #ddd5c4;
+  --line: #d9ded4;
+  --line-strong: #c7cec1;
 
   /* 브랜드 — 세이지 그린 */
   --green: #2f7d69;
-  --green-hover: #266655;
-  --green-ink: #1d5244;
-  --green-soft: #e6f1ec;
-  --green-soft-2: #d7ebe2;
+  --green-hover: #25664f;
+  --green-ink: #1f604f;
+  --green-soft: #e8f1ed;
+  --green-soft-2: #d6e8df;
 
-  /* 액센트 — 따뜻한 테라코타 */
-  --coral: #cf7355;
-  --coral-ink: #a04727;
-  --coral-soft: #fae9df;
+  /* 액센트 — 코랄 */
+  --coral: #c7604d;
+  --coral-ink: #7c3328;
+  --coral-soft: #f8e8e3;
 
   /* 상태 */
-  --amber: #b07d1c;
-  --amber-soft: #f9efd4;
-  --blue: #3d6da0;
-  --blue-soft: #e6eef6;
-  --danger: #c2453d;
-  --danger-soft: #fae3e1;
+  --amber: #a87620;
+  --amber-soft: #f6ecd6;
+  --blue: #386fa4;
+  --blue-soft: #e7eef6;
+  --danger: #b3403a;
+  --danger-soft: #fdf3f1;
 
   /* 그림자 */
-  --shadow-xs: 0 1px 2px rgba(46, 40, 31, 0.05);
-  --shadow-sm: 0 2px 8px -2px rgba(46, 40, 31, 0.10);
-  --shadow: 0 14px 34px -16px rgba(46, 40, 31, 0.28);
-  --shadow-lg: 0 28px 60px -24px rgba(46, 40, 31, 0.34);
+  --shadow-xs: 0 1px 2px rgba(35, 44, 39, 0.05);
+  --shadow-sm: 0 2px 8px -2px rgba(35, 44, 39, 0.10);
+  --shadow: 0 14px 34px -16px rgba(35, 44, 39, 0.24);
+  --shadow-lg: 0 28px 60px -24px rgba(35, 44, 39, 0.30);
   --ring: 0 0 0 3px rgba(47, 125, 105, 0.16);
 
   /* 곡률 */
@@ -878,7 +878,7 @@ select:disabled {
   bottom: 5px;
   padding: 1px 7px;
   border-radius: var(--r-pill);
-  background: rgba(20, 18, 14, 0.72);
+  background: rgba(28, 34, 30, 0.72);
   color: #fff;
   font-size: 10px;
   font-weight: 800;
@@ -891,7 +891,7 @@ select:disabled {
   height: 22px;
   border: 0;
   border-radius: var(--r-pill);
-  background: rgba(20, 18, 14, 0.6);
+  background: rgba(28, 34, 30, 0.6);
   color: #fff;
   font-size: 15px;
   line-height: 1;
@@ -1131,8 +1131,8 @@ dl {
   padding: 12px 14px;
   border-radius: var(--r-sm);
   background: var(--danger-soft);
-  border: 1px solid #e6a8a3;
-  color: #8c2f2a;
+  border: 1px solid #e0a39d;
+  color: #8a2622;
   font-size: 12.5px;
   line-height: 1.5;
 }
@@ -1186,7 +1186,7 @@ dl {
   border-color: var(--line-strong);
 }
 .metric-card.alert {
-  border-color: #e6a8a3;
+  border-color: #e0a39d;
   background: linear-gradient(160deg, var(--danger-soft) 0%, var(--surface) 70%);
 }
 .metric-value {
@@ -1196,7 +1196,7 @@ dl {
   line-height: 1;
 }
 .metric-card.alert .metric-value {
-  color: #8c2f2a;
+  color: #8a2622;
 }
 .metric-label {
   font-size: 13px;
@@ -1513,7 +1513,7 @@ dl {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(28, 24, 18, 0.46);
+  background: rgba(28, 34, 30, 0.44);
   backdrop-filter: blur(3px);
   animation: backdrop-in 160ms ease;
 }
@@ -1596,8 +1596,8 @@ dl {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(900px 540px at 18% 0%, #e7f1ec 0%, rgba(231, 241, 236, 0) 60%),
-    radial-gradient(800px 520px at 92% 100%, #fae9df 0%, rgba(250, 233, 223, 0) 58%),
+    radial-gradient(900px 540px at 18% 0%, #eef4f1 0%, rgba(238, 244, 241, 0) 60%),
+    radial-gradient(800px 520px at 92% 100%, #f7ece8 0%, rgba(247, 236, 232, 0) 58%),
     var(--bg);
 }
 .auth-panel {
