@@ -358,6 +358,78 @@ p {
   font-size: 26px;
 }
 
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.photo-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #edf0e9;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-flag {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.photo-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photo-add {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius);
+  border: 1px dashed #b6c0b0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.photo-add input {
+  display: none;
+}
+
 .card-main {
   min-width: 0;
 }
@@ -457,10 +529,39 @@ p {
 
 .profile-header {
   display: grid;
-  grid-template-columns: 74px 1fr;
+  grid-template-columns: 74px 1fr auto;
   gap: 14px;
   align-items: center;
   margin-bottom: 18px;
+}
+
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.tag.risk {
+  color: #8a2622;
+  background: #f7dcd8;
+}
+
+.text-button.danger {
+  color: #b3403a;
+}
+
+.consent-field {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: #f4f6f1;
+  align-items: flex-start;
+  line-height: 1.45;
+}
+
+.consent-field input {
+  margin-top: 2px;
 }
 
 .status-row {
@@ -1072,10 +1173,262 @@ select:disabled {
   margin-top: 4px;
 }
 
+.room-badge.viewer {
+  background: #efeee8;
+  color: var(--muted);
+}
+
+.member-list {
+  display: grid;
+  gap: 8px;
+}
+
+.member-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.member-row p {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.member-row select {
+  min-height: 34px;
+}
+
+.privacy-warning {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #fdf3f1;
+  border: 1px solid #e0a39d;
+  color: #8a2622;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.privacy-warning strong {
+  font-weight: 900;
+}
+
+.clean-toggle {
+  margin: 10px 0;
+}
+
+.dashboard {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+}
+
+.metric-card.alert {
+  border-color: #e0a39d;
+  background: #fdf3f1;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--green-dark);
+}
+
+.metric-card.alert .metric-value {
+  color: #8a2622;
+}
+
+.metric-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.dashboard-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.breakdown-list {
+  display: grid;
+  gap: 6px;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.dashboard-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 0;
+}
+
+.workspace-tabs .tab-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 800;
+}
+
+.workspace-tabs .tab-button.active {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+}
+
+.match-board {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  overflow-x: auto;
+  min-height: calc(100vh - 113px);
+  align-items: flex-start;
+}
+
+.match-board.empty {
+  display: block;
+}
+
+.board-column {
+  flex: 0 0 240px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+.board-column-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.board-column-head h3 {
+  font-size: 13px;
+}
+
+.board-column-head span {
+  min-width: 22px;
+  text-align: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e7e7df;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.board-cards {
+  display: grid;
+  gap: 8px;
+}
+
+.board-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.board-card-pair {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.board-card-pair .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.board-card-link {
+  color: var(--muted);
+}
+
+.board-card-score {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--green-dark);
+}
+
+.board-card-reason {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.board-card-contact {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  background: #e8f1ed;
+  color: var(--green-dark);
+}
+
+.board-card-contact.locked {
+  background: #efeee8;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.board-card select {
+  width: 100%;
+  min-height: 32px;
+  font-size: 12px;
+}
+
 @media (max-width: 760px) {
   .room-home {
     width: auto;
     padding: 20px 16px 36px;
+  }
+
+  .dashboard-cols {
+    grid-template-columns: 1fr;
   }
 
   .room-home-head,

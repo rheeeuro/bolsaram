@@ -19,5 +19,13 @@ module.exports = {
         FRONTEND_ORIGINS: "http://localhost:3020,http://127.0.0.1:3020",
       },
     },
+    {
+      name: "bolsaram-maintenance",
+      cwd: ".",
+      script: "backend/.venv/bin/python",
+      args: "-m backend.app.maintenance",
+      autorestart: false,
+      cron_restart: "0 4 * * *",
+    },
   ],
 };

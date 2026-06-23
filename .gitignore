@@ -6,3 +6,6 @@ coverage/
 dist/
 .venv/
 .next/
+uploads/
+__pycache__/
+*.pyc

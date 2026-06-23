@@ -6,17 +6,32 @@ import hmac
 import os
 import secrets
 from contextlib import contextmanager
+from io import BytesIO
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pymysql
-from fastapi import Cookie, FastAPI, HTTPException, Response
+from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, EmailStr, Field
+
+from .matching import match_score
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 SCHEMA_SQL_PATH = BASE_DIR / "sql" / "schema.sql"
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", str(BASE_DIR / "uploads")))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+IMAGE_EXTENSIONS = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+WATERMARK_FONT_PATH = os.getenv("WATERMARK_FONT", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 
 DB_CONFIG = {
     "host": os.getenv("DB_HOST", "127.0.0.1"),
@@ -46,6 +61,26 @@ STATUSES = [
     "보류",
     "매칭 완료",
 ]
+MATCH_STATUSES = [
+    "추천됨",
+    "제안 완료",
+    "수락",
+    "연락처 교환",
+    "만남 예정",
+    "완료",
+    "거절",
+]
+PLAN_LIMITS = {
+    "free": {"rooms": 1, "candidates": 30},
+    "pro": {"rooms": 5, "candidates": 300},
+    "group": {"rooms": 20, "candidates": 1000},
+}
+WRITE_ROLES = {"owner", "admin", "member"}
+ASSIGNABLE_ROLES = {"admin", "member", "viewer"}
+
+
+def plan_limits(plan: str | None) -> dict[str, int]:
+    return PLAN_LIMITS.get(plan or "free", PLAN_LIMITS["free"])
 
 SAMPLE_CANDIDATES = [
     {
@@ -138,6 +173,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 class SignupPayload(BaseModel):
@@ -183,6 +219,8 @@ class CandidatePayload(BaseModel):
     privacy: str = "그룹 내 공개"
     status: str = "등록됨"
     color: str | None = None
+    consent: bool = False
+    contact: str = ""
 
 
 class StatusPayload(BaseModel):
@@ -192,6 +230,19 @@ class StatusPayload(BaseModel):
 class LogPayload(BaseModel):
     candidateId: int
     otherId: int | None = None
+
+
+class MatchPayload(BaseModel):
+    candidateAId: int
+    candidateBId: int
+
+
+class MatchStatusPayload(BaseModel):
+    status: str
+
+
+class RolePayload(BaseModel):
+    role: str
 
 
 @contextmanager
@@ -254,7 +305,13 @@ def iso(value: Any) -> str:
 
 
 def today_label() -> str:
-    return datetime.now().strftime("%Y.%m.%d")
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def date_label(value: Any) -> str:
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d")
+    return str(value).replace(".", "-")
 
 
 def random_color() -> str:
@@ -285,8 +342,9 @@ def unique_invite_code() -> str:
     raise HTTPException(status_code=500, detail="초대 코드를 생성하지 못했습니다.")
 
 
-def public_user(user: dict[str, Any]) -> dict[str, str]:
-    return {"id": str(user["id"]), "name": user["name"], "email": user["email"]}
+def public_user(user: dict[str, Any]) -> dict[str, Any]:
+    plan = user.get("plan") or "free"
+    return {"id": str(user["id"]), "name": user["name"], "email": user["email"], "plan": plan, "limits": plan_limits(plan)}
 
 
 def serialize_room(row: dict[str, Any]) -> dict[str, Any]:
@@ -305,7 +363,16 @@ def serialize_room(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def serialize_candidate(row: dict[str, Any]) -> dict[str, Any]:
+def serialize_photo(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row["id"]),
+        "imageUrl": row["image_url"],
+        "sortOrder": int(row["sort_order"]),
+        "isPrimary": bool(row["is_primary"]),
+    }
+
+
+def serialize_candidate(row: dict[str, Any], photos: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {
         "id": str(row["id"]),
         "roomId": str(row["room_id"]),
@@ -327,8 +394,37 @@ def serialize_candidate(row: dict[str, Any]) -> dict[str, Any]:
         "privacy": row["privacy"],
         "status": row["status"],
         "color": row["color"],
+        "consent": bool(row.get("consent_checked")),
+        "contact": row.get("contact") or "",
+        "photos": [serialize_photo(photo) for photo in (photos or [])],
         "createdAt": iso(row["created_at"]),
+        "updatedAt": iso(row["updated_at"]) if row.get("updated_at") else None,
     }
+
+
+def fetch_candidate_photos(candidate_id: int | str) -> list[dict[str, Any]]:
+    return fetch_all(
+        "SELECT * FROM candidate_photos WHERE candidate_id = %s ORDER BY is_primary DESC, sort_order, id",
+        (candidate_id,),
+    )
+
+
+def candidate_with_photos(row: dict[str, Any]) -> dict[str, Any]:
+    return serialize_candidate(row, fetch_candidate_photos(row["id"]))
+
+
+def serialize_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ids = [row["id"] for row in rows]
+    photos_by_candidate: dict[Any, list[dict[str, Any]]] = {}
+    if ids:
+        placeholders = ", ".join(["%s"] * len(ids))
+        photos = fetch_all(
+            f"SELECT * FROM candidate_photos WHERE candidate_id IN ({placeholders}) ORDER BY is_primary DESC, sort_order, id",
+            tuple(ids),
+        )
+        for photo in photos:
+            photos_by_candidate.setdefault(photo["candidate_id"], []).append(photo)
+    return [serialize_candidate(row, photos_by_candidate.get(row["id"], [])) for row in rows]
 
 
 def serialize_log(row: dict[str, Any]) -> dict[str, Any]:
@@ -340,9 +436,23 @@ def serialize_log(row: dict[str, Any]) -> dict[str, Any]:
         "roomId": str(row["room_id"]),
         "pair": pair,
         "status": row["status"],
-        "date": row["log_date"],
+        "date": date_label(row["log_date"]),
         "memo": row["memo"],
         "createdAt": iso(row["created_at"]),
+    }
+
+
+def serialize_match(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row["id"]),
+        "roomId": str(row["room_id"]),
+        "candidateAId": str(row["candidate_a_id"]),
+        "candidateBId": str(row["candidate_b_id"]),
+        "status": row["status"],
+        "score": int(row["score"]) if row.get("score") is not None else None,
+        "reasonSummary": row.get("reason_summary") or "",
+        "createdAt": iso(row["created_at"]),
+        "updatedAt": iso(row["updated_at"]) if row.get("updated_at") else None,
     }
 
 
@@ -369,7 +479,20 @@ def normalize_candidate(payload: CandidatePayload | dict[str, Any]) -> dict[str,
         "privacy": str(data.get("privacy", "그룹 내 공개"))[:40],
         "status": status,
         "color": color[:7],
+        "consent_checked": 1 if data.get("consent") or data.get("consent_checked") else 0,
+        "contact": str(data.get("contact", "")).strip()[:120],
     }
+
+
+CANDIDATE_COLUMNS = (
+    "alias", "gender", "birth_year", "height", "location", "job", "education",
+    "religion", "smoke", "drink", "mbti", "personality", "hobbies", "ideal",
+    "memo", "privacy", "status", "color", "consent_checked", "contact",
+)
+
+
+def candidate_values(candidate: dict[str, Any]) -> tuple[Any, ...]:
+    return tuple(candidate[column] for column in CANDIDATE_COLUMNS)
 
 
 def current_user(token: str | None) -> dict[str, Any] | None:
@@ -377,7 +500,7 @@ def current_user(token: str | None) -> dict[str, Any] | None:
         return None
     return fetch_one(
         """
-        SELECT u.id, u.name, u.email
+        SELECT u.id, u.name, u.email, u.plan
           FROM sessions s
           JOIN users u ON u.id = s.user_id
          WHERE s.token_hash = %s AND s.expires_at > UTC_TIMESTAMP()
@@ -433,6 +556,11 @@ def get_accessible_room(room_id: int | str, user_id: int | str) -> dict[str, Any
     return room
 
 
+def require_room_write(room: dict[str, Any]) -> None:
+    if room.get("role") not in WRITE_ROLES:
+        raise HTTPException(status_code=403, detail="읽기 전용(viewer) 권한으로는 수정할 수 없습니다.")
+
+
 def get_accessible_room_id(room_id: int | str, user_id: int | str) -> tuple[int, dict[str, Any]]:
     db_room_id = resolve_room_db_id(room_id)
     if not db_room_id:
@@ -473,6 +601,23 @@ def ensure_schema() -> None:
             cursor.execute("SHOW COLUMNS FROM rooms LIKE 'public_id'")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE rooms ADD COLUMN public_id CHAR(7) NULL AFTER id")
+            for column, ddl in (
+                ("consent_checked", "ADD COLUMN consent_checked TINYINT(1) NOT NULL DEFAULT 0 AFTER color"),
+                ("contact", "ADD COLUMN contact VARCHAR(120) NOT NULL DEFAULT '' AFTER consent_checked"),
+                ("updated_at", "ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+            ):
+                cursor.execute("SHOW COLUMNS FROM candidates LIKE %s", (column,))
+                if not cursor.fetchone():
+                    cursor.execute(f"ALTER TABLE candidates {ddl}")
+            cursor.execute("SHOW COLUMNS FROM match_logs LIKE 'log_date'")
+            log_date_column = cursor.fetchone()
+            if log_date_column and str(log_date_column.get("Type", "")).lower().startswith("varchar"):
+                cursor.execute("UPDATE match_logs SET log_date = REPLACE(log_date, '.', '-')")
+                cursor.execute("ALTER TABLE match_logs MODIFY log_date DATE NOT NULL")
+            cursor.execute("SHOW COLUMNS FROM users LIKE 'plan'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE users ADD COLUMN plan VARCHAR(16) NOT NULL DEFAULT 'free'")
+            cursor.execute("ALTER TABLE room_members MODIFY role ENUM('owner', 'admin', 'member', 'viewer') NOT NULL DEFAULT 'member'")
     backfill_room_public_ids()
 
 
@@ -594,6 +739,10 @@ def public_rooms(bolsaram_session: str | None = Cookie(default=None)) -> dict[st
 @app.post("/api/rooms", status_code=201)
 def create_room(payload: RoomPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
+    owned = int(fetch_one("SELECT COUNT(*) AS c FROM rooms WHERE owner_id = %s", (user["id"],))["c"])
+    room_limit = plan_limits(user.get("plan"))["rooms"]
+    if owned >= room_limit:
+        raise HTTPException(status_code=403, detail=f"현재 플랜에서는 방을 최대 {room_limit}개까지 만들 수 있습니다.")
     visibility = "private" if payload.visibility == "private" else "public"
     invite_code = unique_invite_code() if visibility == "private" else None
     room_id = execute(
@@ -632,7 +781,13 @@ def room_state(room_id: str, bolsaram_session: str | None = Cookie(default=None)
     db_room_id, room = get_accessible_room_id(room_id, user["id"])
     candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
     logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
-    return {"room": room, "candidates": [serialize_candidate(row) for row in candidates], "logs": [serialize_log(row) for row in logs]}
+    matches = fetch_all("SELECT * FROM matches WHERE room_id = %s ORDER BY updated_at DESC", (db_room_id,))
+    return {
+        "room": room,
+        "candidates": serialize_candidates(candidates),
+        "logs": [serialize_log(row) for row in logs],
+        "matches": [serialize_match(row) for row in matches],
+    }
 
 
 @app.post("/api/rooms/{room_id}/regenerate-code")
@@ -647,89 +802,118 @@ def regenerate_code(room_id: str, bolsaram_session: str | None = Cookie(default=
     return {"room": get_room(room_id, user["id"])}
 
 
+def room_members(db_room_id: int) -> list[dict[str, Any]]:
+    rows = fetch_all(
+        """
+        SELECT u.id, u.name, u.email, rm.role
+          FROM room_members rm
+          JOIN users u ON u.id = rm.user_id
+         WHERE rm.room_id = %s
+         ORDER BY rm.role = 'owner' DESC, rm.created_at
+        """,
+        (db_room_id,),
+    )
+    return [{"id": str(row["id"]), "name": row["name"], "email": row["email"], "role": row["role"]} for row in rows]
+
+
+@app.get("/api/rooms/{room_id}/members")
+def list_members(room_id: str, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    db_room_id, room = get_accessible_room_id(room_id, user["id"])
+    return {"members": room_members(db_room_id), "role": room["role"]}
+
+
+@app.patch("/api/rooms/{room_id}/members/{member_id}")
+def update_member_role(room_id: str, member_id: int, payload: RolePayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    db_room_id, room = get_accessible_room_id(room_id, user["id"])
+    if room["role"] != "owner":
+        raise HTTPException(status_code=403, detail="방 소유자만 역할을 변경할 수 있습니다.")
+    if payload.role not in ASSIGNABLE_ROLES:
+        raise HTTPException(status_code=400, detail="지정할 수 없는 역할입니다.")
+    target = fetch_one("SELECT role FROM room_members WHERE room_id = %s AND user_id = %s", (db_room_id, member_id))
+    if not target:
+        raise HTTPException(status_code=404, detail="해당 멤버를 찾을 수 없습니다.")
+    if target["role"] == "owner":
+        raise HTTPException(status_code=400, detail="소유자 역할은 변경할 수 없습니다.")
+    execute("UPDATE room_members SET role = %s WHERE room_id = %s AND user_id = %s", (payload.role, db_room_id, member_id))
+    return {"members": room_members(db_room_id), "role": room["role"]}
+
+
 @app.post("/api/rooms/{room_id}/candidates", status_code=201)
 def create_candidate(room_id: str, payload: CandidatePayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
+    db_room_id, room = get_accessible_room_id(room_id, user["id"])
+    require_room_write(room)
+    owner_plan = fetch_one("SELECT u.plan FROM rooms r JOIN users u ON u.id = r.owner_id WHERE r.id = %s", (db_room_id,))
+    candidate_limit = plan_limits(owner_plan["plan"] if owner_plan else "free")["candidates"]
+    current_count = int(fetch_one("SELECT COUNT(*) AS c FROM candidates WHERE room_id = %s", (db_room_id,))["c"])
+    if current_count >= candidate_limit:
+        raise HTTPException(status_code=403, detail=f"이 방은 후보를 최대 {candidate_limit}명까지 등록할 수 있습니다. (방 소유자 플랜 기준)")
     candidate = normalize_candidate(payload)
+    columns = ", ".join(("room_id", *CANDIDATE_COLUMNS))
+    placeholders = ", ".join(["%s"] * (len(CANDIDATE_COLUMNS) + 1))
     candidate_id = execute(
-        """
-        INSERT INTO candidates
-          (room_id, alias, gender, birth_year, height, location, job, education, religion, smoke, drink, mbti, personality, hobbies, ideal, memo, privacy, status, color)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            db_room_id,
-            candidate["alias"],
-            candidate["gender"],
-            candidate["birth_year"],
-            candidate["height"],
-            candidate["location"],
-            candidate["job"],
-            candidate["education"],
-            candidate["religion"],
-            candidate["smoke"],
-            candidate["drink"],
-            candidate["mbti"],
-            candidate["personality"],
-            candidate["hobbies"],
-            candidate["ideal"],
-            candidate["memo"],
-            candidate["privacy"],
-            candidate["status"],
-            candidate["color"],
-        ),
+        f"INSERT INTO candidates ({columns}) VALUES ({placeholders})",
+        (db_room_id, *candidate_values(candidate)),
     )
     row = fetch_one("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
-    return {"candidate": serialize_candidate(row)}
+    return {"candidate": candidate_with_photos(row)}
+
+
+@app.patch("/api/candidates/{candidate_id}")
+def edit_candidate(candidate_id: int, payload: CandidatePayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    row = fetch_one("SELECT id, room_id FROM candidates WHERE id = %s LIMIT 1", (candidate_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+    require_room_write(get_accessible_room(row["room_id"], user["id"]))
+    candidate = normalize_candidate(payload)
+    assignments = ", ".join(f"{column} = %s" for column in CANDIDATE_COLUMNS)
+    execute(
+        f"UPDATE candidates SET {assignments} WHERE id = %s",
+        (*candidate_values(candidate), candidate_id),
+    )
+    updated = fetch_one("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
+    return {"candidate": candidate_with_photos(updated)}
+
+
+@app.delete("/api/candidates/{candidate_id}")
+def delete_candidate(candidate_id: int, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, bool]:
+    user = require_user(bolsaram_session)
+    row = fetch_one("SELECT id, room_id FROM candidates WHERE id = %s LIMIT 1", (candidate_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+    require_room_write(get_accessible_room(row["room_id"], user["id"]))
+    execute("DELETE FROM candidates WHERE id = %s", (candidate_id,))
+    return {"ok": True}
 
 
 @app.post("/api/rooms/{room_id}/sample")
 def sample(room_id: str, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
+    db_room_id, room = get_accessible_room_id(room_id, user["id"])
+    require_room_write(room)
     with db() as connection:
         connection.begin()
         try:
             with connection.cursor() as cursor:
                 cursor.execute("DELETE FROM match_logs WHERE room_id = %s", (db_room_id,))
                 cursor.execute("DELETE FROM candidates WHERE room_id = %s", (db_room_id,))
+                columns = ", ".join(("room_id", *CANDIDATE_COLUMNS))
+                placeholders = ", ".join(["%s"] * (len(CANDIDATE_COLUMNS) + 1))
                 for item in SAMPLE_CANDIDATES:
-                    candidate = normalize_candidate(item)
+                    candidate = normalize_candidate({**item, "consent": True})
                     cursor.execute(
-                        """
-                        INSERT INTO candidates
-                          (room_id, alias, gender, birth_year, height, location, job, education, religion, smoke, drink, mbti, personality, hobbies, ideal, memo, privacy, status, color)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            db_room_id,
-                            candidate["alias"],
-                            candidate["gender"],
-                            candidate["birth_year"],
-                            candidate["height"],
-                            candidate["location"],
-                            candidate["job"],
-                            candidate["education"],
-                            candidate["religion"],
-                            candidate["smoke"],
-                            candidate["drink"],
-                            candidate["mbti"],
-                            candidate["personality"],
-                            candidate["hobbies"],
-                            candidate["ideal"],
-                            candidate["memo"],
-                            candidate["privacy"],
-                            candidate["status"],
-                            candidate["color"],
-                        ),
+                        f"INSERT INTO candidates ({columns}) VALUES ({placeholders})",
+                        (db_room_id, *candidate_values(candidate)),
                     )
             connection.commit()
         except Exception:
             connection.rollback()
             raise
     candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
-    return {"candidates": [serialize_candidate(row) for row in candidates], "logs": []}
+    return {"candidates": serialize_candidates(candidates), "logs": []}
 
 
 @app.patch("/api/candidates/{candidate_id}/status")
@@ -740,7 +924,7 @@ def update_status(candidate_id: int, payload: StatusPayload, bolsaram_session: s
     row = fetch_one("SELECT id, room_id FROM candidates WHERE id = %s LIMIT 1", (candidate_id,))
     if not row:
         raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
-    get_accessible_room(row["room_id"], user["id"])
+    require_room_write(get_accessible_room(row["room_id"], user["id"]))
     execute("UPDATE candidates SET status = %s WHERE id = %s", (payload.status, candidate_id))
     execute(
         "INSERT INTO match_logs (room_id, candidate_id, status, log_date, memo) VALUES (%s, %s, %s, %s, '후보 상태 변경')",
@@ -748,13 +932,14 @@ def update_status(candidate_id: int, payload: StatusPayload, bolsaram_session: s
     )
     candidate = fetch_one("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
     logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (row["room_id"],))
-    return {"candidate": serialize_candidate(candidate), "logs": [serialize_log(log) for log in logs]}
+    return {"candidate": candidate_with_photos(candidate), "logs": [serialize_log(log) for log in logs]}
 
 
 @app.post("/api/rooms/{room_id}/logs", status_code=201)
 def create_log(room_id: str, payload: LogPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
     user = require_user(bolsaram_session)
-    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
+    db_room_id, room = get_accessible_room_id(room_id, user["id"])
+    require_room_write(room)
     candidate = fetch_one("SELECT id FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, payload.candidateId))
     if not candidate:
         raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
@@ -772,4 +957,168 @@ def create_log(room_id: str, payload: LogPayload, bolsaram_session: str | None =
     )
     log = fetch_one("SELECT * FROM match_logs WHERE id = %s", (log_id,))
     candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
-    return {"log": serialize_log(log), "candidates": [serialize_candidate(row) for row in candidates]}
+    return {"log": serialize_log(log), "candidates": serialize_candidates(candidates)}
+
+
+def watermark_image(data: bytes, label: str, extension: str) -> bytes:
+    # 무단 재공유 억제용 워터마크. 실패하거나 GIF(애니메이션 손상 방지)면 원본을 그대로 둔다.
+    if extension == ".gif":
+        return data
+    try:
+        image = Image.open(BytesIO(data)).convert("RGBA")
+    except Exception:
+        return data
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    text = f"bolsaram · {label}"
+    size = max(14, image.width // 24)
+    try:
+        font = ImageFont.truetype(WATERMARK_FONT_PATH, size)
+    except Exception:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    margin = max(8, size // 2)
+    x = max(margin, image.width - text_width - margin)
+    y = max(margin, image.height - text_height - margin * 2)
+    draw.text((x + 1, y + 1), text, font=font, fill=(0, 0, 0, 120))
+    draw.text((x, y), text, font=font, fill=(255, 255, 255, 180))
+    combined = Image.alpha_composite(image, overlay)
+    out = BytesIO()
+    if extension in (".jpg", ".jpeg"):
+        combined.convert("RGB").save(out, format="JPEG", quality=88)
+    elif extension == ".webp":
+        combined.save(out, format="WEBP", quality=88)
+    else:
+        combined.save(out, format="PNG")
+    return out.getvalue()
+
+
+@app.post("/api/candidates/{candidate_id}/photos", status_code=201)
+async def upload_photo(candidate_id: int, file: UploadFile = File(...), bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    row = fetch_one("SELECT id, room_id FROM candidates WHERE id = %s LIMIT 1", (candidate_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+    room = get_accessible_room(row["room_id"], user["id"])
+    require_room_write(room)
+    extension = IMAGE_EXTENSIONS.get(file.content_type or "")
+    if not extension:
+        raise HTTPException(status_code=400, detail="JPG, PNG, WEBP, GIF 이미지만 업로드할 수 있습니다.")
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="이미지 용량은 8MB를 넘을 수 없습니다.")
+    data = watermark_image(data, str(room.get("id") or "bolsaram"), extension)
+    filename = f"{secrets.token_hex(16)}{extension}"
+    (UPLOAD_DIR / filename).write_bytes(data)
+    existing = fetch_all("SELECT id FROM candidate_photos WHERE candidate_id = %s", (candidate_id,))
+    execute(
+        "INSERT INTO candidate_photos (candidate_id, image_url, sort_order, is_primary) VALUES (%s, %s, %s, %s)",
+        (candidate_id, f"/api/uploads/{filename}", len(existing), 0 if existing else 1),
+    )
+    full = fetch_one("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
+    return {"candidate": candidate_with_photos(full)}
+
+
+@app.delete("/api/photos/{photo_id}")
+def delete_photo(photo_id: int, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    photo = fetch_one(
+        """
+        SELECT p.id, p.candidate_id, p.image_url, p.is_primary, c.room_id
+          FROM candidate_photos p
+          JOIN candidates c ON c.id = p.candidate_id
+         WHERE p.id = %s LIMIT 1
+        """,
+        (photo_id,),
+    )
+    if not photo:
+        raise HTTPException(status_code=404, detail="사진을 찾을 수 없습니다.")
+    require_room_write(get_accessible_room(photo["room_id"], user["id"]))
+    execute("DELETE FROM candidate_photos WHERE id = %s", (photo_id,))
+    filename = str(photo["image_url"]).rsplit("/", 1)[-1]
+    target = UPLOAD_DIR / filename
+    if target.is_file():
+        target.unlink()
+    # 대표 사진이 삭제되면 남은 첫 사진을 대표로 승격한다.
+    if photo["is_primary"]:
+        nxt = fetch_one("SELECT id FROM candidate_photos WHERE candidate_id = %s ORDER BY sort_order, id LIMIT 1", (photo["candidate_id"],))
+        if nxt:
+            execute("UPDATE candidate_photos SET is_primary = 1 WHERE id = %s", (nxt["id"],))
+    full = fetch_one("SELECT * FROM candidates WHERE id = %s", (photo["candidate_id"],))
+    return {"candidate": candidate_with_photos(full)}
+
+
+def score_pair(db_room_id: int, candidate_a_id: int, candidate_b_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    a = fetch_one("SELECT * FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, candidate_a_id))
+    b = fetch_one("SELECT * FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, candidate_b_id))
+    if not a or not b:
+        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+    if candidate_a_id == candidate_b_id:
+        raise HTTPException(status_code=400, detail="같은 후보끼리는 매칭할 수 없습니다.")
+    result = match_score(serialize_candidate(a), serialize_candidate(b))
+    return result, {"a": a, "b": b}
+
+
+@app.get("/api/rooms/{room_id}/matches")
+def list_matches(room_id: str, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
+    rows = fetch_all("SELECT * FROM matches WHERE room_id = %s ORDER BY updated_at DESC", (db_room_id,))
+    return {"matches": [serialize_match(row) for row in rows]}
+
+
+@app.post("/api/rooms/{room_id}/matches", status_code=201)
+def create_match(room_id: str, payload: MatchPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    db_room_id, room = get_accessible_room_id(room_id, user["id"])
+    require_room_write(room)
+    # 쌍을 순서와 무관하게 저장하기 위해 작은 id를 a로 고정한다.
+    candidate_a_id, candidate_b_id = sorted((payload.candidateAId, payload.candidateBId))
+    result, _ = score_pair(db_room_id, candidate_a_id, candidate_b_id)
+    reason_summary = " · ".join(result["reasons"])[:500]
+    existing = fetch_one(
+        "SELECT id FROM matches WHERE room_id = %s AND candidate_a_id = %s AND candidate_b_id = %s LIMIT 1",
+        (db_room_id, candidate_a_id, candidate_b_id),
+    )
+    if existing:
+        execute(
+            "UPDATE matches SET score = %s, reason_summary = %s WHERE id = %s",
+            (result["score"], reason_summary, existing["id"]),
+        )
+        match_id = int(existing["id"])
+    else:
+        match_id = execute(
+            """
+            INSERT INTO matches (room_id, candidate_a_id, candidate_b_id, status, score, reason_summary, created_by)
+            VALUES (%s, %s, %s, '추천됨', %s, %s, %s)
+            """,
+            (db_room_id, candidate_a_id, candidate_b_id, result["score"], reason_summary, user["id"]),
+        )
+        execute(
+            "INSERT INTO match_logs (room_id, candidate_id, other_candidate_id, status, log_date, memo) VALUES (%s, %s, %s, '추천됨', %s, '매칭 후보 등록')",
+            (db_room_id, candidate_a_id, candidate_b_id, today_label()),
+        )
+    row = fetch_one("SELECT * FROM matches WHERE id = %s", (match_id,))
+    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
+    return {"match": serialize_match(row), "logs": [serialize_log(log) for log in logs]}
+
+
+@app.patch("/api/matches/{match_id}/status")
+def update_match_status(match_id: int, payload: MatchStatusPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    if payload.status not in MATCH_STATUSES:
+        raise HTTPException(status_code=400, detail="매칭 상태 값이 올바르지 않습니다.")
+    row = fetch_one("SELECT * FROM matches WHERE id = %s LIMIT 1", (match_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="매칭을 찾을 수 없습니다.")
+    require_room_write(get_accessible_room(row["room_id"], user["id"]))
+    execute("UPDATE matches SET status = %s WHERE id = %s", (payload.status, match_id))
+    execute(
+        "INSERT INTO match_logs (room_id, candidate_id, other_candidate_id, status, log_date, memo) VALUES (%s, %s, %s, %s, %s, '매칭 상태 변경')",
+        (row["room_id"], row["candidate_a_id"], row["candidate_b_id"], payload.status, today_label()),
+    )
+    updated = fetch_one("SELECT * FROM matches WHERE id = %s", (match_id,))
+    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (row["room_id"],))
+    return {"match": serialize_match(updated), "logs": [serialize_log(log) for log in logs]}
