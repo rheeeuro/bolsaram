@@ -441,16 +441,7 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
   if (!room) {
     return (
       <div className="app-shell">
-        <header className="topbar">
-          <Brand caption={`${user.name}님 · ${user.email}`} />
-          <div className="room-bar">
-            <button className="secondary-button" type="button" onClick={() => setModal("room")}>방 생성</button>
-            <button className="primary-button" type="button" onClick={openJoinModal}>새로운 방 참가하기</button>
-          </div>
-          <div className="top-actions">
-            <button className="text-button" type="button" onClick={logout}>로그아웃</button>
-          </div>
-        </header>
+        <AppBar user={user} onLogout={logout} />
 
         <RoomHome rooms={rooms} onOpen={(targetRoom) => loadRoomState(targetRoom.id).catch((error) => notify(error.message))} onCreate={() => setModal("room")} onJoin={openJoinModal} />
 
@@ -463,54 +454,58 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <Brand caption={`${user.name}님 · ${user.email}`} />
-        <div className="room-bar">
-          <button className="secondary-button" type="button" onClick={clearRoomState}>방 목록</button>
-          <label className="room-select-label">
-            <span>방</span>
-            <select value={room?.id || ""} onChange={(event) => loadRoomState(event.target.value).catch((error) => notify(error.message))} disabled={!rooms.length}>
-              {rooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-          </label>
-          <span className={`room-badge ${room?.visibility === "private" ? "private" : ""}`}>{room?.visibility === "private" ? "비공개" : "공개"}</span>
-          {isViewer && <span className="room-badge viewer">읽기 전용</span>}
-          <button className="secondary-button" type="button" onClick={openMembersModal}>멤버</button>
-          <button className="secondary-button" type="button" onClick={() => setModal("room")}>방 생성</button>
-          <button className="secondary-button" type="button" onClick={openJoinModal}>새로운 방 참가하기</button>
-          <button className="icon-button" type="button" disabled={!room || room.visibility !== "private"} title="입장 링크 복사" onClick={() => {
+      <AppBar user={user} onLogout={logout} />
+
+      <div className="room-header">
+        <div className="room-header-left">
+          <button className="ghost-button compact" type="button" onClick={clearRoomState}>← 방 목록</button>
+          <div className="room-title-block">
+            <h2>{room.name}</h2>
+            <div className="room-badges">
+              <span className={`room-badge ${room?.visibility === "private" ? "private" : ""}`}>{room?.visibility === "private" ? "🔒 비공개" : "공개방"}</span>
+              <span className="room-badge viewer">{ROLE_LABELS[room.role] || "멤버"}</span>
+              {isViewer && <span className="room-badge viewer">읽기 전용</span>}
+            </div>
+          </div>
+        </div>
+        <div className="room-header-actions">
+          {rooms.length > 1 && <select className="room-switch" value={room?.id || ""} onChange={(event) => loadRoomState(event.target.value).catch((error) => notify(error.message))}>
+            {rooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>}
+          <button className="ghost-button" type="button" onClick={openMembersModal}>멤버</button>
+          {room.visibility === "private" && <button className="ghost-button" type="button" title="입장 링크 복사" onClick={() => {
             navigator.clipboard.writeText(`${window.location.origin}${room.inviteUrl}`);
             notify(`입장 링크와 코드 ${room.inviteCode}를 복사했습니다.`);
-          }}>링크</button>
-        </div>
-        <div className="top-actions">
-          {!isViewer && <button className="icon-button" type="button" title="현재 방에 샘플 데이터 복원" onClick={async () => {
+          }}>링크 복사</button>}
+          <button className="ghost-button" type="button" onClick={openJoinModal}>방 참가</button>
+          <button className="ghost-button" type="button" onClick={() => setModal("room")}>방 생성</button>
+          {!isViewer && <button className="ghost-button" type="button" title="현재 방에 샘플 데이터 복원" onClick={async () => {
             if (!room) return;
             const payload = await api(`/api/rooms/${room.id}/sample`, { method: "POST" });
             setCandidates(payload.candidates);
             setLogs(payload.logs);
             setSelectedId(payload.candidates[0]?.id || null);
             notify("현재 방에 샘플 데이터를 복원했습니다.");
-          }}>복원</button>}
-          {!isViewer && <button className="primary-button" type="button" onClick={openCandidateCreate}>후보 등록</button>}
-          <button className="text-button" type="button" onClick={logout}>로그아웃</button>
+          }}>샘플 복원</button>}
+          {!isViewer && <button className="primary-button" type="button" onClick={openCandidateCreate}>＋ 후보 등록</button>}
         </div>
-      </header>
+      </div>
 
       <div className="room-meta">
-        <span>방 아이디 <strong>{room.id}</strong></span><span className="meta-divider">{`${typeof window !== "undefined" ? window.location.origin : ""}${roomUrl(room.id)}`}</span>
-        {room?.visibility === "private" ? <><span>입장 코드 <strong>{room.inviteCode}</strong></span><span className="meta-divider">{`${typeof window !== "undefined" ? window.location.origin : ""}${room.inviteUrl}`}</span>{room.role === "owner" && <button className="text-button" type="button" onClick={async () => {
+        <span className="meta-item">방 아이디 <strong>{room.id}</strong></span>
+        <span className="meta-divider">{`${typeof window !== "undefined" ? window.location.origin : ""}${roomUrl(room.id)}`}</span>
+        {room?.visibility === "private" ? <><span className="meta-item">입장 코드 <strong>{room.inviteCode}</strong></span><span className="meta-divider">{`${typeof window !== "undefined" ? window.location.origin : ""}${room.inviteUrl}`}</span>{room.role === "owner" && <button className="text-button" type="button" onClick={async () => {
           const payload = await api(`/api/rooms/${room.id}/regenerate-code`, { method: "POST" });
           setRoom(payload.room);
           setRooms((items) => items.map((item) => item.id === payload.room.id ? payload.room : item));
           notify("입장 코드를 재발급했습니다.");
-        }}>코드 재발급</button>}</> : <span>공개방입니다.</span>}
+        }}>코드 재발급</button>}</> : <span className="meta-item">공개방입니다.</span>}
       </div>
 
       <nav className="workspace-tabs">
         <button className={`tab-button ${view === "dashboard" ? "active" : ""}`} type="button" onClick={() => setView("dashboard")}>현황</button>
-        <button className={`tab-button ${view === "candidates" ? "active" : ""}`} type="button" onClick={() => setView("candidates")}>후보 {candidates.length}</button>
-        <button className={`tab-button ${view === "board" ? "active" : ""}`} type="button" onClick={() => setView("board")}>매칭 보드 {matches.length}</button>
+        <button className={`tab-button ${view === "candidates" ? "active" : ""}`} type="button" onClick={() => setView("candidates")}>후보 <span className="tab-count">{candidates.length}</span></button>
+        <button className={`tab-button ${view === "board" ? "active" : ""}`} type="button" onClick={() => setView("board")}>매칭 보드 <span className="tab-count">{matches.length}</span></button>
       </nav>
 
       {view === "dashboard" && <Dashboard candidates={candidates} matches={matches} logs={logs} onOpenCandidates={() => setView("candidates")} onOpenBoard={() => setView("board")} />}
@@ -568,6 +563,22 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
 
 function Brand({ caption = "후보 구조화 · 조건 검토 · 진행 관리", centered = false }) {
   return <div className={`brand ${centered ? "auth-brand" : ""}`}><div className="brand-mark">B</div><div><h1>볼사람</h1><p>{caption}</p></div></div>;
+}
+
+function AppBar({ user, onLogout, children }) {
+  return (
+    <header className="app-bar">
+      <Brand />
+      <div className="app-bar-actions">
+        {children}
+        <div className="user-chip">
+          <span className="user-name">{user.name}</span>
+          <span className="user-avatar">{user.name?.replace(/\s/g, "").slice(0, 1) || "?"}</span>
+        </div>
+        <button className="text-button" type="button" onClick={onLogout}>로그아웃</button>
+      </div>
+    </header>
+  );
 }
 
 function Field({ label, children }) {
