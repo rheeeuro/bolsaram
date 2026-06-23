@@ -424,7 +424,7 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
           <form className="auth-form" onSubmit={submitAuth}>
             <div>
               <h2>{isSignup ? "회원가입" : "로그인"}</h2>
-              <p>{isSignup ? "가입하면 기본 공개방이 자동으로 생성됩니다." : initialInviteCode ? `비공개방 코드 ${initialInviteCode}로 입장하려면 먼저 로그인해 주세요.` : initialRoomId ? `방 ${initialRoomId}로 입장하려면 먼저 로그인해 주세요.` : "계정으로 입장해 방별 후보 데이터를 관리하세요."}</p>
+              <p>{isSignup ? "가입 후 방을 직접 만들거나 초대 코드로 입장할 수 있습니다." : initialInviteCode ? `비공개방 코드 ${initialInviteCode}로 입장하려면 먼저 로그인해 주세요.` : initialRoomId ? `방 ${initialRoomId}로 입장하려면 먼저 로그인해 주세요.` : "계정으로 입장해 방별 후보 데이터를 관리하세요."}</p>
             </div>
             {isSignup && <Field label="이름"><input value={auth.name} onChange={(event) => setAuth({ ...auth, name: event.target.value })} required autoComplete="name" placeholder="홍길동" /></Field>}
             <Field label="이메일"><input type="email" value={auth.email} onChange={(event) => setAuth({ ...auth, email: event.target.value })} required autoComplete="email" placeholder="you@example.com" /></Field>
@@ -469,24 +469,11 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
           </div>
         </div>
         <div className="room-header-actions">
-          {rooms.length > 1 && <select className="room-switch" value={room?.id || ""} onChange={(event) => loadRoomState(event.target.value).catch((error) => notify(error.message))}>
-            {rooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>}
-          <button className="ghost-button" type="button" onClick={openMembersModal}>멤버</button>
           {room.visibility === "private" && <button className="ghost-button" type="button" title="입장 링크 복사" onClick={() => {
             navigator.clipboard.writeText(`${window.location.origin}${room.inviteUrl}`);
             notify(`입장 링크와 코드 ${room.inviteCode}를 복사했습니다.`);
           }}>링크 복사</button>}
-          <button className="ghost-button" type="button" onClick={openJoinModal}>방 참가</button>
-          <button className="ghost-button" type="button" onClick={() => setModal("room")}>방 생성</button>
-          {!isViewer && <button className="ghost-button" type="button" title="현재 방에 샘플 데이터 복원" onClick={async () => {
-            if (!room) return;
-            const payload = await api(`/api/rooms/${room.id}/sample`, { method: "POST" });
-            setCandidates(payload.candidates);
-            setLogs(payload.logs);
-            setSelectedId(payload.candidates[0]?.id || null);
-            notify("현재 방에 샘플 데이터를 복원했습니다.");
-          }}>샘플 복원</button>}
+          <button className="ghost-button" type="button" onClick={openMembersModal}>멤버</button>
           {!isViewer && <button className="primary-button" type="button" onClick={openCandidateCreate}>＋ 후보 등록</button>}
         </div>
       </div>

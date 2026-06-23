@@ -662,15 +662,6 @@ def signup(payload: SignupPayload, response: Response) -> dict[str, Any]:
                     (payload.name.strip(), email, password_hash),
                 )
                 user_id = int(cursor.lastrowid)
-                cursor.execute(
-                    "INSERT INTO rooms (public_id, owner_id, name, visibility) VALUES (%s, %s, %s, 'public')",
-                    (unique_room_public_id(), user_id, f"{payload.name.strip()}님의 공개방"),
-                )
-                room_id = int(cursor.lastrowid)
-                cursor.execute(
-                    "INSERT INTO room_members (room_id, user_id, role) VALUES (%s, %s, 'owner')",
-                    (room_id, user_id),
-                )
             connection.commit()
         except pymysql.err.IntegrityError as exc:
             connection.rollback()

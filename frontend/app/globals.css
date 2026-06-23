@@ -436,24 +436,6 @@ select:disabled {
   flex-wrap: wrap;
 }
 
-.room-switch {
-  min-height: 42px;
-  min-width: 180px;
-  max-width: 240px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--ink);
-  padding: 0 12px;
-  font-weight: 700;
-  outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-.room-switch:focus {
-  border-color: var(--green);
-  box-shadow: var(--ring);
-}
-
 .room-switcher {
   display: flex;
   flex-direction: column;
