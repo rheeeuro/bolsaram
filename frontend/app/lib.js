@@ -1,7 +1,6 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export const CURRENT_YEAR = new Date().getFullYear();
-export const statuses = ["등록됨", "소개 가능", "검토 중", "제안 완료", "수락", "연락처 교환", "만남 예정", "만남 완료", "거절", "보류", "매칭 완료"];
-export const matchStatuses = ["추천됨", "제안 완료", "수락", "연락처 교환", "만남 예정", "완료", "거절"];
+export const statuses = ["등록됨", "비활성"];
 export const emptyCandidate = {
   rawText: "",
   alias: "",
@@ -78,11 +77,6 @@ export function primaryPhotoUrl(candidate) {
   const photo = candidate.photos?.find((item) => item.isPrimary) || candidate.photos?.[0];
   return photo ? `${API_URL}${photo.imageUrl}` : "";
 }
-
-export function splitWords(value) {
-  return String(value || "").split(/[,\s/·]+/).map((word) => word.trim()).filter(Boolean);
-}
-
 export function jobGroup(job) {
   const text = normalize(job);
   if (/은행|금융|보험|증권/.test(text)) return "금융";
@@ -91,61 +85,6 @@ export function jobGroup(job) {
   if (/it|개발|기획|서비스|테크/.test(text)) return "IT";
   if (/변호사|의사|회계사|전문직|로펌/.test(text)) return "전문직";
   return "기타";
-}
-
-export function closeRegion(a, b) {
-  const groups = [["강남", "삼성", "판교", "분당", "야탑"], ["김포", "마포", "공항", "서울"]];
-  const one = normalize(a);
-  const two = normalize(b);
-  return groups.some((group) => group.some((word) => one.includes(word)) && group.some((word) => two.includes(word)));
-}
-
-export function matchScore(a, b) {
-  let score = 0;
-  const reasons = [];
-  const ageDiff = Math.abs(age(a) - age(b));
-  const sharedHobbies = splitWords(a.hobbies).filter((hobby) => splitWords(b.hobbies).includes(hobby));
-  const sameReligion = a.religion === b.religion || a.religion === "미입력" || b.religion === "미입력";
-  const smokeOk = a.smoke === b.smoke || a.smoke === "미입력" || b.smoke === "미입력";
-  const idealHit = splitWords(a.ideal).some((word) => normalize(b.personality).includes(normalize(word)));
-
-  if (ageDiff <= 4) {
-    score += 20;
-    reasons.push("나이 차이 적절");
-  } else if (ageDiff <= 7) {
-    score += 12;
-    reasons.push("나이 조건 검토 가능");
-  }
-  if (closeRegion(a.location, b.location)) {
-    score += 15;
-    reasons.push("생활권 가까움");
-  }
-  if (sameReligion) {
-    score += 15;
-    reasons.push("종교 조건 충족");
-  }
-  if (smokeOk) {
-    score += 15;
-    reasons.push("흡연 조건 충족");
-  }
-  if (sharedHobbies.length) {
-    score += Math.min(10, sharedHobbies.length * 5);
-    reasons.push(`공통 취미 ${sharedHobbies.slice(0, 2).join(", ")}`);
-  }
-  if (a.mbti && b.mbti && a.mbti[0] !== b.mbti[0]) {
-    score += 8;
-    reasons.push("성향 밸런스");
-  }
-  if (idealHit) {
-    score += 10;
-    reasons.push("이상형 키워드 일부 일치");
-  }
-  if (["금융", "대기업", "전문직", "공무원"].includes(jobGroup(b.job))) {
-    score += 5;
-    reasons.push("직업 안정성");
-  }
-
-  return { score: Math.min(score, 100), reasons: reasons.slice(0, 4) };
 }
 
 export const CLEAN_MESSAGE = [

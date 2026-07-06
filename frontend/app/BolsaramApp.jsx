@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { API_URL, CURRENT_YEAR, statuses, matchStatuses, emptyCandidate, defaultFilters, api, roomUrl, roomIdFromPath, updateBrowserUrl, normalize, age, initials, primaryPhotoUrl, splitWords, jobGroup, closeRegion, matchScore, parseRawProfile, shareMessage, detectPrivacyRisks } from "./lib";
+import { API_URL, statuses, emptyCandidate, defaultFilters, api, roomUrl, roomIdFromPath, updateBrowserUrl, normalize, age, initials, primaryPhotoUrl, jobGroup, parseRawProfile, shareMessage, detectPrivacyRisks } from "./lib";
 
 export default function BolsaramApp({ initialInviteCode = "", initialRoomId = "" }) {
   const [authMode, setAuthMode] = useState("login");
@@ -13,13 +13,12 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
   const [room, setRoom] = useState(null);
   const [candidates, setCandidates] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [matches, setMatches] = useState([]);
   const [members, setMembers] = useState([]);
   const [view, setView] = useState("candidates");
   const [selectedId, setSelectedId] = useState(null);
-  const [sortMode, setSortMode] = useState("recent");
   const [filters, setFilters] = useState(defaultFilters);
   const [candidateDraft, setCandidateDraft] = useState(emptyCandidate);
+  const [pendingPhotos, setPendingPhotos] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [roomDraft, setRoomDraft] = useState({ name: "", visibility: "public" });
   const [joinCode, setJoinCode] = useState(initialInviteCode);
@@ -39,7 +38,6 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
     setRoom(payload.room);
     setCandidates(payload.candidates);
     setLogs(payload.logs);
-    setMatches(payload.matches || []);
     setSelectedId((current) => (payload.candidates.some((candidate) => candidate.id === current) ? current : payload.candidates[0]?.id || null));
     if (options.syncUrl !== false) updateBrowserUrl(roomUrl(payload.room.id));
   };
@@ -48,7 +46,6 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
     setRoom(null);
     setCandidates([]);
     setLogs([]);
-    setMatches([]);
     setView("candidates");
     setSelectedId(null);
     if (options.syncUrl !== false) updateBrowserUrl("/");
@@ -133,8 +130,8 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
       if (filters.status !== "all" && candidate.status !== filters.status) return false;
       return true;
     });
-    return rows.sort((a, b) => (sortMode === "score" && selected ? matchScore(selected, b).score - matchScore(selected, a).score : new Date(b.createdAt) - new Date(a.createdAt)));
-  }, [candidates, filters, selected, sortMode]);
+    return rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [candidates, filters]);
 
   const duplicatePreview = useMemo(() => {
     if (!candidateDraft.alias && !candidateDraft.birthYear) return null;
@@ -159,29 +156,20 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
   };
 
   const stats = {
-    available: candidates.filter((candidate) => candidate.status === "소개 가능").length,
-    reviewing: candidates.filter((candidate) => ["검토 중", "제안 완료"].includes(candidate.status)).length,
+    active: candidates.filter((candidate) => candidate.status !== "비활성").length,
+    inactive: candidates.filter((candidate) => candidate.status === "비활성").length,
     duplicates: duplicateCandidates().length,
   };
-
-  const recommendations = selected
-    ? candidates
-        .filter((other) => other.id !== selected.id && other.gender !== selected.gender)
-        .map((candidate) => ({ candidate, ...matchScore(selected, candidate) }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3)
-    : [];
 
   const operatorChecks = selected
     ? [
         { level: duplicateCandidates(selected)[0] ? "risk" : "", text: duplicateCandidates(selected)[0] ? `${duplicateCandidates(selected)[0].alias} 후보와 중복 가능성이 있습니다.` : "중복 의심 항목이 없습니다." },
         { level: selected.privacy === "비공개" ? "warn" : "", text: `${selected.privacy} 상태입니다.` },
         { level: selected.smoke === "미입력" ? "warn" : "", text: selected.smoke === "미입력" ? "흡연 여부 재확인이 필요합니다." : `${selected.smoke}으로 기록되어 있습니다.` },
-        { level: ["거절", "보류", "매칭 완료"].includes(selected.status) ? "risk" : "", text: `현재 상태는 ${selected.status}입니다.` },
+        { level: selected.status === "비활성" ? "risk" : "", text: selected.status === "비활성" ? "비활성 후보입니다." : "등록된 후보입니다." },
       ]
     : [];
 
-  const ownLogs = selected ? logs.filter((log) => log.pair.includes(selected.id)).sort((a, b) => b.date.localeCompare(a.date)) : [];
   const isViewer = room?.role === "viewer";
   const shareText = selected ? shareMessage(selected, tone, includeClean) : "";
   const shareRisks = selected ? detectPrivacyRisks([selected.job, selected.education, selected.location, selected.personality, selected.ideal, selected.memo].join(" ")) : [];
@@ -240,9 +228,17 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
     }
   };
 
+  const closeCandidateModal = () => {
+    setModal(null);
+    setEditingId(null);
+    setCandidateDraft(emptyCandidate);
+    setPendingPhotos([]);
+  };
+
   const openCandidateCreate = () => {
     setEditingId(null);
     setCandidateDraft(emptyCandidate);
+    setPendingPhotos([]);
     setModal("candidate");
   };
 
@@ -255,7 +251,17 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
       height: candidate.height ? String(candidate.height) : "",
       rawText: "",
     });
+    setPendingPhotos([]);
     setModal("candidate");
+  };
+
+  const uploadPhotoFile = async (candidateId, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`${API_URL}/api/candidates/${candidateId}/photos`, { method: "POST", credentials: "include", body: form });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || "사진 업로드에 실패했습니다.");
+    return payload.candidate;
   };
 
   const saveCandidate = async (event) => {
@@ -264,19 +270,26 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
     try {
       const body = { ...candidateDraft, birthYear: Number(candidateDraft.birthYear), height: candidateDraft.height ? Number(candidateDraft.height) : null };
       delete body.rawText;
+      let candidate;
       if (editingId) {
         const payload = await api(`/api/candidates/${editingId}`, { method: "PATCH", body });
-        setCandidates((items) => items.map((item) => (item.id === payload.candidate.id ? payload.candidate : item)));
-        setSelectedId(payload.candidate.id);
-        notify("후보 정보를 수정했습니다.");
+        candidate = payload.candidate;
+        setCandidates((items) => items.map((item) => (item.id === candidate.id ? candidate : item)));
       } else {
         const payload = await api(`/api/rooms/${room.id}/candidates`, { method: "POST", body });
-        setCandidates((items) => [payload.candidate, ...items]);
-        setSelectedId(payload.candidate.id);
-        notify("후보를 등록했습니다.");
+        candidate = payload.candidate;
+        setCandidates((items) => [candidate, ...items]);
       }
+      setSelectedId(candidate.id);
+      for (const file of pendingPhotos) {
+        candidate = await uploadPhotoFile(candidate.id, file);
+        setCandidates((items) => items.map((item) => (item.id === candidate.id ? candidate : item)));
+      }
+      const photoNote = pendingPhotos.length ? ` · 사진 ${pendingPhotos.length}장` : "";
+      notify(editingId ? `후보 정보를 수정했습니다.${photoNote}` : `후보를 등록했습니다.${photoNote}`);
       setCandidateDraft(emptyCandidate);
       setEditingId(null);
+      setPendingPhotos([]);
       setModal(null);
     } catch (error) {
       notify(error.message);
@@ -285,7 +298,7 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
 
   const deleteCandidate = async (candidate) => {
     if (!candidate) return;
-    if (typeof window !== "undefined" && !window.confirm(`${candidate.alias} 후보를 삭제할까요? 관련 진행 로그도 함께 삭제됩니다.`)) return;
+    if (typeof window !== "undefined" && !window.confirm(`${candidate.alias} 후보를 삭제할까요? 관련 기록도 함께 삭제됩니다.`)) return;
     try {
       await api(`/api/candidates/${candidate.id}`, { method: "DELETE" });
       setCandidates((items) => {
@@ -303,13 +316,20 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
   const uploadPhoto = async (file) => {
     if (!file || !selected) return;
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const response = await fetch(`${API_URL}/api/candidates/${selected.id}/photos`, { method: "POST", credentials: "include", body: form });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.detail || "사진 업로드에 실패했습니다.");
-      setCandidates((items) => items.map((item) => (item.id === payload.candidate.id ? payload.candidate : item)));
+      const candidate = await uploadPhotoFile(selected.id, file);
+      setCandidates((items) => items.map((item) => (item.id === candidate.id ? candidate : item)));
       notify("사진을 추가했습니다.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const createUploadCode = async () => {
+    if (!selected) return;
+    try {
+      const payload = await api(`/api/candidates/${selected.id}/upload-code`, { method: "POST" });
+      try { await navigator.clipboard.writeText(payload.code); } catch { /* 클립보드 권한 없으면 무시 */ }
+      notify(`카카오 업로드 코드 ${payload.code} (복사됨 · ${payload.ttlMinutes}분 유효)`);
     } catch (error) {
       notify(error.message);
     }
@@ -331,44 +351,7 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
       const payload = await api(`/api/candidates/${selected.id}/status`, { method: "PATCH", body: { status } });
       setCandidates((items) => items.map((item) => (item.id === payload.candidate.id ? payload.candidate : item)));
       setLogs(payload.logs);
-      notify("상태를 저장했습니다.");
-    } catch (error) {
-      notify(error.message);
-    }
-  };
-
-  const addReviewLog = async (otherId = null) => {
-    if (!room || !selected) return;
-    const other = candidates.find((candidate) => candidate.id === otherId) || recommendations[0]?.candidate;
-    if (!other) return;
-    try {
-      const payload = await api(`/api/rooms/${room.id}/logs`, { method: "POST", body: { candidateId: Number(selected.id), otherId: Number(other.id) } });
-      setLogs((items) => [payload.log, ...items]);
-      setCandidates(payload.candidates);
-      notify("검토 로그를 추가했습니다.");
-    } catch (error) {
-      notify(error.message);
-    }
-  };
-
-  const createMatch = async (aId, bId) => {
-    if (!room || !aId || !bId) return;
-    try {
-      const payload = await api(`/api/rooms/${room.id}/matches`, { method: "POST", body: { candidateAId: Number(aId), candidateBId: Number(bId) } });
-      setMatches((items) => [payload.match, ...items.filter((item) => item.id !== payload.match.id)]);
-      if (payload.logs) setLogs(payload.logs);
-      notify("매칭 보드에 추가했습니다.");
-    } catch (error) {
-      notify(error.message);
-    }
-  };
-
-  const updateMatchStatus = async (matchId, status) => {
-    try {
-      const payload = await api(`/api/matches/${matchId}/status`, { method: "PATCH", body: { status } });
-      setMatches((items) => items.map((item) => (item.id === payload.match.id ? payload.match : item)));
-      if (payload.logs) setLogs(payload.logs);
-      notify("매칭 상태를 변경했습니다.");
+      notify(status === "비활성" ? "후보를 비활성 처리했습니다." : "상태를 저장했습니다.");
     } catch (error) {
       notify(error.message);
     }
@@ -403,7 +386,6 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
     setRoom(null);
     setCandidates([]);
     setLogs([]);
-    setMatches([]);
   };
 
   if (loading) return <div className="loading-screen">볼사람을 불러오는 중</div>;
@@ -493,10 +475,9 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
       <nav className="workspace-tabs">
         <button className={`tab-button ${view === "dashboard" ? "active" : ""}`} type="button" onClick={() => setView("dashboard")}>현황</button>
         <button className={`tab-button ${view === "candidates" ? "active" : ""}`} type="button" onClick={() => setView("candidates")}>후보 <span className="tab-count">{candidates.length}</span></button>
-        <button className={`tab-button ${view === "board" ? "active" : ""}`} type="button" onClick={() => setView("board")}>매칭 보드 <span className="tab-count">{matches.length}</span></button>
       </nav>
 
-      {view === "dashboard" && <Dashboard candidates={candidates} matches={matches} logs={logs} onOpenCandidates={() => setView("candidates")} onOpenBoard={() => setView("board")} />}
+      {view === "dashboard" && <Dashboard candidates={candidates} logs={logs} onOpenCandidates={() => setView("candidates")} />}
 
       {view === "candidates" && <main className="workspace">
         <aside className="filter-panel">
@@ -510,11 +491,11 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
           <Field label="종교"><select value={filters.religion} onChange={(event) => setFilters({ ...filters, religion: event.target.value })}><option value="all">전체</option><option value="무교">무교</option><option value="기독교">기독교</option><option value="천주교">천주교</option><option value="불교">불교</option></select></Field>
           <label className="field check-field"><input type="checkbox" checked={filters.nonSmoker} onChange={(event) => setFilters({ ...filters, nonSmoker: event.target.checked })} /><span>비흡연만</span></label>
           <Field label="활동 상태"><select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="all">전체</option>{statuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></Field>
-          <div className="stats-strip"><Stat label="전체 후보" value={candidates.length} /><Stat label="소개 가능" value={stats.available} /><Stat label="진행 중" value={stats.reviewing} /><Stat label="중복 의심" value={stats.duplicates} /></div>
+          <div className="stats-strip"><Stat label="전체 후보" value={candidates.length} /><Stat label="활성" value={stats.active} /><Stat label="비활성" value={stats.inactive} /><Stat label="중복 의심" value={stats.duplicates} /></div>
         </aside>
 
         <section className="list-panel">
-          <div className="panel-heading"><div><h2>후보자</h2><p>{filteredCandidates.length}명</p></div><div className="view-tabs"><button className={`tab-button ${sortMode === "recent" ? "active" : ""}`} type="button" onClick={() => setSortMode("recent")}>최근</button><button className={`tab-button ${sortMode === "score" ? "active" : ""}`} type="button" onClick={() => setSortMode("score")}>추천순</button></div></div>
+          <div className="panel-heading"><div><h2>후보자</h2><p>{filteredCandidates.length}명</p></div></div>
           <div className="candidate-list">
             {filteredCandidates.map((candidate) => <button key={candidate.id} className={`candidate-card ${candidate.id === selected?.id ? "active" : ""}`} type="button" onClick={() => setSelectedId(candidate.id)}><div className="avatar" style={{ background: candidate.color }}>{primaryPhotoUrl(candidate) ? <img src={primaryPhotoUrl(candidate)} alt="" /> : initials(candidate)}</div><div className="card-main"><div className="card-title"><h3>{candidate.alias}</h3><span>{age(candidate)}세</span></div><p className="card-meta">{candidate.location} · {candidate.job}<br />{candidate.height || "-"}cm · {candidate.education}</p><div className="tag-row"><span className="tag">{candidate.status}</span><span className="tag">{candidate.smoke}</span><span className="tag accent">{jobGroup(candidate.job)}</span></div></div></button>)}
           </div>
@@ -522,14 +503,9 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
 
         <section className="detail-panel">
           {!selected ? <div className="detail-empty"><h2>후보를 선택하세요</h2></div> : <div className="detail-content">
-            <div className="profile-header"><div className="avatar large" style={{ background: selected.color }}>{primaryPhotoUrl(selected) ? <img src={primaryPhotoUrl(selected)} alt={selected.alias} /> : initials(selected)}</div><div className="profile-header-main"><div className="status-row"><h2>{selected.alias}</h2><span className="status-pill">{selected.status}</span></div><p>{age(selected)}세 · {selected.location} · {selected.job}</p><div className="tag-row">{[selected.mbti, selected.smoke, selected.religion, selected.privacy].filter(Boolean).map((tag) => <span key={tag} className="tag">{tag}</span>)}{!selected.consent && <span className="tag risk">동의 미확인</span>}</div></div>{!isViewer && <div className="profile-actions"><button className="secondary-button compact" type="button" onClick={() => openCandidateEdit(selected)}>수정</button><button className="text-button danger" type="button" onClick={() => deleteCandidate(selected)}>삭제</button></div>}</div>
-            <div className="photo-strip">{(selected.photos || []).map((photo) => <div key={photo.id} className="photo-thumb"><img src={`${API_URL}${photo.imageUrl}`} alt="" />{photo.isPrimary && <span className="photo-flag">대표</span>}{!isViewer && <button type="button" className="photo-remove" title="사진 삭제" onClick={() => removePhoto(photo.id)}>×</button>}</div>)}{!isViewer && <label className="photo-add"><input type="file" accept="image/*" onChange={(event) => { uploadPhoto(event.target.files?.[0]); event.target.value = ""; }} /><span>＋ 사진</span></label>}</div>
+            <div className="profile-header"><div className="avatar large" style={{ background: selected.color }}>{primaryPhotoUrl(selected) ? <img src={primaryPhotoUrl(selected)} alt={selected.alias} /> : initials(selected)}</div><div className="profile-header-main"><div className="status-row"><h2>{selected.alias}</h2><span className="status-pill">{selected.status}</span></div><p>{age(selected)}세 · {selected.location} · {selected.job}</p><div className="tag-row">{[selected.mbti, selected.smoke, selected.religion, selected.privacy].filter(Boolean).map((tag) => <span key={tag} className="tag">{tag}</span>)}{!selected.consent && <span className="tag risk">동의 미확인</span>}</div></div>{!isViewer && <div className="profile-actions"><button className="secondary-button compact" type="button" onClick={() => openCandidateEdit(selected)}>수정</button><button className="secondary-button compact" type="button" disabled={selected.status === "비활성"} onClick={() => saveStatus("비활성")}>비활성</button><button className="text-button danger" type="button" onClick={() => deleteCandidate(selected)}>삭제</button></div>}</div>
+            <div className="photo-strip">{(selected.photos || []).map((photo) => <div key={photo.id} className="photo-thumb"><img src={`${API_URL}${photo.imageUrl}`} alt="" />{photo.isPrimary && <span className="photo-flag">대표</span>}{!isViewer && <button type="button" className="photo-remove" title="사진 삭제" onClick={() => removePhoto(photo.id)}>×</button>}</div>)}{!isViewer && <label className="photo-add"><input type="file" accept="image/*" onChange={(event) => { uploadPhoto(event.target.files?.[0]); event.target.value = ""; }} /><span>＋ 사진</span></label>}{!isViewer && <button type="button" className="photo-add kakao-code" title="카카오 챗봇으로 사진을 받을 업로드 코드를 발급합니다." onClick={createUploadCode}>＋ 카카오 코드</button>}</div>
             <div className="detail-grid"><InfoBlock title="프로필" rows={[["성별", selected.gender], ["출생연도", `${selected.birthYear}년`], ["키", `${selected.height || "-"}cm`], ["학력", selected.education || "-"], ["종교", selected.religion || "-"], ["음주", selected.drink || "-"], ["성격", selected.personality || "-"], ["취미", selected.hobbies || "-"], ["이상형", selected.ideal || "-"], ["메모", selected.memo || "-"], ["연락처", selected.contact || "-"]]} /><div className="info-block"><h3>운영 체크</h3><div className="check-list">{operatorChecks.map((check) => <div key={check.text} className="check-item"><span className={`check-dot ${check.level}`}></span><span>{check.text}</span></div>)}</div></div></div>
-            <div className="status-editor"><Field label="진행 상태"><select defaultValue={selected.status} disabled={isViewer} onChange={(event) => saveStatus(event.target.value)}>{statuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></Field></div>
-            <div className="section-heading"><h3>추천 후보</h3><span>검토용 점수</span></div>
-            <div className="recommendation-list">{recommendations.length ? recommendations.map((item) => <div key={item.candidate.id} className="recommendation-card"><div className="score-ring" style={{ "--score": `${item.score * 3.6}deg` }}><span>{item.score}</span></div><div><h4>{item.candidate.alias}</h4><p>{item.candidate.birthYear}년생 · {item.candidate.job} · {item.candidate.location}<br />{item.reasons.join(" · ")}</p></div>{!isViewer && <button className="secondary-button compact" type="button" onClick={() => createMatch(selected.id, item.candidate.id)}>매칭</button>}</div>) : <div className="recommendation-card"><p>추천 가능한 상대 후보가 없습니다.</p></div>}</div>
-            <div className="section-heading"><h3>진행 로그</h3>{!isViewer && <button className="secondary-button compact" type="button" onClick={() => addReviewLog()}>검토 등록</button>}</div>
-            <div className="timeline">{ownLogs.length ? ownLogs.map((log) => { const other = candidates.find((item) => item.id === log.pair.find((id) => id !== selected.id)); return <div key={log.id} className="timeline-item"><time>{log.date} · {log.status}</time>{selected.alias} ↔ {other?.alias || "상대 후보"}<br />{log.memo}</div>; }) : <div className="timeline-item"><time>기록 없음</time>아직 연결 이력이 없습니다.</div>}</div>
             <div className="section-heading"><h3>카톡 공유글</h3><select className="compact-select" value={tone} onChange={(event) => setTone(event.target.value)}><option value="clean">깔끔한 정보형</option><option value="natural">자연스러운 소개형</option><option value="openchat">오픈채팅용</option><option value="formal">격식 있는 소개형</option></select></div>
             {shareRisks.length > 0 && <div className="privacy-warning"><strong>개인정보 노출 주의</strong> 후보 정보에 {shareRisks.join(", ")} 형식이 포함되어 있습니다. 공유 전 제거를 권장합니다.</div>}
             <label className="field check-field clean-toggle"><input type="checkbox" checked={includeClean} onChange={(event) => setIncludeClean(event.target.checked)} /><span>클린메시지 자동 삽입</span></label>
@@ -538,16 +514,14 @@ export default function BolsaramApp({ initialInviteCode = "", initialRoomId = ""
         </section>
       </main>}
 
-      {view === "board" && <MatchBoard matches={matches} candidates={candidates} onStatus={updateMatchStatus} onOpenCandidates={() => setView("candidates")} canWrite={!isViewer} />}
-
-      {modal === "candidate" && <Modal title={editingId ? "후보 수정" : "후보 등록"} description={editingId ? "후보 정보를 수정합니다." : "오픈채팅 문장을 붙여넣으면 주요 필드를 채웁니다."} onClose={() => { setModal(null); setEditingId(null); setCandidateDraft(emptyCandidate); }}><CandidateForm draft={candidateDraft} setDraft={setCandidateDraft} duplicate={duplicatePreview} onSubmit={saveCandidate} editing={Boolean(editingId)} /></Modal>}
+      {modal === "candidate" && <Modal title={editingId ? "후보 수정" : "후보 등록"} description={editingId ? "후보 정보를 수정합니다." : "오픈채팅 문장을 붙여넣으면 주요 필드를 채웁니다."} onClose={closeCandidateModal}><CandidateForm draft={candidateDraft} setDraft={setCandidateDraft} duplicate={duplicatePreview} onSubmit={saveCandidate} editing={Boolean(editingId)} photos={pendingPhotos} setPhotos={setPendingPhotos} /></Modal>}
       {modal === "members" && <MembersModal members={members} isOwner={room?.role === "owner"} onChangeRole={changeRole} onClose={() => setModal(null)} />}
       <Toast message={toast} />
     </div>
   );
 }
 
-function Brand({ caption = "후보 구조화 · 조건 검토 · 진행 관리", centered = false }) {
+function Brand({ caption = "후보 등록 · 사진 업로드 · 비활성 관리", centered = false }) {
   return <div className={`brand ${centered ? "auth-brand" : ""}`}><div className="brand-mark">B</div><div><h1>볼사람</h1><p>{caption}</p></div></div>;
 }
 
@@ -663,19 +637,17 @@ function RoomHome({ rooms, publicRooms, onOpen, onEnterPublic, onLoadPublic, onC
   </main>;
 }
 
-function Dashboard({ candidates, matches, logs, onOpenCandidates, onOpenBoard }) {
+function Dashboard({ candidates, logs, onOpenCandidates }) {
   const byId = useMemo(() => new Map(candidates.map((candidate) => [candidate.id, candidate])), [candidates]);
-  const available = candidates.filter((candidate) => candidate.status === "소개 가능").length;
-  const activeMatches = matches.filter((match) => !["완료", "거절"].includes(match.status)).length;
-  const meeting = matches.filter((match) => match.status === "만남 예정").length;
+  const active = candidates.filter((candidate) => candidate.status !== "비활성").length;
+  const inactiveStatus = candidates.filter((candidate) => candidate.status === "비활성").length;
   const consentNeeded = candidates.filter((candidate) => !candidate.consent).length;
   const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
   const inactive = candidates.filter((candidate) => candidate.updatedAt && new Date(candidate.updatedAt).getTime() < ninetyDaysAgo && candidate.privacy !== "비공개").length;
   const cards = [
     { label: "등록 후보", value: candidates.length, onClick: onOpenCandidates },
-    { label: "소개 가능", value: available, onClick: onOpenCandidates },
-    { label: "진행 중 매칭", value: activeMatches, onClick: onOpenBoard },
-    { label: "만남 예정", value: meeting, onClick: onOpenBoard },
+    { label: "활성 후보", value: active, onClick: onOpenCandidates },
+    { label: "비활성", value: inactiveStatus, onClick: onOpenCandidates },
     { label: "동의 확인 필요", value: consentNeeded, alert: consentNeeded > 0, onClick: onOpenCandidates },
     { label: "장기 미활동(90일+)", value: inactive, alert: inactive > 0, onClick: onOpenCandidates },
   ];
@@ -695,7 +667,7 @@ function Dashboard({ candidates, matches, logs, onOpenCandidates, onOpenBoard })
         {breakdown.length ? <div className="breakdown-list">{breakdown.map((row) => <div key={row.status} className="breakdown-row"><span>{row.status}</span><strong>{row.count}</strong></div>)}</div> : <p className="dashboard-empty">등록된 후보가 없습니다.</p>}
       </section>
       <section className="info-block">
-        <h3>최근 활동</h3>
+        <h3>최근 변경</h3>
         {recent.length ? <div className="timeline">{recent.map((log) => <div key={log.id} className="timeline-item"><time>{log.date} · {log.status}</time>{aliasOf(log.pair[0])}{log.pair[1] ? ` ↔ ${aliasOf(log.pair[1])}` : ""}<br />{log.memo}</div>)}</div> : <p className="dashboard-empty">아직 활동 기록이 없습니다.</p>}
       </section>
     </div>
@@ -721,46 +693,6 @@ function MembersModal({ members, isOwner, onChangeRole, onClose }) {
   </Modal>;
 }
 
-function MatchBoard({ matches, candidates, onStatus, onOpenCandidates, canWrite = true }) {
-  const byId = useMemo(() => new Map(candidates.map((candidate) => [candidate.id, candidate])), [candidates]);
-  const columns = matchStatuses.map((status) => ({ status, items: matches.filter((match) => match.status === status) }));
-  if (!matches.length) {
-    return <main className="match-board empty">
-      <div className="room-empty">
-        <h3>아직 매칭이 없습니다.</h3>
-        <p>후보 상세의 추천 후보에서 “매칭”을 누르면 보드에 추가됩니다.</p>
-        <button className="primary-button" type="button" onClick={onOpenCandidates}>후보 보기</button>
-      </div>
-    </main>;
-  }
-  return <main className="match-board">
-    {columns.map((column) => <section key={column.status} className="board-column">
-      <div className="board-column-head"><h3>{column.status}</h3><span>{column.items.length}</span></div>
-      <div className="board-cards">
-        {column.items.map((match) => {
-          const a = byId.get(match.candidateAId);
-          const b = byId.get(match.candidateBId);
-          return <article key={match.id} className="board-card">
-            <div className="board-card-pair">
-              <span className="dot" style={{ background: a?.color || "#999" }}></span>{a?.alias || "삭제된 후보"}
-              <span className="board-card-link">↔</span>
-              <span className="dot" style={{ background: b?.color || "#999" }}></span>{b?.alias || "삭제된 후보"}
-            </div>
-            {match.score != null && <div className="board-card-score">{match.score}점</div>}
-            {match.reasonSummary && <p className="board-card-reason">{match.reasonSummary}</p>}
-            {["수락", "연락처 교환", "만남 예정", "완료"].includes(match.status)
-              ? <div className="board-card-contact">📞 {a?.contact || "미입력"} · {b?.contact || "미입력"}</div>
-              : <div className="board-card-contact locked">🔒 수락 후 연락처 공개</div>}
-            <select value={match.status} disabled={!canWrite} onChange={(event) => onStatus(match.id, event.target.value)}>
-              {matchStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
-          </article>;
-        })}
-      </div>
-    </section>)}
-  </main>;
-}
-
 function PrivateJoinModal({ joinCode, setJoinCode, onSubmit, onClose }) {
   return <Modal title="코드로 입장" description="비공개방 입장 코드 또는 초대 링크의 코드를 입력하세요." onClose={onClose}>
     <form onSubmit={onSubmit}>
@@ -778,12 +710,29 @@ function Modal({ title, description, onClose, children }) {
   return <div className="modal-backdrop"><section className="candidate-dialog"><div className="candidate-form"><div className="dialog-heading"><div><h2>{title}</h2><p>{description}</p></div><button className="icon-button" type="button" onClick={onClose}>닫기</button></div>{children}</div></section></div>;
 }
 
-function CandidateForm({ draft, setDraft, duplicate, onSubmit, editing = false }) {
+function CandidateForm({ draft, setDraft, duplicate, onSubmit, editing = false, photos = [], setPhotos = () => {} }) {
   const set = (key, value) => setDraft({ ...draft, [key]: value });
   const risks = detectPrivacyRisks([draft.rawText, draft.job, draft.education, draft.location, draft.personality, draft.ideal, draft.memo].join(" "));
+  const previews = useMemo(() => photos.map((file) => ({ file, url: URL.createObjectURL(file) })), [photos]);
+  useEffect(() => () => previews.forEach((preview) => URL.revokeObjectURL(preview.url)), [previews]);
   return <form onSubmit={onSubmit}>
     <Field label="카톡 원문"><textarea rows={4} value={draft.rawText} onChange={(event) => set("rawText", event.target.value)} placeholder="95년생 / 김포공항쪽 거주 / 키 163 / 연세대 학부졸 / 현대자동차 7년차 / ESFJ" /></Field>
     <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setDraft({ ...draft, ...parseRawProfile(draft.rawText) })}>자동 분리</button><span className="notice">{duplicate ? `${duplicate.alias} 후보와 중복 가능` : ""}</span></div>
+    <div className="form-photos">
+      <span className="form-photos-label">사진{editing ? " 추가" : ""}</span>
+      <div className="photo-strip">
+        {previews.map((preview, index) => <div key={index} className="photo-thumb">
+          <img src={preview.url} alt="" />
+          {index === 0 && !editing && <span className="photo-flag">대표</span>}
+          <button type="button" className="photo-remove" title="사진 제거" onClick={() => setPhotos(photos.filter((_, position) => position !== index))}>×</button>
+        </div>)}
+        <label className="photo-add">
+          <input type="file" accept="image/*" multiple onChange={(event) => { setPhotos([...photos, ...Array.from(event.target.files || [])]); event.target.value = ""; }} />
+          <span>＋ 사진</span>
+        </label>
+      </div>
+      {editing && <p className="form-photos-hint">여기서 추가한 사진은 저장 시 업로드됩니다. 기존 사진은 후보 상세에서 관리합니다.</p>}
+    </div>
     <div className="form-grid">
       <Field label="이름 또는 별칭"><input value={draft.alias} onChange={(event) => set("alias", event.target.value)} required /></Field>
       <Field label="성별"><select value={draft.gender} onChange={(event) => set("gender", event.target.value)}><option value="여">여</option><option value="남">남</option></select></Field>
@@ -801,7 +750,7 @@ function CandidateForm({ draft, setDraft, duplicate, onSubmit, editing = false }
       <label className="field wide"><span>취미</span><input value={draft.hobbies} onChange={(event) => set("hobbies", event.target.value)} /></label>
       <label className="field wide"><span>이상형</span><input value={draft.ideal} onChange={(event) => set("ideal", event.target.value)} /></label>
       <label className="field wide"><span>소개 메모</span><textarea rows={3} value={draft.memo} onChange={(event) => set("memo", event.target.value)} /></label>
-      <label className="field wide"><span>연락처 (비공개 · 매칭 수락 후 공개)</span><input value={draft.contact} onChange={(event) => set("contact", event.target.value)} placeholder="010-0000-0000" /></label>
+      <label className="field wide"><span>연락처 (비공개)</span><input value={draft.contact} onChange={(event) => set("contact", event.target.value)} placeholder="010-0000-0000" /></label>
     </div>
     {risks.length > 0 && <div className="privacy-warning">입력값에 {risks.join(", ")} 형식이 감지됐습니다. 식별 가능 정보는 최소화해 주세요.</div>}
     <label className="field check-field consent-field"><input type="checkbox" checked={Boolean(draft.consent)} onChange={(event) => set("consent", event.target.checked)} required /><span>본인은 해당 후보자의 소개 목적 정보 등록 및 공유 동의를 받았습니다.</span></label>

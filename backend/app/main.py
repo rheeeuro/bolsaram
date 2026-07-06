@@ -12,13 +12,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pymysql
-from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile
+from fastapi import Cookie, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, EmailStr, Field
 
-from .matching import match_score
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 SCHEMA_SQL_PATH = BASE_DIR / "sql" / "schema.sql"
@@ -32,6 +31,14 @@ IMAGE_EXTENSIONS = {
     "image/gif": ".gif",
 }
 WATERMARK_FONT_PATH = os.getenv("WATERMARK_FONT", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+# 카카오 챗봇 스킬 서버가 사진 업로드 API 호출 시 보내야 하는 공용 키. 비어 있으면 카카오 업로드를 막는다.
+KAKAO_API_KEY = os.getenv("KAKAO_API_KEY", "")
+# 후보별 업로드 코드의 유효 시간(분)과 코드 1건당 허용 업로드 횟수.
+UPLOAD_CODE_TTL_MINUTES = int(os.getenv("UPLOAD_CODE_TTL_MINUTES", "30"))
+UPLOAD_CODE_MAX_USES = int(os.getenv("UPLOAD_CODE_MAX_USES", "10"))
+UPLOAD_TOKEN_TTL_MINUTES = int(os.getenv("UPLOAD_TOKEN_TTL_MINUTES", "30"))
+KAKAO_DEFAULT_ROOM_ID = os.getenv("KAKAO_DEFAULT_ROOM_ID", "")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", os.getenv("FRONTEND_PUBLIC_URL", "http://127.0.0.1:3020")).rstrip("/")
 
 DB_CONFIG = {
     "host": os.getenv("DB_HOST", "127.0.0.1"),
@@ -48,28 +55,7 @@ SESSION_COOKIE = "bolsaram_session"
 SESSION_MAX_AGE = 14 * 24 * 60 * 60
 ROOM_ID_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 ROOM_ID_ALPHABET = f"{ROOM_ID_LETTERS}23456789"
-STATUSES = [
-    "등록됨",
-    "소개 가능",
-    "검토 중",
-    "제안 완료",
-    "수락",
-    "연락처 교환",
-    "만남 예정",
-    "만남 완료",
-    "거절",
-    "보류",
-    "매칭 완료",
-]
-MATCH_STATUSES = [
-    "추천됨",
-    "제안 완료",
-    "수락",
-    "연락처 교환",
-    "만남 예정",
-    "완료",
-    "거절",
-]
+STATUSES = ["등록됨", "비활성"]
 PLAN_LIMITS = {
     "free": {"rooms": 1, "candidates": 30},
     "pro": {"rooms": 5, "candidates": 300},
@@ -100,7 +86,7 @@ SAMPLE_CANDIDATES = [
         "ideal": "배려심 있고 선한 사람",
         "memo": "활동적이고 대화가 밝은 스타일",
         "privacy": "그룹 내 공개",
-        "status": "소개 가능",
+        "status": "등록됨",
         "color": "#2f7d69",
     },
     {
@@ -120,7 +106,7 @@ SAMPLE_CANDIDATES = [
         "ideal": "밝고 자기 일이 있는 사람",
         "memo": "안정적인 직장 선호 조건에 잘 맞음",
         "privacy": "그룹 내 공개",
-        "status": "검토 중",
+        "status": "등록됨",
         "color": "#386fa4",
     },
     {
@@ -140,7 +126,7 @@ SAMPLE_CANDIDATES = [
         "ideal": "가치관이 선하고 대화가 잘 되는 사람",
         "memo": "종교 조건 확인 필요",
         "privacy": "전체 공개",
-        "status": "소개 가능",
+        "status": "등록됨",
         "color": "#a87620",
     },
     {
@@ -160,7 +146,7 @@ SAMPLE_CANDIDATES = [
         "ideal": "예의 있고 안정적인 사람",
         "memo": "진지한 만남 선호",
         "privacy": "그룹 내 공개",
-        "status": "제안 완료",
+        "status": "등록됨",
         "color": "#c7604d",
     },
 ]
@@ -224,20 +210,6 @@ class CandidatePayload(BaseModel):
 
 
 class StatusPayload(BaseModel):
-    status: str
-
-
-class LogPayload(BaseModel):
-    candidateId: int
-    otherId: int | None = None
-
-
-class MatchPayload(BaseModel):
-    candidateAId: int
-    candidateBId: int
-
-
-class MatchStatusPayload(BaseModel):
     status: str
 
 
@@ -342,6 +314,114 @@ def unique_invite_code() -> str:
     raise HTTPException(status_code=500, detail="초대 코드를 생성하지 못했습니다.")
 
 
+def random_upload_code() -> str:
+    return "".join(secrets.choice(ROOM_ID_ALPHABET) for _ in range(8))
+
+
+def unique_upload_code() -> str:
+    for _ in range(16):
+        code = random_upload_code()
+        if not fetch_one("SELECT id FROM candidate_upload_codes WHERE code = %s LIMIT 1", (code,)):
+            return code
+    raise HTTPException(status_code=500, detail="업로드 코드를 생성하지 못했습니다.")
+
+
+def unique_upload_token() -> str:
+    for _ in range(16):
+        token = secrets.token_urlsafe(32)
+        if not fetch_one("SELECT id FROM upload_tokens WHERE token_hash = %s LIMIT 1", (hash_token(token),)):
+            return token
+    raise HTTPException(status_code=500, detail="업로드 링크를 생성하지 못했습니다.")
+
+
+def app_base_url(request: Request | None = None) -> str:
+    if PUBLIC_BASE_URL:
+        return PUBLIC_BASE_URL
+    if request:
+        return str(request.base_url).rstrip("/")
+    return ""
+
+
+def nested_value(data: dict[str, Any], *keys: str) -> Any:
+    current: Any = data
+    for key in keys:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
+def kakao_params(payload: dict[str, Any]) -> dict[str, Any]:
+    params = nested_value(payload, "action", "params")
+    return params if isinstance(params, dict) else {}
+
+
+def kakao_user_key(payload: dict[str, Any]) -> str:
+    properties = nested_value(payload, "userRequest", "user", "properties") or {}
+    candidates = (
+        nested_value(payload, "userRequest", "user", "id"),
+        properties.get("plusfriendUserKey") if isinstance(properties, dict) else None,
+        properties.get("appUserId") if isinstance(properties, dict) else None,
+        properties.get("botUserKey") if isinstance(properties, dict) else None,
+    )
+    for item in candidates:
+        if item:
+            return str(item)[:120]
+    return "unknown"
+
+
+def resolve_kakao_upload_room(payload: dict[str, Any]) -> int | None:
+    params = kakao_params(payload)
+    room_ref = params.get("roomId") or params.get("room_id") or KAKAO_DEFAULT_ROOM_ID
+    return resolve_room_db_id(room_ref) if room_ref else None
+
+
+def issue_upload_token(db_room_id: int, kakao_key: str) -> tuple[str, datetime]:
+    token = unique_upload_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=UPLOAD_TOKEN_TTL_MINUTES)
+    execute(
+        """
+        INSERT INTO upload_tokens (room_id, token_hash, kakao_user_key, purpose, expires_at)
+        VALUES (%s, %s, %s, 'profile_upload', %s)
+        """,
+        (db_room_id, hash_token(token), kakao_key[:120], expires_at.strftime("%Y-%m-%d %H:%M:%S")),
+    )
+    return token, expires_at
+
+
+def upload_token_or_error(token: str) -> dict[str, Any]:
+    row = fetch_one(
+        """
+        SELECT ut.*, r.name AS room_name, r.public_id AS room_public_id,
+               (ut.expires_at <= UTC_TIMESTAMP()) AS expired
+          FROM upload_tokens ut
+          JOIN rooms r ON r.id = ut.room_id
+         WHERE ut.token_hash = %s
+         LIMIT 1
+        """,
+        (hash_token(token.strip()),),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="유효하지 않은 업로드 링크입니다.")
+    if row.get("used_at"):
+        raise HTTPException(status_code=409, detail="이미 사용된 업로드 링크입니다.")
+    if row.get("expired"):
+        raise HTTPException(status_code=410, detail="업로드 링크가 만료되었습니다.")
+    return row
+
+
+def kakao_skill_response(text: str, upload_url: str | None = None) -> dict[str, Any]:
+    template: dict[str, Any] = {"outputs": [{"simpleText": {"text": text}}]}
+    if upload_url:
+        template["quickReplies"] = [{"label": "업로드하기", "action": "webLink", "webLinkUrl": upload_url}]
+    return {"version": "2.0", "template": template}
+
+
+def require_kakao_api_key(x_kakao_api_key: str | None) -> None:
+    if KAKAO_API_KEY and (not x_kakao_api_key or not hmac.compare_digest(x_kakao_api_key, KAKAO_API_KEY)):
+        raise HTTPException(status_code=401, detail="인증에 실패했습니다.")
+
+
 def public_user(user: dict[str, Any]) -> dict[str, Any]:
     plan = user.get("plan") or "free"
     return {"id": str(user["id"]), "name": user["name"], "email": user["email"], "plan": plan, "limits": plan_limits(plan)}
@@ -439,20 +519,6 @@ def serialize_log(row: dict[str, Any]) -> dict[str, Any]:
         "date": date_label(row["log_date"]),
         "memo": row["memo"],
         "createdAt": iso(row["created_at"]),
-    }
-
-
-def serialize_match(row: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": str(row["id"]),
-        "roomId": str(row["room_id"]),
-        "candidateAId": str(row["candidate_a_id"]),
-        "candidateBId": str(row["candidate_b_id"]),
-        "status": row["status"],
-        "score": int(row["score"]) if row.get("score") is not None else None,
-        "reasonSummary": row.get("reason_summary") or "",
-        "createdAt": iso(row["created_at"]),
-        "updatedAt": iso(row["updated_at"]) if row.get("updated_at") else None,
     }
 
 
@@ -614,6 +680,7 @@ def ensure_schema() -> None:
             if log_date_column and str(log_date_column.get("Type", "")).lower().startswith("varchar"):
                 cursor.execute("UPDATE match_logs SET log_date = REPLACE(log_date, '.', '-')")
                 cursor.execute("ALTER TABLE match_logs MODIFY log_date DATE NOT NULL")
+            cursor.execute("UPDATE candidates SET status = '등록됨' WHERE status NOT IN ('등록됨', '비활성')")
             cursor.execute("SHOW COLUMNS FROM users LIKE 'plan'")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE users ADD COLUMN plan VARCHAR(16) NOT NULL DEFAULT 'free'")
@@ -771,13 +838,11 @@ def room_state(room_id: str, bolsaram_session: str | None = Cookie(default=None)
     user = require_user(bolsaram_session)
     db_room_id, room = get_accessible_room_id(room_id, user["id"])
     candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
-    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
-    matches = fetch_all("SELECT * FROM matches WHERE room_id = %s ORDER BY updated_at DESC", (db_room_id,))
+    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s AND other_candidate_id IS NULL ORDER BY created_at DESC", (db_room_id,))
     return {
         "room": room,
         "candidates": serialize_candidates(candidates),
         "logs": [serialize_log(row) for row in logs],
-        "matches": [serialize_match(row) for row in matches],
     }
 
 
@@ -922,33 +987,126 @@ def update_status(candidate_id: int, payload: StatusPayload, bolsaram_session: s
         (row["room_id"], candidate_id, payload.status, today_label()),
     )
     candidate = fetch_one("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
-    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (row["room_id"],))
+    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s AND other_candidate_id IS NULL ORDER BY created_at DESC", (row["room_id"],))
     return {"candidate": candidate_with_photos(candidate), "logs": [serialize_log(log) for log in logs]}
 
 
-@app.post("/api/rooms/{room_id}/logs", status_code=201)
-def create_log(room_id: str, payload: LogPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
-    user = require_user(bolsaram_session)
-    db_room_id, room = get_accessible_room_id(room_id, user["id"])
-    require_room_write(room)
-    candidate = fetch_one("SELECT id FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, payload.candidateId))
-    if not candidate:
-        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
-    if payload.otherId:
-        other = fetch_one("SELECT id FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, payload.otherId))
-        if not other:
-            raise HTTPException(status_code=404, detail="상대 후보를 찾을 수 없습니다.")
-    execute("UPDATE candidates SET status = '검토 중' WHERE id = %s", (payload.candidateId,))
-    log_id = execute(
-        """
-        INSERT INTO match_logs (room_id, candidate_id, other_candidate_id, status, log_date, memo)
-        VALUES (%s, %s, %s, '검토 중', %s, '추천 후보 검토 등록')
-        """,
-        (db_room_id, payload.candidateId, payload.otherId, today_label()),
+
+
+@app.post("/api/kakao/skill")
+async def kakao_skill(request: Request, x_kakao_api_key: str | None = Header(default=None)) -> dict[str, Any]:
+    require_kakao_api_key(x_kakao_api_key)
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    db_room_id = resolve_kakao_upload_room(payload if isinstance(payload, dict) else {})
+    if not db_room_id:
+        return kakao_skill_response("업로드 대상 방이 설정되지 않았습니다. 챗봇 파라미터 roomId 또는 KAKAO_DEFAULT_ROOM_ID를 설정해 주세요.")
+    token, expires_at = issue_upload_token(db_room_id, kakao_user_key(payload if isinstance(payload, dict) else {}))
+    upload_url = f"{app_base_url(request)}/upload?token={token}"
+    return kakao_skill_response(
+        f"프로필 등록 링크를 열어주세요. 링크는 {UPLOAD_TOKEN_TTL_MINUTES}분 동안 1회만 사용할 수 있습니다.",
+        upload_url,
     )
-    log = fetch_one("SELECT * FROM match_logs WHERE id = %s", (log_id,))
-    candidates = fetch_all("SELECT * FROM candidates WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
-    return {"log": serialize_log(log), "candidates": serialize_candidates(candidates)}
+
+
+@app.get("/api/upload-tokens/{token}")
+def inspect_upload_token(token: str) -> dict[str, Any]:
+    row = upload_token_or_error(token)
+    return {
+        "valid": True,
+        "roomName": row.get("room_name") or "볼사람",
+        "roomId": row.get("room_public_id"),
+        "expiresAt": iso(row["expires_at"]),
+        "ttlMinutes": UPLOAD_TOKEN_TTL_MINUTES,
+    }
+
+
+def candidate_limit_for_room(db_room_id: int) -> int:
+    owner_plan = fetch_one("SELECT u.plan FROM rooms r JOIN users u ON u.id = r.owner_id WHERE r.id = %s", (db_room_id,))
+    return plan_limits(owner_plan["plan"] if owner_plan else "free")["candidates"]
+
+
+def ensure_candidate_capacity(db_room_id: int) -> None:
+    candidate_limit = candidate_limit_for_room(db_room_id)
+    current_count = int(fetch_one("SELECT COUNT(*) AS c FROM candidates WHERE room_id = %s", (db_room_id,))["c"])
+    if current_count >= candidate_limit:
+        raise HTTPException(status_code=403, detail=f"이 방은 후보를 최대 {candidate_limit}명까지 등록할 수 있습니다.")
+
+
+@app.post("/api/profiles", status_code=201)
+async def create_profile_from_upload(
+    token: str = Form(...),
+    alias: str = Form(default=""),
+    title: str = Form(default=""),
+    description: str = Form(default=""),
+    age: int = Form(...),
+    region: str = Form(default=""),
+    gender: str = Form(default="여"),
+    job: str = Form(default=""),
+    height: int | None = Form(default=None),
+    ideal: str = Form(default=""),
+    privacy: str = Form(default="그룹 내 공개"),
+    image: UploadFile | None = File(default=None),
+    images: list[UploadFile] | None = File(default=None),
+) -> dict[str, Any]:
+    row = upload_token_or_error(token)
+    uploads = [item for item in ([image] if image and image.filename else []) + (images or []) if item and item.filename]
+    if not uploads:
+        raise HTTPException(status_code=400, detail="사진을 1장 이상 첨부해 주세요.")
+    if len(uploads) > 3:
+        raise HTTPException(status_code=400, detail="사진은 최대 3장까지 업로드할 수 있습니다.")
+    if age < 18 or age > 80:
+        raise HTTPException(status_code=400, detail="나이는 18세부터 80세까지 입력할 수 있습니다.")
+    if height is not None and (height < 100 or height > 250):
+        raise HTTPException(status_code=400, detail="키는 100cm부터 250cm까지 입력할 수 있습니다.")
+
+    db_room_id = int(row["room_id"])
+    ensure_candidate_capacity(db_room_id)
+    birth_year = datetime.now().year - age
+    normalized_gender = "남" if gender in ("남", "남성", "male", "M") else "여"
+    display_alias = (alias or title or f"{birth_year}년생 {'남성' if normalized_gender == '남' else '여성'} 후보").strip()
+    candidate = normalize_candidate({
+        "alias": display_alias,
+        "gender": normalized_gender,
+        "birthYear": birth_year,
+        "height": height,
+        "location": region,
+        "job": job,
+        "education": "",
+        "religion": "미입력",
+        "smoke": "미입력",
+        "drink": "미입력",
+        "mbti": "",
+        "personality": description,
+        "hobbies": "",
+        "ideal": ideal,
+        "memo": description,
+        "privacy": privacy,
+        "status": "등록됨",
+        "consent": True,
+        "contact": "",
+    })
+    columns = ", ".join(("room_id", *CANDIDATE_COLUMNS))
+    placeholders = ", ".join(["%s"] * (len(CANDIDATE_COLUMNS) + 1))
+    candidate_id = execute(
+        f"INSERT INTO candidates ({columns}) VALUES ({placeholders})",
+        (db_room_id, *candidate_values(candidate)),
+    )
+    saved: dict[str, Any] | None = None
+    for upload in uploads:
+        saved = await store_candidate_photo(candidate_id, upload, str(row.get("room_public_id") or db_room_id))
+    execute("UPDATE upload_tokens SET used_at = UTC_TIMESTAMP() WHERE id = %s", (row["id"],))
+    execute(
+        "INSERT INTO match_logs (room_id, candidate_id, status, log_date, memo) VALUES (%s, %s, '등록됨', %s, '카카오 업로드 등록')",
+        (db_room_id, candidate_id, today_label()),
+    )
+    return {
+        "ok": True,
+        "candidate": saved or candidate_with_photos(fetch_one("SELECT * FROM candidates WHERE id = %s", (candidate_id,))),
+        "message": "프로필 등록이 완료되었습니다.",
+    }
 
 
 def watermark_image(data: bytes, label: str, extension: str) -> bytes:
@@ -986,21 +1144,15 @@ def watermark_image(data: bytes, label: str, extension: str) -> bytes:
     return out.getvalue()
 
 
-@app.post("/api/candidates/{candidate_id}/photos", status_code=201)
-async def upload_photo(candidate_id: int, file: UploadFile = File(...), bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
-    user = require_user(bolsaram_session)
-    row = fetch_one("SELECT id, room_id FROM candidates WHERE id = %s LIMIT 1", (candidate_id,))
-    if not row:
-        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
-    room = get_accessible_room(row["room_id"], user["id"])
-    require_room_write(room)
+async def store_candidate_photo(candidate_id: int, file: UploadFile, room_label: str) -> dict[str, Any]:
+    # 사진 1장을 워터마크 처리해 uploads에 저장하고 candidate_photos에 기록한다. 권한 검사는 호출부 책임이다.
     extension = IMAGE_EXTENSIONS.get(file.content_type or "")
     if not extension:
         raise HTTPException(status_code=400, detail="JPG, PNG, WEBP, GIF 이미지만 업로드할 수 있습니다.")
     data = await file.read()
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="이미지 용량은 8MB를 넘을 수 없습니다.")
-    data = watermark_image(data, str(room.get("id") or "bolsaram"), extension)
+    data = watermark_image(data, room_label, extension)
     filename = f"{secrets.token_hex(16)}{extension}"
     (UPLOAD_DIR / filename).write_bytes(data)
     existing = fetch_all("SELECT id FROM candidate_photos WHERE candidate_id = %s", (candidate_id,))
@@ -1009,7 +1161,82 @@ async def upload_photo(candidate_id: int, file: UploadFile = File(...), bolsaram
         (candidate_id, f"/api/uploads/{filename}", len(existing), 0 if existing else 1),
     )
     full = fetch_one("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
-    return {"candidate": candidate_with_photos(full)}
+    return candidate_with_photos(full)
+
+
+@app.post("/api/candidates/{candidate_id}/photos", status_code=201)
+async def upload_photo(candidate_id: int, file: UploadFile = File(...), bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    row = fetch_one("SELECT id, room_id FROM candidates WHERE id = %s LIMIT 1", (candidate_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+    room = get_accessible_room(row["room_id"], user["id"])
+    require_room_write(room)
+    candidate = await store_candidate_photo(candidate_id, file, str(room.get("id") or "bolsaram"))
+    return {"candidate": candidate}
+
+
+@app.post("/api/candidates/{candidate_id}/upload-code", status_code=201)
+def create_upload_code(candidate_id: int, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
+    user = require_user(bolsaram_session)
+    row = fetch_one("SELECT id, room_id, alias FROM candidates WHERE id = %s LIMIT 1", (candidate_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+    room = get_accessible_room(row["room_id"], user["id"])
+    require_room_write(room)
+    # 같은 후보의 기존 코드는 정리해 코드가 누적되지 않게 한다.
+    execute("DELETE FROM candidate_upload_codes WHERE candidate_id = %s", (candidate_id,))
+    code = unique_upload_code()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=UPLOAD_CODE_TTL_MINUTES)
+    execute(
+        "INSERT INTO candidate_upload_codes (candidate_id, code, created_by, expires_at, max_uses) VALUES (%s, %s, %s, %s, %s)",
+        (candidate_id, code, user["id"], expires_at.strftime("%Y-%m-%d %H:%M:%S"), UPLOAD_CODE_MAX_USES),
+    )
+    return {
+        "code": code,
+        "candidateId": str(candidate_id),
+        "alias": row.get("alias"),
+        "expiresAt": iso(expires_at),
+        "ttlMinutes": UPLOAD_CODE_TTL_MINUTES,
+        "maxUses": UPLOAD_CODE_MAX_USES,
+    }
+
+
+@app.post("/api/kakao/photos", status_code=201)
+async def kakao_upload_photo(
+    code: str = Form(...),
+    file: UploadFile = File(...),
+    x_kakao_api_key: str | None = Header(default=None),
+) -> dict[str, Any]:
+    # 카카오 챗봇 스킬 서버 전용. 쿠키 대신 공용 API 키 + 후보별 업로드 코드로 인증한다.
+    if not KAKAO_API_KEY:
+        raise HTTPException(status_code=503, detail="카카오 업로드가 설정되지 않았습니다.")
+    if not x_kakao_api_key or not hmac.compare_digest(x_kakao_api_key, KAKAO_API_KEY):
+        raise HTTPException(status_code=401, detail="인증에 실패했습니다.")
+    normalized = (code or "").strip().upper()
+    row = fetch_one(
+        "SELECT *, (expires_at <= NOW()) AS expired FROM candidate_upload_codes WHERE code = %s LIMIT 1",
+        (normalized,),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="유효하지 않은 업로드 코드입니다.")
+    if row["expired"]:
+        raise HTTPException(status_code=410, detail="업로드 코드가 만료되었습니다. 새 코드를 발급받으세요.")
+    if row["used_count"] >= row["max_uses"]:
+        raise HTTPException(status_code=429, detail="업로드 코드의 사용 횟수를 초과했습니다.")
+    candidate_row = fetch_one("SELECT id, room_id, alias FROM candidates WHERE id = %s LIMIT 1", (row["candidate_id"],))
+    if not candidate_row:
+        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+    candidate = await store_candidate_photo(candidate_row["id"], file, str(candidate_row["room_id"] or "bolsaram"))
+    execute("UPDATE candidate_upload_codes SET used_count = used_count + 1 WHERE id = %s", (row["id"],))
+    remaining = max(0, row["max_uses"] - row["used_count"] - 1)
+    return {
+        "ok": True,
+        "alias": candidate_row.get("alias"),
+        "photoCount": len(candidate.get("photos", [])),
+        "remainingUses": remaining,
+        "message": f"{candidate_row.get('alias') or '후보'} 사진을 추가했습니다. (남은 업로드 {remaining}회)",
+    }
 
 
 @app.delete("/api/photos/{photo_id}")
@@ -1040,76 +1267,3 @@ def delete_photo(photo_id: int, bolsaram_session: str | None = Cookie(default=No
     full = fetch_one("SELECT * FROM candidates WHERE id = %s", (photo["candidate_id"],))
     return {"candidate": candidate_with_photos(full)}
 
-
-def score_pair(db_room_id: int, candidate_a_id: int, candidate_b_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
-    a = fetch_one("SELECT * FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, candidate_a_id))
-    b = fetch_one("SELECT * FROM candidates WHERE room_id = %s AND id = %s", (db_room_id, candidate_b_id))
-    if not a or not b:
-        raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
-    if candidate_a_id == candidate_b_id:
-        raise HTTPException(status_code=400, detail="같은 후보끼리는 매칭할 수 없습니다.")
-    result = match_score(serialize_candidate(a), serialize_candidate(b))
-    return result, {"a": a, "b": b}
-
-
-@app.get("/api/rooms/{room_id}/matches")
-def list_matches(room_id: str, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
-    user = require_user(bolsaram_session)
-    db_room_id, _ = get_accessible_room_id(room_id, user["id"])
-    rows = fetch_all("SELECT * FROM matches WHERE room_id = %s ORDER BY updated_at DESC", (db_room_id,))
-    return {"matches": [serialize_match(row) for row in rows]}
-
-
-@app.post("/api/rooms/{room_id}/matches", status_code=201)
-def create_match(room_id: str, payload: MatchPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
-    user = require_user(bolsaram_session)
-    db_room_id, room = get_accessible_room_id(room_id, user["id"])
-    require_room_write(room)
-    # 쌍을 순서와 무관하게 저장하기 위해 작은 id를 a로 고정한다.
-    candidate_a_id, candidate_b_id = sorted((payload.candidateAId, payload.candidateBId))
-    result, _ = score_pair(db_room_id, candidate_a_id, candidate_b_id)
-    reason_summary = " · ".join(result["reasons"])[:500]
-    existing = fetch_one(
-        "SELECT id FROM matches WHERE room_id = %s AND candidate_a_id = %s AND candidate_b_id = %s LIMIT 1",
-        (db_room_id, candidate_a_id, candidate_b_id),
-    )
-    if existing:
-        execute(
-            "UPDATE matches SET score = %s, reason_summary = %s WHERE id = %s",
-            (result["score"], reason_summary, existing["id"]),
-        )
-        match_id = int(existing["id"])
-    else:
-        match_id = execute(
-            """
-            INSERT INTO matches (room_id, candidate_a_id, candidate_b_id, status, score, reason_summary, created_by)
-            VALUES (%s, %s, %s, '추천됨', %s, %s, %s)
-            """,
-            (db_room_id, candidate_a_id, candidate_b_id, result["score"], reason_summary, user["id"]),
-        )
-        execute(
-            "INSERT INTO match_logs (room_id, candidate_id, other_candidate_id, status, log_date, memo) VALUES (%s, %s, %s, '추천됨', %s, '매칭 후보 등록')",
-            (db_room_id, candidate_a_id, candidate_b_id, today_label()),
-        )
-    row = fetch_one("SELECT * FROM matches WHERE id = %s", (match_id,))
-    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (db_room_id,))
-    return {"match": serialize_match(row), "logs": [serialize_log(log) for log in logs]}
-
-
-@app.patch("/api/matches/{match_id}/status")
-def update_match_status(match_id: int, payload: MatchStatusPayload, bolsaram_session: str | None = Cookie(default=None)) -> dict[str, Any]:
-    user = require_user(bolsaram_session)
-    if payload.status not in MATCH_STATUSES:
-        raise HTTPException(status_code=400, detail="매칭 상태 값이 올바르지 않습니다.")
-    row = fetch_one("SELECT * FROM matches WHERE id = %s LIMIT 1", (match_id,))
-    if not row:
-        raise HTTPException(status_code=404, detail="매칭을 찾을 수 없습니다.")
-    require_room_write(get_accessible_room(row["room_id"], user["id"]))
-    execute("UPDATE matches SET status = %s WHERE id = %s", (payload.status, match_id))
-    execute(
-        "INSERT INTO match_logs (room_id, candidate_id, other_candidate_id, status, log_date, memo) VALUES (%s, %s, %s, %s, %s, '매칭 상태 변경')",
-        (row["room_id"], row["candidate_a_id"], row["candidate_b_id"], payload.status, today_label()),
-    )
-    updated = fetch_one("SELECT * FROM matches WHERE id = %s", (match_id,))
-    logs = fetch_all("SELECT * FROM match_logs WHERE room_id = %s ORDER BY created_at DESC", (row["room_id"],))
-    return {"match": serialize_match(updated), "logs": [serialize_log(log) for log in logs]}

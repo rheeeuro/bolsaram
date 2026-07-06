@@ -74,22 +74,28 @@ CREATE TABLE IF NOT EXISTS candidate_photos (
   CONSTRAINT photos_candidate_fk FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS matches (
+CREATE TABLE IF NOT EXISTS candidate_upload_codes (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  candidate_id BIGINT UNSIGNED NOT NULL,
+  code CHAR(8) NOT NULL UNIQUE,
+  created_by BIGINT UNSIGNED NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used_count INT NOT NULL DEFAULT 0,
+  max_uses INT NOT NULL DEFAULT 10,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT upload_codes_candidate_fk FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS upload_tokens (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   room_id BIGINT UNSIGNED NOT NULL,
-  candidate_a_id BIGINT UNSIGNED NOT NULL,
-  candidate_b_id BIGINT UNSIGNED NOT NULL,
-  status VARCHAR(40) NOT NULL DEFAULT '추천됨',
-  score SMALLINT NULL,
-  reason_summary VARCHAR(500) NOT NULL DEFAULT '',
-  created_by BIGINT UNSIGNED NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  kakao_user_key VARCHAR(120) NOT NULL DEFAULT '',
+  purpose VARCHAR(40) NOT NULL DEFAULT 'profile_upload',
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY matches_pair_unique (room_id, candidate_a_id, candidate_b_id),
-  CONSTRAINT matches_room_fk FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-  CONSTRAINT matches_a_fk FOREIGN KEY (candidate_a_id) REFERENCES candidates(id) ON DELETE CASCADE,
-  CONSTRAINT matches_b_fk FOREIGN KEY (candidate_b_id) REFERENCES candidates(id) ON DELETE CASCADE,
-  CONSTRAINT matches_created_by_fk FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT upload_tokens_room_fk FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS match_logs (
