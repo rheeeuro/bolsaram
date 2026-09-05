@@ -9,7 +9,8 @@ services:
       MARIADB_PASSWORD: bolsaram0711
       MARIADB_ROOT_PASSWORD: root0711
     ports:
-      - "0.0.0.0:3308:3306"
+      # 로컬(backend)만 접속한다. 0.0.0.0 이던 동안 외부 스캐너들이 3308 을 계속 두드렸다(2026-07-29).
+      - "127.0.0.1:3308:3306"
     volumes:
       - bolsaram_mariadb_data:/var/lib/mysql
     healthcheck:

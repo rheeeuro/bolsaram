@@ -1,174 +1,47 @@
 # 볼사람(bolsaram)
 
-카톡 오픈채팅에서 흩어지는 소개팅 후보 정보를 구조화하고, 주선자가 후보 정보를 빠르게 등록·확인하고 비활성 처리할 수 있게 만든 **방(Room) 기반 후보 관리 도구**입니다.
+> **재설계 중** — 기존 프로토타입 코드는 전부 제거했습니다.
+> 설계(요구사항 → 도메인 모델 → 기술 스택 → 구조)를 확정한 뒤 새로 구현합니다.
+> 이전 구현은 git 태그 `archive/v1-prototype`(커밋 `4d39048`)에서 확인할 수 있습니다.
 
-후보를 구조화해 등록하고, 사진을 업로드하며, 비활성 또는 삭제까지 단순하게 처리하는 운영 도구입니다.
+## 고정 인프라 정보
 
-## 서비스 구성
+새 설계에서도 그대로 사용할 값입니다.
 
-| 레이어 | 구성 | 포트 / 프로세스 |
-| --- | --- | --- |
-| 프론트엔드 | Next.js 16 · React 19 (`frontend/`) | `:3020` · PM2 `bolsaram-fe` |
-| 백엔드 | FastAPI · PyMySQL (`backend/app/main.py`) | `:8010` · PM2 `bolsaram-be` |
-| 데이터베이스 | MariaDB 11.4 (`sql/schema.sql`) | `:3308` |
-| 유지보수 배치 | 장기 미활동 후보 자동 비공개 (`backend/app/maintenance.py`) | PM2 `bolsaram-maintenance` (매일 04:00) |
+| 항목 | 값 |
+| --- | --- |
+| 프론트엔드 포트 | `3020` |
+| 백엔드 API 포트 | `8010` |
+| MariaDB 호스트 포트 | `3308` (→ 컨테이너 `3306`) |
+| MariaDB 바인드 | `127.0.0.1` 전용 (외부 노출 금지) |
+| DB 이름 | `bolsaram` |
+| DB 사용자 | `bolsaram_user` |
+| 컨테이너명 | `bolsaram_mariadb` (image `mariadb:11.4`) |
+| 데이터 볼륨 | `bolsaram_mariadb_data` |
 
-- Next.js가 `/api/*` 요청을 백엔드로 프록시하고, 인증은 쿠키 기반 세션(`sessions` 테이블)을 사용합니다.
-- DB 테이블: `users · sessions · rooms · room_members · candidates · candidate_photos · candidate_upload_codes · match_logs`
-- AI 보조 기능(카톡 파싱·개인정보 위험 감지)은 외부 API 없이 **규칙 기반**으로 동작합니다.
+- 비밀번호를 포함한 접속 정보 원본은 [docker-compose.yml](docker-compose.yml)에 있습니다. README에는 노출하지 않습니다.
+- MariaDB 포트는 `127.0.0.1`에만 바인딩합니다. `0.0.0.0`으로 열어둔 동안 외부 스캐너가 3308을 계속 두드린 이력이 있습니다(2026-07-29).
+- 이 호스트에서 8000–8002 포트는 다른 프로젝트가 사용 중이라 백엔드는 8010을 씁니다.
 
-## 핵심 개념
-
-- **방(Room)**: 모든 후보 데이터는 방에 속하며 방 밖으로 노출되지 않습니다.
-  - **공개방** — 앱에서 탐색해 입장합니다.
-  - **비공개방** — 초대 코드 또는 `/join/{code}` 링크로만 입장합니다.
-- **권한(역할)**: `owner`(소유자) · `admin`(관리자) · `member`(멤버)는 쓰기 가능, `viewer`(읽기 전용)는 조회만 가능합니다. 역할 변경은 owner만 할 수 있습니다.
-- **요금제 한도**: `free`(방 1·후보 30) / `pro`(방 5·후보 300) / `group`(방 20·후보 1000). 후보 한도는 방 소유자의 플랜 기준입니다. *업그레이드/결제 UI는 미구현이며 플랜 값은 현재 DB에서 직접 변경합니다(기본 free).*
-- **개인정보 보호**: 입력·공유 단계에서 전화번호·이메일·SNS·상세 주소·차량번호·주민번호 형식을 자동 감지해 경고하고, 연락처는 후보 상세에서 권한 있는 멤버에게만 표시합니다. 180일 미활동 후보는 배치로 자동 비공개 전환됩니다.
-
-## 주요 기능
-
-- 이메일/비밀번호 회원가입·로그인 (가입 후 방을 직접 생성하거나 초대 코드로 입장)
-- 공개방/비공개방 생성·탐색·입장, 입장 코드·링크 발급 및 재발급
-- 카톡 원문 붙여넣기 기반 자동 필드 분리, 중복 의심 후보 체크
-- 성별·나이·키·지역·직업군·종교·흡연·활동 상태 필터와 최근순 정렬
-- 중복 의심 후보와 운영 체크(동의·흡연·비활성 경고)
-- 후보 사진 업로드(워터마크 합성), 카카오 챗봇 업로드 링크 발급, 비활성 처리
-- 현황 대시보드(지표·상태 분포·최근 활동·동의/미활동 경고)
-- 톤별 카톡 공유용 소개글 생성·복사(정보형·소개형·오픈채팅용·격식형 + 클린메시지)
-- 방 멤버 관리 및 역할 변경(읽기 전용 게이팅)
-
-## 이용 방법
-
-1. **로그인/회원가입** — 가입 후 방 목록 화면에서 방을 직접 만들거나 초대 코드로 입장합니다.
-2. **방 목록 화면** — 두 탭으로 구성됩니다.
-   - **방 목록 탭** — 현재 입장 중인 공개/비공개방 카드 목록
-   - **탐색 탭** — 새로운 공개방을 탐색하고 이름 검색·정렬(후보/멤버/이름순)로 조건 검색해 입장
-   - 상단 `＋ 방 생성`(공개/비공개 선택)과 `코드로 입장`(비공개방 코드)을 제공합니다.
-3. **방 워크스페이스** — 상단에 `← 방 목록`, 방 제목·뱃지, 링크 복사(비공개방)·멤버·후보 등록 버튼이 있고 아래 2개 탭으로 나뉩니다. 방 생성·참가·전환은 `← 방 목록`으로 나가 방 목록 화면에서 합니다.
-   - **현황** — 등록 후보·활성 후보·비활성 지표, 동의 확인 필요/90일+ 미활동 경고, 상태 분포, 최근 활동
-   - **후보** (3분할 메인 화면) — ① 필터·통계 ② 후보 리스트(최근순) ③ 후보 상세(프로필·사진, 운영 체크, 카톡 공유글)
-4. **후보 등록** — 모달에 카톡 원문을 붙여넣고 `자동 분리`를 누르면 출생연도·키·MBTI·지역·학력·직업 등이 자동으로 채워집니다. `라벨 : 값` 형식과 라벨 없는 형식을 모두 인식합니다. 등록 단계에서 **사진을 함께 첨부**할 수 있고(저장 시 업로드), 정보 등록·공유 **동의 체크가 필수**입니다.
-
-## 카카오 챗봇 업로드
-
-카카오 챗봇은 이미지 파일을 직접 처리하지 않고 업로드 진입점으로만 사용합니다. 챗봇 Skill/Webhook은 `POST /api/kakao/skill`로 연결하고, 응답의 `업로드하기` 버튼은 `/upload?token=...` 모바일 웹 폼을 엽니다.
-
-- `PUBLIC_BASE_URL`: 카카오톡에서 열 공개 HTTPS 주소입니다. 예: `https://bolsaram.example.com`
-- `KAKAO_DEFAULT_ROOM_ID`: 챗봇 업로드가 기본으로 등록될 방 `public_id`입니다. Skill payload의 `action.params.roomId`가 있으면 그 값을 우선합니다.
-- `UPLOAD_TOKEN_TTL_MINUTES`: 업로드 링크 유효 시간입니다. 기본 30분이며 1회 사용 후 폐기됩니다.
-- `KAKAO_API_KEY`: 값이 있으면 Skill 요청의 `X-Kakao-Api-Key` 헤더와 비교합니다.
-
-모바일 웹 폼은 성별·나이·지역·직업·키·사진 1~3장·소개글·원하는 상대 조건·공개 여부를 받아 후보로 저장합니다. 업로드 이미지는 기존 서버 업로드 파이프라인을 사용해 워터마크 처리와 재저장을 거치므로 EXIF 같은 원본 메타데이터가 그대로 노출되지 않습니다.
-
-## 실행
-
-### 1. Node 의존성 설치
+## 데이터베이스 실행
 
 ```bash
-npm --prefix frontend install
+npm run db:up      # MariaDB 컨테이너 기동
+npm run db:logs    # 로그 확인
 ```
 
-### 2. Python 가상환경 및 백엔드 의존성 설치
-
-이 환경에서는 `uv`를 사용합니다.
-
-```bash
-uv venv backend/.venv
-uv pip install --python backend/.venv/bin/python -r backend/requirements.txt
-```
-
-### 3. MariaDB 실행
-
-요구사항에 맞춰 `bolsaram_mariadb` 컨테이너를 `0.0.0.0:3308 -> 3306/tcp`로 실행합니다.
-
-```bash
-npm run db:up
-```
-
-DB 접속 정보(`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`)는 `docker-compose.yml`과 환경변수로 관리합니다. 기본 접속 포트는 `3308`이며, 자격 증명 값은 README에 노출하지 않습니다.
-
-### 4. FastAPI 백엔드 실행
-
-현재 작업 환경에서는 8000-8002 포트가 다른 프로젝트에서 사용 중이라, 기본 API 포트는 8010으로 설정했습니다.
-
-```bash
-npm run dev:api
-```
-
-API: `http://localhost:8010`
-
-### 5. Next.js 프론트엔드 실행
-
-```bash
-npm run dev
-```
-
-Frontend: `http://localhost:3020`
-
-프론트에서 다른 API 주소를 쓰려면 다음 환경변수를 설정합니다.
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8010 npm run dev
-```
-
-백엔드 CORS 허용 origin은 `FRONTEND_ORIGINS`로 바꿀 수 있습니다.
-
-```bash
-FRONTEND_ORIGINS=http://localhost:3020 npm run dev:api
-```
+> 2026-09-06에 볼륨을 삭제하고 재생성했습니다. 현재 `bolsaram` DB는 **테이블 0개의 빈 상태**입니다.
+> 스키마는 새 설계에서 마이그레이션 도구와 함께 정의합니다.
 
 ## 운영 (PM2)
 
-```bash
-pm2 restart bolsaram-fe bolsaram-be   # 운영 프로세스 재시작
-pm2 status bolsaram-fe bolsaram-be    # 상태 확인
-curl http://127.0.0.1:8010/health     # 백엔드 헬스체크
-curl -I http://127.0.0.1:3020         # 프론트엔드 응답 확인
-```
+이전 PM2 프로세스(`bolsaram-fe`, `bolsaram-be`, `bolsaram-maintenance`)는 정지 상태이며,
+`ecosystem.config.cjs`는 삭제했습니다. 새 스택을 정한 뒤 다시 작성합니다.
 
-PM2 설정 파일은 `ecosystem.config.cjs`입니다.
+## 다음 단계
 
-## 개발 명령
-
-```bash
-npm run check
-npm run build
-npm run db:logs
-```
-
-`npm run check`는 FastAPI 문법 검사와 Next.js 프로덕션 빌드를 함께 실행합니다.
-
-## 구조
-
-```text
-.
-├── frontend/
-│   ├── app/
-│   │   ├── BolsaramApp.jsx      # 메인 앱 UI
-│   │   ├── lib.js              # API 클라이언트·파싱·공유글 헬퍼
-│   │   ├── globals.css         # 디자인 시스템(라이트, 세이지 그린)
-│   │   ├── layout.jsx
-│   │   ├── page.jsx
-│   │   ├── join/[code]/page.jsx # 비공개방 입장 링크
-│   │   └── rooms/[roomId]/page.jsx
-│   ├── next.config.mjs
-│   └── package.json
-├── backend/
-│   ├── app/
-│   │   ├── main.py             # FastAPI 라우트
-│   │   └── maintenance.py      # 장기 미활동 자동 비공개 배치
-│   └── requirements.txt
-├── sql/
-│   └── schema.sql
-├── ecosystem.config.cjs
-├── docker-compose.yml
-├── package.json
-└── README.md
-```
-
-## 비공개방 입장 흐름
-
-1. 로그인 후 `방 생성`에서 `비공개방`을 선택합니다.
-2. 생성된 입장 코드 또는 `/join/{code}` 링크를 복사해 공유합니다.
-3. 초대받은 사용자는 로그인 후 `새로운 방 참가하기 → 비공개방`에 코드를 입력하거나 링크로 접속해 입장합니다.
+1. 요구사항·범위 정리
+2. 도메인 모델 및 데이터 모델 설계
+3. 기술 스택 결정
+4. 프로젝트 구조·검증 파이프라인 정의
+5. 구현

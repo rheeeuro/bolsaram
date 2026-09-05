@@ -1,23 +1,13 @@
 {
   "name": "bolsaram",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
-  "description": "볼사람(bolsaram): Next.js와 FastAPI 기반 소개팅 후보 관리 웹 애플리케이션",
+  "description": "볼사람(bolsaram): 재설계 단계. 현재는 DB 컨테이너 실행 스크립트만 유지합니다.",
   "type": "module",
   "scripts": {
     "db:up": "docker compose up -d mariadb",
-    "db:logs": "docker compose logs -f mariadb",
-    "dev": "npm --prefix frontend run dev",
-    "dev:api": "backend/.venv/bin/python -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8010",
-    "build": "npm --prefix frontend run build",
-    "start": "npm --prefix frontend run start",
-    "check": "backend/.venv/bin/python -m py_compile backend/app/main.py && npm --prefix frontend run build"
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f mariadb"
   },
-  "keywords": [
-    "bolsaram",
-    "candidate-management",
-    "prototype",
-    "kakao-openchat"
-  ],
   "license": "UNLICENSED"
 }
