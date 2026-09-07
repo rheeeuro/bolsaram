@@ -58,7 +58,7 @@ pnpm lint
 pnpm test
 
 pnpm pm2:start         # PM2 등록 + 저장 (최초 1회)
-pnpm deploy            # 빌드 후 bolsaram-web 재시작
+pnpm deploy:web        # 빌드 후 bolsaram-web 재시작
 pnpm pm2:status        # 앱 상태
 pnpm pm2:logs          # 로그 50줄
 pnpm db:cleanup        # 만료 데이터 정리 (평소엔 cron 이 돌린다)

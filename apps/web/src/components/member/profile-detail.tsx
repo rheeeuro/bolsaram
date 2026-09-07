@@ -37,8 +37,10 @@ export function ProfileDetail({
 
   return (
     <main className="pb-8">
-      {/* 큰 인물 사진 (UI 컨셉 04) */}
-      <div className="relative aspect-4/5 w-full overflow-hidden bg-[var(--color-ivory-200)] sm:aspect-16/10">
+      {/* 큰 인물 사진 (UI 컨셉 04).
+          모바일은 화면을 꽉 채우고, 데스크톱은 본문 폭보다 좁은 세로 카드로 둔다 —
+          전체폭을 유지하면 넓은 화면에서 사진만 한 화면을 다 먹는다. */}
+      <div className="relative mx-auto aspect-4/5 w-full overflow-hidden bg-[var(--color-ivory-200)] sm:mt-6 sm:max-w-[400px] sm:rounded-[var(--radius-card)]">
         {current ? (
           // signed URL 은 단기 만료된다. next/image 캐싱을 피한다.
           // eslint-disable-next-line @next/next/no-img-element

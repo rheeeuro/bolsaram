@@ -8,7 +8,7 @@ description: 볼사람 웹 앱을 띄우고 실제 화면·API 동작을 확인�
 ## 어느 서버를 쓸지
 
 - **PM2(운영 프로세스)** 가 이미 3020 을 쓰고 있다: `pm2 status bolsaram-web` 으로 확인.
-  코드 변경을 반영하려면 `pnpm deploy` (빌드 + 재시작). 턴 종료 시 훅이 자동으로 한다.
+  코드 변경을 반영하려면 `pnpm deploy:web` (빌드 + 재시작). 턴 종료 시 훅이 자동으로 한다.
 - **개발 서버**로 확인하려면 먼저 PM2 앱을 멈춘다: `pm2 stop bolsaram-web` → `pnpm dev`.
   끝나면 `pm2 start bolsaram-web` 으로 되돌린다.
 

@@ -14,7 +14,7 @@ tools: Bash, Read, Grep, Glob
 2. 정적 검증: `pnpm verify` (typecheck + lint + test). DB 통합 테스트가 있으므로
    `docker ps --filter name=bolsaram_postgres` 로 컨테이너를 먼저 확인한다.
 3. 동작 검증: `pm2 status bolsaram-web` 으로 앱이 떠 있는지 보고, 영향받은 경로를 실제로 호출한다.
-   - 코드 변경이 반영되지 않았으면 `pnpm deploy` (빌드 + 재시작) 후 확인한다.
+   - 코드 변경이 반영되지 않았으면 `pnpm deploy:web` (빌드 + 재시작) 후 확인한다.
    - 화면 변경이면 렌더링된 HTML 에서 핵심 요소를 확인하고 **모바일 폭(390px) 관점도 언급**한다.
 4. 권한 경계 검증 — 변경이 이 축을 건드렸다면 반드시 확인한다.
    - 쿠키 없이 API 호출 → 401 인가

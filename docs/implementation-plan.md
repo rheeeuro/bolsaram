@@ -85,6 +85,12 @@ PM2 로 상시 기동한다. 정의는 `ecosystem.config.cjs`.
 포기해야 하는" 상황이 된다. `APP_ENV=staging` 에서는 OTP 를 화면에 띄워 회원 흐름을 확인할 수
 있고, `production` 으로 올리면 서버가 그 조합을 거부한다.
 
+배포 스크립트 이름을 `deploy` → `deploy:web` 으로 바꿨다(2026-09-07). pnpm 9 에 내장 `deploy`
+명령이 있어 `pnpm deploy` 가 스크립트 대신 그쪽으로 잡히고 `ERR_PNPM_NOTHING_TO_DEPLOY` 로
+끝났다. `pnpm run deploy` 로 우회할 수는 있지만, 짧은 형태를 습관적으로 치면 계속 걸리므로
+이름 자체를 겹치지 않게 했다. `pm2:*`·`db:*` 와 같은 접두 규칙에도 맞는다.
+턴 종료 훅(`deploy-on-stop.sh`)은 `pnpm build` 와 `pm2 restart` 를 직접 부르므로 영향이 없다.
+
 ## 에이전트 하네스 (2026-09-07 추가)
 
 `../jongalab` 의 구조를 참고해 `.agent-config/` 단일 원본 + `sync.py` 생성 방식을 도입했다.

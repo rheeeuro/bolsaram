@@ -92,7 +92,7 @@ pnpm dev          # http://127.0.0.1:3020
 
 ```bash
 pnpm pm2:start    # 최초 등록 + 저장
-pnpm deploy       # 빌드 후 재시작
+pnpm deploy:web   # 빌드 후 재시작
 pnpm pm2:status   # 상태
 pnpm pm2:logs     # 로그
 ```

@@ -151,7 +151,7 @@ commit 은 `idempotency_key` 를 조건부로 선점해 같은 세션에서 프�
 ```bash
 pnpm dev                       # 개발 서버 (PM2 가 3020 을 쓰고 있으면 먼저 pm2 stop bolsaram-web)
 pnpm --filter @bolsaram/web typecheck
-pnpm deploy                    # 빌드 + PM2 재시작
+pnpm deploy:web                # 빌드 + PM2 재시작
 ```
 
 환경변수는 리포 루트 `.env` 하나로 관리하고 `next.config.ts` 가 읽어들인다.
