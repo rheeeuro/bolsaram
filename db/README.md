@@ -37,6 +37,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0012_group_invites.sql`           | 모임 초대 코드 (동료 주선자 합류)                                                      |
 | `0013_drop_open_claim.sql`         | `profiles_claim` 제거 — 누구나 주인 없는 프로필을 가져갈 수 있었다                     |
 | `0014_group_description.sql`       | 모임 설명 (주선자끼리 보는 메모)                                                       |
+| `0015_magic_link_login.sql`        | 회원 로그인을 매직 링크로 — `login_codes` 제거, 전화번호 필수 해제                     |
+| `0016_invite_claim_pair.sql`       | `invites_claim_pair` 완화 — 링크를 쓴 회원을 삭제할 수 있게                            |
 
 ## 테이블
 
@@ -49,12 +51,12 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
 | `favorites`                                    | 관심                                               | 본인만                              |
-| `invites`                                      | 초대 (토큰 해시만 저장)                            | 관리자만                            |
+| `invites`                                      | **회원 로그인 링크** (토큰 해시만 저장)            | 관리자만                            |
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
 | `telegram_connections`                         | 텔레그램 계정 ↔ 주선자 연결                        | 관리자만                            |
 | `telegram_import_sessions`                     | 봇 대화 상태 (ImportSession 과 1:1)                | 관리자만                            |
-| `sessions` · `login_codes`                     | 세션·OTP                                           | **권한 없음** (owner 커넥션 전용)   |
+| `sessions`                                     | 세션                                               | **권한 없음** (owner 커넥션 전용)   |
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
 | `group_invite_codes`                           | 모임 초대 코드(해시). 동료 주선자 합류             | **권한 없음** (owner 커넥션 전용)   |
 | `admin_login_failures`                         | 관리자 로그인 실패 기록 (시도 제한 판정)           | **권한 없음** (owner 커넥션 전용)   |
@@ -71,7 +73,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `profiles.user_id` UNIQUE                            | 한 계정에 프로필 두 개                        |
 | `invites_one_open` (부분 유니크)                     | 프로필당 살아 있는 초대 두 개                 |
 | `import_sessions_idempotency` (부분 유니크)          | 같은 키로 두 번 commit                        |
-| `invites_claim_pair` · `import_sessions_commit_pair` | 짝이 안 맞는 상태 (claim 됐는데 주인 없음 등) |
+| `import_sessions_commit_pair`                       | 짝이 안 맞는 commit 상태                      |
+| `invites_claim_pair`                                | 쓴 사람은 있는데 쓴 시각이 없는 상태          |
 | `telegram_import_sessions_one_active` (부분 유니크) | 한 텔레그램 사용자의 대화 두 개 — 사진이 한 세션에 묶이는 근거 |
 | `telegram_link_codes_one_open` (부분 유니크)        | 주선자당 살아 있는 연결 코드 두 개            |
 | `telegram_webhook_events.update_id` PK              | 같은 webhook update 두 번 처리                |

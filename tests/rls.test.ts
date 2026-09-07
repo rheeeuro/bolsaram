@@ -222,11 +222,6 @@ describe("관리자 전용 테이블", () => {
     ).rejects.toThrow(/permission denied/i);
   });
 
-  it("앱 롤은 OTP 테이블에 접근할 수 없다", async () => {
-    await expect(
-      withRls(fx.member1, (sql) => sql.query(`SELECT id FROM login_codes`)),
-    ).rejects.toThrow(/permission denied/i);
-  });
 
   it("회원은 감사 로그를 읽지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) => sql.query(`SELECT id FROM audit_logs`));

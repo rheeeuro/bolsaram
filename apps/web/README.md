@@ -76,16 +76,12 @@ server/
 ├── auth/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
 │   ├── login.ts              관리자 비밀번호 · 회원 OTP (재요청·시도 제한)
-│   ├── invite.ts             초대 발급·미리보기·claim (해시 저장, replay 차단)
+│   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
 │   ├── group-invite.ts       모임 초대 코드 발급·소비, 내 모임 조회
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
 ├── storage/local.ts          private 저장소 + signed download/upload URL
-├── sms/                      인증번호 발송 (프로바이더 추상화)
-│   ├── types.ts              SmsSender 인터페이스 (delivers 로 실제 도착 여부 구분)
-│   ├── console.ts            개발용 — 서버 로그에만 남긴다
-│   └── index.ts              SMS_PROVIDER 로 선택
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
 │   ├── mock.ts               규칙 기반 추출기 (기본, API 키 불필요)
@@ -121,10 +117,8 @@ server/
 | ----------------------------------------- | ------------------- | ----------------- | ------------------------------------ |
 | `/api/auth/signup`                        | POST                | –                 | 주선자 가입 (계정만)                 |
 | `/api/auth/admin-login`                   | POST                | –                 | 주선자 로그인 (15분 5회 시도 제한)   |
-| `/api/auth/otp/request`                   | POST                | –                 | 회원 인증번호 발급                   |
-| `/api/auth/otp/verify`                    | POST                | –                 | 인증번호 확인 → 세션                 |
 | `/api/auth/logout`                        | POST                | –                 | 세션 폐기                            |
-| `/api/claim`                              | POST                | 회원              | 초대 토큰으로 프로필 연결            |
+| `/api/claim`                              | POST                | **초대 토큰**     | 회원 로그인 (매직 링크) + 최초 계정 생성 |
 | `/api/profiles`                           | GET                 | 회원              | Discover 목록 (필터·커서)            |
 | `/api/profiles/[id]`                      | GET / PATCH         | 회원 / 관리자     | 상세 조회 / 내용 수정                |
 | `/api/profiles/[id]/status`               | PATCH               | 관리자            | 상태·노출 변경                       |

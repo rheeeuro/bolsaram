@@ -16,8 +16,6 @@ import type { Sql } from "./client.js";
 export const RETENTION = {
   /** 만료·폐기된 세션 행 */
   sessions: 30,
-  /** 소비·만료된 로그인 코드 */
-  loginCodes: 7,
   /** 사용·만료된 초대 */
   invites: 90,
   /** 등록되지 않은 채 방치된 Import 세션 — 원본 사진까지 지운다 */
@@ -51,16 +49,6 @@ export const STEPS: Step[] = [
           WHERE (expires_at < now() - make_interval(days => $1))
              OR (revoked_at IS NOT NULL AND revoked_at < now() - make_interval(days => $1))`,
         [RETENTION.sessions],
-      );
-      return r.rowCount ?? 0;
-    },
-  },
-  {
-    label: "만료 로그인 코드",
-    run: async (sql) => {
-      const r = await sql.query(
-        `DELETE FROM login_codes WHERE created_at < now() - make_interval(days => $1)`,
-        [RETENTION.loginCodes],
       );
       return r.rowCount ?? 0;
     },

@@ -1,31 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiPost } from "@/lib/api-client";
 
-export function ClaimForm({ token, loggedIn }: { token: string; loggedIn: boolean }) {
+/**
+ * 초대 링크 진입 버튼.
+ *
+ * 로그인 화면을 거치지 않는다 — 이 버튼이 곧 로그인이다. 링크를 소비하면 세션이
+ * 생기고, 처음이면 회원 계정도 함께 만들어진다.
+ */
+export function ClaimForm({ token, alreadyLinked }: { token: string; alreadyLinked: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  if (!loggedIn) {
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="text-[13px] leading-relaxed text-[var(--color-ink-600)]">
-          먼저 초대받은 휴대폰 번호로 로그인해 주세요.
-        </p>
-        <Link
-          href={`/login?next=${encodeURIComponent(`/claim/${token}`)}`}
-          className="flex h-12 items-center justify-center rounded-xl bg-[var(--color-rose-500)] text-[15px] font-medium text-white"
-        >
-          로그인하고 계속하기
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -36,17 +25,20 @@ export function ClaimForm({ token, loggedIn }: { token: string; loggedIn: boolea
           void (async () => {
             setBusy(true);
             setError(null);
-            const result = await apiPost("/api/claim", { token: decodeURIComponent(token) });
+            const result = await apiPost<{ firstTime: boolean }>("/api/claim", {
+              token: decodeURIComponent(token),
+            });
             setBusy(false);
             if (!result.ok) {
               setError(result.message);
               return;
             }
-            router.replace("/me");
+            // 처음이면 내 프로필을 확인하게, 재로그인이면 바로 탐색으로 보낸다.
+            router.replace(result.data.firstTime ? "/me" : "/discover");
           })();
         }}
       >
-        {busy ? "연결 중…" : "내 프로필로 연결하기"}
+        {busy ? "들어가는 중…" : alreadyLinked ? "볼사람 시작하기" : "내 프로필로 시작하기"}
       </Button>
       {error ? <p className="text-[13px] text-[var(--color-danger)]">{error}</p> : null}
     </div>

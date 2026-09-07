@@ -41,11 +41,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         // 이 호스트의 인스턴스는 아직 실제 사용자를 받지 않는 로컬 스테이징이다.
-        // SMS 가 연동되지 않은 상태라 staging 에서는 OTP 를 화면에 띄워 회원 흐름을 확인한다.
-        // **실제 배포 시 APP_ENV 를 production 으로 바꾸고 DEV_EXPOSE_OTP 를 지운다** —
-        // production 에서 이 값이 켜져 있으면 서버가 기동을 거부한다.
+        // 실제 배포 시 APP_ENV 를 production 으로 바꾼다.
         APP_ENV: "staging",
-        DEV_EXPOSE_OTP: "true",
       },
       ...log("bolsaram-web"),
     },

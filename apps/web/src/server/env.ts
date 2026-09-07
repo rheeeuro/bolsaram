@@ -43,16 +43,6 @@ const envSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, "TELEGRAM_WEBHOOK_SECRET 에는 A-Z a-z 0-9 _ - 만 쓸 수 있습니다.")
     .optional(),
 
-  /**
-   * SMS 발송 프로바이더. 기본 `console` 은 실제로 보내지 않고 서버 로그에만 남긴다.
-   * 실제 업체 어댑터가 붙으면 여기에 값을 추가한다(server/sms/index.ts).
-   */
-  SMS_PROVIDER: z.enum(["console"]).default("console"),
-
-  DEV_EXPOSE_OTP: z
-    .string()
-    .optional()
-    .transform((v) => v === "true"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /**
    * 배포 환경. NODE_ENV 와 분리한 축이다.
@@ -85,14 +75,6 @@ export function env(): Env {
   if (parsed.data.AI_PROVIDER === "openai" && !parsed.data.OPENAI_API_KEY) {
     throw new Error("AI_PROVIDER=openai 이면 OPENAI_API_KEY 가 필요합니다.");
   }
-  // 실제 사용자를 받는 배포에서 문자가 도착하지 않는 sender 로 뜨면 회원이 로그인할
-   // 방법이 없다. 조용히 깨지는 대신 기동을 거부한다.
-  if (parsed.data.APP_ENV === "production" && parsed.data.SMS_PROVIDER === "console") {
-    throw new Error(
-      "APP_ENV=production 에서는 SMS_PROVIDER=console 을 쓸 수 없습니다." +
-        " 실제 발송 어댑터를 붙이세요(apps/web/src/server/sms/).",
-    );
-  }
   // 반쯤 켜진 상태를 허용하지 않는다. 토큰 없이 webhook 만 열리면 검증도 못 하고
   // 답장도 못 하는 채널이 생긴다.
   if (parsed.data.TELEGRAM_ENABLED) {
@@ -102,12 +84,6 @@ export function env(): Env {
     if (!parsed.data.TELEGRAM_WEBHOOK_SECRET) {
       throw new Error("TELEGRAM_ENABLED=true 이면 TELEGRAM_WEBHOOK_SECRET 이 필요합니다.");
     }
-  }
-  // OTP 노출은 실제 운영에서 절대 허용하지 않는다.
-  // 판정 기준은 NODE_ENV 가 아니라 APP_ENV 다 — PM2 로 띄운 로컬 스테이징도
-  // NODE_ENV 는 production 이지만 아직 실제 사용자가 없다.
-  if (parsed.data.APP_ENV === "production" && parsed.data.DEV_EXPOSE_OTP) {
-    throw new Error("APP_ENV=production 에서는 DEV_EXPOSE_OTP 를 켤 수 없습니다.");
   }
   cached = parsed.data;
   return cached;
@@ -128,20 +104,3 @@ export function isTelegramEnabled(): boolean {
   return env().TELEGRAM_ENABLED;
 }
 
-/**
- * 이 배포가 자기 호스트 밖에서 접근 가능한지 — `APP_ORIGIN` 이 loopback 인지로 판정한다.
- *
- * 개발 편의 기능 중 **네트워크로 값을 흘리는 것**은 이 값으로 막는다. `APP_ENV` 만으로는
- * 부족하다 — 이 호스트는 APP_ENV=staging 인데 실제로는 공개 도메인으로 서비스되고 있었고,
- * 그 상태에서 로그인 인증번호가 API 응답에 실려 누구나 남의 계정으로 로그인할 수 있었다.
- * 사람이 플래그를 옳게 설정하는 데 기대지 않고 주소에서 유도한다.
- */
-export function isLoopbackDeployment(): boolean {
-  try {
-    const host = new URL(env().APP_ORIGIN).hostname;
-    return host === "127.0.0.1" || host === "localhost" || host === "[::1]" || host === "::1";
-  } catch {
-    // 파싱할 수 없으면 공개로 간주한다 — 안전한 쪽으로 틀린다.
-    return false;
-  }
-}

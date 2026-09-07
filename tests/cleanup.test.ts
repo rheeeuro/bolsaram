@@ -74,7 +74,6 @@ afterAll(async () => {
     await sql.query(`DELETE FROM import_sessions WHERE created_by = $1`, [adminId]);
     await sql.query(`DELETE FROM profiles WHERE created_by = $1`, [adminId]);
     await sql.query(`DELETE FROM users WHERE id = $1`, [adminId]);
-    await sql.query(`DELETE FROM login_codes WHERE phone LIKE '0109888%'`);
     await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
   });
   await rm(STORAGE, { recursive: true, force: true });
@@ -169,21 +168,6 @@ describe("purgeAbandonedImports", () => {
 });
 
 describe("runCleanup", () => {
-  it("만료된 로그인 코드를 지운다", async () => {
-    await withOwner(async (sql) => {
-      await sql.query(
-        `INSERT INTO login_codes (phone, code_hash, expires_at, created_at)
-         SELECT '0109888'||g, 'x', now()-interval '10 days', now()-interval '10 days'
-           FROM generate_series(1,3) g`,
-      );
-      const summary = await runCleanup(sql, STORAGE);
-      const step = summary.find((s) => s.label === "만료 로그인 코드");
-      expect(step?.count).toBeGreaterThanOrEqual(3);
-
-      const left = await sql.query(`SELECT 1 FROM login_codes WHERE phone LIKE '0109888%'`);
-      expect(left.rowCount).toBe(0);
-    });
-  });
 
   it("기한이 지나 열려 있는 초대를 회수한다", async () => {
     await withOwner(async (sql) => {

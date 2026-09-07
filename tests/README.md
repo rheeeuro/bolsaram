@@ -38,6 +38,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·사진 묶기·권한 경계   | 필요 | 23   |
 | `admin-login.test.ts`          | 관리자 비밀번호 시도 제한·창 만료·권한 경계    | 필요 | 7    |
 | `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
+| `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 21   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
@@ -81,6 +82,8 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `admin-signup.test.ts` 「전체공개를 남이 고칠 수 없다」    | 보이는 것과 고치는 것을 분리         |
 | `admin-signup.test.ts` 「마지막 주선자는 …나갈 수 없다」   | 아무도 못 보는 회원을 만들지 않음    |
 | `group-isolation.test.ts` 「남의 프로필을 자기 것으로」    | 초대 없는 claim 차단 (0013)          |
+| `member-magic-link.test.ts` 「같은 링크를 두 번」          | 링크 replay 차단 (회원 로그인 수단)  |
+| `member-magic-link.test.ts` 「링크를 쓴 회원을 삭제」      | 탈퇴 처리가 제약에 막히지 않음 (0016)|
 | `docs-guide.test.ts`                                       | 사용자 문서와 구현의 정합성         |
 | `docs-readme.test.ts`                                      | 디렉터리 문서와 코드 구조의 정합성  |
 

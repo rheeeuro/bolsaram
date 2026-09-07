@@ -234,7 +234,7 @@ async function main(): Promise<void> {
         `  관리자 — ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`,
         "",
         "  모든 인물 정보와 사진은 합성 데이터입니다.",
-        `  OTP 는 DEV_EXPOSE_OTP=true 일 때 서버 콘솔과 로그인 화면에 표시됩니다.`,
+        `  회원은 비밀번호가 없습니다 — 관리자 화면에서 초대 링크를 발급해 로그인합니다.`,
       ].join("\n"),
     );
   });

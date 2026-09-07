@@ -24,7 +24,7 @@
 | 웹       | Next.js 16 App Router, React 19, TypeScript strict, Tailwind v4, Zod 4          |
 | API      | Next.js Route Handler (별도 백엔드 프로세스 없음)                               |
 | DB       | PostgreSQL 17 (로컬 컨테이너), 순수 SQL 마이그레이션 + RLS                      |
-| 인증     | 자체 세션(서명 쿠키 + `sessions` 테이블). 관리자 이메일/비밀번호, 회원 전화 OTP |
+| 인증     | 자체 세션(서명 쿠키 + `sessions`). 주선자 이메일/비밀번호, **회원은 초대 링크** |
 | 스토리지 | 로컬 private 디렉터리 + HMAC signed URL                                         |
 | AI       | provider 추상화. 기본 `mock`, `AI_PROVIDER=openai` 로 전환                      |
 | Import   | 텔레그램 Bot API webhook (1차) + 관리자 웹 업로드. `TELEGRAM_ENABLED` 게이트     |
@@ -73,13 +73,17 @@ pnpm agents:check      # 생성 파일 드리프트 검사
 pnpm agents:test       # 셸 가드 판정 케이스 23개
 ```
 
+회원 계정은 **초대 링크를 소비할 때만** 만들어집니다(`consumeInvite`).
+자유 가입이 없고, 전화번호는 신원이 아니라 주선자가 기록하는 연락 수단입니다.
+
 시드 계정:
 
 - 주선자 `admin@bolsaram.local` — **이 호스트의 비밀번호는 교체됐습니다.**
   `pnpm db:seed` 가 만드는 기본값은 `bolsaram-admin` 이지만, 공개 도메인에 열려 있어
   2026-09-07 에 임의 값으로 바꿨습니다. 값을 모르면 `packages/db/src/cli/seed.ts` 의
   방식대로 해시를 새로 넣으세요. 또는 `/signup` 으로 새 주선자 계정을 만듭니다.
-- 회원 `01020001000` ~ `01020001005` (OTP는 `DEV_EXPOSE_OTP=true`일 때 화면·콘솔에 표시)
+- 회원 `01020001000` ~ `01020001005` — **비밀번호가 없습니다.** 관리자 화면에서
+  프로필 상세 → 초대 링크를 발급해 그 링크로 들어갑니다(매직 링크).
 
 ## PM2
 
@@ -92,7 +96,6 @@ pnpm agents:test       # 셸 가드 판정 케이스 23개
 - 앱을 추가·변경하면 `pnpm pm2:save` 로 저장해야 재부팅 후에도 살아난다
   (이 호스트는 systemd `pm2-euro.service` 로 PM2 를 복원한다).
 - 웹 앱은 `APP_ENV=staging` 으로 뜬다. 실제 배포 시 `production` 으로 바꾸고
-  `DEV_EXPOSE_OTP` 를 지운다.
 - **환경변수 가드가 걸리면 앱이 아무것도 서비스하지 않는다** — `instrumentation` 훅에서
   던지므로 포트는 열리지만 **모든 요청이 500** 이 된다. 프로세스가 죽지 않으니
   `pm2 status` 에는 `online` 으로 보인다. 설정을 바꾼 뒤에는 상태가 아니라 **기동 로그**를
@@ -282,17 +285,15 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   자세한 내용은 `docs/implementation-plan.md` 「실기기 검증 결과」.
 - **카카오 챗봇 Import**: 폐기했습니다. 오픈빌더 스킬 payload 에 사용자 전송 이미지 필드가
   없습니다(`docs/v2/BOLSARAM_ARCHITECTURE_CHANGE_CHATBOT_v1.md` 배너 참고).
-- **SMS 발송**: 프로바이더 추상화(`apps/web/src/server/sms/`)까지 되어 있고 **실제 업체
-  어댑터가 없습니다.** 기본 `console` sender 는 서버 로그에만 남깁니다. 업체를 정하면
-  `SmsSender` 구현 하나를 추가하고 `SMS_PROVIDER` 에 값을 넣으면 됩니다.
-  국내 발신번호 사전등록이 필요하므로 업체·계약은 사용자 결정입니다.
-  `APP_ENV=production` + `SMS_PROVIDER=console` 조합은 환경변수 검증에 걸립니다
-  (앱이 아무것도 서비스하지 않고 모든 요청이 500 — 위 「PM2」 참고).
+- **SMS**: 쓰지 않기로 했습니다(2026-09-07). 회원 로그인은 주선자가 카카오톡으로 보내는
+  **초대 링크**입니다 — 링크가 세션을 만들고, 처음이면 회원 계정도 함께 만듭니다.
+  전화번호 OTP 경로·`server/sms/`·`DEV_EXPOSE_OTP` 는 제거했습니다(0015).
+  세션(30일)이 만료되면 주선자가 링크를 재발급합니다.
 - **모임 전환 UI**: 없습니다. 한 사람은 한 모임에만 속하고, 옮기려면 나갔다가 초대
   코드로 다시 들어와야 합니다(나가기·참여는 `/admin/group` 에 있습니다).
 - **주선자 비밀번호**: 이 호스트는 교체했습니다(2026-09-07). 다만 `pnpm db:seed` 는
   여전히 문서화된 기본값을 씁니다 — 새로 시드한 환경을 공개 주소에 붙이면 같은 문제가
   생깁니다. 시도 제한(15분 5회)은 **이미 알려진 비밀번호를 막지 못합니다.**
-- **운영 배포 전환**: `APP_ENV=production` 으로 올린 적이 없습니다. SMS 어댑터가 붙어야
-  가능하고, 그때 `DEV_EXPOSE_OTP` 제거와 시크릿·토큰 재발급을 함께 합니다.
+- **운영 배포 전환**: `APP_ENV=production` 으로 올린 적이 없습니다. 올릴 때 시크릿·봇
+  토큰·OpenAI 키 재발급을 함께 합니다.
   (PM2 구성 자체는 `ecosystem.config.cjs` 에 있습니다 — 위 「PM2」 참고.)

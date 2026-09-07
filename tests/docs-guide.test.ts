@@ -105,21 +105,17 @@ describe("가이드가 언급하는 화면이 실제로 있다", () => {
 });
 
 describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
-  it("인증번호 유효시간 5분", () => {
-    const ms = constantOf("apps/web/src/server/auth/login.ts", "OTP_TTL_MS");
-    expect(ms / 60_000).toBe(5);
-    expect(ALL).toMatch(/5분/);
-  });
-
-  it("인증번호 재요청 대기 30초", () => {
-    const ms = constantOf("apps/web/src/server/auth/login.ts", "OTP_RESEND_COOLDOWN_MS");
-    expect(ms / 1000).toBe(30);
-    expect(ALL).toMatch(/30초/);
-  });
-
-  it("인증번호 시도 횟수 5회", () => {
-    expect(constantOf("apps/web/src/server/auth/login.ts", "OTP_MAX_ATTEMPTS")).toBe(5);
-    expect(ALL).toMatch(/5(번|회)/);
+  it("회원 로그인에 인증번호를 쓰지 않는다", () => {
+    // SMS 를 쓰지 않기로 해서 OTP 경로를 제거했다(0015). 안 쓰는 인증 경로를
+    // 코드에 남겨두면 가이드와 실제가 어긋난다.
+    // 주석에는 "OTP 경로를 제거했다"처럼 남을 수 있으므로 **함수와 상수**만 본다.
+    const login = readFileSync(
+      path.join(ROOT, "apps/web/src/server/auth/login.ts"),
+      "utf8",
+    );
+    expect(login).not.toMatch(/issueLoginCode|verifyLoginCode|OTP_TTL_MS|OTP_MAX_ATTEMPTS/);
+    // 회원 로그인 경로는 초대 링크뿐이다.
+    expect(guide("member.md")).toMatch(/링크/);
   });
 
   it("로그인 유지 30일", () => {

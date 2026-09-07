@@ -1,9 +1,17 @@
 /**
- * 초대 / Claim (설계문서 §4 가입, §12 보안).
+ * 초대 링크 = **회원의 로그인 수단**.
  *
- * 토큰은 평문으로 저장하지 않는다. pepper 를 섞은 HMAC 만 DB 에 남기고
- * 평문은 발급 시 한 번만 반환한다. claim 은 조건부 UPDATE 로 원자적으로 처리해
- * 같은 토큰을 두 번 쓰는 replay 를 막는다.
+ * SMS 를 쓰지 않으므로 회원에게 인증번호를 보낼 방법이 없다. 주선자가 이미 카카오톡으로
+ * 초대 링크를 보내고 있으니 그 링크가 세션까지 만든다(매직 링크).
+ *
+ *   프로필에 주인이 없으면 → 회원 계정을 만들고 연결한 뒤 세션
+ *   주인이 있으면        → 그 계정으로 세션 (재로그인)
+ *
+ * 토큰은 평문으로 저장하지 않는다. pepper 를 섞은 HMAC 만 DB 에 남기고 평문은 발급 시
+ * 한 번만 반환한다. 소비는 조건부 UPDATE 로 원자적으로 처리해 replay 를 막는다.
+ *
+ * 링크를 가진 사람이 곧 그 회원이 된다 — 주선자가 본인에게 직접 전달하는 것이 전제다.
+ * 그래서 유효기간을 짧게 두고 1회용으로 만든다. 세션이 만료되면 주선자가 재발급한다.
  */
 import "server-only";
 import { withOwnerTx } from "@bolsaram/db";
@@ -88,73 +96,78 @@ export async function previewInvite(token: string): Promise<InvitePreview> {
 }
 
 /**
- * 토큰으로 프로필을 사용자에게 연결한다.
+ * 토큰을 소비해 **세션을 만들 사용자**를 돌려준다.
+ *
+ * 프로필에 주인이 없으면 회원 계정을 새로 만든다 — 이 경로가 유일한 회원 가입
+ * 경로다(볼사람은 비공개 서비스라 자유 가입이 없다). 이미 주인이 있으면 그 계정으로
+ * 재로그인한다.
+ *
  * `claimed_at IS NULL` 조건을 UPDATE 에 넣어 동시 요청 중 하나만 성공하게 한다.
  */
-export async function claimInvite(input: {
+export async function consumeInvite(input: {
   token: string;
-  userId: string;
-}): Promise<{ profileId: string }> {
+}): Promise<{ userId: string; profileId: string; firstTime: boolean }> {
   return withOwnerTx(async (sql) => {
-    const claimed = await sql.query<{ id: string; profile_id: string }>(
-      `UPDATE invites
-          SET claimed_at = now(), claimed_by = $2
+    // 먼저 행을 잠근다. `claimed_at`·`claimed_by` 는 CHECK(invites_claim_pair)가
+    // 함께 채워지길 요구하므로 **누구로 소비할지 정한 뒤에 한 번에** 써야 한다.
+    // FOR UPDATE 로 동시 요청을 직렬화하고, 아래 UPDATE 에 조건을 한 번 더 둔다.
+    const found = await sql.query<{ id: string; profile_id: string }>(
+      `SELECT id, profile_id FROM invites
         WHERE token_hash = $1
           AND claimed_at IS NULL
           AND revoked_at IS NULL
           AND expires_at > now()
-        RETURNING id, profile_id`,
-      [hashToken(input.token), input.userId],
+        FOR UPDATE`,
+      [hashToken(input.token)],
     );
-    const invite = claimed.rows[0];
+    const invite = found.rows[0];
     if (!invite) {
-      throw new DomainError("NOT_FOUND", "만료되었거나 이미 사용된 초대 링크입니다.");
+      throw new DomainError("NOT_FOUND", "만료되었거나 이미 사용된 링크입니다.");
     }
 
-    // 한 사용자는 프로필 하나만 가진다. 먼저 확인해 사용자에게 이유를 알려준다
-    // (profiles.user_id UNIQUE 가 최종 방어선이며 아래에서 그 위반도 번역한다).
-    const mine = await sql.query<{ id: string }>(`SELECT id FROM profiles WHERE user_id = $1`, [
-      input.userId,
-    ]);
-    const already = mine.rows[0];
-    if (already) {
-      // 같은 프로필을 다시 claim 한 경우는 성공으로 본다(재시도 안전).
-      if (already.id === invite.profile_id) return { profileId: already.id };
-      throw new DomainError(
-        "CONFLICT",
-        "이미 연결된 프로필이 있습니다. 다른 프로필을 연결하려면 주선자에게 문의해 주세요.",
-      );
-    }
+    const profile = await sql.query<{ user_id: string | null; real_name: string | null }>(
+      `SELECT user_id, real_name FROM profiles WHERE id = $1`,
+      [invite.profile_id],
+    );
+    const row = profile.rows[0];
+    if (!row) throw new DomainError("NOT_FOUND", "대상 프로필을 찾을 수 없습니다.");
 
-    // 이미 주인이 있는 프로필이면 연결하지 않는다. 트랜잭션째로 되돌린다.
-    let linked;
-    try {
-      linked = await sql.query<{ id: string }>(
-        `UPDATE profiles SET user_id = $2
-          WHERE id = $1 AND user_id IS NULL
-          RETURNING id`,
-        [invite.profile_id, input.userId],
+    let userId = row.user_id;
+    const firstTime = userId == null;
+
+    if (firstTime) {
+      // 첫 진입. 회원 계정을 만든다 — 이 경로가 유일한 회원 가입 경로다.
+      // 전화번호는 더 이상 신원이 아니므로 넣지 않는다(0015).
+      const created = await sql.query<{ id: string }>(
+        `INSERT INTO users (role, display_name) VALUES ('MEMBER', $1) RETURNING id`,
+        [row.real_name],
       );
-    } catch (error) {
-      // 23505 = unique_violation. 동시 요청 두 개가 위 검사를 함께 통과한 경우다.
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        (error as { code?: string }).code === "23505"
-      ) {
-        throw new DomainError("CONFLICT", "이미 연결된 프로필이 있습니다.");
+      userId = created.rows[0]!.id;
+
+      const linked = await sql.query<{ id: string }>(
+        `UPDATE profiles SET user_id = $2 WHERE id = $1 AND user_id IS NULL RETURNING id`,
+        [invite.profile_id, userId],
+      );
+      if (linked.rowCount === 0) {
+        // 경쟁에서 졌다. 트랜잭션째로 되돌아가 방금 만든 계정도 사라진다.
+        throw new DomainError("CONFLICT", "이미 다른 계정에 연결된 프로필입니다.");
       }
-      throw error;
-    }
-    if (linked.rowCount === 0) {
-      throw new DomainError("CONFLICT", "이미 다른 계정에 연결된 프로필입니다.");
     }
 
-    return { profileId: invite.profile_id };
+    const claimed = await sql.query(
+      `UPDATE invites SET claimed_at = now(), claimed_by = $2
+        WHERE id = $1 AND claimed_at IS NULL`,
+      [invite.id, userId],
+    );
+    if (claimed.rowCount === 0) {
+      throw new DomainError("NOT_FOUND", "만료되었거나 이미 사용된 링크입니다.");
+    }
+
+    return { userId: userId!, profileId: invite.profile_id, firstTime };
   });
 }
 
-/** 초대 링크 전체 URL. 관리자 화면에서 복사해 카카오톡으로 보낸다. */
+/** 링크 전체 URL. 관리자 화면에서 복사해 카카오톡으로 보낸다. */
 export function inviteUrl(token: string): string {
   return `${env().APP_ORIGIN}/claim/${encodeURIComponent(token)}`;
 }
