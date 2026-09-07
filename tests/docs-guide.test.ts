@@ -27,7 +27,7 @@ import { TELEGRAM_MAX_FILE_BYTES } from "@bolsaram/schemas";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const GUIDE_DIR = path.join(ROOT, "docs", "guide");
 
-const GUIDE_FILES = ["README.md", "member.md", "admin.md", "faq.md"];
+const GUIDE_FILES = ["README.md", "member.md", "admin.md", "faq.md", "privacy.md"];
 
 function guide(name: string): string {
   return readFileSync(path.join(GUIDE_DIR, name), "utf8");
@@ -239,6 +239,48 @@ describe("가이드가 설명하는 상태가 코드의 상태와 같다", () =>
       expect(label, `${field} 의 한글 이름이 테스트에 없음`).toBeDefined();
       expect(admin, `필수 항목 "${label}" 안내 없음`).toContain(label!);
     }
+  });
+});
+
+describe("개인정보 처리방침이 실제 동작과 같다", () => {
+  const privacy = () => guide("privacy.md");
+
+  it("보관 기간이 정리 작업의 값과 같다", () => {
+    // 방침에 적은 숫자가 실제 정리 주기와 다르면 지키지 않는 약속이 된다.
+    const source = readFileSync(path.join(ROOT, "packages/db/src/cleanup.ts"), "utf8");
+    const days = (key: string) =>
+      Number(new RegExp(`${key}:\\s*(\\d+)`).exec(source)?.[1]);
+    const text = privacy();
+    for (const [key, label] of [
+      ["sessions", "30일"],
+      ["invites", "90일"],
+      ["abandonedImports", "30일"],
+      ["rawModelOutput", "14일"],
+      ["auditLogs", "365일"],
+    ] as const) {
+      expect(days(key), `${key} 상수를 읽지 못했습니다`).toBeGreaterThan(0);
+      expect(text, `${key} 보관 기간이 방침에 없습니다`).toContain(`${days(key)}일`);
+    }
+  });
+
+  it("사진을 AI 에 보내지 않는다고 적혀 있다", () => {
+    // ExtractionInput 에 이미지 필드가 없어서 구조적으로 불가능하다.
+    expect(privacy()).toMatch(/사진은 AI ?에 보내지 않습니다/);
+  });
+
+  it("연결 전에는 이름·연락처가 보이지 않는다고 적혀 있다", () => {
+    expect(privacy()).toMatch(/이름과 연락 방법은.*연결되기 전까지/s);
+  });
+
+  it("전체공개 범위를 분명히 밝힌다", () => {
+    // 주선자 가입이 열려 있으므로 이 사실을 숨기면 안 된다.
+    expect(privacy()).toMatch(/전체공개로 등록된 프로필은 가입한 모든 주선자가 봅니다/);
+  });
+
+  it("아직 정하지 않은 것을 숨기지 않는다", () => {
+    // 동의 절차와 책임자가 비어 있다 — 공개 전에 채워야 한다.
+    expect(privacy()).toMatch(/동의/);
+    expect(privacy()).toMatch(/개인정보 보호책임자|책임자/);
   });
 });
 

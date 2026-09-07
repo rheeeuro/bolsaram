@@ -40,9 +40,9 @@ module.exports = {
       max_memory_restart: "1G",
       env: {
         NODE_ENV: "production",
-        // 이 호스트의 인스턴스는 아직 실제 사용자를 받지 않는 로컬 스테이징이다.
-        // 실제 배포 시 APP_ENV 를 production 으로 바꾼다.
-        APP_ENV: "staging",
+        // 실제 사용자를 받는 배포다. production 에서는 APP_ORIGIN 이 https 여야 하고
+        // 기본 시크릿을 쓸 수 없다(apps/web/src/server/env.ts).
+        APP_ENV: "production",
       },
       ...log("bolsaram-web"),
     },

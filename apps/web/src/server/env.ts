@@ -85,6 +85,32 @@ export function env(): Env {
       throw new Error("TELEGRAM_ENABLED=true 이면 TELEGRAM_WEBHOOK_SECRET 이 필요합니다.");
     }
   }
+  // production 은 실제 사용자를 받는 배포다. 여기서 걸러야 할 설정 실수가 있다.
+  if (parsed.data.APP_ENV === "production") {
+    // 초대 링크·봇 검토 버튼이 이 주소로 나간다. loopback 이면 회원에게 보낸 링크가
+    // 열리지 않는다(실제로 이 호스트에서 한 번 겪었다).
+    if (!parsed.data.APP_ORIGIN.startsWith("https://")) {
+      throw new Error(
+        `APP_ENV=production 에서는 APP_ORIGIN 이 https 여야 합니다: ${parsed.data.APP_ORIGIN}`,
+      );
+    }
+    // .env.example 의 자리표시자가 그대로 올라가는 것을 막는다.
+    const placeholders = (
+      [
+        ["SESSION_SECRET", parsed.data.SESSION_SECRET],
+        ["STORAGE_SECRET", parsed.data.STORAGE_SECRET],
+        ["INVITE_TOKEN_PEPPER", parsed.data.INVITE_TOKEN_PEPPER],
+      ] as const
+    ).filter(([, value]) => value.startsWith("change-me"));
+    if (placeholders.length > 0) {
+      throw new Error(
+        `APP_ENV=production 에서는 기본 시크릿을 쓸 수 없습니다: ${placeholders
+          .map(([name]) => name)
+          .join(", ")}`,
+      );
+    }
+  }
+
   cached = parsed.data;
   return cached;
 }
@@ -94,10 +120,6 @@ export function isProduction(): boolean {
   return env().NODE_ENV === "production";
 }
 
-/** 실제 사용자를 받는 배포인지. 개발 편의 기능의 허용 여부는 이 값으로 판단한다. */
-export function isLiveDeployment(): boolean {
-  return env().APP_ENV === "production";
-}
 
 /** 텔레그램 Import 채널이 켜져 있는지. 라우트와 관리자 화면이 함께 이 값을 본다. */
 export function isTelegramEnabled(): boolean {
