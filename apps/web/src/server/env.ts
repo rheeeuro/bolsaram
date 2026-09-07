@@ -43,6 +43,12 @@ const envSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, "TELEGRAM_WEBHOOK_SECRET 에는 A-Z a-z 0-9 _ - 만 쓸 수 있습니다.")
     .optional(),
 
+  /**
+   * SMS 발송 프로바이더. 기본 `console` 은 실제로 보내지 않고 서버 로그에만 남긴다.
+   * 실제 업체 어댑터가 붙으면 여기에 값을 추가한다(server/sms/index.ts).
+   */
+  SMS_PROVIDER: z.enum(["console"]).default("console"),
+
   DEV_EXPOSE_OTP: z
     .string()
     .optional()
@@ -60,6 +66,11 @@ const envSchema = z.object({
   APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
 });
 
+/**
+ * 아래 검증에 걸리면 `instrumentation` 훅이 던지고 **앱이 아무것도 서비스하지 않는다** —
+ * 포트는 열리지만 모든 요청이 500 이다(프로세스는 죽지 않으므로 `pm2 status` 는
+ * online 으로 보인다). 설정 변경 후에는 상태가 아니라 기동 로그를 확인한다.
+ */
 export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | null = null;
@@ -73,6 +84,14 @@ export function env(): Env {
   }
   if (parsed.data.AI_PROVIDER === "openai" && !parsed.data.OPENAI_API_KEY) {
     throw new Error("AI_PROVIDER=openai 이면 OPENAI_API_KEY 가 필요합니다.");
+  }
+  // 실제 사용자를 받는 배포에서 문자가 도착하지 않는 sender 로 뜨면 회원이 로그인할
+   // 방법이 없다. 조용히 깨지는 대신 기동을 거부한다.
+  if (parsed.data.APP_ENV === "production" && parsed.data.SMS_PROVIDER === "console") {
+    throw new Error(
+      "APP_ENV=production 에서는 SMS_PROVIDER=console 을 쓸 수 없습니다." +
+        " 실제 발송 어댑터를 붙이세요(apps/web/src/server/sms/).",
+    );
   }
   // 반쯤 켜진 상태를 허용하지 않는다. 토큰 없이 webhook 만 열리면 검증도 못 하고
   // 답장도 못 하는 채널이 생긴다.

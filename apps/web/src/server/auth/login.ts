@@ -3,14 +3,16 @@
  *   관리자 — 이메일 + 비밀번호
  *   회원   — 전화번호 + 6자리 OTP
  *
- * 실제 SMS 발송은 연동하지 않았다. 개발 환경(DEV_EXPOSE_OTP=true)에서는 코드를
- * 서버 콘솔과 응답으로 돌려주고, 운영에서는 발송 어댑터를 붙여야 한다.
+ * 인증번호 전달은 `server/sms/` 의 sender 가 담당한다. 기본 sender(`console`)는 실제로
+ * 보내지 않고 서버 로그에만 남기므로, 운영 배포에는 실제 업체 어댑터가 필요하다
+ * (`APP_ENV=production` + `SMS_PROVIDER=console` 조합은 기동이 거부된다).
  */
 import "server-only";
 import { withOwner, withOwnerTx } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
 import { env, isLoopbackDeployment } from "../env";
 import { generateOtp, peppered, verifyPassword } from "../crypto";
+import { smsSender } from "../sms/index";
 
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
@@ -35,8 +37,10 @@ export async function loginAdmin(email: string, password: string): Promise<strin
 }
 
 export type OtpIssueResult = {
-  /** 개발 환경에서만 채워진다. */
+  /** loopback 배포 + DEV_EXPOSE_OTP 에서만 채워진다. 공개 배포에서는 절대 비어 있다. */
   devCode?: string;
+  /** 문자가 실제로 사용자 휴대폰에 도착하는 경로였는지. 화면 안내 문구를 가른다. */
+  delivered: boolean;
 };
 
 export async function issueLoginCode(phone: string): Promise<OtpIssueResult> {
@@ -68,20 +72,21 @@ export async function issueLoginCode(phone: string): Promise<OtpIssueResult> {
     );
   });
 
-  if (env().DEV_EXPOSE_OTP) {
-    // 서버 로그는 호스트에 접근할 수 있는 사람만 본다. 여기까지는 안전하다.
-    console.info(`[dev] ${phone} 로그인 코드: ${code}`);
-    // 응답에 싣는 것은 **loopback 배포에서만**. 공개 주소로 서비스되는 배포에서
-    // 코드를 내려주면 인터넷의 누구나 남의 계정으로 로그인할 수 있다.
-    // 공개 배포에서 코드가 필요하면 `pnpm pm2:logs` 로 확인한다.
-    return isLoopbackDeployment() ? { devCode: code } : {};
-  }
-  // TODO(SMS 연동): APP_ENV=production 으로 올리기 전에 발송 어댑터를 붙인다.
-  //   완료 조건 — 실제 문자로 코드가 도착하고 DEV_EXPOSE_OTP 없이 로그인이 된다.
-  throw new DomainError(
-    "INVALID_STATE",
-    "문자 발송이 아직 연동되지 않았습니다. 관리자에게 문의해 주세요.",
-  );
+  const sender = smsSender();
+  // 발송 실패는 삼키지 않는다. 코드 행은 이미 남았지만 사용자는 받지 못했으므로
+  // 재요청할 수 있어야 한다(쿨다운은 30초).
+  await sender.send({
+    to: phone,
+    text: `[볼사람] 인증번호 ${code} (5분 내 입력)`,
+  });
+
+  // 응답에 코드를 싣는 것은 **loopback 배포 + DEV_EXPOSE_OTP** 에서만.
+  // 공개 주소로 서비스되는 배포에서 코드를 내려주면 인터넷의 누구나 남의 계정으로
+  // 로그인할 수 있다. 공개 배포에서 코드가 필요하면 `pnpm pm2:logs` 로 확인한다.
+  const expose = env().DEV_EXPOSE_OTP && isLoopbackDeployment();
+  return expose
+    ? { devCode: code, delivered: sender.delivers }
+    : { delivered: sender.delivers };
 }
 
 /** 코드 검증 후 사용자 id 를 돌려준다. 해당 번호의 회원이 없으면 만들지 않는다. */

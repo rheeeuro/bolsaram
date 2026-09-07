@@ -72,6 +72,10 @@ server/
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
 ├── storage/local.ts          private 저장소 + signed download/upload URL
+├── sms/                      인증번호 발송 (프로바이더 추상화)
+│   ├── types.ts              SmsSender 인터페이스 (delivers 로 실제 도착 여부 구분)
+│   ├── console.ts            개발용 — 서버 로그에만 남긴다
+│   └── index.ts              SMS_PROVIDER 로 선택
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
 │   ├── mock.ts               규칙 기반 추출기 (기본, API 키 불필요)

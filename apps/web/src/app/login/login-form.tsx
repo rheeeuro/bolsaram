@@ -47,13 +47,18 @@ function MemberLogin({ onDone }: { onDone: () => void }) {
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [devCode, setDevCode] = useState<string | null>(null);
+  /** 문자가 실제로 도착하는 경로였는지. false 면 기다려도 오지 않는다. */
+  const [delivered, setDelivered] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function request() {
     setBusy(true);
     setError(null);
-    const result = await apiPost<{ devCode?: string }>("/api/auth/otp/request", { phone });
+    const result = await apiPost<{ devCode?: string; delivered?: boolean }>(
+      "/api/auth/otp/request",
+      { phone },
+    );
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
@@ -61,6 +66,7 @@ function MemberLogin({ onDone }: { onDone: () => void }) {
     }
     setSent(true);
     setDevCode(result.data.devCode ?? null);
+    setDelivered(result.data.delivered !== false);
   }
 
   async function verify() {
@@ -94,6 +100,13 @@ function MemberLogin({ onDone }: { onDone: () => void }) {
           onChange={(e) => setPhone(e.target.value)}
         />
       </Field>
+
+      {sent && !delivered && !devCode ? (
+        <p className="rounded-lg bg-[var(--color-ivory-200)] px-3 py-2 text-[12.5px] leading-relaxed text-[var(--color-ink-700)]">
+          문자 발송이 아직 연동되지 않았습니다. 인증번호를 받으려면 주선자에게 문의해
+          주세요.
+        </p>
+      ) : null}
 
       {sent ? (
         <Field label="인증번호" hint="5분 안에 입력해 주세요">

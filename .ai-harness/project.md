@@ -85,7 +85,11 @@ pnpm agents:test       # 셸 가드 판정 케이스 23개
 - 앱을 추가·변경하면 `pnpm pm2:save` 로 저장해야 재부팅 후에도 살아난다
   (이 호스트는 systemd `pm2-euro.service` 로 PM2 를 복원한다).
 - 웹 앱은 `APP_ENV=staging` 으로 뜬다. 실제 배포 시 `production` 으로 바꾸고
-  `DEV_EXPOSE_OTP` 를 지운다 — production 에서 그 값이 켜져 있으면 서버가 기동을 거부한다.
+  `DEV_EXPOSE_OTP` 를 지운다.
+- **환경변수 가드가 걸리면 앱이 아무것도 서비스하지 않는다** — `instrumentation` 훅에서
+  던지므로 포트는 열리지만 **모든 요청이 500** 이 된다. 프로세스가 죽지 않으니
+  `pm2 status` 에는 `online` 으로 보인다. 설정을 바꾼 뒤에는 상태가 아니라 **기동 로그**를
+  확인한다(실측 2026-09-07).
 - **다른 프로젝트 앱(jongalab·trading·kiwoom)을 건드리지 않는다.** 항상 이름을 지정해 조작한다.
 
 ## 에이전트 하네스
@@ -264,5 +268,9 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   자세한 내용은 `docs/implementation-plan.md` 「실기기 검증 결과」.
 - **카카오 챗봇 Import**: 폐기했습니다. 오픈빌더 스킬 payload 에 사용자 전송 이미지 필드가
   없습니다(`docs/v2/BOLSARAM_ARCHITECTURE_CHANGE_CHATBOT_v1.md` 배너 참고).
-- **SMS 발송**: 미연동. 운영 배포 전에 어댑터가 필요합니다(`apps/web/src/server/auth/login.ts`의 TODO).
+- **SMS 발송**: 프로바이더 추상화(`apps/web/src/server/sms/`)까지 되어 있고 **실제 업체
+  어댑터가 없습니다.** 기본 `console` sender 는 서버 로그에만 남깁니다. 업체를 정하면
+  `SmsSender` 구현 하나를 추가하고 `SMS_PROVIDER` 에 값을 넣으면 됩니다.
+  국내 발신번호 사전등록이 필요하므로 업체·계약은 사용자 결정입니다.
+  `APP_ENV=production` + `SMS_PROVIDER=console` 조합은 서버가 기동을 거부합니다.
 - **PM2 배포 구성**: 없음. 필요해지면 새로 작성합니다.
