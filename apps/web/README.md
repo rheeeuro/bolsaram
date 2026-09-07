@@ -52,7 +52,8 @@ apps/web/src/
 │   │   ├── imports/          Import Inbox + 검토 상세
 │   │   ├── profiles/         목록 + 상세 편집·게시·초대
 │   │   ├── requests/         신청 목록 + 연결 처리
-│   │   └── members/          초대·연결 현황
+│   │   ├── members/          초대·연결 현황
+│   │   └── group/            모임 설정 · 주선자 구성원 · 초대 코드
 │   └── api/                  Route Handler (아래 표)
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty)
@@ -140,7 +141,7 @@ server/
 | `/api/imports/[id]/extraction`            | PATCH               | 관리자            | 검토 결과 저장                       |
 | `/api/imports/[id]/commit`                | POST                | 관리자            | 프로필 생성 (idempotent)             |
 | `/api/admin/groups`                       | POST                | 관리자            | 모임 만들기 (모임 없는 주선자)       |
-| `/api/admin/group`                        | GET / POST / PUT    | 관리자            | 내 모임 / 초대 코드 발급 / 코드로 참여 |
+| `/api/admin/group`                        | GET / PATCH / POST / PUT | 관리자       | 내 모임 / 이름·설명 수정 / 초대 코드 발급 / 코드로 참여 |
 | `/api/admin/telegram`                     | GET / POST / DELETE | 관리자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |

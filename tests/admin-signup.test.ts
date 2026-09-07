@@ -12,7 +12,12 @@
  */
 import { afterAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
-import { consumeGroupInvite, issueGroupInvite } from "../apps/web/src/server/auth/group-invite";
+import {
+  consumeGroupInvite,
+  issueGroupInvite,
+  readMyGroup,
+  updateGroup,
+} from "../apps/web/src/server/auth/group-invite";
 import { loginAdmin } from "../apps/web/src/server/auth/login";
 import { createGroupForAdmin, signupAdmin } from "../apps/web/src/server/auth/signup";
 
@@ -268,5 +273,73 @@ describe("모임 참여 (초대 코드)", () => {
     expect(owners).toHaveLength(2);
     expect(owners.filter((o) => o.is_owner)).toHaveLength(1);
     expect(owners[0]!.user_id).toBe(owner.userId);
+  });
+});
+
+describe("모임 정보", () => {
+  it("만들 때 설명을 함께 넣는다", async () => {
+    const owner = await newAdmin("설명등록자");
+    await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-설명모임`,
+      description: "계리사·회계사 중심으로 봅니다",
+    });
+    const group = await readMyGroup(owner.userId);
+    expect(group).toMatchObject({
+      name: `${TAG}-설명모임`,
+      description: "계리사·회계사 중심으로 봅니다",
+      isOwner: true,
+    });
+  });
+
+  it("이름과 설명을 고칠 수 있다", async () => {
+    const owner = await newAdmin("수정자");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-수정전`,
+    });
+    await updateGroup({ groupId, name: `${TAG}-수정후`, description: "새 설명" });
+    const group = await readMyGroup(owner.userId);
+    expect(group).toMatchObject({ name: `${TAG}-수정후`, description: "새 설명" });
+  });
+
+  it("보낸 항목만 바뀐다", async () => {
+    const owner = await newAdmin("부분수정자");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-부분`,
+      description: "원래 설명",
+    });
+    // 이름만 보내면 설명은 그대로여야 한다.
+    await updateGroup({ groupId, name: `${TAG}-부분2` });
+    expect(await readMyGroup(owner.userId)).toMatchObject({
+      name: `${TAG}-부분2`,
+      description: "원래 설명",
+    });
+  });
+
+  it("설명을 빈 문자열로 보내면 지운다", async () => {
+    const owner = await newAdmin("설명삭제자");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-삭제`,
+      description: "지울 설명",
+    });
+    await updateGroup({ groupId, description: "" });
+    expect(await readMyGroup(owner.userId)).toMatchObject({ description: null });
+  });
+
+  it("합류한 주선자는 개설자로 표시되지 않는다", async () => {
+    const owner = await newAdmin("표시개설자");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-표시모임`,
+    });
+    const issued = await issueGroupInvite({ groupId, createdBy: owner.userId });
+    const invited = await newAdmin("표시참여자");
+    await consumeGroupInvite({ code: issued.code, userId: invited.userId });
+
+    expect(await readMyGroup(owner.userId)).toMatchObject({ isOwner: true });
+    expect(await readMyGroup(invited.userId)).toMatchObject({ isOwner: false });
   });
 });

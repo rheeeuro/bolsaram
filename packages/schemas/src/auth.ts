@@ -32,6 +32,25 @@ export const adminSignupSchema = z.object({
 });
 export type AdminSignupInput = z.infer<typeof adminSignupSchema>;
 
+/** 모임 이름·설명. `groups` 의 CHECK 와 같은 범위를 쓴다. */
+export const groupNameSchema = z.string().trim().min(1).max(80);
+export const groupDescriptionSchema = z.string().trim().max(500);
+
+export const groupCreateSchema = z.object({
+  name: groupNameSchema,
+  description: groupDescriptionSchema.optional(),
+});
+
+/** 수정. 보낸 필드만 바꾼다 — 설명을 빈 문자열로 보내면 지운다. */
+export const groupUpdateSchema = z
+  .object({
+    name: groupNameSchema.optional(),
+    description: groupDescriptionSchema.optional(),
+  })
+  .refine((v) => v.name !== undefined || v.description !== undefined, {
+    message: "바꿀 항목이 없습니다.",
+  });
+
 export const requestOtpSchema = z.object({
   phone: phoneSchema,
 });

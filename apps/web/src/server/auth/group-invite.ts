@@ -97,14 +97,22 @@ export async function consumeGroupInvite(input: {
 export type GroupSummary = {
   groupId: string;
   name: string;
+  /** 주선자들끼리 보는 메모. 회원에게는 노출하지 않는다. */
+  description: string | null;
+  isOwner: boolean;
   admins: { userId: string; displayName: string | null; isOwner: boolean }[];
 };
 
 /** 관리자 화면이 보여줄 내 모임 정보. */
 export async function readMyGroup(userId: string): Promise<GroupSummary | null> {
   return withOwner(async (sql) => {
-    const g = await sql.query<{ group_id: string; name: string }>(
-      `SELECT g.id AS group_id, g.name
+    const g = await sql.query<{
+      group_id: string;
+      name: string;
+      description: string | null;
+      is_owner: boolean;
+    }>(
+      `SELECT g.id AS group_id, g.name, g.description, ga.is_owner
          FROM group_admins ga JOIN groups g ON g.id = ga.group_id
         WHERE ga.user_id = $1 ORDER BY ga.added_at LIMIT 1`,
       [userId],
@@ -125,6 +133,8 @@ export async function readMyGroup(userId: string): Promise<GroupSummary | null> 
     return {
       groupId: group.group_id,
       name: group.name,
+      description: group.description,
+      isOwner: group.is_owner,
       admins: admins.rows.map((r) => ({
         userId: r.user_id,
         displayName: r.display_name,
@@ -132,4 +142,31 @@ export async function readMyGroup(userId: string): Promise<GroupSummary | null> 
       })),
     };
   });
+}
+
+/**
+ * 모임 이름·설명을 고친다. 보낸 필드만 바꾼다.
+ *
+ * 같은 모임의 주선자면 누구나 고칠 수 있다 — 한 팀으로 일하는 사이라 개설자만으로
+ * 좁히면 개설자가 없을 때 아무도 못 고친다. RLS(`groups_owner_update`)도 같은 판정이다.
+ */
+export async function updateGroup(input: {
+  groupId: string;
+  name?: string;
+  description?: string;
+}): Promise<void> {
+  const result = await withOwner((sql) =>
+    sql.query(
+      `UPDATE groups
+          SET name = COALESCE($2, name),
+              description = CASE WHEN $3::text IS NULL THEN description
+                                 WHEN btrim($3) = '' THEN NULL
+                                 ELSE btrim($3) END
+        WHERE id = $1`,
+      [input.groupId, input.name ?? null, input.description ?? null],
+    ),
+  );
+  if (result.rowCount === 0) {
+    throw new DomainError("NOT_FOUND", "모임을 찾을 수 없습니다.");
+  }
 }

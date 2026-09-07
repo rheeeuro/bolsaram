@@ -61,6 +61,7 @@ export async function signupAdmin(input: {
 export async function createGroupForAdmin(input: {
   userId: string;
   name: string;
+  description?: string;
 }): Promise<{ groupId: string }> {
   return withOwnerTx(async (sql) => {
     const existing = await sql.query(`SELECT 1 FROM group_admins WHERE user_id = $1`, [
@@ -70,8 +71,8 @@ export async function createGroupForAdmin(input: {
       throw new DomainError("CONFLICT", "이미 모임에 속해 있습니다.");
     }
     const group = await sql.query<{ id: string }>(
-      `INSERT INTO groups (name, created_by) VALUES ($1, $2) RETURNING id`,
-      [input.name, input.userId],
+      `INSERT INTO groups (name, description, created_by) VALUES ($1, $2, $3) RETURNING id`,
+      [input.name, input.description?.trim() || null, input.userId],
     );
     const groupId = group.rows[0]!.id;
     await sql.query(

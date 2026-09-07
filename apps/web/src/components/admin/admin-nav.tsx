@@ -13,6 +13,7 @@ const LINKS: NavLink[] = [
   { href: "/admin/profiles", label: "프로필" },
   { href: "/admin/requests", label: "신청" },
   { href: "/admin/members", label: "회원" },
+  { href: "/admin/group", label: "모임" },
 ];
 
 export function AdminNav({ displayName }: { displayName: string | null }) {

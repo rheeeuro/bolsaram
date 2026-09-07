@@ -5,8 +5,6 @@ import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Card, Stat, Table, Td, Th } from "@/components/admin/table";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { label } from "@/lib/labels";
-import { GroupPanel } from "@/components/admin/group-panel";
-import { readMyGroup } from "@/server/auth/group-invite";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +22,6 @@ type Kpi = {
 export default async function AdminDashboard() {
   const viewer = await requireAdminPage();
 
-  // 모임이 없어도 정상 상태다 — 그때는 전체공개 프로필만 다룬다.
-  // 모임 패널이 만들기·참여를 안내한다.
-  const group = await readMyGroup(viewer.userId);
 
   const { kpi, recent } = await withRls(rlsContextOf(viewer), async (sql) => {
     // 대시보드는 단일 왕복으로 끝낸다. 카운트가 늘어나면 뷰로 뺀다.
@@ -168,10 +163,14 @@ export default async function AdminDashboard() {
               title="초대 링크 발급"
               description="등록한 프로필의 주인에게 링크를 보냅니다."
             />
+            <QuickLink
+              href="/admin/group"
+              title="모임 설정"
+              description="모임 정보와 동료 주선자를 관리합니다."
+            />
           </div>
         </Card>
 
-        <GroupPanel group={group} />
       </div>
     </>
   );

@@ -2,6 +2,7 @@
  * 내 모임 관리.
  *
  *   GET    내 모임과 주선자 목록
+ *   PATCH  모임 이름·설명 수정 (모임에 속한 주선자만)
  *   POST   초대 코드 발급 (모임에 속한 주선자만)
  *   PUT    초대 코드로 합류 (모임이 없는 주선자만)
  *
@@ -9,10 +10,12 @@
  */
 import { z } from "zod";
 import { requireAdmin, requireAdminGroup } from "@/server/auth/guard";
+import { groupUpdateSchema } from "@bolsaram/schemas";
 import {
   consumeGroupInvite,
   issueGroupInvite,
   readMyGroup,
+  updateGroup,
 } from "@/server/auth/group-invite";
 import { ok, readJson, route } from "@/server/http/respond";
 
@@ -22,6 +25,13 @@ export const GET = route(async () => {
   const viewer = await requireAdmin();
   const group = await readMyGroup(viewer.userId);
   return ok({ group });
+});
+
+export const PATCH = route(async (request: Request) => {
+  const input = await readJson(request, groupUpdateSchema);
+  const viewer = await requireAdminGroup();
+  await updateGroup({ groupId: viewer.groupId, ...input });
+  return ok({ ok: true });
 });
 
 export const POST = route(async () => {
