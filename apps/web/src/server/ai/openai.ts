@@ -22,12 +22,12 @@ import {
 
 const API_URL = "https://api.openai.com/v1/chat/completions";
 const TIMEOUT_MS = 60_000;
-/** 이미지가 많으면 비용과 지연이 커진다. 앞쪽 몇 장만 보낸다. */
-const MAX_IMAGES = 4;
 
-type ContentPart =
-  | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string; detail: "low" | "high" } };
+/**
+ * 텍스트만 보낸다. 사진은 보내지 않는다 — `ExtractionInput` 주석 참고.
+ * 이미지 파트를 아예 만들 수 없게 타입에서 뺐다.
+ */
+type ContentPart = { type: "text"; text: string };
 
 export class OpenAiExtractionProvider implements ExtractionProvider {
   readonly name = "openai";
@@ -42,20 +42,10 @@ export class OpenAiExtractionProvider implements ExtractionProvider {
         text: `아래는 카카오톡에서 받은 프로필 원문이다.\n\n---\n${input.text}\n---`,
       });
     } else {
+      // 원문이 없으면 채울 근거가 없다. 사진은 보내지 않으므로 전부 null 이 나온다.
       content.push({
         type: "text",
-        text: "프로필 원문 텍스트가 없다. 이미지에서 읽을 수 있는 것만 채우고 나머지는 null 로 둔다.",
-      });
-    }
-
-    for (const image of input.images.slice(0, MAX_IMAGES)) {
-      content.push({
-        type: "image_url",
-        image_url: {
-          // data URL 로 보낸다 — private 스토리지의 signed URL 을 외부에 넘기지 않는다.
-          url: `data:${image.mimeType};base64,${image.data.toString("base64")}`,
-          detail: "low",
-        },
+        text: "프로필 원문 텍스트가 없다. 모든 항목을 null 로 두고 그 사실을 notes 에 남긴다.",
       });
     }
 

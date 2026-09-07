@@ -91,12 +91,8 @@ export class MockExtractionProvider implements ExtractionProvider {
     const text = input.text ?? "";
 
     if (text.trim().length === 0) {
-      notes.push(
-        input.images.length > 0
-          ? "텍스트가 없어 이미지만으로는 항목을 채울 수 없습니다. 카카오톡에서 복사한 글을 붙여넣어 주세요."
-          : "분석할 내용이 없습니다.",
-      );
-      return this.finish(fields, confidence, notes, input);
+      notes.push("분석할 내용이 없습니다. 카카오톡에서 복사한 글을 붙여넣어 주세요.");
+      return this.finish(fields, confidence, notes);
     }
 
     const set = <K extends keyof ExtractedFields>(
@@ -128,25 +124,24 @@ export class MockExtractionProvider implements ExtractionProvider {
 
     if (fields.gender == null) notes.push("성별이 명시되어 있지 않습니다. 직접 선택해 주세요.");
     if (fields.birthYear == null) notes.push("나이/출생연도를 찾지 못했습니다.");
-    if (input.images.length > 0 && text.length < 30) {
-      notes.push("텍스트가 짧습니다. 이미지 속 내용은 사람이 확인해 주세요.");
+    if (text.length < 30) {
+      notes.push("원문이 짧습니다. 사진을 보고 사람이 확인해 주세요.");
     }
 
-    return this.finish(fields, confidence, notes, input);
+    return this.finish(fields, confidence, notes);
   }
 
   private finish(
     fields: ExtractedFields,
     confidence: ExtractionConfidence,
     notes: string[],
-    input: ExtractionInput,
   ): ExtractionOutput {
     const raw = { fields, confidence, notes };
     // mock 도 실제 프로바이더와 같은 검증을 통과해야 한다.
     const parsed = extractionResultSchema.parse(raw);
     return {
       ...parsed,
-      model: `mock/${input.images.length}img`,
+      model: "mock",
       promptVersion: PROMPT_VERSION,
       raw,
     };

@@ -143,15 +143,6 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     expect(ALL).toMatch(/25MB/);
   });
 
-  it("AI 분석에 쓰는 사진 장수 6장", () => {
-    const n = constantOf(
-      "apps/web/src/server/services/import-service.ts",
-      "MAX_ANALYZE_IMAGES",
-    );
-    expect(n).toBe(6);
-    expect(ALL).toMatch(/6장/);
-  });
-
   it("낮은 신뢰도 기준 65%", () => {
     expect(Math.round(LOW_CONFIDENCE_THRESHOLD * 100)).toBe(65);
     expect(ALL).toMatch(/65%/);
@@ -248,6 +239,16 @@ describe("가이드가 설명하는 상태가 코드의 상태와 같다", () =>
 });
 
 describe("가이드가 보안 약속을 정확히 설명한다", () => {
+  it("사진을 AI 에 보내지 않는다고 적혀 있다", () => {
+    // ExtractionInput 에 이미지 필드가 없어서 구조적으로 불가능하다.
+    const types = readFileSync(
+      path.join(ROOT, "apps/web/src/server/ai/types.ts"),
+      "utf8",
+    );
+    expect(types).not.toMatch(/images\??:/);
+    expect(guide("admin.md")).toMatch(/사진은.*(보내지 않|전송하지 않)/);
+  });
+
   it("연결 전에는 이름·연락처가 공개되지 않는다고 적혀 있다", () => {
     // 이 약속은 domain 의 projectProfile 이 강제한다(tests/visibility.test.ts).
     expect(ALL).toMatch(/연결.*(뒤|후|이후).*(이름|연락)/);

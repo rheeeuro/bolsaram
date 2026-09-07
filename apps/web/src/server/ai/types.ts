@@ -5,11 +5,20 @@
 import "server-only";
 import type { ExtractionResult } from "@bolsaram/schemas";
 
+/**
+ * 추출 입력은 **원문 텍스트뿐이다. 사진은 모델에 보내지 않는다.**
+ *
+ * 프로필은 항상 카카오톡에서 복사한 텍스트로 들어온다(운영 확인). 사진을 함께 보내면
+ * 실제 인물 사진이 외부 모델로 나가는데 얻는 정보가 없다 — 프롬프트도 원문을 우선하고,
+ * 실측(2026-09-07)에서도 채워진 11개 필드가 전부 원문에서 나왔다. 입력 토큰은
+ * 장당 156~230 개씩 늘어난다.
+ *
+ * 그래서 이미지 필드를 아예 두지 않는다. 조건부로 두면 언젠가 조건이 뒤집힌다.
+ * 사진에서 정보를 읽어야 하는 경우(스크린샷)가 실제로 생기면 그때 다시 넣는다.
+ */
 export type ExtractionInput = {
-  /** 정규화된 원문. 있으면 이게 1차 source 다(설계문서 §11). */
+  /** 정규화된 원문. 유일한 source 다(설계문서 §11). */
   text: string | null;
-  /** 이미지 바이트. 텍스트가 없거나 부족할 때 보조로 쓴다. */
-  images: { mimeType: string; data: Buffer }[];
 };
 
 export type ExtractionOutput = ExtractionResult & {

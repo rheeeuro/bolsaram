@@ -88,7 +88,6 @@ describe("MockExtractionProvider", () => {
         "비흡연",
         "취미: 러닝, 전시, 커피",
       ].join("\n"),
-      images: [],
     });
 
     expect(result.fields.gender).toBe("FEMALE");
@@ -102,14 +101,14 @@ describe("MockExtractionProvider", () => {
   });
 
   it("두 자리 연도를 세기까지 고려해 환산한다", async () => {
-    const older = await provider.extract({ text: "87년생 남자", images: [] });
+    const older = await provider.extract({ text: "87년생 남자" });
     expect(older.fields.birthYear).toBe(1987);
-    const younger = await provider.extract({ text: "01년생 여자", images: [] });
+    const younger = await provider.extract({ text: "01년생 여자" });
     expect(younger.fields.birthYear).toBe(2001);
   });
 
   it("적히지 않은 값은 추론하지 않는다", async () => {
-    const result = await provider.extract({ text: "안녕하세요 잘 부탁드립니다", images: [] });
+    const result = await provider.extract({ text: "안녕하세요 잘 부탁드립니다" });
     expect(result.fields.gender).toBeNull();
     expect(result.fields.birthYear).toBeNull();
     expect(result.fields.height).toBeNull();
@@ -118,15 +117,13 @@ describe("MockExtractionProvider", () => {
   });
 
   it("이름만으로 성별을 추측하지 않는다", async () => {
-    const result = await provider.extract({ text: "이름은 지훈입니다", images: [] });
+    const result = await provider.extract({ text: "이름은 지훈입니다" });
     expect(result.fields.gender).toBeNull();
   });
 
-  it("텍스트 없이 이미지만 오면 붙여넣기를 안내한다", async () => {
-    const result = await provider.extract({
-      text: null,
-      images: [{ mimeType: "image/png", data: Buffer.from([1, 2, 3]) }],
-    });
+  it("원문이 없으면 아무 항목도 채우지 않고 붙여넣기를 안내한다", async () => {
+    // 사진은 모델에 보내지 않으므로(ai/types.ts) 원문이 유일한 근거다.
+    const result = await provider.extract({ text: null });
     expect(result.notes.join(" ")).toContain("붙여넣어");
     expect(Object.values(result.fields).every((v) => v === null)).toBe(true);
   });
@@ -140,21 +137,21 @@ describe("MockExtractionProvider", () => {
       "취미: " + "가".repeat(500),
     ];
     for (const text of samples) {
-      const result = await provider.extract({ text, images: [] });
+      const result = await provider.extract({ text });
       expect(extractionResultSchema.safeParse(result).success).toBe(true);
     }
   });
 
   it("범위를 벗어난 값은 null 로 떨군다", async () => {
-    const result = await provider.extract({ text: "1800년생 키 999cm", images: [] });
+    const result = await provider.extract({ text: "1800년생 키 999cm" });
     expect(result.fields.birthYear).toBeNull();
     expect(result.fields.height).toBeNull();
   });
 
   it("같은 입력에 같은 결과를 낸다 (결정적)", async () => {
     const text = "90년생 남자 키 180 IT 개발자 서울";
-    const a = await provider.extract({ text, images: [] });
-    const b = await provider.extract({ text, images: [] });
+    const a = await provider.extract({ text });
+    const b = await provider.extract({ text });
     expect(a.fields).toEqual(b.fields);
   });
 });

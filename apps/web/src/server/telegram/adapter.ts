@@ -227,11 +227,9 @@ async function handleCommand(
         const active = await conversations.findActiveConversation(sql, identity.telegramUserId);
         if (!active) return null;
         const session = await imports.requireSession(sql, active.importSessionId);
-        const assets = await imports.listAssets(sql, active.importSessionId);
-        const hasContent =
-          (session.rawText?.trim().length ?? 0) > 0 ||
-          assets.some((a) => a.uploadedAt != null);
-        return hasContent ? active.importSessionId : null;
+        // 사진은 모델에 보내지 않으므로 원문이 없으면 분석할 것이 없다.
+        const hasText = (session.rawText?.trim().length ?? 0) > 0;
+        return hasText ? active.importSessionId : null;
       });
       if (!sessionId) {
         await sendMessage(identity.telegramChatId, messages.nothingToAnalyze);

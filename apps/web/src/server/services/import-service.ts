@@ -15,25 +15,14 @@ import type { ExtractedFields } from "@bolsaram/schemas";
 import { extractionProvider } from "../ai/index";
 import { writeAudit } from "../audit";
 import * as imports from "../repo/imports";
-import { objectSize, openObject } from "../storage/local";
-
-/** 분석에 넣을 이미지 최대 장수. 나머지는 사람이 보고 판단한다. */
-const MAX_ANALYZE_IMAGES = 6;
-const MAX_ANALYZE_IMAGE_BYTES = 8 * 1024 * 1024;
-
-async function readAsset(storageKey: string): Promise<Buffer | null> {
-  const size = await objectSize(storageKey);
-  if (size == null || size > MAX_ANALYZE_IMAGE_BYTES) return null;
-  const chunks: Buffer[] = [];
-  for await (const chunk of openObject(storageKey)) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
-}
 
 /**
  * 분석 실행. 실패하면 세션을 FAILED 로 남기고 예외를 올린다 — 삼키지 않는다.
  * 프로바이더 호출이 길 수 있어 RLS 트랜잭션 밖에서 수행하고, 앞뒤로만 DB 를 만진다.
+ *
+ * **사진은 모델에 보내지 않는다.** 그래서 원문이 없으면 분석할 것이 없다 —
+ * 사진만 있는 세션은 여기서 막고 글을 붙여넣도록 안내한다.
+ * 이유는 `ai/types.ts` 의 `ExtractionInput` 주석 참고.
  */
 export async function analyzeSession(
   ctx: RlsContext,
@@ -44,29 +33,19 @@ export async function analyzeSession(
     if (session.status === "IMPORTED") {
       throw new DomainError("CONFLICT", "이미 등록된 세션입니다.");
     }
-    const assets = await imports.listAssets(sql, sessionId);
-    const uploaded = assets.filter((a) => a.uploadedAt != null);
-
-    if (!session.rawText?.trim() && uploaded.length === 0) {
+    if (!session.rawText?.trim()) {
       throw new DomainError(
         "VALIDATION",
-        "분석할 내용이 없습니다. 사진을 올리거나 카카오톡에서 복사한 글을 붙여넣어 주세요.",
+        "분석할 원문이 없습니다. 카카오톡에서 복사한 프로필 글을 붙여넣어 주세요.",
       );
     }
     await imports.setStatus(sql, sessionId, "ANALYZING");
-    return { rawText: session.rawText, assets: uploaded.slice(0, MAX_ANALYZE_IMAGES) };
+    return { rawText: session.rawText };
   });
 
   try {
-    const images: { mimeType: string; data: Buffer }[] = [];
-    for (const asset of prepared.assets) {
-      const data = await readAsset(asset.storageKey);
-      if (data) images.push({ mimeType: asset.mimeType, data });
-    }
-
     const result = await extractionProvider().extract({
-      text: prepared.rawText ? normalizeRawText(prepared.rawText) : null,
-      images,
+      text: normalizeRawText(prepared.rawText),
     });
 
     return await withRls(ctx, async (sql) => {

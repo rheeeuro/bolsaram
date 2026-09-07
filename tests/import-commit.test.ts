@@ -72,9 +72,11 @@ describe("analyze", () => {
     expect(session.status).not.toBe("IMPORTED");
   });
 
-  it("분석할 내용이 없으면 거부한다", async () => {
+  it("원문이 없으면 거부한다", async () => {
+    // 사진은 모델에 보내지 않으므로 원문이 유일한 근거다(ai/types.ts).
+    // 사진만 있는 세션도 여기서 막혀야 한다 — 분석해도 전부 null 이 나온다.
     const id = await newSession(null);
-    await expect(analyzeSession(admin, id)).rejects.toThrow(/분석할 내용이 없습니다/);
+    await expect(analyzeSession(admin, id)).rejects.toThrow(/분석할 원문이 없습니다/);
   });
 
   it("여러 번 분석해도 최신 결과가 쓰인다", async () => {
