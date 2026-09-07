@@ -108,3 +108,21 @@ export function isLiveDeployment(): boolean {
 export function isTelegramEnabled(): boolean {
   return env().TELEGRAM_ENABLED;
 }
+
+/**
+ * 이 배포가 자기 호스트 밖에서 접근 가능한지 — `APP_ORIGIN` 이 loopback 인지로 판정한다.
+ *
+ * 개발 편의 기능 중 **네트워크로 값을 흘리는 것**은 이 값으로 막는다. `APP_ENV` 만으로는
+ * 부족하다 — 이 호스트는 APP_ENV=staging 인데 실제로는 공개 도메인으로 서비스되고 있었고,
+ * 그 상태에서 로그인 인증번호가 API 응답에 실려 누구나 남의 계정으로 로그인할 수 있었다.
+ * 사람이 플래그를 옳게 설정하는 데 기대지 않고 주소에서 유도한다.
+ */
+export function isLoopbackDeployment(): boolean {
+  try {
+    const host = new URL(env().APP_ORIGIN).hostname;
+    return host === "127.0.0.1" || host === "localhost" || host === "[::1]" || host === "::1";
+  } catch {
+    // 파싱할 수 없으면 공개로 간주한다 — 안전한 쪽으로 틀린다.
+    return false;
+  }
+}

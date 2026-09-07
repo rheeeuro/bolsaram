@@ -37,7 +37,7 @@
 | 10   | Mobile Share                                                                 | 미착수·후순위 (텔레그램으로 대체) |
 | 11   | Invite/Claim: 만료·해시 토큰, replay 방지                                    | 완료                           |
 | 12   | Tests: 필터 · 상태 전이 · 권한 · 정규화 · 검증 · idempotency                 | 완료                           |
-| 13   | 텔레그램 Import: webhook · 계정 연결 · 대화 상태 · 사진/글 수집 · Inbox 연동  | 완료(코드), 실기기 검증 미실시 |
+| 13   | 텔레그램 Import: webhook · 계정 연결 · 대화 상태 · 사진/글 수집 · Inbox 연동  | 완료 (실기기 검증 포함)        |
 
 ## 실기기에서 따로 확인해야 하는 항목
 
@@ -211,21 +211,83 @@ withRls(주선자) — 그 뒤 전부. 일반 관리자 요청과 완전히 같�
 봇 명령 목록, 「봇도 검토를 거친다」·「주선자 전용 통로」 약속을 고정했다. 같은 테스트의
 경로 검사가 봇 명령을 앱 경로로 오인하므로 `TELEGRAM_COMMANDS` 를 코드에서 가져와 제외했다.
 
+### Node fetch 가 텔레그램에만 실패했던 것 (2026-09-07)
+
+토큰을 넣고 처음 실제 호출을 했을 때 `getBotUsername()` 이 `fetch failed / ETIMEDOUT`
+으로 실패했다. 같은 호스트에서 `curl` 은 정상이고, Node `fetch` 는 GitHub·npm 에는
+붙는데 `api.telegram.org` 에만 실패했다.
+
+원인은 IPv6 가 아니라 **연결 지연**이었다. Node 의 Happy Eyeballs 는 주소 하나당
+`autoSelectFamilyAttemptTimeout`(기본 **250ms**)만 기다리고 다음 주소로 넘어간다.
+`api.telegram.org`(암스테르담) 은 이 호스트에서 TCP 연결에 **260~266ms** 걸려 시도가
+완료 직전에 취소된다. GitHub 는 6ms(로컬 엣지)라 걸리지 않았다.
+
+`startup-node.ts` 에서 이 값을 2초로 올렸다. 주소 선택 방식은 건드리지 않았다 —
+`--dns-result-order=ipv4first` 는 효과가 없었고(문제가 주소 선택이 아니므로),
+IPv4 를 강제하는 대신 느린 연결을 허용하는 쪽이 원인에 맞는 처방이다.
+OpenAI 처럼 해외 프로바이더 호출 전부가 같은 제한에 걸리므로 함께 해결된다.
+
+이 과정에서 `instrumentation.ts` 를 런타임별로 갈랐다(`startup-node.ts`). Edge 런타임에서도
+평가되는 파일에서 `node:net` 을 직접 import 하면 번들러가 경고한다 — Next 문서
+「Specifying the runtime」이 안내하는 분리 방식을 따랐다.
+
+`/api/admin/telegram` 이 `getBotUsername()` 실패를 `.catch(() => null)` 로 조용히
+삼키고 있어서 원인을 찾을 수 없었다. 이유를 로그에 남기도록 고쳤다 — 토큰 오설정을
+말없이 넘기면 딥링크만 사라진 채로 아무 단서가 없다.
+
 ### 남은 일
 
-**실기기 검증을 하지 않았다.** @BotFather 토큰이 없어 실제 Bot API 를 한 번도 호출하지
-못했다. 아래를 사람이 해야 한다.
+봇(`@bolsaram_bot`)과 `.env` 설정은 끝났고 여기까지 실제로 확인했다.
 
-1. @BotFather 로 봇 생성 → 토큰 확보
-2. `.env` 에 `TELEGRAM_ENABLED=true` · `TELEGRAM_BOT_TOKEN` ·
-   `TELEGRAM_WEBHOOK_SECRET`(`openssl rand -hex 32`) 추가
-3. `pnpm deploy:web` 으로 재시작
-4. 공개 HTTPS 주소로 `setWebhook` 등록 —
+- `getMe` 로 토큰 유효성 확인, 관리자 화면의 연결 코드 발급이 실제 Bot API 를 거쳐
+  `https://t.me/bolsaram_bot?start=<코드>` 딥링크를 만든다
+- webhook: 채널 켜짐(404 → 401), 시크릿 없음·틀림 모두 401, 맞는 시크릿은 200,
+  같은 `update_id` 재전송은 DB 에 행 하나만 남고 무시, 잘못된 JSON 도 200
+- 로그에 프로필 원문·토큰이 남지 않음
+
+**남은 것은 텔레그램이 우리 서버에 도달하는 구간이다.** 아래를 사람이 해야 한다.
+
+1. 공개 HTTPS 주소 확보 — 현재 `APP_ORIGIN` 이 `127.0.0.1` 이라 텔레그램이 도달할 수 없다
+2. `APP_ORIGIN` 을 그 주소로 바꾸고 `pnpm deploy:web`
+3. `setWebhook` 등록 —
    `https://api.telegram.org/bot<token>/setWebhook?url=<origin>/api/integrations/telegram/webhook&secret_token=<secret>`
-   (`APP_ORIGIN` 이 `127.0.0.1` 이라 지금은 텔레그램이 도달할 수 없다. 터널이나 도메인이 필요하다)
-5. 관리자 화면 → Import Inbox → 텔레그램 연결 → `/start <코드>`
-6. 사진 여러 장 → 프로필 글 → Inbox 에 올라오는지 확인
+   (`<secret>` 은 `.env` 의 `TELEGRAM_WEBHOOK_SECRET` 값)
+4. 관리자 화면 → Import Inbox → 텔레그램 연결 → 딥링크 또는 `/start <코드>`
+5. 사진 여러 장 → 프로필 글 → Inbox 에 올라오는지 확인
 
-검증 전에는 Bot API 응답 형태를 추측으로 고치지 않는다. 특히 확인이 필요한 것:
-앨범이 실제로 몇 개 update 로 쪼개지는지, HEIC 를 보냈을 때 `photo` 의 mime 이
-정말 JPEG 로 바뀌는지, webhook 재전송 간격.
+### 실기기 검증 결과 (2026-09-07)
+
+`bolsaram.rheeeuro.com` 에 webhook 을 등록하고 실제 봇으로 끝까지 돌렸다.
+
+동작한 것 — 계정 연결(`/start <코드>`), 사진 4장이 **하나의 ImportSession** 으로 묶임
+(order 0~3, 전부 image/jpeg, private 저장소에 4/4 복사됨), 프로필 글 수신,
+AI 분석 자동 실행, `REVIEW_REQUIRED` 로 정지(자동 게시 안 됨), Inbox 에 `source=TELEGRAM`,
+webhook update 전건 처리(미처리 0).
+
+**가정이 틀린 것 — 앨범 식별자가 오지 않는다.**
+
+실제 운영 경로는 「카카오톡에서 여러 장 선택 → 공유하기 → 텔레그램 봇」이다.
+이 경로에서 텔레그램은 **앨범이 아니라 개별 메시지로** 사진을 하나씩 전달한다 —
+4장 전부 `media_group_id` 가 없었다. 즉 `media_group_id` 로 안내를 억제하는 원래
+설계는 실제 채널에서 한 번도 발동하지 않고, 사진 장수만큼 안내가 나갔다.
+
+`shouldAnnounceMedia` 를 "이미 받은 장수가 0일 때만"으로 바꿨다. 첫 장에서 다음 행동만
+알려주고, **총 장수는 글을 받을 때 정확한 값으로 한 번** 알려준다. 중간 확인은 `/status`.
+타이머·버퍼링을 쓰지 않으므로 프로세스가 재시작돼도 안전하다.
+
+한편 **사진을 묶는 주체를 앨범이 아니라 대화 세션으로 둔 결정은 이 실측으로 검증됐다.**
+설계 문서 §5.2 가 권한 앨범 debounce 를 따랐다면 이 경로에서 프로필이 4개로 쪼개졌다.
+
+수정 후 재검증(사진 3장 + 글): 안내 말풍선 **1건**(장수만큼 나오지 않음), 글 응답의
+장수 **정확**(3장), 분석 완료 안내까지 도달. 사용자가 봇 대화창에서 확인했다.
+검토 버튼 URL 은 텔레그램 검증을 통과한다(`chat not found` 만 반환 —
+`BUTTON_URL_INVALID` 아님). 봇이 무엇으로 해석하고 무엇을 답했는지는
+`텔레그램 수신: …` / `텔레그램 응답: …` 로그로 남긴다(내용은 남기지 않는다).
+
+**§19 완료 기준 1~8 을 실측으로 충족했다.** 9(만료 정리)는 cleanup 단계로,
+10(기존 기능 회귀 없음)은 `pnpm verify` 로, 11(Mobile Share 코드 보존)은
+애초에 미착수라 해당 없음.
+
+아직 확인하지 않은 것: 텔레그램 **안에서** 앨범으로 보낼 때의 `media_group_id`
+(안내 규칙이 더 이상 그 값에 의존하지 않으므로 동작에 영향 없음), HEIC 전송 시 mime,
+webhook 재전송 간격, 20MB 초과 파일의 실패 형태.

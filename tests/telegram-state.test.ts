@@ -251,20 +251,19 @@ describe("대화 상태", () => {
   });
 });
 
-describe("앨범 안내", () => {
-  it("같은 앨범에는 한 번만 안내한다", () => {
-    expect(shouldAnnounceMedia(null, "group-1")).toBe(true);
-    expect(shouldAnnounceMedia("group-1", "group-1")).toBe(false);
+describe("사진 안내", () => {
+  it("첫 장에만 안내한다", () => {
+    expect(shouldAnnounceMedia(0)).toBe(true);
+    expect(shouldAnnounceMedia(1)).toBe(false);
+    expect(shouldAnnounceMedia(3)).toBe(false);
   });
 
-  it("앨범이 바뀌면 다시 안내한다", () => {
-    expect(shouldAnnounceMedia("group-1", "group-2")).toBe(true);
-  });
-
-  it("한 장씩 보낸 사진은 매번 안내한다", () => {
-    // 앨범이 아니면 media_group_id 가 없다.
-    expect(shouldAnnounceMedia("group-1", null)).toBe(true);
-    expect(shouldAnnounceMedia(null, null)).toBe(true);
+  it("여러 장을 한 번에 보내도 안내는 한 번뿐이다", () => {
+    // 실측(2026-09-07): 카카오톡 「공유하기」로 4장을 한 번에 보내면 텔레그램은
+    // media_group_id 없이 개별 메시지 4건으로 전달한다. 앨범 식별자로는 억제할 수
+    // 없으므로 "이미 받은 장수"로 판정한다. 4장이면 안내는 1건이어야 한다.
+    const announcements = [0, 1, 2, 3].filter(shouldAnnounceMedia);
+    expect(announcements).toHaveLength(1);
   });
 });
 

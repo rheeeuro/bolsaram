@@ -221,18 +221,20 @@ export function mergeRawText(
 // ── 앨범 ──────────────────────────────────────────────────────
 
 /**
- * 사진 여러 장을 앨범으로 보내면 같은 `media_group_id` 를 가진 update 가 따로 온다.
- * 사진을 하나로 묶는 일은 대화 세션이 하므로 버퍼링은 필요 없다. 이 판정은
- * 같은 앨범에 대해 안내 메시지를 한 번만 보내기 위한 것이다.
+ * 사진 안내를 보낼지 — **첫 장에만** 보낸다.
  *
- * 한 장씩 보낸 사진은 media_group_id 가 없으므로 항상 새 안내를 받는다.
+ * 처음에는 `media_group_id` 가 같으면 억제하는 방식이었는데, 실제 운영 경로에서
+ * 그 값이 오지 않는다. 카카오톡 「공유하기」로 여러 장을 한 번에 텔레그램으로 보내면
+ * 텔레그램은 **앨범이 아니라 개별 메시지로** 하나씩 전달한다(실측 2026-09-07:
+ * 4장 전부 media_group_id 없음). 그래서 장수만큼 안내가 나가 시끄러웠다.
+ *
+ * 앨범 식별자에 기대지 않는다. 첫 장에서 "다음에 무엇을 할지"만 알려주고, 총 장수는
+ * 글을 받을 때 정확한 값으로 한 번 알려준다. 중간 확인은 `/status` 로 한다.
+ *
+ * 사진을 하나로 묶는 일은 대화 세션이 하므로 버퍼링·debounce 는 여전히 필요 없다.
  */
-export function shouldAnnounceMedia(
-  lastMediaGroupId: string | null,
-  incomingMediaGroupId: string | null,
-): boolean {
-  if (incomingMediaGroupId == null) return true;
-  return lastMediaGroupId !== incomingMediaGroupId;
+export function shouldAnnounceMedia(uploadedBefore: number): boolean {
+  return uploadedBefore === 0;
 }
 
 /** 세션이 사진을 더 받을 수 있는지. 넘치면 봇이 알려주고 받지 않는다. */

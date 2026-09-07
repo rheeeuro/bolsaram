@@ -254,9 +254,11 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 - **모바일 앱(Expo Share Extension/Intent)**: 미착수이며 **후순위**입니다. Import 1차 채널은
   텔레그램 봇입니다(`docs/implementation-plan.md` 「텔레그램 Import 채널」).
   `docs/share-spike-plan.md`에 계획만 있고, 실기기 검증 없이 공유 payload를 확정하지 않습니다.
-- **텔레그램 봇 실기기 검증**: 코드는 완성됐지만 실제 봇으로 끝까지 돌려본 적이 없습니다.
-  @BotFather 토큰과 `setWebhook` 등록이 필요합니다. 그 전까지 Bot API 응답 형태를
-  추측으로 바꾸지 않습니다.
+- **텔레그램 봇 실기기 검증**: 완료했습니다(2026-09-07). `@bolsaram_bot` 이
+  `bolsaram.rheeeuro.com` 의 webhook 으로 붙어 있습니다. 실측으로 확인된 사실 —
+  카카오톡 「공유하기」로 여러 장을 보내면 텔레그램은 `media_group_id` 없이 개별
+  메시지로 전달합니다. 사진을 묶는 것은 앨범이 아니라 **대화 세션**입니다.
+  자세한 내용은 `docs/implementation-plan.md` 「실기기 검증 결과」.
 - **카카오 챗봇 Import**: 폐기했습니다. 오픈빌더 스킬 payload 에 사용자 전송 이미지 필드가
   없습니다(`docs/v2/BOLSARAM_ARCHITECTURE_CHANGE_CHATBOT_v1.md` 배너 참고).
 - **SMS 발송**: 미연동. 운영 배포 전에 어댑터가 필요합니다(`apps/web/src/server/auth/login.ts`의 TODO).

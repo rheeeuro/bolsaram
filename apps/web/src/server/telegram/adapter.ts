@@ -96,6 +96,15 @@ async function route(message: TelegramMessage): Promise<void> {
 
   const intent = classifyTelegramMessage(message);
 
+  // 무엇으로 해석했는지만 남긴다. 프로필 원문·사진·텔레그램 식별값은 남기지 않는다(§15).
+  // 봇이 조용히 아무 일도 하지 않을 때 원인을 알 수 있는 유일한 단서다.
+  console.info(
+    `텔레그램 수신: ${intent.kind}` +
+      (intent.kind === "command" ? ` ${intent.command}` : "") +
+      (intent.kind === "ignored" ? ` (${intent.reason})` : "") +
+      (intent.kind === "photo" ? ` ${intent.mediaGroupId ? "앨범" : "단독"}` : ""),
+  );
+
   // /start 는 연결 전에도 동작해야 하는 유일한 명령이다.
   if (intent.kind === "command" && intent.command === "/start") {
     await handleStart(message.chat.id, sender.id, intent.argument);
@@ -315,9 +324,10 @@ async function handlePhoto(
 
     const assets = await imports.listAssets(sql, conversation.importSessionId);
     const uploadedCount = assets.filter((a) => a.uploadedAt != null).length;
-    // caption 만으로 상태를 READY 로 올리지 않는다. 앨범이 아직 들어오는 중일 수 있어
+    // caption 만으로 상태를 READY 로 올리지 않는다. 사진이 아직 들어오는 중일 수 있어
     // 자동 분석을 걸면 절반만 분석된다. 분석은 글을 받거나 /analyze 로만 시작한다.
-    const announce = shouldAnnounceMedia(conversation.lastMediaGroupId, intent.mediaGroupId);
+    // 안내는 첫 장에만. 이번 사진을 넣기 전 장수로 판정한다.
+    const announce = shouldAnnounceMedia(uploadedCount - 1);
     const nextState = nextTelegramState({
       current: conversation.state,
       assetCount: uploadedCount,
@@ -331,8 +341,13 @@ async function handlePhoto(
     return { uploadedCount, announce, captionStored, hasText };
   });
 
+  // 봇이 무엇을 답했는지 남긴다. 안내가 장수만큼 나가는 회귀를 데이터로 잡을 수 있어야 한다
+  // (문구·프로필 내용은 남기지 않는다).
+  console.info(
+    `텔레그램 응답: 사진 ${result.uploadedCount}장째 · 안내 ${result.announce ? "전송" : "생략"}`,
+  );
   if (result.announce) {
-    await sendMessage(identity.telegramChatId, messages.mediaReceived(result.uploadedCount));
+    await sendMessage(identity.telegramChatId, messages.mediaReceiving);
     if (result.captionStored) {
       await sendMessage(identity.telegramChatId, messages.captionStored);
     }
@@ -355,19 +370,26 @@ async function handleText(
       await imports.updateRawText(sql, conversation.importSessionId, merged.rawText);
     }
     const assets = await imports.listAssets(sql, conversation.importSessionId);
+    const uploadedCount = assets.filter((a) => a.uploadedAt != null).length;
     await conversations.updateConversation(sql, conversation, {
       state: nextTelegramState({
         current: conversation.state,
-        assetCount: assets.filter((a) => a.uploadedAt != null).length,
+        assetCount: uploadedCount,
         hasText: merged.rawText.length > 0,
       }),
     });
-    return { sessionId: conversation.importSessionId, truncated: merged.truncated };
+    return {
+      sessionId: conversation.importSessionId,
+      truncated: merged.truncated,
+      uploadedCount,
+    };
   });
 
   await sendMessage(
     identity.telegramChatId,
-    result.truncated ? messages.textTruncated : messages.textReceived,
+    result.truncated
+      ? messages.textTruncated(result.uploadedCount)
+      : messages.textReceived(result.uploadedCount),
   );
   triggerAnalyze(ctx, identity, result.sessionId);
 }

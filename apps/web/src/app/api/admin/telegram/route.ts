@@ -37,8 +37,15 @@ export const POST = route(async () => {
   }
   const viewer = await requireAdmin();
 
-  // 봇 이름은 딥링크를 만들기 위한 것이다. 못 가져와도 코드 발급은 진행한다.
-  const botUsername = await getBotUsername().catch(() => null);
+  // 봇 이름은 딥링크를 만들기 위한 것이다. 못 가져와도 코드 발급은 진행하지만,
+  // 왜 못 가져왔는지는 반드시 남긴다 — 토큰 오설정을 조용히 넘기면 찾을 방법이 없다.
+  const botUsername = await getBotUsername().catch((error: unknown) => {
+    console.error(
+      "텔레그램 봇 이름 조회 실패 — 딥링크 없이 코드만 발급합니다",
+      error instanceof Error ? `${error.name}: ${error.message}` : error,
+    );
+    return null;
+  });
   const issued = await issueTelegramLinkCode(viewer.userId, botUsername ?? undefined);
 
   await withRls(rlsContextOf(viewer), (sql) =>

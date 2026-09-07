@@ -9,7 +9,7 @@
 import "server-only";
 import { withOwner, withOwnerTx } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
-import { env } from "../env";
+import { env, isLoopbackDeployment } from "../env";
 import { generateOtp, peppered, verifyPassword } from "../crypto";
 
 const OTP_TTL_MS = 5 * 60_000;
@@ -69,8 +69,12 @@ export async function issueLoginCode(phone: string): Promise<OtpIssueResult> {
   });
 
   if (env().DEV_EXPOSE_OTP) {
+    // 서버 로그는 호스트에 접근할 수 있는 사람만 본다. 여기까지는 안전하다.
     console.info(`[dev] ${phone} 로그인 코드: ${code}`);
-    return { devCode: code };
+    // 응답에 싣는 것은 **loopback 배포에서만**. 공개 주소로 서비스되는 배포에서
+    // 코드를 내려주면 인터넷의 누구나 남의 계정으로 로그인할 수 있다.
+    // 공개 배포에서 코드가 필요하면 `pnpm pm2:logs` 로 확인한다.
+    return isLoopbackDeployment() ? { devCode: code } : {};
   }
   // TODO(SMS 연동): APP_ENV=production 으로 올리기 전에 발송 어댑터를 붙인다.
   //   완료 조건 — 실제 문자로 코드가 도착하고 DEV_EXPOSE_OTP 없이 로그인이 된다.

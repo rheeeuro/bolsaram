@@ -53,9 +53,12 @@ export const messages = {
   canceled: "현재 등록을 취소했습니다.",
   nothingToCancel: "진행 중인 등록이 없습니다.",
 
-  /** 사진을 받은 뒤. 앨범 하나에 한 번만 보낸다. */
-  mediaReceived: (count: number) =>
-    `사진 ${count}장을 받았습니다.\n프로필 글을 보내주세요.`,
+  /**
+   * 첫 사진을 받은 뒤 한 번만 보낸다.
+   * 장수를 말하지 않는 이유 — 카카오톡 「공유하기」로 보내면 사진이 하나씩 따로 도착해서
+   * 이 시점의 장수는 최종 장수가 아니다. 총 장수는 글을 받을 때 알려준다.
+   */
+  mediaReceiving: "사진을 받고 있습니다.\n다 보내신 뒤 프로필 글을 보내주세요.",
 
   mediaFull: `사진은 한 세션에 ${TELEGRAM_MAX_ASSETS_PER_SESSION}장까지 받습니다. 프로필 글을 보내주세요.`,
 
@@ -64,8 +67,15 @@ export const messages = {
     "글을 따로 보내면 이어서 덧붙고, 설명만으로 분석하려면 /analyze 를 보내주세요.",
   ].join("\n"),
 
-  textReceived: "프로필 내용을 받았습니다.\n분석을 시작합니다.",
-  textTruncated: "프로필 내용이 너무 길어 일부만 저장했습니다.\n분석을 시작합니다.",
+  /** 글을 받은 뒤. 여기서 사진 총 장수를 확정해 알려준다. */
+  textReceived: (assetCount: number) =>
+    (assetCount > 0
+      ? `사진 ${assetCount}장과 프로필 내용을 받았습니다.`
+      : "프로필 내용을 받았습니다.") + "\n분석을 시작합니다.",
+  textTruncated: (assetCount: number) =>
+    (assetCount > 0
+      ? `사진 ${assetCount}장을 받았고, 프로필 내용이 너무 길어 일부만 저장했습니다.`
+      : "프로필 내용이 너무 길어 일부만 저장했습니다.") + "\n분석을 시작합니다.",
 
   nothingToAnalyze: "분석할 내용이 없습니다. 사진이나 프로필 글을 보내주세요.",
   analyzing: "분석을 시작합니다.",

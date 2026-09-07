@@ -26,7 +26,8 @@ Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에
 
 ```
 apps/web/src/
-├── instrumentation.ts        기동 시 환경변수 검증 (설정 실수를 트래픽 전에 잡는다)
+├── instrumentation.ts        기동 훅 — 런타임 분기만 (Node/Edge 양쪽에서 평가된다)
+├── startup-node.ts           Node 기동 작업 — 환경변수 검증 + 해외 API 연결 대기시간
 ├── app/
 │   ├── page.tsx              인트로 (로그인 상태면 역할별 리다이렉트)
 │   ├── layout.tsx            폰트·메타데이터·noindex
