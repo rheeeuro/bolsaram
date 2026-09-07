@@ -15,6 +15,7 @@ import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import {
   consumeGroupInvite,
   issueGroupInvite,
+  leaveGroup,
   readMyGroup,
   updateGroup,
 } from "../apps/web/src/server/auth/group-invite";
@@ -341,5 +342,88 @@ describe("모임 정보", () => {
 
     expect(await readMyGroup(owner.userId)).toMatchObject({ isOwner: true });
     expect(await readMyGroup(invited.userId)).toMatchObject({ isOwner: false });
+  });
+});
+
+describe("모임 나가기", () => {
+  it("빈 모임은 나가면서 사라진다", async () => {
+    const admin = await newAdmin("빈모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: admin.userId,
+      name: `${TAG}-빈모임`,
+    });
+    const result = await leaveGroup(admin.userId);
+    expect(result.deletedGroup).toBe(true);
+    expect(await readMyGroup(admin.userId)).toBeNull();
+
+    const left = await withOwner(async (sql) => {
+      const r = await sql.query(`SELECT 1 FROM groups WHERE id = $1`, [groupId]);
+      return r.rowCount ?? 0;
+    });
+    // 주인 없는 빈 모임을 남기지 않는다.
+    expect(left).toBe(0);
+  });
+
+  it("마지막 주선자는 회원이 남아 있으면 나갈 수 없다", async () => {
+    const admin = await newAdmin("마지막주선자");
+    const { groupId } = await createGroupForAdmin({
+      userId: admin.userId,
+      name: `${TAG}-회원있는모임`,
+    });
+    await seedProfile({ groupId, createdBy: admin.userId, name: "남는회원" });
+
+    // 나가면 그 회원을 아무도 볼 수 없게 된다 — 되돌릴 방법이 없으므로 막는다.
+    await expect(leaveGroup(admin.userId)).rejects.toThrow(/남아 있어 나갈 수 없습니다/);
+    expect(await readMyGroup(admin.userId)).not.toBeNull();
+  });
+
+  it("동료가 있으면 회원이 남아 있어도 나갈 수 있다", async () => {
+    const owner = await newAdmin("떠나는개설자");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-인수모임`,
+    });
+    await seedProfile({ groupId, createdBy: owner.userId, name: "인수될회원" });
+
+    const issued = await issueGroupInvite({ groupId, createdBy: owner.userId });
+    const successor = await newAdmin("후임");
+    await consumeGroupInvite({ code: issued.code, userId: successor.userId });
+
+    const result = await leaveGroup(owner.userId);
+    expect(result.deletedGroup).toBe(false);
+    expect(await readMyGroup(owner.userId)).toBeNull();
+
+    // 개설자가 후임에게 넘어가야 한다 — 개설자 없는 모임을 만들 수 없다.
+    const after = await readMyGroup(successor.userId);
+    expect(after).toMatchObject({ groupId, isOwner: true });
+    expect(after?.admins).toHaveLength(1);
+  });
+
+  it("나간 뒤에는 그 모임 회원이 보이지 않는다", async () => {
+    const owner = await newAdmin("나갈사람");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-차단확인모임`,
+    });
+    const issued = await issueGroupInvite({ groupId, createdBy: owner.userId });
+    const stays = await newAdmin("남을사람");
+    await consumeGroupInvite({ code: issued.code, userId: stays.userId });
+    const hidden = await seedProfile({
+      groupId,
+      createdBy: stays.userId,
+      name: "나간뒤안보임",
+    });
+
+    await leaveGroup(owner.userId);
+    const visible = await withRls(owner, async (sql) => {
+      const r = await sql.query(`SELECT id FROM profiles WHERE id = $1`, [hidden]);
+      return r.rowCount ?? 0;
+    });
+    expect(visible).toBe(0);
+  });
+
+  it("모임이 없으면 나갈 수 없다", async () => {
+    const admin = await newAdmin("무소속나가기");
+    await expect(leaveGroup(admin.userId)).rejects.toThrow(/속한 모임이 없습니다/);
   });
 });

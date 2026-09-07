@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/admin/table";
 import { Field, Input, Textarea } from "@/components/ui/field";
-import { apiPatch, apiPost, apiPut } from "@/lib/api-client";
+import { apiDelete, apiPatch, apiPost, apiPut } from "@/lib/api-client";
 
 type Admin = { userId: string; displayName: string | null; isOwner: boolean };
 export type Group = {
@@ -200,6 +200,31 @@ function HasGroup({ group }: { group: Group }) {
             {busy === "invite" ? "발급 중…" : "주선자 초대 코드 받기"}
           </Button>
         )}
+      </Card>
+
+      <Card title="모임 나가기">
+        <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+          나가면 이 모임의 회원이 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다.
+          <br />
+          마지막 주선자라면 <strong>회원이 남아 있는 동안 나갈 수 없습니다</strong> —
+          전체공개로 옮기거나 동료를 먼저 초대해 주세요.
+        </p>
+        <Button
+          variant="danger"
+          disabled={busy != null}
+          onClick={() =>
+            void (async () => {
+              setBusy("leave");
+              setError(null);
+              const result = await apiDelete("/api/admin/group");
+              setBusy(null);
+              if (result.ok) router.refresh();
+              else setError(result.message);
+            })()
+          }
+        >
+          {busy === "leave" ? "나가는 중…" : "모임 나가기"}
+        </Button>
       </Card>
 
       {error ? (

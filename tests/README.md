@@ -37,8 +37,8 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 32   |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·사진 묶기·권한 경계   | 필요 | 23   |
 | `admin-login.test.ts`          | 관리자 비밀번호 시도 제한·창 만료·권한 경계    | 필요 | 7    |
-| `group-isolation.test.ts`      | 모임 간 격리(주선자·회원·Import·신청)          | 필요 | 11   |
-| `admin-signup.test.ts`         | 주선자 가입·모임 생성·가입 후 무권한 확인      | 필요 | 7    |
+| `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
+| `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 21   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
@@ -78,7 +78,9 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `admin-login.test.ts` 「창이 지난 실패는 세지 않는다」     | 영구 락아웃 없음(계정 잠그기 방지)  |
 | `group-isolation.test.ts` 「남의 모임 …못한다」            | 주선자 자유 가입의 마지막 방어선    |
 | `group-isolation.test.ts` 「모임을 넘는 소개 신청」        | 테넌트 경계를 넘는 신청 차단        |
-| `admin-signup.test.ts` 「가입만으로는 아무것도 볼 수 없다」 | 자유 가입이 데이터 접근을 주지 않음 |
+| `admin-signup.test.ts` 「전체공개를 남이 고칠 수 없다」    | 보이는 것과 고치는 것을 분리         |
+| `admin-signup.test.ts` 「마지막 주선자는 …나갈 수 없다」   | 아무도 못 보는 회원을 만들지 않음    |
+| `group-isolation.test.ts` 「남의 프로필을 자기 것으로」    | 초대 없는 claim 차단 (0013)          |
 | `docs-guide.test.ts`                                       | 사용자 문서와 구현의 정합성         |
 | `docs-readme.test.ts`                                      | 디렉터리 문서와 코드 구조의 정합성  |
 

@@ -231,7 +231,7 @@ describe("주인 없는 프로필 가로채기", () => {
 });
 
 describe("모임에 속하지 않은 주선자", () => {
-  it("어떤 프로필도 보지 못한다", async () => {
+  it("모임 소속 프로필은 보지 못한다 (전체공개는 본다)", async () => {
     const orphan = await withOwner(async (sql) => {
       const r = await sql.query<{ id: string }>(
         `INSERT INTO users (role, email, password_hash, display_name)
@@ -240,11 +240,31 @@ describe("모임에 속하지 않은 주선자", () => {
       );
       return { userId: r.rows[0]!.id, role: "ADMIN" as const };
     });
-    // 가입만 하고 모임이 없으면 아무것도 못 본다 — 자유 가입의 안전판이다.
-    const rows = await withRls(orphan, async (sql) => {
-      const r = await sql.query(`SELECT id FROM profiles`);
+    // 모임 소속 프로필은 보이지 않는다 — 자유 가입의 안전판이다.
+    // (전체공개 프로필은 보이는 게 정상이므로 전체 개수를 세면 안 된다.
+    //  전체 개수로 단정하면 전체공개 풀이 비었을 때만 통과하는 약한 테스트가 된다.)
+    const visible = await withRls(orphan, async (sql) => {
+      const r = await sql.query(`SELECT id FROM profiles WHERE id = ANY($1)`, [
+        [A.profileId, B.profileId],
+      ]);
       return r.rowCount ?? 0;
     });
-    expect(rows).toBe(0);
+    expect(visible).toBe(0);
+
+    // 전체공개 프로필은 반대로 보여야 한다.
+    const publicId = await withOwner(async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
+                               status, visibility, real_name)
+         VALUES (NULL,'FEMALE',1996,'SEOUL','ACTIVE','LISTED',$1) RETURNING id`,
+        [`${TAG}-전체공개`],
+      );
+      return r.rows[0]!.id;
+    });
+    const seesPublic = await withRls(orphan, async (sql) => {
+      const r = await sql.query(`SELECT id FROM profiles WHERE id = $1`, [publicId]);
+      return r.rowCount ?? 0;
+    });
+    expect(seesPublic).toBe(1);
   });
 });

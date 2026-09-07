@@ -5,6 +5,7 @@
  *   PATCH  모임 이름·설명 수정 (모임에 속한 주선자만)
  *   POST   초대 코드 발급 (모임에 속한 주선자만)
  *   PUT    초대 코드로 합류 (모임이 없는 주선자만)
+ *   DELETE 모임 나가기
  *
  * 평문 코드는 발급 응답에 한 번만 실린다. 다시 조회할 수 없고 로그에 남기지 않는다.
  */
@@ -14,6 +15,7 @@ import { groupUpdateSchema } from "@bolsaram/schemas";
 import {
   consumeGroupInvite,
   issueGroupInvite,
+  leaveGroup,
   readMyGroup,
   updateGroup,
 } from "@/server/auth/group-invite";
@@ -49,4 +51,10 @@ export const PUT = route(async (request: Request) => {
   const viewer = await requireAdmin();
   const joined = await consumeGroupInvite({ code: input.code, userId: viewer.userId });
   return ok(joined);
+});
+
+export const DELETE = route(async () => {
+  const viewer = await requireAdminGroup();
+  const result = await leaveGroup(viewer.userId);
+  return ok(result);
 });

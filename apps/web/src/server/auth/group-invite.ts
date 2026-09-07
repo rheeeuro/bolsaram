@@ -170,3 +170,67 @@ export async function updateGroup(input: {
     throw new DomainError("NOT_FOUND", "모임을 찾을 수 없습니다.");
   }
 }
+
+/**
+ * 모임에서 나간다.
+ *
+ * 막는 경우가 하나 있다 — **마지막 주선자인데 모임에 회원이나 Import 가 남아 있으면**
+ * 나갈 수 없다. 나가면 그 데이터를 아무도 볼 수 없게 되고(RLS 가 전부 막는다) 되돌릴
+ * 방법도 없다. 먼저 회원을 전체공개로 옮기거나 동료를 초대하라고 알려준다.
+ *
+ * 비어 있는 모임이면 나가면서 모임까지 지운다 — 주인 없는 빈 모임을 남기지 않는다.
+ * 개설자가 나가고 다른 주선자가 남으면 가장 먼저 들어온 사람에게 개설자를 넘긴다
+ * (`group_admins_one_owner` 때문에 개설자 없는 모임을 만들 수 없다).
+ */
+export async function leaveGroup(userId: string): Promise<{ deletedGroup: boolean }> {
+  return withOwnerTx(async (sql) => {
+    const mine = await sql.query<{ group_id: string; is_owner: boolean }>(
+      `SELECT group_id, is_owner FROM group_admins WHERE user_id = $1 ORDER BY added_at LIMIT 1`,
+      [userId],
+    );
+    const row = mine.rows[0];
+    if (!row) throw new DomainError("NOT_FOUND", "속한 모임이 없습니다.");
+
+    const others = await sql.query<{ user_id: string }>(
+      `SELECT user_id FROM group_admins
+        WHERE group_id = $1 AND user_id <> $2 ORDER BY added_at`,
+      [row.group_id, userId],
+    );
+
+    if (others.rowCount === 0) {
+      const left = await sql.query<{ count: number }>(
+        `SELECT (
+           (SELECT count(*) FROM profiles WHERE group_id = $1)
+           + (SELECT count(*) FROM import_sessions WHERE group_id = $1)
+         )::int AS count`,
+        [row.group_id],
+      );
+      if ((left.rows[0]?.count ?? 0) > 0) {
+        throw new DomainError(
+          "CONFLICT",
+          "모임에 회원이나 가져온 프로필이 남아 있어 나갈 수 없습니다." +
+            " 전체공개로 옮기거나 동료 주선자를 초대한 뒤 나가 주세요.",
+        );
+      }
+      // 빈 모임이다. group_admins·초대 코드는 CASCADE 로 함께 사라진다.
+      await sql.query(`DELETE FROM groups WHERE id = $1`, [row.group_id]);
+      return { deletedGroup: true };
+    }
+
+    if (row.is_owner) {
+      await sql.query(
+        `UPDATE group_admins SET is_owner = false WHERE group_id = $1 AND user_id = $2`,
+        [row.group_id, userId],
+      );
+      await sql.query(
+        `UPDATE group_admins SET is_owner = true WHERE group_id = $1 AND user_id = $2`,
+        [row.group_id, others.rows[0]!.user_id],
+      );
+    }
+    await sql.query(`DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2`, [
+      row.group_id,
+      userId,
+    ]);
+    return { deletedGroup: false };
+  });
+}
