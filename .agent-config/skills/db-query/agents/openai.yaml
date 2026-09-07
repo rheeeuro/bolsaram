@@ -1,0 +1,4 @@
+interface:
+  display_name: "DB Query"
+  short_description: "볼사람 PostgreSQL 조회 (RLS 롤 구분 주의)"
+  default_prompt: "Use $db-query to inspect the bolsaram database."

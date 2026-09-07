@@ -10,7 +10,8 @@ export async function register(): Promise<void> {
   const { env } = await import("./server/env");
   const config = env();
   console.info(
-    `볼사람 서버 기동 — ${config.NODE_ENV} / AI 프로바이더 ${config.AI_PROVIDER}` +
-      (config.DEV_EXPOSE_OTP ? " / OTP 노출(개발 전용)" : ""),
+    `볼사람 서버 기동 — APP_ENV=${config.APP_ENV} (NODE_ENV=${config.NODE_ENV})` +
+      ` / AI 프로바이더 ${config.AI_PROVIDER}` +
+      (config.DEV_EXPOSE_OTP ? " / ⚠️ OTP 화면 노출 켜짐" : ""),
   );
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "New Migration"
+  short_description: "RLS 정책까지 갖춘 새 마이그레이션 추가"
+  default_prompt: "Use $new-migration to add a schema change safely."

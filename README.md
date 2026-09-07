@@ -81,13 +81,49 @@ docs/              설계 문서 · 구현 계획 · Share Spike 계획
 - v1 프로토타입 MariaDB는 `docker compose --profile legacy up mariadb`로만 뜹니다.
   이전 구현은 git 태그 `archive/v1-prototype`에 있습니다.
 
+## 운영 (PM2)
+
+```bash
+pnpm pm2:start    # 최초 등록 + 저장
+pnpm deploy       # 빌드 후 재시작
+pnpm pm2:status   # 상태
+pnpm pm2:logs     # 로그
+```
+
+| 앱                 | 역할                                             | 스케줄     |
+| ------------------ | ------------------------------------------------ | ---------- |
+| `bolsaram-web`     | 웹 + API (3020)                                  | 상시       |
+| `bolsaram-cleanup` | 만료 세션·OTP·초대 정리, 방치된 Import 원본 삭제 | 매일 04:10 |
+
+정의는 [ecosystem.config.cjs](ecosystem.config.cjs)에 있습니다. 이 호스트에는 다른 프로젝트의
+PM2 앱도 함께 떠 있으니 항상 앱 이름을 지정해 조작하세요.
+
+`APP_ENV`는 `NODE_ENV`와 분리된 축입니다. PM2로 띄우면 `NODE_ENV=production`이지만
+아직 실제 사용자를 받지 않는 스테이징이므로 `APP_ENV=staging`으로 두어 회원 OTP 로그인을
+확인할 수 있습니다. **실제 배포 시 `production`으로 바꾸고 `DEV_EXPOSE_OTP`를 지우세요** —
+그 조합이면 서버가 기동을 거부합니다.
+
 ## 검증
 
 ```bash
-pnpm verify     # typecheck + lint + test
+pnpm verify        # typecheck + lint + test (108개)
+pnpm agents:check  # 에이전트 설정 드리프트 검사
+pnpm agents:test   # 셸 가드 판정 케이스 23개
 ```
 
 DB 통합 테스트가 포함되어 있어 `pnpm db:up`이 필요합니다.
+
+## 에이전트 하네스
+
+Claude Code와 Codex가 같은 규칙으로 움직이도록 `.agent-config/`를 단일 원본으로 두고
+`sync.py`가 에이전트별 설정을 생성합니다. 생성 파일을 직접 고치면 다음 동기화에 덮어써지므로
+훅이 편집을 막습니다.
+
+편집할 때마다 해당 패키지 타입체크와 마이그레이션 RLS 검사가 돌고, 턴이 끝나면 변경된 코드를
+빌드해 PM2 앱을 재시작합니다. 비밀 파일·프로필 사진 저장소·이미 적용된 마이그레이션은
+Edit 도구와 셸 양쪽에서 차단합니다.
+
+자세한 내용은 [.ai-harness/project.md](.ai-harness/project.md)를 보세요.
 
 ## 보안
 

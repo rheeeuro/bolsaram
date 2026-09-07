@@ -16,3 +16,14 @@ __pycache__/
 
 # 로컬 private 스토리지(프로필 원본/Import 원본). 절대 커밋하지 않는다.
 var/storage/
+
+# PM2 로그
+var/log/
+
+# 테스트가 만드는 임시 스토리지
+var/test-storage/
+
+# 에이전트 훅 상태 파일 (턴 단위 임시)
+.claude/.pending-changes
+.claude/.turn-start
+.claude/settings.local.json

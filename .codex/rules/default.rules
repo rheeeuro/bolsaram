@@ -1,0 +1,73 @@
+# Generated from .agent-config/manifest.json; do not edit directly.
+
+prefix_rule(
+    pattern = ["pnpm", "verify"],
+    decision = "allow",
+    justification = "타입체크·린트·테스트 통합 검증",
+)
+
+prefix_rule(
+    pattern = ["pnpm", "typecheck"],
+    decision = "allow",
+    justification = "TypeScript 정적 검사",
+)
+
+prefix_rule(
+    pattern = ["pnpm", "lint"],
+    decision = "allow",
+    justification = "ESLint 검사",
+)
+
+prefix_rule(
+    pattern = ["pnpm", "test"],
+    decision = "allow",
+    justification = "vitest 실행",
+)
+
+prefix_rule(
+    pattern = ["pnpm", "build"],
+    decision = "allow",
+    justification = "Next.js 빌드",
+)
+
+prefix_rule(
+    pattern = ["pnpm", "db:migrate"],
+    decision = "allow",
+    justification = "로컬 DB 마이그레이션 적용",
+)
+
+prefix_rule(
+    pattern = ["pnpm", "db:seed"],
+    decision = "allow",
+    justification = "합성 시드 데이터 적재",
+)
+
+prefix_rule(
+    pattern = ["pm2", "status"],
+    decision = "allow",
+    justification = "PM2 상태 확인",
+)
+
+prefix_rule(
+    pattern = ["pm2", "jlist"],
+    decision = "allow",
+    justification = "PM2 상태 JSON 확인",
+)
+
+prefix_rule(
+    pattern = ["pm2", "logs"],
+    decision = "allow",
+    justification = "PM2 로그 확인",
+)
+
+prefix_rule(
+    pattern = ["docker", "ps"],
+    decision = "allow",
+    justification = "로컬 컨테이너 상태 확인",
+)
+
+prefix_rule(
+    pattern = ["rg"],
+    decision = "allow",
+    justification = "저장소 텍스트 검색",
+)

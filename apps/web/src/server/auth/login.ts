@@ -72,7 +72,7 @@ export async function issueLoginCode(phone: string): Promise<OtpIssueResult> {
     console.info(`[dev] ${phone} 로그인 코드: ${code}`);
     return { devCode: code };
   }
-  // TODO(SMS 연동): 운영 배포 전에 발송 어댑터를 붙인다.
+  // TODO(SMS 연동): APP_ENV=production 으로 올리기 전에 발송 어댑터를 붙인다.
   //   완료 조건 — 실제 문자로 코드가 도착하고 DEV_EXPOSE_OTP 없이 로그인이 된다.
   throw new DomainError(
     "INVALID_STATE",

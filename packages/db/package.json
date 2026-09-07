@@ -11,7 +11,8 @@
     "lint": "eslint src",
     "migrate": "tsx src/cli/migrate.ts",
     "reset": "tsx src/cli/reset.ts",
-    "seed": "tsx src/cli/seed.ts"
+    "seed": "tsx src/cli/seed.ts",
+    "cleanup": "tsx src/cli/cleanup.ts"
   },
   "dependencies": {
     "@bolsaram/domain": "workspace:*",

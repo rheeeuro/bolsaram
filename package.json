@@ -24,7 +24,18 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test",
+    "db:cleanup": "pnpm --filter @bolsaram/db cleanup",
+    "pm2:start": "pm2 start ecosystem.config.cjs && pm2 save",
+    "pm2:restart": "pm2 restart bolsaram-web",
+    "pm2:stop": "pm2 stop bolsaram-web",
+    "pm2:status": "pm2 status bolsaram-web bolsaram-cleanup",
+    "pm2:logs": "pm2 logs bolsaram-web --lines 50",
+    "pm2:save": "pm2 save",
+    "deploy": "pnpm build && pm2 restart bolsaram-web",
+    "agents:sync": "python3 .agent-config/sync.py",
+    "agents:check": "python3 .agent-config/sync.py --check",
+    "agents:test": "python3 .agent-config/guard-cases.py"
   },
   "devDependencies": {
     "@bolsaram/db": "workspace:^",

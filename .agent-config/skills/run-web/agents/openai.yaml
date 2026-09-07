@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Web"
+  short_description: "웹 앱을 띄우고 화면·API·권한을 실제로 확인"
+  default_prompt: "Use $run-web to verify the change in the running app."

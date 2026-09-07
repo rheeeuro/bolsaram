@@ -56,12 +56,66 @@ pnpm verify            # typecheck + lint + test — 마무리 전에 실행
 pnpm typecheck
 pnpm lint
 pnpm test
+
+pnpm pm2:start         # PM2 등록 + 저장 (최초 1회)
+pnpm deploy            # 빌드 후 bolsaram-web 재시작
+pnpm pm2:status        # 앱 상태
+pnpm pm2:logs          # 로그 50줄
+pnpm db:cleanup        # 만료 데이터 정리 (평소엔 cron 이 돌린다)
+
+pnpm agents:sync       # 하네스 원본 → 에이전트별 설정 생성
+pnpm agents:check      # 생성 파일 드리프트 검사
+pnpm agents:test       # 셸 가드 판정 케이스 23개
 ```
 
 시드 계정:
 
 - 주선자 `admin@bolsaram.local` / `bolsaram-admin`
 - 회원 `01020001000` ~ `01020001005` (OTP는 `DEV_EXPOSE_OTP=true`일 때 화면·콘솔에 표시)
+
+## PM2
+
+| 앱                 | 역할             | 비고                                                 |
+| ------------------ | ---------------- | ---------------------------------------------------- |
+| `bolsaram-web`     | 웹 + API (3020)  | 상시. 코드 변경 시 빌드 후 재시작해야 반영된다       |
+| `bolsaram-cleanup` | 만료 데이터 정리 | 매일 04:10 cron. 매 실행 새 프로세스라 재시작 불필요 |
+
+- 정의는 `ecosystem.config.cjs`. 루트 package.json 이 `type: module` 이라 확장자가 `.cjs` 다.
+- 앱을 추가·변경하면 `pnpm pm2:save` 로 저장해야 재부팅 후에도 살아난다
+  (이 호스트는 systemd `pm2-euro.service` 로 PM2 를 복원한다).
+- 웹 앱은 `APP_ENV=staging` 으로 뜬다. 실제 배포 시 `production` 으로 바꾸고
+  `DEV_EXPOSE_OTP` 를 지운다 — production 에서 그 값이 켜져 있으면 서버가 기동을 거부한다.
+- **다른 프로젝트 앱(jongalab·trading·kiwoom)을 건드리지 않는다.** 항상 이름을 지정해 조작한다.
+
+## 에이전트 하네스
+
+`.agent-config/` 가 **단일 원본**이고 `sync.py` 가 에이전트별 설정을 생성한다.
+생성 파일을 직접 고치면 다음 동기화에 덮어써지므로 가드가 편집을 막는다.
+
+```
+.agent-config/
+  manifest.json     훅 on/off · 권한 · Codex 규칙
+  sync.py           생성기 (--check 로 드리프트 검사)
+  guard-cases.py    셸 가드 판정 케이스
+  skills/           check · run-web · db-query · new-migration
+  agents/           verify-agent · ui-agent
+```
+
+훅은 `.claude/hooks/` 에 있고 두 에이전트가 공유한다.
+
+| 시점             | 훅                 | 하는 일                                     |
+| ---------------- | ------------------ | ------------------------------------------- |
+| SessionStart     | sync.py            | 생성 파일 동기화                            |
+| PreToolUse       | guard-sensitive.sh | 민감 파일 편집·열람 차단 (셸 우회 포함)     |
+| PostToolUse      | quality-gate.sh    | 해당 패키지 타입체크, 마이그레이션 RLS 검사 |
+| PostToolUse      | track-changes.sh   | 변경 기록 + 건드린 축의 규칙 주입           |
+| UserPromptSubmit | mark-turn-start.sh | 턴 시작 시각 기록                           |
+| Stop             | deploy-on-stop.sh  | 빌드 + PM2 재시작, 미적용 마이그레이션 안내 |
+
+가드가 막는 대상: 생성된 에이전트 설정, 비밀 파일, private 스토리지, 운영 로그,
+**이미 적용된 마이그레이션**. 판정 기준은 `guard-bash-write.py` 가 단일 소스이며
+`pnpm agents:test` 로 검증한다. 경로를 문자열로만 다뤄야 하는 경우(문서·테스트)는
+Bash heredoc 대신 Write 도구를 쓴다.
 
 ## 구조
 
@@ -78,6 +132,9 @@ packages/
   config/         공용 tsconfig / eslint
 db/migrations/    번호순 SQL. 적용된 파일은 절대 수정하지 않고 새 파일을 추가합니다.
 tests/            vitest. 도메인 단위 + DB 통합
+.agent-config/    에이전트 하네스 원본 (위 참고)
+ecosystem.config.cjs  PM2 정의
+var/             private 스토리지와 PM2 로그 (git 제외, 열람 금지)
 ```
 
 ## 작업 규칙
