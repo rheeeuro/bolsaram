@@ -27,3 +27,7 @@ var/test-storage/
 .claude/.pending-changes
 .claude/.turn-start
 .claude/settings.local.json
+
+# 비밀 파일 가드 일시 해제 마커. 사용자가 명시적으로 요청할 때만 만들고 곧바로 지운다.
+# 커밋되면 가드가 상시 꺼진 상태로 배포된다.
+.claude/.allow-secret-edit

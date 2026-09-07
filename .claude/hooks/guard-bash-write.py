@@ -15,6 +15,7 @@ file_path 기반 가드(guard-sensitive.sh)는 Edit/Write 도구만 본다. 같�
 from __future__ import annotations
 
 import re
+import pathlib
 import shlex
 import sys
 
@@ -27,6 +28,15 @@ GENERATED = (
 # 비밀·개인정보 — 읽기도 금지.
 SECRETS = (".env", ".env.local")
 PROTECTED_DIRS = ("var/storage", "var/log")
+
+# 사용자가 명시적으로 요청했을 때만 비밀 파일 가드를 내린다(guard-sensitive.sh 와 같은 마커).
+# 마커가 있어도 생성 설정 파일·적용된 마이그레이션 가드는 그대로 걸린다.
+# guard-sensitive.sh 와 같은 경로를 봐야 한다: <repo>/.claude/.allow-secret-edit
+_OVERRIDE = pathlib.Path(__file__).resolve().parent.parent / ".allow-secret-edit"
+
+
+def secret_guard_off() -> bool:
+    return _OVERRIDE.is_file()
 
 # ── 쓰기 동작 ────────────────────────────────────────────────────────────────
 WRITE_CMDS = {"tee", "rm", "mv", "cp", "install", "truncate", "dd", "shred", "patch", "ln"}
@@ -51,10 +61,9 @@ PY_READ_RE = re.compile(
 )
 INLINE_RE = re.compile(r"\b(?:python3?|node|npx|tsx|ruby|perl|pnpm)\b[^\n;|&]*?(?:\s-c\b|\s-e\b|<<-?\s*['\"]?\w)")
 # 경로 경계에서만 잡아 `.environ`·`process.env` 같은 식별자를 피한다.
-SECRET_TEXT_RE = re.compile(
-    r"""(?:^|[\s'"=(,/])\.env(?:\.local)?(?:$|[\s'"),;:])"""
-    r"""|(?:^|[\s'"=(,/])var/(?:storage|log)/""",
-)
+# 비밀 파일과 보호 디렉터리를 나눠 둔다 — 승인 마커는 앞엣것만 해제한다.
+SECRET_FILE_RE = re.compile(r"""(?:^|[\s'"=(,/])\.env(?:\.local)?(?:$|[\s'"),;:])""")
+PROTECTED_DIR_RE = re.compile(r"""(?:^|[\s'"=(,/])var/(?:storage|log)/""")
 
 # 마이그레이션 — **이미 적용된** 파일만 수정 금지. 새 파일 작성은 정상 작업이다.
 MIGRATION_RE = re.compile(r"db/migrations/(\d{4}_[\w-]+\.sql)")
@@ -107,8 +116,9 @@ def classify(token: str) -> str | None:
     if any(t.endswith(g) or (g.endswith("/") and g in t) for g in GENERATED):
         return (f"🚫 {t} 는 .agent-config/ 에서 생성되는 파일입니다.\n"
                 "   스킬·에이전트·공유 설정은 .agent-config/ 원본을 고치고 sync.py 로 생성하세요.")
-    if name in SECRETS:
-        return f"🚫 {t} 는 비밀 파일입니다. 읽기·편집·커밋 금지 (.env.example 을 고치세요)."
+    if name in SECRETS and not secret_guard_off():
+        return (f"🚫 {t} 는 비밀 파일입니다. 읽기·편집·커밋 금지 (.env.example 을 고치세요).\n"
+                "   사용자가 명시적으로 요청했다면 .claude/.allow-secret-edit 마커로 일시 해제할 수 있습니다.")
     if any(f"{d}/" in t or t.endswith(d) for d in PROTECTED_DIRS):
         return (f"🚫 {t} 는 보호된 디렉터리입니다.\n"
                 "   var/storage 는 프로필 사진(개인정보), var/log 는 운영 로그입니다. 읽기·편집 금지.")
@@ -124,7 +134,9 @@ def is_read_forbidden(token: str) -> bool:
     """읽기까지 막는 대상인지."""
     t = token.strip().strip("'\"")
     name = t.rsplit("/", 1)[-1]
-    return name in SECRETS or any(f"{d}/" in t or t.endswith(d) for d in PROTECTED_DIRS)
+    if name in SECRETS:
+        return not secret_guard_off()
+    return any(f"{d}/" in t or t.endswith(d) for d in PROTECTED_DIRS)
 
 
 def path_like(token: str) -> bool:
@@ -176,7 +188,9 @@ def check(command: str) -> str | None:
     #    줄 단위 + 부분 문자열로 본다. 읽기 전용 형태면 통과, 판단 불가는 차단.
     if INLINE_RE.search(command):
         for line in command.splitlines():
-            if SECRET_TEXT_RE.search(line):
+            if PROTECTED_DIR_RE.search(line) or (
+                SECRET_FILE_RE.search(line) and not secret_guard_off()
+            ):
                 return ("🚫 비밀 파일·보호된 디렉터리는 읽기·편집 금지입니다.\n"
                         "   (.env · .env.local · var/storage/ · var/log/)\n"
                         "   이 경로를 문자열로만 다뤄야 한다면(문서·테스트 케이스 등)\n"

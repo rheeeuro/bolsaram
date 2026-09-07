@@ -73,7 +73,9 @@ export class OpenAiExtractionProvider implements ExtractionProvider {
           schema: toStrictJsonSchema(),
         },
       },
-      temperature: 0,
+      // temperature 를 보내지 않는다. GPT-5.6 계열은 기본값(1)만 허용하고
+      // 다른 값을 주면 400 을 돌려준다. 추출의 일관성은 온도가 아니라
+      // strict JSON Schema 와 "추론하지 말고 null" 규칙(SYSTEM_PROMPT)으로 확보한다.
     };
 
     const controller = new AbortController();
