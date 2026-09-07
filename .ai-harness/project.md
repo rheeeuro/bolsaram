@@ -68,6 +68,9 @@ pnpm pm2:status        # 앱 상태
 pnpm pm2:logs          # 로그 50줄
 pnpm db:cleanup        # 만료 데이터 정리 (평소엔 cron 이 돌린다)
 
+pnpm telegram:webhook  # 봇 webhook 등록 상태 (--set 등록, --delete 해제)
+pnpm ai:check          # OpenAI 키·모델 사용 가능 여부
+
 pnpm agents:sync       # 하네스 원본 → 에이전트별 설정 생성
 pnpm agents:check      # 생성 파일 드리프트 검사
 pnpm agents:test       # 셸 가드 판정 케이스 23개
@@ -300,4 +303,6 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   **법률 검토를 받지 않았고**, 등록되는 사람의 동의 절차와 개인정보 보호책임자·연락처가
   비어 있습니다. 실제 회원을 받기 전에 채워야 합니다.
 - **시크릿 재발급**: 봇 토큰·OpenAI 키·세션 시크릿이 작업 기록에 남았습니다.
-  공개 운영 전에 전부 재발급하세요.
+  공개 운영 전에 전부 재발급하세요. **새 값은 대화에 붙여넣지 말고 환경 파일에 직접
+  넣습니다** — `pnpm telegram:webhook --set` 과 `pnpm ai:check` 가 값을 출력하지 않고
+  확인·등록해 줍니다.

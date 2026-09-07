@@ -35,7 +35,9 @@
     "deploy:web": "pnpm build && pm2 restart bolsaram-web",
     "agents:sync": "python3 .agent-config/sync.py",
     "agents:check": "python3 .agent-config/sync.py --check",
-    "agents:test": "python3 .agent-config/guard-cases.py"
+    "agents:test": "python3 .agent-config/guard-cases.py",
+    "telegram:webhook": "tsx scripts/telegram-webhook.ts",
+    "ai:check": "tsx scripts/ai-check.ts"
   },
   "devDependencies": {
     "@bolsaram/db": "workspace:^",

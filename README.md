@@ -69,6 +69,7 @@ pnpm dev          # http://127.0.0.1:3020
 | `packages/config`    | 공용 tsconfig / eslint                                      | –                                      |
 | `db`                 | 스키마와 마이그레이션 (RLS 정책 포함)                       | [README](db/README.md)                 |
 | `tests`              | vitest — 도메인 단위 + DB 통합                              | [README](tests/README.md)              |
+| `scripts`            | 운영 스크립트 (텔레그램 webhook 등록, AI 키 확인) |
 | `docs`               | 설계 문서 · 구현 계획 · [사용 가이드](docs/guide/README.md) | –                                      |
 
 이 README 들은 코드가 바뀌면 함께 갱신합니다. 어긋나면 `tests/docs-readme.test.ts` 가 잡습니다.
