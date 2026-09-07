@@ -245,6 +245,44 @@ export async function upsertAsset(
   return toAsset(result.rows[0]!);
 }
 
+/**
+ * 이미 내려받은 파일을 세션 끝에 붙인다. 슬롯을 미리 만들지 않는 경로
+ * (텔레그램처럼 서버가 파일을 직접 가진 경우)가 쓴다.
+ *
+ * 순서를 `MAX(sort_order) + 1` 로 정하므로 같은 세션에 동시 요청이 들어오면
+ * 같은 번호를 잡을 수 있다. 앨범은 여러 webhook 으로 나뉘어 오므로 실제로 일어난다.
+ * 그래서 세션 행을 먼저 잠가 직렬화한다 — UNIQUE 위반으로 재시도하는 대신
+ * 도착 순서를 그대로 보존한다.
+ */
+export async function appendUploadedAsset(
+  sql: Sql,
+  input: {
+    sessionId: string;
+    storageKey: string;
+    filename: string | null;
+    mimeType: string;
+    byteSize: number;
+  },
+): Promise<ImportAssetRecord> {
+  const locked = await sql.query(`SELECT id FROM import_sessions WHERE id = $1 FOR UPDATE`, [
+    input.sessionId,
+  ]);
+  if (locked.rowCount === 0) {
+    throw new DomainError("NOT_FOUND", "Import 세션을 찾을 수 없습니다.");
+  }
+
+  const result = await sql.query<AssetRow>(
+    `INSERT INTO import_assets
+       (import_session_id, storage_key, original_filename, mime_type, byte_size,
+        sort_order, uploaded_at)
+     SELECT $1, $2, $3, $4, $5, COALESCE(MAX(sort_order) + 1, 0), now()
+       FROM import_assets WHERE import_session_id = $1
+     RETURNING id, storage_key, original_filename, mime_type, byte_size, sort_order, uploaded_at`,
+    [input.sessionId, input.storageKey, input.filename, input.mimeType, input.byteSize],
+  );
+  return toAsset(result.rows[0]!);
+}
+
 export async function markAssetUploaded(sql: Sql, assetId: string): Promise<void> {
   const result = await sql.query(`UPDATE import_assets SET uploaded_at = now() WHERE id = $1`, [
     assetId,

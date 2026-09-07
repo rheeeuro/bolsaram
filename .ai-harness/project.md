@@ -7,7 +7,7 @@
 볼사람(Bolsaram) — 주선자가 검증해 등록한 사람만 참여하는 비공개 소개팅 서비스.
 
 - 회원 흐름: `프로필 탐색/필터 → 상세 → 마음 보내기 → 상대 수락 → 주선자 연결`
-- 운영 흐름: `카카오톡 → 공유/업로드 → AI 구조화 → 검토 → 게시`
+- 운영 흐름: `카카오톡 → 텔레그램 봇 또는 관리자 업로드 → AI 구조화 → 검토 → 게시`
 - 카피: `좋은 사람을, 좋은 방식으로.`
 
 상세 설계는 `docs/v2/`(원본 설계 문서)와 `docs/implementation-plan.md`(실제 구현 결정)를 봅니다.
@@ -23,6 +23,7 @@
 | 인증     | 자체 세션(서명 쿠키 + `sessions` 테이블). 관리자 이메일/비밀번호, 회원 전화 OTP |
 | 스토리지 | 로컬 private 디렉터리 + HMAC signed URL                                         |
 | AI       | provider 추상화. 기본 `mock`, `AI_PROVIDER=openai` 로 전환                      |
+| Import   | 텔레그램 Bot API webhook (1차) + 관리자 웹 업로드. `TELEGRAM_ENABLED` 게이트     |
 
 설계 문서의 Supabase는 로컬 대체물로 구현했습니다. 이유와 대응표는 `docs/implementation-plan.md`에 있습니다.
 **RLS는 대체하지 않았습니다** — 런타임 롤 `bolsaram_app`은 `NOBYPASSRLS`이며 모든 접근이 정책을 통과합니다.
@@ -141,7 +142,7 @@ rm .claude/.allow-secret-edit      # 즉시 복구
 apps/web/src/
   app/            라우트. (member) 그룹 = 회원, admin/ = 관리자, api/ = Route Handler
   components/     ui/(공용) member/(감성 톤) admin/(CRM 톤)
-  server/         서버 전용. auth/ repo/ services/ storage/ ai/ views/ http/
+  server/         서버 전용. auth/ repo/ services/ storage/ ai/ telegram/ views/ http/
 packages/
   schemas/        Zod 스키마 + 도메인 열거형 (AI 추출 스키마의 single source)
   domain/         순수 도메인 로직 (상태 기계, 공개 규칙, 필터 → SQL)
@@ -236,6 +237,9 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 - `any` 남용 금지. 필요한 곳은 `eslint-disable`과 이유를 함께 씁니다.
 - 에러를 삼키지 않습니다. 도메인 위반은 `DomainError`로 던지고 HTTP 레이어가 status로 번역합니다.
 - **service-role/owner 커넥션을 인증 레이어 밖에서 쓰지 않습니다.** 일반 요청은 항상 `withRls(ctx, ...)`.
+  텔레그램 webhook 도 예외가 아닙니다 — 신원 확인(`server/auth/telegram.ts`)만 owner 로 하고,
+  그 뒤 모든 접근은 연결된 주선자 명의로 `withRls` 를 통과합니다.
+- **외부에서 들어오는 payload 는 Zod 로 검증한 뒤에만 씁니다.** AI raw 출력과 같은 규칙입니다.
 - 권한 검사는 RLS와 애플리케이션 레이어에 **중복으로** 둡니다. 한쪽만 믿지 않습니다.
 - private 이미지의 영구 URL을 만들지 않습니다. 응답마다 단기 signed URL을 새로 발급합니다.
 - AI raw 출력은 반드시 Zod로 검증한 뒤에 씁니다. 검증 없이 저장·표시하지 않습니다.
@@ -247,7 +251,13 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 
 ## 아직 안 된 것
 
-- **모바일 앱(Expo Share Extension/Intent)**: 미착수. `docs/share-spike-plan.md`에 계획만 있습니다.
-  실기기 검증 없이 카카오톡 공유 payload를 확정하지 않습니다.
+- **모바일 앱(Expo Share Extension/Intent)**: 미착수이며 **후순위**입니다. Import 1차 채널은
+  텔레그램 봇입니다(`docs/implementation-plan.md` 「텔레그램 Import 채널」).
+  `docs/share-spike-plan.md`에 계획만 있고, 실기기 검증 없이 공유 payload를 확정하지 않습니다.
+- **텔레그램 봇 실기기 검증**: 코드는 완성됐지만 실제 봇으로 끝까지 돌려본 적이 없습니다.
+  @BotFather 토큰과 `setWebhook` 등록이 필요합니다. 그 전까지 Bot API 응답 형태를
+  추측으로 바꾸지 않습니다.
+- **카카오 챗봇 Import**: 폐기했습니다. 오픈빌더 스킬 payload 에 사용자 전송 이미지 필드가
+  없습니다(`docs/v2/BOLSARAM_ARCHITECTURE_CHANGE_CHATBOT_v1.md` 배너 참고).
 - **SMS 발송**: 미연동. 운영 배포 전에 어댑터가 필요합니다(`apps/web/src/server/auth/login.ts`의 TODO).
 - **PM2 배포 구성**: 없음. 필요해지면 새로 작성합니다.

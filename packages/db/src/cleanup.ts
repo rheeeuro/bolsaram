@@ -9,6 +9,7 @@
  */
 import { rm } from "node:fs/promises";
 import path from "node:path";
+import { TELEGRAM_SESSION_TTL_HOURS } from "@bolsaram/domain";
 import type { Sql } from "./client.js";
 
 /** 보존 기간(일). 운영 정책이 정해지면 이 값을 조정한다. */
@@ -25,6 +26,13 @@ export const RETENTION = {
   rawModelOutput: 14,
   /** 감사 로그 */
   auditLogs: 365,
+  /**
+   * 처리한 webhook 이벤트. 중복 판정에 쓰이므로 텔레그램이 재전송을 포기하는
+   * 기간(최대 하루)보다 넉넉히 길게 둔다.
+   */
+  telegramWebhookEvents: 7,
+  /** 소비·만료된 봇 연결 코드 */
+  telegramLinkCodes: 7,
 } as const;
 
 export type Step = { label: string; run: (sql: Sql) => Promise<number> };
@@ -87,6 +95,42 @@ export const STEPS: Step[] = [
             AND e.raw_model_output IS NOT NULL
             AND e.created_at < now() - make_interval(days => $1)`,
         [RETENTION.rawModelOutput],
+      );
+      return r.rowCount ?? 0;
+    },
+  },
+  {
+    label: "방치된 봇 대화",
+    run: async (sql) => {
+      // 대화만 닫는다. 사진·원문이 붙은 ImportSession 은 남겨두고 관리자가 마무리한다
+      // (완전히 방치된 것은 아래 purgeAbandonedImports 가 보관 기간 뒤에 지운다).
+      const r = await sql.query(
+        `UPDATE telegram_import_sessions SET state = 'EXPIRED'
+          WHERE state IN ('WAITING_MEDIA', 'WAITING_TEXT', 'READY')
+            AND last_activity_at < now() - make_interval(hours => $1)`,
+        [TELEGRAM_SESSION_TTL_HOURS],
+      );
+      return r.rowCount ?? 0;
+    },
+  },
+  {
+    label: "오래된 봇 연결 코드",
+    run: async (sql) => {
+      const r = await sql.query(
+        `DELETE FROM telegram_link_codes
+          WHERE created_at < now() - make_interval(days => $1)`,
+        [RETENTION.telegramLinkCodes],
+      );
+      return r.rowCount ?? 0;
+    },
+  },
+  {
+    label: "오래된 webhook 이벤트",
+    run: async (sql) => {
+      const r = await sql.query(
+        `DELETE FROM telegram_webhook_events
+          WHERE received_at < now() - make_interval(days => $1)`,
+        [RETENTION.telegramWebhookEvents],
       );
       return r.rowCount ?? 0;
     },

@@ -29,8 +29,10 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `rls.test.ts`                  | RLS 정책 강제                                  | 필요 | 22   |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 7    |
+| `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 32   |
+| `telegram-import.test.ts`      | webhook 멱등성·계정 연결·사진 묶기·권한 경계   | 필요 | 23   |
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 21   |
-| `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 35   |
+| `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
 `setup.ts` 가 리포 루트 `.env` 를 읽어 DB 접속 정보를 채운다.
 `stubs/server-only.ts` 는 `server-only` 표식을 Node 러너에서 무력화한다.
@@ -58,6 +60,12 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `import-normalization.test.ts` 「확인이 남으면 공개 불가」 | AI 자동 게시 차단                   |
 | `import-commit.test.ts` 「동시 호출에도 프로필 하나」      | commit 멱등성                       |
 | `cleanup.test.ts` 「참조된 사진은 남긴다」                 | 정리 작업이 게시된 사진을 깨지 않음 |
+| `telegram-import.test.ts` 「같은 update_id 는 한 번만」    | webhook 재전송이 사진을 두 번 저장하지 않음 |
+| `telegram-import.test.ts` 「연결되지 않은 …신원이 없다」   | 검색으로 봇을 찾은 외부인 차단      |
+| `telegram-import.test.ts` 「회원 계정으로는 …없다」        | 텔레그램은 주선자 전용 채널         |
+| `telegram-import.test.ts` 「같은 앨범이 동시에」           | 앨범 사진의 순서·번호 충돌 없음     |
+| `telegram-import.test.ts` 「런타임 롤은 …접근할 수 없다」  | 봇 연결 코드·webhook 이벤트 격리    |
+| `telegram-state.test.ts` 「직접 보낸 글이 …우선한다」      | 원문 우선순위(§5.4)                 |
 | `docs-guide.test.ts`                                       | 사용자 문서와 구현의 정합성         |
 | `docs-readme.test.ts`                                      | 디렉터리 문서와 코드 구조의 정합성  |
 

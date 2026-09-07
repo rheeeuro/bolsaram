@@ -26,6 +26,7 @@ packages/schemas/src/
 ├── match.ts        소개 신청 생성·거절·연결, 관심 토글
 ├── import.ts       Import 세션·에셋·원문·검토·commit
 ├── auth.ts         전화번호 정규화, 관리자 로그인, OTP, 초대
+├── telegram.ts     텔레그램 Bot API payload · 파일/사진 상한
 └── index.ts        위 전부 재수출
 ```
 
@@ -54,6 +55,16 @@ UI 는 라벨 맵을 직접 인덱싱하지 않고 `apps/web/src/lib/labels.ts` 
 - 모든 필드가 nullable 이다. 모델이 모르면 **추론하지 않고 null** 을 넣는다.
 - `REQUIRED_FIELDS_FOR_COMMIT` 가 비어 있으면 프로필로 등록할 수 없다.
 - `LOW_CONFIDENCE_THRESHOLD` 미만이면 관리자 검토 화면에서 강조된다.
+
+### `telegram.ts` — 외부에서 들어오는 입력
+
+webhook 본문은 신뢰할 수 없는 입력이다. AI raw 출력과 같은 규칙을 적용해 **반드시
+validate 한 뒤에만** 쓴다. 우리가 실제로 읽는 필드만 선언하므로 텔레그램이 필드를
+추가해도 깨지지 않는다(Zod 가 선언하지 않은 키를 조용히 버린다).
+
+`TELEGRAM_MAX_FILE_BYTES` 는 20MB 다 — Bot API 의 `getFile` 제약이며 우리 업로드
+상한(25MB)보다 작다. 어떤 메시지를 무엇으로 해석할지는 여기가 아니라
+`@bolsaram/domain` 의 `classifyTelegramMessage` 가 정한다.
 
 ### `profile.ts` — 쿼리스트링을 다루는 스키마
 

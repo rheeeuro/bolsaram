@@ -49,6 +49,11 @@ type Session = {
   rawText: string | null;
   errorMessage: string | null;
   committedProfileId: string | null;
+  /**
+   * 텔레그램으로 들어온 경우의 대화 정보 (설계 변경 문서 TELEGRAM v1 §13).
+   * 텔레그램 사용자명·식별값은 담지 않는다 — 검토에 필요하지 않다.
+   */
+  telegram: { state: string; startedAt: string; lastActivityAt: string } | null;
 };
 
 type Asset = {
@@ -187,6 +192,14 @@ export function ImportReview({
           <p className="mb-2 text-[12px] text-[var(--surface-text-muted)]">
             출처 {label.importSource(session.source)} · 사진 {assets.length}장
           </p>
+
+          {session.telegram ? (
+            <p className="mb-2 text-[12px] text-[var(--surface-text-muted)]">
+              봇 대화 {session.telegram.state} · 시작{" "}
+              {new Date(session.telegram.startedAt).toLocaleString("ko-KR")} · 마지막 메시지{" "}
+              {new Date(session.telegram.lastActivityAt).toLocaleString("ko-KR")}
+            </p>
+          ) : null}
 
           {assets.length > 0 ? (
             <div className="mb-4 grid grid-cols-3 gap-2">

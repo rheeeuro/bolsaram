@@ -21,6 +21,8 @@ import {
   VISIBILITY_LABELS,
   REQUIRED_FIELDS_FOR_COMMIT,
 } from "@bolsaram/schemas";
+import { TELEGRAM_COMMANDS, TELEGRAM_SESSION_TTL_HOURS } from "@bolsaram/domain";
+import { TELEGRAM_MAX_FILE_BYTES } from "@bolsaram/schemas";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const GUIDE_DIR = path.join(ROOT, "docs", "guide");
@@ -63,11 +65,17 @@ describe("가이드 파일", () => {
 });
 
 describe("가이드가 언급하는 화면이 실제로 있다", () => {
-  /** 가이드 본문에서 `/discover` 같은 앱 경로를 뽑는다(코드블록·URL 제외). */
+  /**
+   * 가이드 본문에서 `/discover` 같은 앱 경로를 뽑는다(코드블록·URL 제외).
+   *
+   * 텔레그램 봇 명령(`/new` 등)은 앱 경로가 아니라 다른 이름 공간이므로 제외한다.
+   * 목록을 코드에서 가져오므로 명령을 추가하면 여기도 자동으로 따라온다.
+   */
+  const botCommands = new Set<string>(TELEGRAM_COMMANDS);
   const mentioned = new Set(
     [...ALL.matchAll(/`(\/[a-z][a-z0-9/-]*)`/g)]
       .map((m) => m[1]!)
-      .filter((p) => !p.startsWith("/api")),
+      .filter((p) => !p.startsWith("/api") && !botCommands.has(p)),
   );
 
   const pageRoutes = new Set<string>();
@@ -157,6 +165,26 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     expect(ALL).toMatch(/4시 10분/);
   });
 
+  it("봇 연결 코드 유효시간 15분", () => {
+    const minutes = constantOf(
+      "apps/web/src/server/auth/telegram.ts",
+      "TELEGRAM_LINK_CODE_TTL_MINUTES",
+    );
+    expect(minutes).toBe(15);
+    expect(guide("admin.md")).toMatch(/15분/);
+  });
+
+  it("봇으로 받는 사진 상한 20MB", () => {
+    // Bot API 의 getFile 제약이라 웹 업로드 상한(25MB)과 다르다. 둘 다 안내해야 한다.
+    expect(TELEGRAM_MAX_FILE_BYTES / (1024 * 1024)).toBe(20);
+    expect(ALL).toMatch(/20MB/);
+  });
+
+  it("봇 대화 만료 24시간", () => {
+    expect(TELEGRAM_SESSION_TTL_HOURS).toBe(24);
+    expect(guide("admin.md")).toMatch(/24시간/);
+  });
+
   it("Discover 기본 필터 범위", () => {
     const source = readFileSync(
       path.join(ROOT, "apps/web/src/components/member/filter-sheet.tsx"),
@@ -196,6 +224,14 @@ describe("가이드가 설명하는 상태가 코드의 상태와 같다", () =>
     }
   });
 
+  it("봇 명령이 모두 관리자 가이드에 있다", () => {
+    // 명령을 추가했는데 안내하지 않으면 운영자가 알 방법이 없다.
+    const admin = guide("admin.md");
+    for (const command of TELEGRAM_COMMANDS) {
+      expect(admin, `봇 명령 "${command}" 안내 없음`).toContain(command);
+    }
+  });
+
   it("게시에 반드시 필요한 항목을 관리자 가이드가 알려준다", () => {
     const admin = guide("admin.md");
     const KOREAN: Record<string, string> = {
@@ -220,6 +256,17 @@ describe("가이드가 보안 약속을 정확히 설명한다", () => {
   it("로그인 없이는 아무 프로필도 볼 수 없다고 적혀 있다", () => {
     // RLS 정책이 강제한다(tests/rls.test.ts 「익명은 아무 프로필도 보지 못한다」).
     expect(ALL).toMatch(/로그인하지 않(은|으면)/);
+  });
+
+  it("봇으로 올린 것도 검토를 거친다고 적혀 있다", () => {
+    // 게시 게이트는 채널과 무관하게 assertCommittable 이 강제한다.
+    expect(guide("admin.md")).toMatch(/봇이 프로필을 공개하는 일은 없습니다/);
+  });
+
+  it("텔레그램이 주선자 전용 통로라고 적혀 있다", () => {
+    // consumeTelegramLinkCode 가 ADMIN 이 아닌 계정을 거부한다
+    // (tests/telegram-import.test.ts 「회원 계정으로는 봇을 연결할 수 없다」).
+    expect(ALL).toMatch(/주선자 전용 통로/);
   });
 
   it("AI 결과가 검토 없이 게시되지 않는다고 적혀 있다", () => {

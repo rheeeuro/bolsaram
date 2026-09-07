@@ -21,6 +21,28 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
 
+  /**
+   * 텔레그램 Import 채널. 기본은 꺼져 있고, 꺼져 있으면 webhook 이 404 를 준다.
+   * 봇 토큰이 없는 환경(테스트·CI)에서 라우트가 살아 있으면 오히려 위험하다.
+   */
+  TELEGRAM_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+  /** @BotFather 가 발급한 토큰. 로그에 남기지 않는다. */
+  TELEGRAM_BOT_TOKEN: z.string().min(20).optional(),
+  /**
+   * setWebhook 의 secret_token. 텔레그램이 매 요청에
+   * `X-Telegram-Bot-Api-Secret-Token` 헤더로 되돌려주고, 우리는 그 값으로 발신자를
+   * 확인한다. Bot API 가 허용하는 문자는 A-Z a-z 0-9 _ - 뿐이다.
+   */
+  TELEGRAM_WEBHOOK_SECRET: z
+    .string()
+    .min(32, "TELEGRAM_WEBHOOK_SECRET 은 32자 이상이어야 합니다.")
+    .max(256)
+    .regex(/^[A-Za-z0-9_-]+$/, "TELEGRAM_WEBHOOK_SECRET 에는 A-Z a-z 0-9 _ - 만 쓸 수 있습니다.")
+    .optional(),
+
   DEV_EXPOSE_OTP: z
     .string()
     .optional()
@@ -52,6 +74,16 @@ export function env(): Env {
   if (parsed.data.AI_PROVIDER === "openai" && !parsed.data.OPENAI_API_KEY) {
     throw new Error("AI_PROVIDER=openai 이면 OPENAI_API_KEY 가 필요합니다.");
   }
+  // 반쯤 켜진 상태를 허용하지 않는다. 토큰 없이 webhook 만 열리면 검증도 못 하고
+  // 답장도 못 하는 채널이 생긴다.
+  if (parsed.data.TELEGRAM_ENABLED) {
+    if (!parsed.data.TELEGRAM_BOT_TOKEN) {
+      throw new Error("TELEGRAM_ENABLED=true 이면 TELEGRAM_BOT_TOKEN 이 필요합니다.");
+    }
+    if (!parsed.data.TELEGRAM_WEBHOOK_SECRET) {
+      throw new Error("TELEGRAM_ENABLED=true 이면 TELEGRAM_WEBHOOK_SECRET 이 필요합니다.");
+    }
+  }
   // OTP 노출은 실제 운영에서 절대 허용하지 않는다.
   // 판정 기준은 NODE_ENV 가 아니라 APP_ENV 다 — PM2 로 띄운 로컬 스테이징도
   // NODE_ENV 는 production 이지만 아직 실제 사용자가 없다.
@@ -70,4 +102,9 @@ export function isProduction(): boolean {
 /** 실제 사용자를 받는 배포인지. 개발 편의 기능의 허용 여부는 이 값으로 판단한다. */
 export function isLiveDeployment(): boolean {
   return env().APP_ENV === "production";
+}
+
+/** 텔레그램 Import 채널이 켜져 있는지. 라우트와 관리자 화면이 함께 이 값을 본다. */
+export function isTelegramEnabled(): boolean {
+  return env().TELEGRAM_ENABLED;
 }

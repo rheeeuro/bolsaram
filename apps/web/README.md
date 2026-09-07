@@ -68,6 +68,7 @@ server/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
 │   ├── login.ts              관리자 비밀번호 · 회원 OTP (재요청·시도 제한)
 │   ├── invite.ts             초대 발급·미리보기·claim (해시 저장, replay 차단)
+│   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
 ├── storage/local.ts          private 저장소 + signed download/upload URL
 ├── ai/
@@ -79,7 +80,12 @@ server/
 │   ├── profiles.ts           Discover·상세·관리자 목록·수정
 │   ├── matches.ts            신청 생성·전이·시그널 목록·연결 상대
 │   ├── favorites.ts          관심 토글·목록
-│   └── imports.ts            세션·에셋·추출·검토
+│   ├── imports.ts            세션·에셋·추출·검토
+│   └── telegram.ts           봇 대화 상태 + 계정 연결 조회/해제
+├── telegram/                 텔레그램 Import 채널 (Bot API 를 아는 유일한 곳)
+│   ├── client.ts             Bot API 호출·파일 다운로드·webhook 서명 확인
+│   ├── adapter.ts            Update → 신원 확인 → 의도 판정 → ImportSession
+│   └── messages.ts           봇 응답 문구
 ├── services/import-service.ts  분석 실행 + idempotent commit
 ├── views/profile-view.ts     공개 단계 적용 + signed URL 부착
 └── http/
@@ -92,6 +98,9 @@ server/
 ## API
 
 인증이 필요 없는 경로는 없다(`/api/auth/*` 제외). 미인증은 401, 회원의 관리자 경로 접근은 403.
+
+텔레그램 webhook 만 세션 쿠키를 쓰지 않는다. 발신자 확인은 `setWebhook` 의 `secret_token`
+(요청 헤더 `X-Telegram-Bot-Api-Secret-Token`)으로 하고, 채널이 꺼져 있으면 404 를 준다.
 
 | 경로                                      | 메서드              | 권한              | 용도                                 |
 | ----------------------------------------- | ------------------- | ----------------- | ------------------------------------ |
@@ -115,6 +124,8 @@ server/
 | `/api/imports/[id]/analyze`               | POST                | 관리자            | AI 추출 실행                         |
 | `/api/imports/[id]/extraction`            | PATCH               | 관리자            | 검토 결과 저장                       |
 | `/api/imports/[id]/commit`                | POST                | 관리자            | 프로필 생성 (idempotent)             |
+| `/api/admin/telegram`                     | GET / POST / DELETE | 관리자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
+| `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |
 | `/api/uploads`                            | PUT                 | 관리자            | signed 토큰으로 직접 업로드          |
 
@@ -143,6 +154,24 @@ Route Handler
 `세션 생성 → signed 업로드 → 확정 → 원문 → 분석 → 검토 → commit`.
 commit 은 `idempotency_key` 를 조건부로 선점해 같은 세션에서 프로필이 두 개 생기지 않게 한다.
 분석은 프로바이더 호출이 길어 RLS 트랜잭션 **밖에서** 하고 앞뒤로만 DB 를 만진다.
+
+### 텔레그램 Import
+
+```
+webhook
+  → secret_token 확인            채널이 꺼져 있으면 404
+  → update_id 선점               재전송이면 여기서 끝 (owner)
+  → 텔레그램 계정 → 주선자 신원  연결 안 됐으면 안내만 (owner)
+  → 의도 판정                    domain 의 classifyTelegramMessage
+  → withRls(주선자) 로 세션 갱신 사진 다운로드는 트랜잭션 밖
+  → 200 응답 + 분석은 따로 띄움
+```
+
+**입력 채널만 추가한 것이며 Import 도메인은 그대로다.** 봇으로 들어온 세션도 같은
+Inbox·검토·commit 을 거치고, 게시 게이트(`assertCommittable`)를 우회하지 않는다.
+
+owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세션 쿠키가 없어 RLS 컨텍스트를
+만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 관리자 요청과 완전히 같다.
 
 ---
 

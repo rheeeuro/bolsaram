@@ -30,6 +30,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0005_import.sql`                  | `import_sessions` · `import_assets` · `import_extractions` + 최신 추출 뷰              |
 | `0006_rls.sql`                     | 전 테이블 RLS 정책 + 권한 부여                                                         |
 | `0007_require_auth_for_browse.sql` | 익명 열람 차단 (로그인 없이는 프로필 0건)                                              |
+| `0008_telegram.sql`                | 텔레그램 Import 채널: 계정 연결·연결 코드·봇 대화·webhook 이벤트                       |
 
 ## 테이블
 
@@ -43,7 +44,10 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `invites`                                      | 초대 (토큰 해시만 저장)                            | 관리자만                            |
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
+| `telegram_connections`                         | 텔레그램 계정 ↔ 주선자 연결                        | 관리자만                            |
+| `telegram_import_sessions`                     | 봇 대화 상태 (ImportSession 과 1:1)                | 관리자만                            |
 | `sessions` · `login_codes`                     | 세션·OTP                                           | **권한 없음** (owner 커넥션 전용)   |
+| `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
 
 ## 무결성을 DB 가 지키는 것
 
@@ -58,6 +62,10 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `invites_one_open` (부분 유니크)                     | 프로필당 살아 있는 초대 두 개                 |
 | `import_sessions_idempotency` (부분 유니크)          | 같은 키로 두 번 commit                        |
 | `invites_claim_pair` · `import_sessions_commit_pair` | 짝이 안 맞는 상태 (claim 됐는데 주인 없음 등) |
+| `telegram_import_sessions_one_active` (부분 유니크) | 한 텔레그램 사용자의 대화 두 개 — 사진이 한 세션에 묶이는 근거 |
+| `telegram_link_codes_one_open` (부분 유니크)        | 주선자당 살아 있는 연결 코드 두 개            |
+| `telegram_webhook_events.update_id` PK              | 같은 webhook update 두 번 처리                |
+| `telegram_connections` 양방향 UNIQUE                | 계정 하나에 텔레그램 두 개 / 그 반대          |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을
 DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
@@ -71,8 +79,13 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 - 회원은 공개 프로필과 자기 프로필만 읽고, 프로필을 만들거나 남의 것을 고칠 수 없다.
 - 신청은 **자기 명의로만** 만들 수 있다(`requester_profile_id = app_current_profile_id()`).
 - Import·초대는 관리자 전용이다.
+- 텔레그램 봇 대화·계정 연결도 관리자 전용이다. webhook 은 **RLS 를 우회하지 않는다** —
+  신원 확인만 owner 커넥션으로 하고, 그 뒤 모든 접근은 연결된 주선자 명의로 정책을 통과한다.
+- 봇 연결 코드와 webhook 이벤트 테이블은 `sessions`·`login_codes` 와 같은 취급이다.
+  정책을 주지 않고 권한을 회수해 런타임 롤이 아예 접근하지 못한다.
 
-전부 `tests/rls.test.ts` 22개가 실제 DB 에 붙어 검증한다.
+`tests/rls.test.ts` 22개와 `tests/telegram-import.test.ts` 의 「권한 경계」가
+실제 DB 에 붙어 검증한다.
 
 ## 새 마이그레이션 추가
 

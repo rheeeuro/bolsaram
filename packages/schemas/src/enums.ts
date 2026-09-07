@@ -218,9 +218,16 @@ export const MATCH_REQUEST_STATUS_LABELS: Record<MatchRequestStatus, string> = {
 /** 같은 두 사람 사이에 동시에 하나만 존재할 수 있는 상태(설계문서 §4 활성 중복 신청 금지). */
 export const ACTIVE_MATCH_REQUEST_STATUSES = ["REQUESTED", "ACCEPTED", "INTRODUCED"] as const;
 
-export const IMPORT_SOURCES = ["KAKAO_SHARE", "MANUAL_UPLOAD", "SCREENSHOT", "TEXT"] as const;
+export const IMPORT_SOURCES = [
+  "TELEGRAM",
+  "KAKAO_SHARE",
+  "MANUAL_UPLOAD",
+  "SCREENSHOT",
+  "TEXT",
+] as const;
 export type ImportSource = (typeof IMPORT_SOURCES)[number];
 export const IMPORT_SOURCE_LABELS: Record<ImportSource, string> = {
+  TELEGRAM: "텔레그램",
   KAKAO_SHARE: "카카오톡 공유",
   MANUAL_UPLOAD: "직접 업로드",
   SCREENSHOT: "스크린샷",
@@ -249,3 +256,24 @@ export const IMPORT_STATUS_LABELS: Record<ImportStatus, string> = {
 
 export const IMPORT_ASSET_TYPES = ["IMAGE", "FILE"] as const;
 export type ImportAssetType = (typeof IMPORT_ASSET_TYPES)[number];
+
+/**
+ * 텔레그램 봇 대화 상태. import_status 와 축이 다르다 —
+ * 이건 "대화가 어디까지 왔는가", 저건 "Import 가 어디까지 왔는가"다.
+ * db/migrations/0008_telegram.sql 의 telegram_session_state 와 1:1 로 대응한다.
+ */
+export const TELEGRAM_SESSION_STATES = [
+  "WAITING_MEDIA",
+  "WAITING_TEXT",
+  "READY",
+  "CANCELED",
+  "EXPIRED",
+] as const;
+export type TelegramSessionState = (typeof TELEGRAM_SESSION_STATES)[number];
+export const TELEGRAM_SESSION_STATE_LABELS: Record<TelegramSessionState, string> = {
+  WAITING_MEDIA: "사진 대기",
+  WAITING_TEXT: "프로필 글 대기",
+  READY: "분석 대기",
+  CANCELED: "취소됨",
+  EXPIRED: "만료됨",
+};

@@ -1,7 +1,7 @@
 /**
- * Import Inbox (설계문서 §6, 모바일 가이드).
+ * Import Inbox (설계문서 §6, 설계 변경 문서 TELEGRAM v1 §13).
  * 카카오톡에서 받은 사진과 글을 여기서 세션으로 만든다.
- * 모바일 앱의 share target 도 같은 API 계약을 쓴다.
+ * 텔레그램 봇으로 들어온 것도 같은 목록에 올라오며, 출처 열로 구분한다.
  */
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
@@ -9,14 +9,20 @@ import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Table, Td, Th } from "@/components/admin/table";
 import { listInbox } from "@/server/repo/imports";
+import { findConnectionForUser } from "@/server/repo/telegram";
+import { isTelegramEnabled } from "@/server/env";
 import { label } from "@/lib/labels";
 import { NewImportPanel } from "@/components/admin/new-import-panel";
+import { TelegramLinkPanel } from "@/components/admin/telegram-link-panel";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportInboxPage() {
   const viewer = await requireAdminPage();
-  const items = await withRls(rlsContextOf(viewer), (sql) => listInbox(sql, {}));
+  const { items, connection } = await withRls(rlsContextOf(viewer), async (sql) => ({
+    items: await listInbox(sql, {}),
+    connection: await findConnectionForUser(sql, viewer.userId),
+  }));
 
   return (
     <>
@@ -29,7 +35,14 @@ export default async function ImportInboxPage() {
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
-        <NewImportPanel />
+        <div className="space-y-4">
+          <NewImportPanel />
+          <TelegramLinkPanel
+            enabled={isTelegramEnabled()}
+            connected={connection != null}
+            lastSeenAt={connection?.lastSeenAt?.toISOString() ?? null}
+          />
+        </div>
 
         <section>
           {items.length === 0 ? (

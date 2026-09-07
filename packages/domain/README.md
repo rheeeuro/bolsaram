@@ -27,6 +27,7 @@ packages/domain/src/
 ├── visibility.ts   단계적 정보 공개 (LIST / DETAIL / INTRODUCED / OWNER / ADMIN)
 ├── import.ts       Import 상태 기계 · 원문 정규화 · 검토 판정 · 게시 게이트
 ├── filters.ts      Discover 필터 → SQL 조각 · 커서 페이지네이션
+├── telegram.ts     봇 대화 상태 기계 · 메시지 분류 · 원문 합치기 · 앨범 판정
 └── index.ts        위 전부 재수출
 ```
 
@@ -70,6 +71,26 @@ REQUESTED ─accept──► ACCEPTED ─introduce──► INTRODUCED ─close�
 
 `normalizeRawText()` 는 카카오톡 말머리(`[이름] [오후 3:12]`)와 제로폭 문자를 정리한다.
 원문 자체는 DB 에 그대로 보관하고, 이 결과는 프롬프트 입력에만 쓴다.
+
+### `telegram.ts` — 봇 대화 판정
+
+```
+WAITING_MEDIA → WAITING_TEXT → READY → (분석은 Import 상태 기계가 이어받는다)
+                     └──────── CANCELED / EXPIRED ────────┘
+```
+
+Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가", `import.ts` 의 것은
+"Import 가 어디까지 왔는가"다. 둘을 합치지 않는다.
+
+`classifyTelegramMessage` 가 "이 메시지를 무엇으로 볼 것인가"의 단일 판정 지점이다.
+사진으로 보낸 것과 파일로 보낸 것을 같은 형태로 만들고, 이미지가 아닌 파일과 모르는
+명령은 여기서 걸러진다. 자유문장을 명령으로 해석하지 않는다.
+
+`mergeRawText` 가 §5.4 의 우선순위를 고정한다 — **직접 보낸 글이 사진 설명보다 항상
+이긴다.** 직접 보낸 글은 누적한다(카카오톡 프로필이 여러 메시지로 쪼개져 온다).
+
+`shouldAnnounceMedia` 는 앨범 안내를 한 번만 보내기 위한 것이다. 사진을 하나로 묶는
+일은 대화 세션이 하므로 앨범 버퍼링·debounce 가 필요 없다.
 
 ### `filters.ts` — SQL 조각 생성
 

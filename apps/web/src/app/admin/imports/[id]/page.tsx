@@ -10,8 +10,10 @@ import {
   listAssets,
   findSession,
 } from "@/server/repo/imports";
+import { findConversationByImportSession } from "@/server/repo/telegram";
 import { signDownloadUrl } from "@/server/storage/local";
 import { ImportReview } from "@/components/admin/import-review";
+import { TELEGRAM_SESSION_STATE_LABELS } from "@bolsaram/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,8 @@ export default async function ImportDetailPage({
     const assets = await listAssets(sql, id);
     const extraction = await latestExtraction(sql, id);
     const fields = effectiveFields(extraction);
+    const conversation =
+      session.source === "TELEGRAM" ? await findConversationByImportSession(sql, id) : null;
 
     return {
       session: {
@@ -38,6 +42,13 @@ export default async function ImportDetailPage({
         rawText: session.rawText,
         errorMessage: session.errorMessage,
         committedProfileId: session.committedProfileId,
+        telegram: conversation
+          ? {
+              state: TELEGRAM_SESSION_STATE_LABELS[conversation.state],
+              startedAt: conversation.createdAt.toISOString(),
+              lastActivityAt: conversation.lastActivityAt.toISOString(),
+            }
+          : null,
       },
       assets: assets.map((asset) => ({
         id: asset.id,
