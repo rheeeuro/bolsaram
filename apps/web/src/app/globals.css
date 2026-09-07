@@ -1,0 +1,113 @@
+@import "tailwindcss";
+@import "@bolsaram/ui-tokens/theme.css";
+
+/*
+ * 볼사람 전역 스타일.
+ * 회원 화면은 warm ivory + serif display, 관리자 화면은 중성 CRM 톤.
+ * 표면 색은 .member-surface / .admin-surface 가 정의한 --surface-* 변수를 쓴다.
+ */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--surface-page, var(--color-ivory-50));
+    color: var(--surface-text, var(--color-ink-900));
+    font-family: var(--font-sans);
+    /* 모바일 우선. 리스트는 빠르고 기능적으로. */
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--color-rose-200);
+    color: var(--color-burgundy-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-rose-500);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer components {
+  .display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  .kicker {
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--surface-text-muted);
+  }
+
+  /* 스크롤바를 숨기되 스크롤은 유지한다(필터 칩 가로 스크롤). */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer utilities {
+  /* 감정 연출 구간에서만 쓰는 등장 모션. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-rise {
+    animation: rise var(--duration-emotive) var(--ease-soft) both;
+  }
+
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  .animate-sheet {
+    animation: sheet-up var(--duration-base) var(--ease-soft) both;
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .animate-fade {
+    animation: fade var(--duration-base) var(--ease-soft) both;
+  }
+}

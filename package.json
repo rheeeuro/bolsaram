@@ -2,12 +2,46 @@
   "name": "bolsaram",
   "version": "0.0.0",
   "private": true,
-  "description": "볼사람(bolsaram): 재설계 단계. 현재는 DB 컨테이너 실행 스크립트만 유지합니다.",
+  "description": "볼사람(Bolsaram): 주선자가 검증한 사람만 참여하는 비공개 소개팅 서비스",
   "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "db:up": "docker compose up -d mariadb",
+    "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
-    "db:logs": "docker compose logs -f mariadb"
+    "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "pnpm --filter @bolsaram/db migrate",
+    "db:reset": "pnpm --filter @bolsaram/db reset",
+    "db:seed": "pnpm --filter @bolsaram/db seed",
+    "dev": "pnpm --filter @bolsaram/web dev",
+    "build": "pnpm --filter @bolsaram/web build",
+    "start": "pnpm --filter @bolsaram/web start",
+    "typecheck": "pnpm -r --no-bail typecheck",
+    "lint": "pnpm -r --no-bail lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test"
+  },
+  "devDependencies": {
+    "@bolsaram/db": "workspace:^",
+    "@bolsaram/domain": "workspace:^",
+    "@bolsaram/schemas": "workspace:^",
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.3.4",
+    "@types/node": "^22.20.1",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "playwright": "^1.63.0",
+    "prettier": "^3.9.6",
+    "server-only": "^0.0.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^3.2.7"
   },
   "license": "UNLICENSED"
 }

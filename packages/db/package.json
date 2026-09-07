@@ -1,0 +1,25 @@
+{
+  "name": "@bolsaram/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "migrate": "tsx src/cli/migrate.ts",
+    "reset": "tsx src/cli/reset.ts",
+    "seed": "tsx src/cli/seed.ts"
+  },
+  "dependencies": {
+    "@bolsaram/domain": "workspace:*",
+    "@bolsaram/schemas": "workspace:*",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@bolsaram/config": "workspace:*",
+    "@types/pg": "^8.11.10"
+  }
+}

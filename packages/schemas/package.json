@@ -1,0 +1,21 @@
+{
+  "name": "@bolsaram/schemas",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./enums": "./src/enums.ts",
+    "./extraction": "./src/extraction.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@bolsaram/config": "workspace:^"
+  }
+}

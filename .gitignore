@@ -1,11 +1,18 @@
 node_modules/
 .DS_Store
 .env
+.env.local
 .local
 coverage/
 dist/
 .venv/
 .next/
+next-env.d.ts
 uploads/
 __pycache__/
 *.pyc
+.turbo/
+*.tsbuildinfo
+
+# 로컬 private 스토리지(프로필 원본/Import 원본). 절대 커밋하지 않는다.
+var/storage/

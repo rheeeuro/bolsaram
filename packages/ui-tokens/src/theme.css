@@ -1,0 +1,95 @@
+/*
+ * 볼사람 디자인 토큰 (설계문서 §13).
+ *
+ * 회원 화면: warm ivory 바탕, muted rose/burgundy 강조, serif display + clean sans.
+ * 관리자 화면: 같은 토큰 위에 채도를 죽인 CRM 팔레트(`.admin-surface`)를 얹는다.
+ * 특정 방송 프로그램의 디자인/로고를 복제하지 않는다.
+ */
+
+@theme {
+  /* ── 바탕: warm ivory ─────────────────────────────── */
+  --color-ivory-50: #fdfbf7;
+  --color-ivory-100: #f9f4ec;
+  --color-ivory-200: #f1e9dc;
+  --color-ivory-300: #e5d9c7;
+  --color-ivory-400: #d3c3ab;
+
+  /* ── 강조: muted rose → burgundy ──────────────────── */
+  --color-rose-100: #f6e4e6;
+  --color-rose-200: #ecc7cd;
+  --color-rose-300: #dda3ad;
+  --color-rose-400: #c87d8c;
+  --color-rose-500: #b25f70;
+  --color-rose-600: #97485a;
+  --color-burgundy-700: #7a3546;
+  --color-burgundy-800: #5c2634;
+  --color-burgundy-900: #401a24;
+
+  /* ── 잉크: 따뜻한 회갈색 계열 (순수 검정 사용 금지) ── */
+  --color-ink-900: #241f1d;
+  --color-ink-800: #3a332f;
+  --color-ink-700: #554c46;
+  --color-ink-600: #756a62;
+  --color-ink-500: #978d84;
+  --color-ink-400: #b8afa6;
+  --color-ink-300: #d6cfc7;
+  --color-ink-200: #e8e2db;
+  --color-ink-100: #f3efe9;
+
+  /* ── 상태 ─────────────────────────────────────────── */
+  --color-success: #4b7a5b;
+  --color-warning: #b07d33;
+  --color-danger: #a34a42;
+  --color-info: #4a6b8a;
+
+  /* ── 타이포 ───────────────────────────────────────── */
+  --font-display: var(--font-serif-display), "Nanum Myeongjo", "Apple SD Gothic Neo", serif;
+  --font-sans:
+    var(--font-clean-sans), "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
+
+  /* ── 리듬 ─────────────────────────────────────────── */
+  --radius-card: 1rem;
+  --radius-sheet: 1.5rem;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgb(36 31 29 / 0.04), 0 8px 24px -12px rgb(36 31 29 / 0.12);
+  --shadow-sheet: 0 -8px 40px -12px rgb(36 31 29 / 0.22);
+  --shadow-lift: 0 2px 8px rgb(36 31 29 / 0.08), 0 16px 40px -16px rgb(36 31 29 / 0.2);
+
+  /* ── 모션: 절제된 연출. 감정 순간에만 길게 쓴다. ──── */
+  --ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-quick: 140ms;
+  --duration-base: 240ms;
+  --duration-emotive: 520ms;
+}
+
+/* 관리자 화면은 감성보다 밀도. 배경을 중성 회색으로 눌러 회원 화면과 구분한다. */
+.admin-surface {
+  --surface-page: #f7f7f8;
+  --surface-card: #ffffff;
+  --surface-muted: #f0f0f2;
+  --surface-border: #e2e2e6;
+  --surface-text: #1c1c1f;
+  --surface-text-muted: #6b6b73;
+  --surface-accent: var(--color-burgundy-700);
+}
+
+/* 회원 화면 기본 표면. */
+.member-surface {
+  --surface-page: var(--color-ivory-50);
+  --surface-card: #ffffff;
+  --surface-muted: var(--color-ivory-100);
+  --surface-border: var(--color-ivory-300);
+  --surface-text: var(--color-ink-900);
+  --surface-text-muted: var(--color-ink-600);
+  --surface-accent: var(--color-rose-500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

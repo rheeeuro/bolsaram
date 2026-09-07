@@ -2,36 +2,83 @@
 
 이 저장소는 Codex와 Claude Code가 함께 사용하는 프로젝트입니다. 두 도구 모두 코드를 변경하기 전에 이 파일의 기준을 따릅니다.
 
-## 현재 상태: 재설계 단계
-
-- 프로토타입 코드(`frontend/`, `backend/`, `sql/`, `ecosystem.config.cjs`)는 **전부 제거**했습니다.
-- 이전 구현은 git 태그 `archive/v1-prototype`(커밋 `4d39048`)에 보존되어 있습니다.
-- **기술 스택은 아직 정해지지 않았습니다.** 설계 단계에서 결정합니다.
-- 설계가 확정되기 전에는 임의로 프레임워크·디렉터리·의존성을 만들지 않습니다.
-
 ## 제품
 
-- 볼사람: 카톡 오픈채팅에서 흩어지는 소개팅 후보 정보를 구조화해, 주선자가 후보를 등록·관리하는 방(Room) 기반 도구.
-- 상세 요구사항과 도메인 규칙은 설계 단계에서 다시 정의합니다.
+볼사람(Bolsaram) — 주선자가 검증해 등록한 사람만 참여하는 비공개 소개팅 서비스.
 
-## 고정 인프라 (스택과 무관하게 유지)
+- 회원 흐름: `프로필 탐색/필터 → 상세 → 마음 보내기 → 상대 수락 → 주선자 연결`
+- 운영 흐름: `카카오톡 → 공유/업로드 → AI 구조화 → 검토 → 게시`
+- 카피: `좋은 사람을, 좋은 방식으로.`
 
-- 프론트엔드 포트: `3020`
-- 백엔드 API 포트: `8010` (이 호스트는 8000-8002가 다른 프로젝트 사용 중)
-- MariaDB: `127.0.0.1:3308` → 컨테이너 `3306`, DB `bolsaram`, 사용자 `bolsaram_user`
-- MariaDB 포트는 반드시 `127.0.0.1`에만 바인딩합니다. `0.0.0.0` 노출 시 외부 스캐너 접근 이력이 있습니다(2026-07-29).
+상세 설계는 `docs/v2/`(원본 설계 문서)와 `docs/implementation-plan.md`(실제 구현 결정)를 봅니다.
+
+## 기술 스택
+
+| 영역     | 선택                                                                            |
+| -------- | ------------------------------------------------------------------------------- |
+| 모노레포 | pnpm workspace (`apps/*`, `packages/*`)                                         |
+| 웹       | Next.js 16 App Router, React 19, TypeScript strict, Tailwind v4, Zod 4          |
+| API      | Next.js Route Handler (별도 백엔드 프로세스 없음)                               |
+| DB       | PostgreSQL 17 (로컬 컨테이너), 순수 SQL 마이그레이션 + RLS                      |
+| 인증     | 자체 세션(서명 쿠키 + `sessions` 테이블). 관리자 이메일/비밀번호, 회원 전화 OTP |
+| 스토리지 | 로컬 private 디렉터리 + HMAC signed URL                                         |
+| AI       | provider 추상화. 기본 `mock`, `AI_PROVIDER=openai` 로 전환                      |
+
+설계 문서의 Supabase는 로컬 대체물로 구현했습니다. 이유와 대응표는 `docs/implementation-plan.md`에 있습니다.
+**RLS는 대체하지 않았습니다** — 런타임 롤 `bolsaram_app`은 `NOBYPASSRLS`이며 모든 접근이 정책을 통과합니다.
+
+## 고정 인프라
+
+- 웹(프론트+API) 포트: `3020`
+- PostgreSQL: `127.0.0.1:5442` → 컨테이너 `5432`, DB `bolsaram`
+  - `bolsaram_owner` — 마이그레이션·시드·인증 경로 전용 (RLS 우회)
+  - `bolsaram_app` — 런타임 전용 (`NOBYPASSRLS`)
+- DB 포트는 반드시 `127.0.0.1`에만 바인딩합니다. `0.0.0.0` 노출 시 외부 스캐너 접근 이력이 있습니다(2026-07-29).
 - 접속 자격 증명 원본: `docker-compose.yml`. 문서에 비밀번호를 옮겨 적지 않습니다.
-- `bolsaram_mariadb_data` 볼륨은 2026-09-06에 초기화했습니다. `bolsaram` DB는 테이블 0개의 빈 상태이며, 스키마는 새 설계에서 마이그레이션 도구와 함께 정의합니다.
+- 환경변수는 **리포 루트의 `.env`** 하나로 관리합니다. `apps/web/next.config.ts`가 이 파일을 읽어들입니다.
+- v1 프로토타입 MariaDB(`3308`)는 `docker compose --profile legacy up mariadb` 로만 뜹니다. v2는 쓰지 않습니다.
+- 백엔드 포트 `8010`은 더 이상 쓰지 않습니다(API가 웹 앱 안에 있음).
 
-## 현재 사용 가능한 명령
+## 명령
 
 ```bash
-npm run db:up
-npm run db:logs
-npm run db:down
+pnpm install           # corepack 으로 pnpm 활성화 후
+
+pnpm db:up             # Postgres 컨테이너 기동
+pnpm db:migrate        # 마이그레이션 적용
+pnpm db:seed           # 합성 시드 데이터
+pnpm db:reset          # public 스키마 초기화 (개발 전용)
+
+pnpm dev               # 개발 서버 (3020)
+pnpm build && pnpm start
+
+pnpm verify            # typecheck + lint + test — 마무리 전에 실행
+pnpm typecheck
+pnpm lint
+pnpm test
 ```
 
-빌드·테스트·검증 명령은 스택 확정 후 이 파일에 추가합니다.
+시드 계정:
+
+- 주선자 `admin@bolsaram.local` / `bolsaram-admin`
+- 회원 `01020001000` ~ `01020001005` (OTP는 `DEV_EXPOSE_OTP=true`일 때 화면·콘솔에 표시)
+
+## 구조
+
+```
+apps/web/src/
+  app/            라우트. (member) 그룹 = 회원, admin/ = 관리자, api/ = Route Handler
+  components/     ui/(공용) member/(감성 톤) admin/(CRM 톤)
+  server/         서버 전용. auth/ repo/ services/ storage/ ai/ views/ http/
+packages/
+  schemas/        Zod 스키마 + 도메인 열거형 (AI 추출 스키마의 single source)
+  domain/         순수 도메인 로직 (상태 기계, 공개 규칙, 필터 → SQL)
+  db/             커넥션 풀 + RLS 컨텍스트 + 마이그레이션/시드 CLI
+  ui-tokens/      디자인 토큰 (CSS + TS)
+  config/         공용 tsconfig / eslint
+db/migrations/    번호순 SQL. 적용된 파일은 절대 수정하지 않고 새 파일을 추가합니다.
+tests/            vitest. 도메인 단위 + DB 통합
+```
 
 ## 작업 규칙
 
@@ -40,9 +87,27 @@ npm run db:down
 - 사용자가 명시적으로 요청하지 않는 한 커밋하지 않습니다.
 - 사용자의 변경을 되돌리지 않습니다. 큰 변경 전에는 `git status --short`로 상태를 확인합니다.
 - 요청된 동작에 필요한 범위로만 수정합니다.
-- 생성물·의존성 디렉터리(`node_modules/`, `.venv/`, 빌드 산출물, `__pycache__/`)는 수정하지 않습니다.
+- 생성물·의존성 디렉터리(`node_modules/`, `.next/`, `var/storage/`)는 수정하지 않습니다.
+- 이 호스트에는 다른 프로젝트의 서버도 떠 있습니다(3000, 3001, 3307, 11434).
+  `pkill -f next` 처럼 광범위한 종료 명령을 쓰지 말고 PID를 지정합니다.
 
-## PM2
+## 코드 규칙
 
-- 이전 프로세스 `bolsaram-fe`, `bolsaram-be`, `bolsaram-maintenance`는 정지 상태이며 `ecosystem.config.cjs`는 없습니다.
-- 새 스택을 정해 배포 구성을 다시 만들기 전까지 PM2 재시작 절차는 적용하지 않습니다.
+- `any` 남용 금지. 필요한 곳은 `eslint-disable`과 이유를 함께 씁니다.
+- 에러를 삼키지 않습니다. 도메인 위반은 `DomainError`로 던지고 HTTP 레이어가 status로 번역합니다.
+- **service-role/owner 커넥션을 인증 레이어 밖에서 쓰지 않습니다.** 일반 요청은 항상 `withRls(ctx, ...)`.
+- 권한 검사는 RLS와 애플리케이션 레이어에 **중복으로** 둡니다. 한쪽만 믿지 않습니다.
+- private 이미지의 영구 URL을 만들지 않습니다. 응답마다 단기 signed URL을 새로 발급합니다.
+- AI raw 출력은 반드시 Zod로 검증한 뒤에 씁니다. 검증 없이 저장·표시하지 않습니다.
+- AI 결과를 자동 게시하지 않습니다. 게시 게이트는 UI가 아니라 도메인 레이어(`assertCommittable`)에 있습니다.
+- 실제 인물 정보를 seed/fixture로 쓰지 않습니다. 시드는 전부 합성 데이터입니다.
+- 로그에 프로필 원문·사진 URL·전화번호·초대 토큰을 남기지 않습니다.
+- 상태 전이는 도메인 레이어에서 판정하고, DB에는 조건부 UPDATE(`WHERE status = <from>`)로 적용합니다.
+- TODO에는 이유와 완료 조건을 씁니다.
+
+## 아직 안 된 것
+
+- **모바일 앱(Expo Share Extension/Intent)**: 미착수. `docs/share-spike-plan.md`에 계획만 있습니다.
+  실기기 검증 없이 카카오톡 공유 payload를 확정하지 않습니다.
+- **SMS 발송**: 미연동. 운영 배포 전에 어댑터가 필요합니다(`apps/web/src/server/auth/login.ts`의 TODO).
+- **PM2 배포 구성**: 없음. 필요해지면 새로 작성합니다.

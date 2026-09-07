@@ -1,0 +1,18 @@
+{
+  "name": "@bolsaram/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "tsconfig.base.json",
+    "eslint.config.js"
+  ],
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./eslint": "./eslint.config.js"
+  },
+  "scripts": {
+    "typecheck": "echo \"@bolsaram/config: 타입 없음\"",
+    "lint": "echo \"@bolsaram/config: lint 대상 없음\""
+  }
+}

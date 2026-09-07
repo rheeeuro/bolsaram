@@ -1,47 +1,108 @@
-# 볼사람(bolsaram)
+# 볼사람(Bolsaram)
 
-> **재설계 중** — 기존 프로토타입 코드는 전부 제거했습니다.
-> 설계(요구사항 → 도메인 모델 → 기술 스택 → 구조)를 확정한 뒤 새로 구현합니다.
-> 이전 구현은 git 태그 `archive/v1-prototype`(커밋 `4d39048`)에서 확인할 수 있습니다.
+> 좋은 사람을, 좋은 방식으로.
 
-## 고정 인프라 정보
+주선자가 검증해 등록한 사람만 참여하는 **비공개 소개팅 서비스**입니다.
 
-새 설계에서도 그대로 사용할 값입니다.
+- 회원: `프로필 탐색/필터 → 상세 → 마음 보내기 → 상대 수락 → 주선자 연결`
+- 주선자: `카카오톡 프로필 → 업로드/공유 → AI 구조화 → 검토 → 게시`
 
-| 항목 | 값 |
-| --- | --- |
-| 프론트엔드 포트 | `3020` |
-| 백엔드 API 포트 | `8010` |
-| MariaDB 호스트 포트 | `3308` (→ 컨테이너 `3306`) |
-| MariaDB 바인드 | `127.0.0.1` 전용 (외부 노출 금지) |
-| DB 이름 | `bolsaram` |
-| DB 사용자 | `bolsaram_user` |
-| 컨테이너명 | `bolsaram_mariadb` (image `mariadb:11.4`) |
-| 데이터 볼륨 | `bolsaram_mariadb_data` |
+설계 원본은 [docs/v2/](docs/v2/), 실제 구현 결정과 진행 상황은
+[docs/implementation-plan.md](docs/implementation-plan.md)에 있습니다.
 
-- 비밀번호를 포함한 접속 정보 원본은 [docker-compose.yml](docker-compose.yml)에 있습니다. README에는 노출하지 않습니다.
-- MariaDB 포트는 `127.0.0.1`에만 바인딩합니다. `0.0.0.0`으로 열어둔 동안 외부 스캐너가 3308을 계속 두드린 이력이 있습니다(2026-07-29).
-- 이 호스트에서 8000–8002 포트는 다른 프로젝트가 사용 중이라 백엔드는 8010을 씁니다.
-
-## 데이터베이스 실행
+## 빠르게 시작하기
 
 ```bash
-npm run db:up      # MariaDB 컨테이너 기동
-npm run db:logs    # 로그 확인
+corepack enable pnpm
+pnpm install
+
+cp .env.example .env
+# .env 를 열어 SESSION_SECRET / STORAGE_SECRET / INVITE_TOKEN_PEPPER 를 채우고
+# STORAGE_ROOT 를 이 저장소의 절대경로(<repo>/var/storage)로 지정합니다.
+#   openssl rand -hex 32
+
+pnpm db:up        # PostgreSQL 컨테이너
+pnpm db:migrate   # 스키마 + RLS
+pnpm db:seed      # 합성 시드 데이터
+
+pnpm dev          # http://127.0.0.1:3020
 ```
 
-> 2026-09-06에 볼륨을 삭제하고 재생성했습니다. 현재 `bolsaram` DB는 **테이블 0개의 빈 상태**입니다.
-> 스키마는 새 설계에서 마이그레이션 도구와 함께 정의합니다.
+### 시드 계정
 
-## 운영 (PM2)
+| 역할   | 로그인                                                        |
+| ------ | ------------------------------------------------------------- |
+| 주선자 | `admin@bolsaram.local` / `bolsaram-admin`                     |
+| 회원   | `01020001000` ~ `01020001005` (OTP는 화면과 서버 콘솔에 표시) |
 
-이전 PM2 프로세스(`bolsaram-fe`, `bolsaram-be`, `bolsaram-maintenance`)는 정지 상태이며,
-`ecosystem.config.cjs`는 삭제했습니다. 새 스택을 정한 뒤 다시 작성합니다.
+`DEV_EXPOSE_OTP=true`인 개발 환경에서만 OTP가 노출됩니다. 운영 모드에서는 서버가 기동을 거부합니다.
+시드의 이름·사진·연락처는 **전부 합성 데이터**이며 실존 인물과 무관합니다.
 
-## 다음 단계
+## 기술 스택
 
-1. 요구사항·범위 정리
-2. 도메인 모델 및 데이터 모델 설계
-3. 기술 스택 결정
-4. 프로젝트 구조·검증 파이프라인 정의
-5. 구현
+- **모노레포** pnpm workspace
+- **웹/API** Next.js 16 App Router · React 19 · TypeScript strict · Tailwind v4 · Zod 4
+- **DB** PostgreSQL 17 · 순수 SQL 마이그레이션 · Row Level Security
+- **인증** 자체 세션(서명 쿠키 + DB 세션). 관리자 이메일/비밀번호, 회원 전화 OTP
+- **스토리지** 로컬 private 디렉터리 + 단기 HMAC signed URL
+- **AI** provider 추상화 — 기본 `mock`, `AI_PROVIDER=openai`로 전환
+
+설계 문서는 Supabase를 전제하지만, 외부 계정 없이 전체 플로우를 실제로 돌려 검증할 수 있도록
+로컬 대체물로 구현했습니다. 대응표는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있습니다.
+**RLS는 대체하지 않았습니다** — 런타임 롤은 `NOBYPASSRLS`이며 모든 접근이 정책을 통과합니다.
+
+## 구조
+
+```
+apps/web/          Next.js 앱 (회원 화면 + 관리자 화면 + API)
+packages/
+  schemas/         Zod 스키마 · 도메인 열거형 · AI 추출 스키마(single source)
+  domain/          순수 도메인 로직 — 매치 상태 기계, 정보 공개 규칙, 필터
+  db/              커넥션 풀 · RLS 컨텍스트 · 마이그레이션/시드 CLI
+  ui-tokens/       디자인 토큰
+  config/          공용 tsconfig / eslint
+db/migrations/     번호순 SQL (RLS 정책 포함)
+tests/             vitest — 도메인 단위 + DB 통합
+docs/              설계 문서 · 구현 계획 · Share Spike 계획
+```
+
+## 인프라
+
+| 항목             | 값                                                |
+| ---------------- | ------------------------------------------------- |
+| 웹(프론트 + API) | `3020`                                            |
+| PostgreSQL       | `127.0.0.1:5442` → 컨테이너 `5432`, DB `bolsaram` |
+| 컨테이너         | `bolsaram_postgres` (`postgres:17`)               |
+| 데이터 볼륨      | `bolsaram_pg_data`                                |
+| private 스토리지 | `var/storage/` (git 제외, 정적 서빙 안 됨)        |
+
+- 비밀번호를 포함한 접속 정보 원본은 [docker-compose.yml](docker-compose.yml)에 있습니다.
+- DB 포트는 `127.0.0.1`에만 바인딩합니다. `0.0.0.0`으로 열어둔 동안 외부 스캐너가 접근한 이력이 있습니다(2026-07-29).
+- v1 프로토타입 MariaDB는 `docker compose --profile legacy up mariadb`로만 뜹니다.
+  이전 구현은 git 태그 `archive/v1-prototype`에 있습니다.
+
+## 검증
+
+```bash
+pnpm verify     # typecheck + lint + test
+```
+
+DB 통합 테스트가 포함되어 있어 `pnpm db:up`이 필요합니다.
+
+## 보안
+
+- 로그인하지 않으면 프로필을 **DB 레벨에서** 볼 수 없습니다(RLS).
+- 정보는 단계적으로 공개됩니다 — 리스트(익명 코드·사진·출생연도·키·직업군·지역) →
+  상세(소개·취미·이상형) → 연결 후(이름·연락처).
+- 사진은 private 저장소에 있고 매 응답마다 새로 발급되는 단기 signed URL로만 접근합니다.
+- 초대 토큰은 pepper를 섞은 해시로만 저장하며, claim은 원자적이라 재사용(replay)이 불가능합니다.
+- 검색엔진 색인을 금지합니다.
+
+## 아직 안 된 것
+
+- **모바일 앱(Expo Share Extension / Android Share Intent)** — 미착수.
+  [docs/share-spike-plan.md](docs/share-spike-plan.md)에 실기기 검증 계획이 있습니다.
+  카카오톡의 공유 payload는 실기기 확인 전까지 확정하지 않습니다.
+  현재 웹 Import Inbox가 같은 API 계약을 쓰므로, 모바일 추가 시 서버 변경은 필요 없습니다.
+- **SMS 발송** — 미연동. 운영 배포 전 어댑터가 필요합니다.
+- **배포 구성(PM2 등)** — 없음.

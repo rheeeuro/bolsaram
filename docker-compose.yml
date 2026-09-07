@@ -1,7 +1,31 @@
 services:
+  postgres:
+    image: postgres:17
+    container_name: bolsaram_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bolsaram
+      POSTGRES_USER: bolsaram_owner
+      POSTGRES_PASSWORD: bolsaram0711
+      # 한국어 정렬/검색을 위해 UTF-8 고정
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    ports:
+      # 로컬(web 서버)만 접속한다. 0.0.0.0 이던 동안 외부 스캐너들이 3308 을 계속 두드렸다(2026-07-29).
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - bolsaram_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bolsaram_owner -d bolsaram"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+  # v1 프로토타입용 MariaDB. v2 는 Postgres 를 쓴다.
+  # 데이터 보존을 위해 정의만 남겨두며 기본 기동 대상이 아니다(`docker compose up postgres`).
   mariadb:
     image: mariadb:11.4
     container_name: bolsaram_mariadb
+    profiles: ["legacy"]
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: bolsaram
@@ -9,15 +33,10 @@ services:
       MARIADB_PASSWORD: bolsaram0711
       MARIADB_ROOT_PASSWORD: root0711
     ports:
-      # 로컬(backend)만 접속한다. 0.0.0.0 이던 동안 외부 스캐너들이 3308 을 계속 두드렸다(2026-07-29).
       - "127.0.0.1:3308:3306"
     volumes:
       - bolsaram_mariadb_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 8
 
 volumes:
+  bolsaram_pg_data:
   bolsaram_mariadb_data:
