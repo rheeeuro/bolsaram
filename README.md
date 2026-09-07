@@ -10,6 +10,9 @@
 설계 원본은 [docs/v2/](docs/v2/), 실제 구현 결정과 진행 상황은
 [docs/implementation-plan.md](docs/implementation-plan.md)에 있습니다.
 
+**서비스를 쓰는 분은 [사용 가이드](docs/guide/README.md)를 보세요** —
+[회원용](docs/guide/member.md) · [주선자용](docs/guide/admin.md) · [FAQ](docs/guide/faq.md)
+
 ## 빠르게 시작하기
 
 ```bash
@@ -53,18 +56,22 @@ pnpm dev          # http://127.0.0.1:3020
 
 ## 구조
 
-```
-apps/web/          Next.js 앱 (회원 화면 + 관리자 화면 + API)
-packages/
-  schemas/         Zod 스키마 · 도메인 열거형 · AI 추출 스키마(single source)
-  domain/          순수 도메인 로직 — 매치 상태 기계, 정보 공개 규칙, 필터
-  db/              커넥션 풀 · RLS 컨텍스트 · 마이그레이션/시드 CLI
-  ui-tokens/       디자인 토큰
-  config/          공용 tsconfig / eslint
-db/migrations/     번호순 SQL (RLS 정책 포함)
-tests/             vitest — 도메인 단위 + DB 통합
-docs/              설계 문서 · 구현 계획 · Share Spike 계획
-```
+각 디렉터리에는 **그 안의 현재 구조를 설명하는 README** 가 있습니다. 코드를 고치기 전에
+해당 README 부터 읽으세요.
+
+| 디렉터리             | 역할                                                        | 문서                                   |
+| -------------------- | ----------------------------------------------------------- | -------------------------------------- |
+| `apps/web`           | Next.js 앱 — 회원 화면 + 관리자 화면 + API                  | [README](apps/web/README.md)           |
+| `packages/schemas`   | Zod 스키마 · 도메인 열거형 · AI 추출 스키마(단일 원본)      | [README](packages/schemas/README.md)   |
+| `packages/domain`    | 순수 도메인 로직 — 상태 기계, 정보 공개, 필터               | [README](packages/domain/README.md)    |
+| `packages/db`        | 커넥션 풀 · RLS 컨텍스트 · 마이그레이션/시드 CLI            | [README](packages/db/README.md)        |
+| `packages/ui-tokens` | 디자인 토큰                                                 | [README](packages/ui-tokens/README.md) |
+| `packages/config`    | 공용 tsconfig / eslint                                      | –                                      |
+| `db`                 | 스키마와 마이그레이션 (RLS 정책 포함)                       | [README](db/README.md)                 |
+| `tests`              | vitest — 도메인 단위 + DB 통합                              | [README](tests/README.md)              |
+| `docs`               | 설계 문서 · 구현 계획 · [사용 가이드](docs/guide/README.md) | –                                      |
+
+이 README 들은 코드가 바뀌면 함께 갱신합니다. 어긋나면 `tests/docs-readme.test.ts` 가 잡습니다.
 
 ## 인프라
 
@@ -106,7 +113,7 @@ PM2 앱도 함께 떠 있으니 항상 앱 이름을 지정해 조작하세요.
 ## 검증
 
 ```bash
-pnpm verify        # typecheck + lint + test (108개)
+pnpm verify        # typecheck + lint + test (171개)
 pnpm agents:check  # 에이전트 설정 드리프트 검사
 pnpm agents:test   # 셸 가드 판정 케이스 23개
 ```

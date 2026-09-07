@@ -43,10 +43,35 @@ esac
 case "$FILE" in
   */packages/domain/*|*/packages/schemas/*)                            add "domain" ;;
 esac
+# 사용자에게 보이는 동작·정책이 바뀔 수 있는 축. 가이드 동기화를 상기시킨다.
+case "$FILE" in
+  */apps/web/src/app/\(member\)/*|*/apps/web/src/components/member/*|\
+  */apps/web/src/app/admin/*|*/apps/web/src/components/admin/*|\
+  */apps/web/src/server/auth/*|*/packages/schemas/src/enums.ts|\
+  */apps/web/src/server/storage/local.ts|*/ecosystem.config.cjs)       add "user-guide" ;;
+esac
+# 가이드를 직접 고쳤을 때도 검증을 상기시킨다.
+case "$FILE" in
+  */docs/guide/*.md)                                                   add "guide-edit" ;;
+esac
+
+# 디렉터리 README 동기화. 파일을 추가·삭제·이동하면 그 디렉터리 문서를 함께 고쳐야 한다.
+# 어느 README 를 봐야 하는지 파일 경로로 정해준다.
+README=""
+case "$FILE" in
+  */apps/web/src/*)          README="apps/web/README.md" ;;
+  */packages/schemas/src/*)  README="packages/schemas/README.md" ;;
+  */packages/domain/src/*)   README="packages/domain/README.md" ;;
+  */packages/db/src/*)       README="packages/db/README.md" ;;
+  */packages/ui-tokens/src/*) README="packages/ui-tokens/README.md" ;;
+  */db/migrations/*.sql)     README="db/README.md" ;;
+  */tests/*.test.ts)         README="tests/README.md" ;;
+esac
+[ -n "$README" ] && add "dir-readme"
 
 [ -z "$KINDS" ] && exit 0
 
-KINDS="$KINDS" python3 - <<'PY'
+KINDS="$KINDS" README="$README" python3 - <<'PY'
 import json, os
 
 KIND_NOTES = {
@@ -95,10 +120,36 @@ KIND_NOTES = {
         "  **함께** 고쳐야 합니다. 한쪽만 바꾸면 런타임에 깨집니다.\n"
         "- 순수 함수는 `tests/` 에 케이스를 추가하세요. 이 계층은 테스트 비용이 가장 쌉니다."
     ),
+    "user-guide": (
+        "📖 사용자에게 보이는 동작·정책을 건드렸을 수 있습니다.\n"
+        "- `docs/guide/` 는 회원과 주선자가 읽는 문서입니다. 화면 흐름·버튼·정책 숫자\n"
+        "  (인증번호 유효시간, 초대 기간, 업로드 상한, 상태 이름 등)가 바뀌었다면\n"
+        "  **이번 턴에 함께 고치세요.** 코드와 문서가 어긋난 채로 완료 보고하지 않습니다.\n"
+        "- 어긋나면 `npx vitest run tests/docs-guide.test.ts` 가 실패합니다. 이 테스트가\n"
+        "  검증하는 사실을 바꿨다면 가이드와 테스트를 같이 고칩니다.\n"
+        "- 문서는 사용자 입장으로 씁니다 — 파일 경로·함수명이 아니라 화면과 버튼으로 설명합니다."
+    ),
+    "guide-edit": (
+        "📖 사용자 가이드를 고쳤습니다.\n"
+        "- `npx vitest run tests/docs-guide.test.ts` 로 코드와 어긋나지 않는지 확인하세요.\n"
+        "- 새 화면을 안내했다면 그 경로가 실제로 있는지 테스트가 확인합니다.\n"
+        "- 개발자용 설명(파일 경로·내부 구조)은 `docs/` 상위나 `.ai-harness/project.md` 로 보냅니다."
+    ),
+    "dir-readme": (
+        "📄 `{README}` 는 이 디렉터리의 **현재 구조** 소스 오브 트루스입니다.\n"
+        "- 아직 안 읽었다면 먼저 읽어 구조·불변식·주의점을 확인하세요.\n"
+        "- 파일을 추가·삭제·이동했거나 책임·흐름이 바뀌었다면 **이번 턴에 함께 갱신**하세요.\n"
+        "  코드와 문서가 어긋난 채로 완료 보고하지 않습니다.\n"
+        "- 어긋나면 `npx vitest run tests/docs-readme.test.ts` 가 실패합니다\n"
+        "  (없는 파일을 설명하거나, 있는 파일을 빠뜨리면 잡힙니다).\n"
+        "- README 에는 **현재 상태**만 씁니다. 왜 그렇게 됐는지·언제 바꿨는지 같은 이력은 쓰지 않습니다."
+    ),
 }
 
 kinds = [k for k in (os.environ.get("KINDS") or "").splitlines() if k]
 parts = [KIND_NOTES[k] for k in dict.fromkeys(kinds) if k in KIND_NOTES]
+readme = os.environ.get("README") or ""
+parts = [p.replace("{README}", readme) for p in parts]
 if parts:
     print(json.dumps({
         "hookSpecificOutput": {
