@@ -165,7 +165,7 @@ export async function commitSession(
 
 async function insertProfile(
   sql: Sql,
-  groupId: string,
+  groupId: string | null,
   fields: ExtractedFields,
   createdBy: string | null,
   publish: boolean,

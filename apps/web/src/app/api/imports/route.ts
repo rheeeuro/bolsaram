@@ -6,7 +6,7 @@
  */
 import { createImportSessionSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
-import { asAdmin, asGroupAdmin } from "@/server/http/context";
+import { asAdmin } from "@/server/http/context";
 import { fail, ok, readJson, route } from "@/server/http/respond";
 import { createSession, listInbox, upsertAsset } from "@/server/repo/imports";
 import { buildStorageKey, isAllowedImageType, signUploadToken } from "@/server/storage/local";
@@ -29,7 +29,8 @@ export const POST = route(async (request: Request) => {
     }
   }
 
-  return asGroupAdmin(async (sql, viewer) => {
+  // 모임이 없어도 Import 할 수 있다 — 그 결과는 전체공개 프로필이 된다.
+  return asAdmin(async (sql, viewer) => {
     const session = await createSession(sql, {
       groupId: viewer.groupId,
       createdBy: viewer.userId,

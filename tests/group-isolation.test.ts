@@ -196,6 +196,40 @@ describe("회원은 자기 모임 안에서만 본다", () => {
   });
 });
 
+describe("주인 없는 프로필 가로채기", () => {
+  it("로그인만 한 사람이 남의 프로필을 자기 것으로 만들 수 없다", async () => {
+    // 0013 이전에는 profiles_claim 정책이 이걸 허용했다 — 초대 토큰도 모임도 보지
+    // 않았다. claim 은 해시 토큰 검증을 통과한 인증 레이어에서만 일어나야 한다.
+    const orphanProfile = await withOwner(async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region, real_name)
+         VALUES ($1,'MALE',1991,'BUSAN',$2) RETURNING id`,
+        [B.groupId, `${TAG}-주인없음`],
+      );
+      return r.rows[0]!.id;
+    });
+
+    const stolen = await withRls(A.member, async (sql) => {
+      const r = await sql.query(`UPDATE profiles SET user_id = $2 WHERE id = $1`, [
+        orphanProfile,
+        A.member.userId,
+      ]);
+      return r.rowCount ?? 0;
+    });
+    expect(stolen).toBe(0);
+
+    // 주선자도 마찬가지다 — 남의 모임 프로필은 손댈 수 없다.
+    const byAdmin = await withRls(A.admin, async (sql) => {
+      const r = await sql.query(`UPDATE profiles SET user_id = $2 WHERE id = $1`, [
+        orphanProfile,
+        A.admin.userId,
+      ]);
+      return r.rowCount ?? 0;
+    });
+    expect(byAdmin).toBe(0);
+  });
+});
+
 describe("모임에 속하지 않은 주선자", () => {
   it("어떤 프로필도 보지 못한다", async () => {
     const orphan = await withOwner(async (sql) => {

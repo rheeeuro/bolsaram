@@ -33,6 +33,9 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0008_telegram.sql`                | 텔레그램 Import 채널: 계정 연결·연결 코드·봇 대화·webhook 이벤트                       |
 | `0009_admin_login_failures.sql`    | 관리자 비밀번호 시도 제한 (실패 기록)                                                  |
 | `0010_groups.sql`                  | 모임(테넌트) 격리: `groups` · `group_admins` + 전 정책 재작성                          |
+| `0011_public_pool.sql`             | 전체공개 풀: 모임 소속을 선택으로 (`group_id IS NULL` = 전체공개)                      |
+| `0012_group_invites.sql`           | 모임 초대 코드 (동료 주선자 합류)                                                      |
+| `0013_drop_open_claim.sql`         | `profiles_claim` 제거 — 누구나 주인 없는 프로필을 가져갈 수 있었다                     |
 
 ## 테이블
 
@@ -52,6 +55,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_import_sessions`                     | 봇 대화 상태 (ImportSession 과 1:1)                | 관리자만                            |
 | `sessions` · `login_codes`                     | 세션·OTP                                           | **권한 없음** (owner 커넥션 전용)   |
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
+| `group_invite_codes`                           | 모임 초대 코드(해시). 동료 주선자 합류             | **권한 없음** (owner 커넥션 전용)   |
 | `admin_login_failures`                         | 관리자 로그인 실패 기록 (시도 제한 판정)           | **권한 없음** (owner 커넥션 전용)   |
 
 ## 무결성을 DB 가 지키는 것
@@ -82,19 +86,31 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 정책은 `app_current_user_id()` · `app_is_admin()` · `app_current_profile_id()` 를 참조한다.
 값은 `withRls()` 가 `SET LOCAL` 로 넣는다.
 
-**모임이 최상위 격리 단위다.** 관리자 조건은 `app_is_admin()` 이 아니라
-`app_is_group_admin(group_id)` 다 — ADMIN 이라는 사실만으로는 아무것도 볼 수 없고,
-그 모임의 주선자여야 한다. 주선자 가입이 자유롭게 열려 있으므로 이게 마지막 방어선이다.
+**소속 여부가 곧 공개 여부다.**
 
-| 함수                          | 판정                                        |
-| ----------------------------- | ------------------------------------------- |
-| `app_is_group_admin(uuid)`    | 현재 사용자가 그 모임의 주선자인가          |
-| `app_current_member_group()`  | 현재 회원(자기 프로필)이 속한 모임          |
-| `app_can_admin_profile(uuid)` | 그 프로필이 속한 모임의 주선자인가          |
+```
+group_id IS NULL      → 전체공개. 모든 주선자가 본다(고치는 건 등록한 주선자만).
+group_id IS NOT NULL  → 그 모임 주선자만 본다.
+```
+
+주선자 가입이 자유롭게 열려 있으므로 관리자 조건은 `app_is_admin()` 이 될 수 없다.
+**읽기와 쓰기를 다르게 준다** — 전체공개 프로필은 누구나 보지만 남이 고칠 수 없다.
+
+| 함수                                   | 판정                                                |
+| -------------------------------------- | --------------------------------------------------- |
+| `app_is_group_admin(uuid)`             | 그 모임의 주선자인가                                |
+| `app_can_view_profile_as_admin(uuid)`  | 전체공개이거나 자기 모임인가 (읽기)                 |
+| `app_can_edit_profile(uuid)`           | 자기 모임이거나, 전체공개인데 자기가 등록했는가     |
+| `app_can_edit_import(uuid)`            | 위와 같은 판정을 Import 세션에                      |
+| `app_current_member_group()`           | 현재 회원이 속한 풀 (전체공개 회원은 NULL)          |
 
 - 익명(둘 다 NULL)은 어떤 프로필도 읽지 못한다.
 - 모임에 속하지 않은 주선자는 아무 데이터도 보지 못한다.
-- 회원은 **자기 모임 안의** 공개 프로필만 보고, 모임을 넘는 소개 신청은 만들 수 없다.
+- 회원은 **자기와 같은 풀** 안의 공개 프로필만 보고, 풀을 넘는 소개 신청은 만들 수 없다
+  (`IS NOT DISTINCT FROM` 이라 전체공개 회원끼리도 서로 보인다).
+- **claim 정책은 없다.** 주인 없는 프로필을 자기 것으로 만드는 것은 해시된 초대 토큰을
+  검증하는 인증 레이어(owner 커넥션)에서만 일어난다. 정책으로 열어두면 초대 없이도
+  남의 프로필을 가져갈 수 있다(0013 에서 제거).
 - 회원은 공개 프로필과 자기 프로필만 읽고, 프로필을 만들거나 남의 것을 고칠 수 없다.
 - 신청은 **자기 명의로만** 만들 수 있다(`requester_profile_id = app_current_profile_id()`).
 - Import·초대는 관리자 전용이다.

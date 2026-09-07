@@ -22,8 +22,11 @@ import {
 
 export type ImportSessionRecord = {
   id: string;
-  /** 소속 모임. commit 이 만드는 프로필도 같은 모임에 들어간다. */
-  groupId: string;
+  /**
+   * 소속 모임. **null 이면 전체공개**이고 commit 이 만드는 프로필도 소속 없이 생긴다.
+   * 만든 주선자만 다룰 수 있다(RLS).
+   */
+  groupId: string | null;
   createdBy: string;
   source: ImportSource;
   status: ImportStatus;
@@ -60,7 +63,7 @@ export type ImportExtractionRecord = {
 
 type SessionRow = {
   id: string;
-  group_id: string;
+  group_id: string | null;
   created_by: string;
   source: ImportSource;
   status: ImportStatus;
@@ -95,9 +98,9 @@ function toSession(row: SessionRow): ImportSessionRecord {
 
 export async function createSession(
   sql: Sql,
-  input: { groupId: string; createdBy: string; source: ImportSource; rawText?: string },
+  input: { groupId: string | null; createdBy: string; source: ImportSource; rawText?: string },
 ): Promise<ImportSessionRecord> {
-  // group_id 는 RLS 가 요구한다(import_sessions_admin). 넣지 않으면 정책에 걸린다.
+  // group_id 가 null 이면 전체공개 세션이다. RLS 는 그 경우 만든 사람만 통과시킨다.
   const result = await sql.query<SessionRow>(
     `INSERT INTO import_sessions (group_id, created_by, source, raw_text)
      VALUES ($1, $2, $3, $4) RETURNING ${SESSION_COLUMNS}`,

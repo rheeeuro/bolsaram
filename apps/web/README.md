@@ -17,10 +17,11 @@ Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에
 >
 > **불변식 4: 로그에 프로필 원문·사진 URL·전화번호·초대 토큰을 남기지 않는다.**
 >
-> **불변식 5: 모임(그룹)이 최상위 격리 단위다.**
-> 주선자 가입은 열려 있으므로 `ADMIN` 이라는 사실만으로는 아무 데이터도 볼 수 없다.
-> 데이터를 만들거나 고치는 경로는 `asGroupAdmin` / `requireAdminGroup` 을 쓰고,
-> 새 행에는 반드시 `group_id` 를 넣는다. RLS 는 `app_is_group_admin()` 으로 판정한다.
+> **불변식 5: 소속 여부가 공개 여부다.**
+> `group_id IS NULL` 이면 전체공개(모든 주선자가 봄), 아니면 그 모임 전용이다.
+> 주선자 가입이 열려 있으므로 `ADMIN` 이라는 사실만으로 권한을 주지 않는다 —
+> **읽기와 쓰기를 다르게 준다.** 전체공개 프로필은 누구나 보지만 고치는 것은 등록한
+> 주선자만이다. 모임 소속을 바꾸는 것(`group_admins`)은 인증 레이어만 할 수 있다.
 >
 > 이 README 는 현재 구조의 소스 오브 트루스다. 라우트·서버 모듈을 추가·삭제하면 함께 갱신한다.
 > 작업 규칙은 [`.ai-harness/project.md`](../../.ai-harness/project.md) 를 따른다.
@@ -75,7 +76,8 @@ server/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
 │   ├── login.ts              관리자 비밀번호 · 회원 OTP (재요청·시도 제한)
 │   ├── invite.ts             초대 발급·미리보기·claim (해시 저장, replay 차단)
-│   ├── signup.ts             주선자 가입 (계정 + 모임을 한 트랜잭션으로)
+│   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
+│   ├── group-invite.ts       모임 초대 코드 발급·소비, 내 모임 조회
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
 ├── storage/local.ts          private 저장소 + signed download/upload URL
@@ -116,7 +118,7 @@ server/
 
 | 경로                                      | 메서드              | 권한              | 용도                                 |
 | ----------------------------------------- | ------------------- | ----------------- | ------------------------------------ |
-| `/api/auth/signup`                        | POST                | –                 | 주선자 가입 (계정 + 모임 생성)       |
+| `/api/auth/signup`                        | POST                | –                 | 주선자 가입 (계정만)                 |
 | `/api/auth/admin-login`                   | POST                | –                 | 주선자 로그인 (15분 5회 시도 제한)   |
 | `/api/auth/otp/request`                   | POST                | –                 | 회원 인증번호 발급                   |
 | `/api/auth/otp/verify`                    | POST                | –                 | 인증번호 확인 → 세션                 |
@@ -138,6 +140,7 @@ server/
 | `/api/imports/[id]/extraction`            | PATCH               | 관리자            | 검토 결과 저장                       |
 | `/api/imports/[id]/commit`                | POST                | 관리자            | 프로필 생성 (idempotent)             |
 | `/api/admin/groups`                       | POST                | 관리자            | 모임 만들기 (모임 없는 주선자)       |
+| `/api/admin/group`                        | GET / POST / PUT    | 관리자            | 내 모임 / 초대 코드 발급 / 코드로 참여 |
 | `/api/admin/telegram`                     | GET / POST / DELETE | 관리자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |

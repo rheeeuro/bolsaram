@@ -19,7 +19,7 @@ export default async function SignupPage() {
             주선자로 시작하기
           </h1>
           <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-ink-600)]">
-            모임을 만들고 회원을 등록해 두 사람을 연결합니다.
+            회원을 등록해 두 사람을 연결합니다. 모임은 가입 후에 만들거나 참여합니다.
           </p>
         </header>
 
