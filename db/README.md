@@ -31,12 +31,16 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0006_rls.sql`                     | 전 테이블 RLS 정책 + 권한 부여                                                         |
 | `0007_require_auth_for_browse.sql` | 익명 열람 차단 (로그인 없이는 프로필 0건)                                              |
 | `0008_telegram.sql`                | 텔레그램 Import 채널: 계정 연결·연결 코드·봇 대화·webhook 이벤트                       |
+| `0009_admin_login_failures.sql`    | 관리자 비밀번호 시도 제한 (실패 기록)                                                  |
+| `0010_groups.sql`                  | 모임(테넌트) 격리: `groups` · `group_admins` + 전 정책 재작성                          |
 
 ## 테이블
 
 | 테이블                                         | 역할                                               | 앱 롤 접근                          |
 | ---------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
-| `users`                                        | 계정 (ADMIN 이메일/비밀번호, MEMBER 전화)          | 본인 + 관리자                       |
+| `groups`                                       | 모임(테넌트). 주선자 가입 시 하나 생긴다           | 소속 주선자 + 소속 회원             |
+| `group_admins`                                 | 모임 ↔ 주선자 (여러 명 가능, OWNER 한 명)          | 같은 모임 주선자만 조회             |
+| `users`                                        | 계정 (ADMIN 이메일/비밀번호, MEMBER 전화)          | 본인 + 같은 모임 관계자             |
 | `profiles`                                     | 프로필. `public_code` 가 화면의 `#17`              | 공개분 + 본인 + 관리자              |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
@@ -48,6 +52,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_import_sessions`                     | 봇 대화 상태 (ImportSession 과 1:1)                | 관리자만                            |
 | `sessions` · `login_codes`                     | 세션·OTP                                           | **권한 없음** (owner 커넥션 전용)   |
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
+| `admin_login_failures`                         | 관리자 로그인 실패 기록 (시도 제한 판정)           | **권한 없음** (owner 커넥션 전용)   |
 
 ## 무결성을 DB 가 지키는 것
 
@@ -66,6 +71,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_link_codes_one_open` (부분 유니크)        | 주선자당 살아 있는 연결 코드 두 개            |
 | `telegram_webhook_events.update_id` PK              | 같은 webhook update 두 번 처리                |
 | `telegram_connections` 양방향 UNIQUE                | 계정 하나에 텔레그램 두 개 / 그 반대          |
+| `group_admins_one_owner` (부분 유니크)              | 모임당 OWNER 두 명                            |
+| `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을
 DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
@@ -75,7 +82,19 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 정책은 `app_current_user_id()` · `app_is_admin()` · `app_current_profile_id()` 를 참조한다.
 값은 `withRls()` 가 `SET LOCAL` 로 넣는다.
 
+**모임이 최상위 격리 단위다.** 관리자 조건은 `app_is_admin()` 이 아니라
+`app_is_group_admin(group_id)` 다 — ADMIN 이라는 사실만으로는 아무것도 볼 수 없고,
+그 모임의 주선자여야 한다. 주선자 가입이 자유롭게 열려 있으므로 이게 마지막 방어선이다.
+
+| 함수                          | 판정                                        |
+| ----------------------------- | ------------------------------------------- |
+| `app_is_group_admin(uuid)`    | 현재 사용자가 그 모임의 주선자인가          |
+| `app_current_member_group()`  | 현재 회원(자기 프로필)이 속한 모임          |
+| `app_can_admin_profile(uuid)` | 그 프로필이 속한 모임의 주선자인가          |
+
 - 익명(둘 다 NULL)은 어떤 프로필도 읽지 못한다.
+- 모임에 속하지 않은 주선자는 아무 데이터도 보지 못한다.
+- 회원은 **자기 모임 안의** 공개 프로필만 보고, 모임을 넘는 소개 신청은 만들 수 없다.
 - 회원은 공개 프로필과 자기 프로필만 읽고, 프로필을 만들거나 남의 것을 고칠 수 없다.
 - 신청은 **자기 명의로만** 만들 수 있다(`requester_profile_id = app_current_profile_id()`).
 - Import·초대는 관리자 전용이다.
@@ -84,8 +103,8 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 - 봇 연결 코드와 webhook 이벤트 테이블은 `sessions`·`login_codes` 와 같은 취급이다.
   정책을 주지 않고 권한을 회수해 런타임 롤이 아예 접근하지 못한다.
 
-`tests/rls.test.ts` 22개와 `tests/telegram-import.test.ts` 의 「권한 경계」가
-실제 DB 에 붙어 검증한다.
+`tests/rls.test.ts` 22개, `tests/group-isolation.test.ts` 11개,
+`tests/telegram-import.test.ts` 의 「권한 경계」가 실제 DB 에 붙어 검증한다.
 
 ## 새 마이그레이션 추가
 

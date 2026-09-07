@@ -45,9 +45,16 @@ let adminId: string;
 let memberId: string;
 let admin: RlsContext;
 let member: RlsContext;
+/** 주선자는 모임에 속해야 Import 를 만들 수 있다(RLS). */
+let groupId: string;
 
 beforeAll(async () => {
   const ids = await withOwner(async (sql) => {
+    const g = await sql.query<{ id: string }>(
+      `INSERT INTO groups (name) VALUES ($1) RETURNING id`,
+      [TAG],
+    );
+    const group = g.rows[0]!.id;
     const a = await sql.query<{ id: string }>(
       `INSERT INTO users (role, email, password_hash, display_name)
        VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
@@ -58,10 +65,15 @@ beforeAll(async () => {
        VALUES ('MEMBER', $1, $2) RETURNING id`,
       [`0109${String(UPDATE_BASE).slice(-7)}`, `${TAG}-member`],
     );
-    return { adminId: a.rows[0]!.id, memberId: m.rows[0]!.id };
+    await sql.query(
+      `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, true)`,
+      [group, a.rows[0]!.id],
+    );
+    return { adminId: a.rows[0]!.id, memberId: m.rows[0]!.id, group };
   });
   adminId = ids.adminId;
   memberId = ids.memberId;
+  groupId = ids.group;
   admin = { userId: adminId, role: "ADMIN" };
   member = { userId: memberId, role: "MEMBER" };
 });
@@ -74,6 +86,7 @@ afterAll(async () => {
       UPDATE_BASE + 1000,
     ]);
     await sql.query(`DELETE FROM users WHERE display_name LIKE $1`, [`${TAG}%`]);
+    await sql.query(`DELETE FROM groups WHERE name LIKE $1`, [`${TAG}%`]);
   });
   await closePools();
 });
@@ -235,7 +248,11 @@ describe("계정 연결", () => {
 describe("대화와 사진 묶기", () => {
   async function newConversation(): Promise<{ importSessionId: string }> {
     return withRls(admin, async (sql) => {
-      const session = await createSession(sql, { createdBy: adminId, source: "TELEGRAM" });
+      const session = await createSession(sql, {
+        groupId,
+        createdBy: adminId,
+        source: "TELEGRAM",
+      });
       await createConversation(sql, {
         importSessionId: session.id,
         telegramUserId: TG_ADMIN,

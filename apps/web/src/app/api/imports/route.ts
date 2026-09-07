@@ -6,7 +6,7 @@
  */
 import { createImportSessionSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
-import { asAdmin } from "@/server/http/context";
+import { asAdmin, asGroupAdmin } from "@/server/http/context";
 import { fail, ok, readJson, route } from "@/server/http/respond";
 import { createSession, listInbox, upsertAsset } from "@/server/repo/imports";
 import { buildStorageKey, isAllowedImageType, signUploadToken } from "@/server/storage/local";
@@ -29,8 +29,9 @@ export const POST = route(async (request: Request) => {
     }
   }
 
-  return asAdmin(async (sql, viewer) => {
+  return asGroupAdmin(async (sql, viewer) => {
     const session = await createSession(sql, {
+      groupId: viewer.groupId,
       createdBy: viewer.userId,
       source: input.source,
       ...(input.rawText ? { rawText: input.rawText } : {}),

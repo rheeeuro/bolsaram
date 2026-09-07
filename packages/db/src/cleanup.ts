@@ -33,6 +33,11 @@ export const RETENTION = {
   telegramWebhookEvents: 7,
   /** 소비·만료된 봇 연결 코드 */
   telegramLinkCodes: 7,
+  /**
+   * 관리자 로그인 실패 기록. 판정 창(15분)보다 훨씬 길게 둔다 —
+   * 공격 흔적을 며칠은 볼 수 있어야 한다.
+   */
+  adminLoginFailures: 14,
 } as const;
 
 export type Step = { label: string; run: (sql: Sql) => Promise<number> };
@@ -131,6 +136,17 @@ export const STEPS: Step[] = [
         `DELETE FROM telegram_webhook_events
           WHERE received_at < now() - make_interval(days => $1)`,
         [RETENTION.telegramWebhookEvents],
+      );
+      return r.rowCount ?? 0;
+    },
+  },
+  {
+    label: "오래된 관리자 로그인 실패 기록",
+    run: async (sql) => {
+      const r = await sql.query(
+        `DELETE FROM admin_login_failures
+          WHERE failed_at < now() - make_interval(days => $1)`,
+        [RETENTION.adminLoginFailures],
       );
       return r.rowCount ?? 0;
     },

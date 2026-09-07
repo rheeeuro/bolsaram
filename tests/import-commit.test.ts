@@ -26,16 +26,30 @@ const SAMPLE_TEXT = [
   "이상형: 대화가 잘 통하는 분",
 ].join("\n");
 
+/** 주선자는 모임에 속해야 아무것도 할 수 없다 — RLS 가 group_admins 로 판정한다. */
+let groupId: string;
+
 beforeAll(async () => {
-  const id = await withOwner(async (sql) => {
+  const fixture = await withOwner(async (sql) => {
+    const g = await sql.query<{ id: string }>(
+      `INSERT INTO groups (name) VALUES ($1) RETURNING id`,
+      [TAG],
+    );
+    const group = g.rows[0]!.id;
     const result = await sql.query<{ id: string }>(
       `INSERT INTO users (role, email, password_hash, display_name)
        VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
       [`${TAG}@test.local`, TAG],
     );
-    return result.rows[0]!.id;
+    const userId = result.rows[0]!.id;
+    await sql.query(
+      `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, true)`,
+      [group, userId],
+    );
+    return { group, userId };
   });
-  admin = { userId: id, role: "ADMIN" };
+  groupId = fixture.group;
+  admin = { userId: fixture.userId, role: "ADMIN" };
 });
 
 afterAll(async () => {
@@ -43,6 +57,7 @@ afterAll(async () => {
     await sql.query(`DELETE FROM import_sessions WHERE created_by = $1`, [admin.userId]);
     await sql.query(`DELETE FROM profiles WHERE created_by = $1`, [admin.userId]);
     await sql.query(`DELETE FROM users WHERE id = $1`, [admin.userId]);
+    await sql.query(`DELETE FROM groups WHERE id = $1`, [groupId]);
   });
   await closePools();
 });
@@ -50,9 +65,9 @@ afterAll(async () => {
 async function newSession(rawText: string | null): Promise<string> {
   return withRls(admin, async (sql) => {
     const result = await sql.query<{ id: string }>(
-      `INSERT INTO import_sessions (created_by, source, raw_text)
-       VALUES ($1, 'TEXT', $2) RETURNING id`,
-      [admin.userId, rawText],
+      `INSERT INTO import_sessions (group_id, created_by, source, raw_text)
+       VALUES ($1, $2, 'TEXT', $3) RETURNING id`,
+      [groupId, admin.userId, rawText],
     );
     return result.rows[0]!.id;
   });

@@ -16,6 +16,7 @@ const TAG = `cleanuptest-${Date.now()}`;
 const STORAGE = path.resolve(import.meta.dirname, "..", "var", "test-storage", TAG);
 
 let adminId: string;
+let groupId: string;
 
 async function seedFile(key: string): Promise<void> {
   const full = path.join(STORAGE, key);
@@ -35,8 +36,9 @@ async function ageSession(sql: Sql, id: string, days: number): Promise<void> {
 
 async function newSession(sql: Sql): Promise<string> {
   const r = await sql.query<{ id: string }>(
-    `INSERT INTO import_sessions (created_by, source, raw_text) VALUES ($1,'TEXT',$2) RETURNING id`,
-    [adminId, TAG],
+    `INSERT INTO import_sessions (group_id, created_by, source, raw_text)
+     VALUES ($1,$2,'TEXT',$3) RETURNING id`,
+    [groupId, adminId, TAG],
   );
   return r.rows[0]!.id;
 }
@@ -51,14 +53,20 @@ async function addAsset(sql: Sql, sessionId: string, key: string, order = 0): Pr
 }
 
 beforeAll(async () => {
-  adminId = await withOwner(async (sql) => {
+  const fixture = await withOwner(async (sql) => {
+    const g = await sql.query<{ id: string }>(
+      `INSERT INTO groups (name) VALUES ($1) RETURNING id`,
+      [TAG],
+    );
     const r = await sql.query<{ id: string }>(
       `INSERT INTO users (role, email, password_hash, display_name)
        VALUES ('ADMIN',$1,'x',$2) RETURNING id`,
       [`${TAG}@test.local`, TAG],
     );
-    return r.rows[0]!.id;
+    return { group: g.rows[0]!.id, userId: r.rows[0]!.id };
   });
+  groupId = fixture.group;
+  adminId = fixture.userId;
 });
 
 afterAll(async () => {
@@ -67,6 +75,7 @@ afterAll(async () => {
     await sql.query(`DELETE FROM profiles WHERE created_by = $1`, [adminId]);
     await sql.query(`DELETE FROM users WHERE id = $1`, [adminId]);
     await sql.query(`DELETE FROM login_codes WHERE phone LIKE '0109888%'`);
+    await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
   });
   await rm(STORAGE, { recursive: true, force: true });
   await closePools();
@@ -85,9 +94,9 @@ describe("purgeAbandonedImports", () => {
 
       // 한 장만 프로필 사진으로 연결한다(= commit 된 것처럼).
       const profile = await sql.query<{ id: string }>(
-        `INSERT INTO profiles (gender, birth_year, residence_region, created_by)
-         VALUES ('FEMALE',1993,'SEOUL',$1) RETURNING id`,
-        [adminId],
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region, created_by)
+         VALUES ($1,'FEMALE',1993,'SEOUL',$2) RETURNING id`,
+        [groupId, adminId],
       );
       await sql.query(
         `INSERT INTO profile_images (profile_id, storage_key, mime_type, byte_size, sort_order, is_primary)
@@ -125,9 +134,9 @@ describe("purgeAbandonedImports", () => {
   it("등록이 끝난(IMPORTED) 세션은 오래돼도 지우지 않는다", async () => {
     await withOwner(async (sql) => {
       const profile = await sql.query<{ id: string }>(
-        `INSERT INTO profiles (gender, birth_year, residence_region, created_by)
-         VALUES ('MALE',1990,'BUSAN',$1) RETURNING id`,
-        [adminId],
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region, created_by)
+         VALUES ($1,'MALE',1990,'BUSAN',$2) RETURNING id`,
+        [groupId, adminId],
       );
       const sessionId = await newSession(sql);
       await sql.query(
@@ -179,9 +188,9 @@ describe("runCleanup", () => {
   it("기한이 지나 열려 있는 초대를 회수한다", async () => {
     await withOwner(async (sql) => {
       const profile = await sql.query<{ id: string }>(
-        `INSERT INTO profiles (gender, birth_year, residence_region, created_by)
-         VALUES ('FEMALE',1995,'JEJU',$1) RETURNING id`,
-        [adminId],
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region, created_by)
+         VALUES ($1,'FEMALE',1995,'JEJU',$2) RETURNING id`,
+        [groupId, adminId],
       );
       const profileId = profile.rows[0]!.id;
       await sql.query(

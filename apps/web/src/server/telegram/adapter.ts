@@ -116,6 +116,12 @@ async function route(message: TelegramMessage): Promise<void> {
     await sendMessage(message.chat.id, messages.notLinked);
     return;
   }
+  // 가입은 자유롭게 열려 있으므로 모임이 없는 주선자 계정이 존재한다.
+  // RLS 에서도 막히지만 봇이 이유를 먼저 알려준다.
+  if (!identity.groupId) {
+    await sendMessage(identity.telegramChatId, messages.noGroup);
+    return;
+  }
   await touchTelegramConnection(sender.id);
 
   const ctx = rlsContextOfTelegram(identity);
@@ -414,7 +420,12 @@ async function startConversation(
   identity: TelegramIdentity,
 ): Promise<conversations.TelegramConversationRecord> {
   // created_by 를 연결된 주선자로 남긴다 — 관리자 화면에서 누가 가져왔는지 보인다.
+  // group_id 는 RLS 가 요구한다. 모임이 없는 주선자는 route 에서 미리 걸러진다.
+  if (!identity.groupId) {
+    throw new DomainError("FORBIDDEN", "아직 모임에 속해 있지 않습니다.");
+  }
   const session = await imports.createSession(sql, {
+    groupId: identity.groupId,
     createdBy: identity.userId,
     source: "TELEGRAM",
   });

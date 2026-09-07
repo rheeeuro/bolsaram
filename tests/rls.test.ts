@@ -37,14 +37,26 @@ beforeAll(async () => {
 
     const profile = async (userId: string | null, status: string, visibility: string) => {
       const result = await sql.query<{ id: string }>(
-        `INSERT INTO profiles (user_id, gender, birth_year, residence_region, status, visibility, real_name)
-         VALUES ($1,'FEMALE',1993,'SEOUL',$2,$3,$4) RETURNING id`,
-        [userId, status, visibility, `${TAG}-이름`],
+        `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status, visibility, real_name)
+         VALUES ($1,$2,'FEMALE',1993,'SEOUL',$3,$4,$5) RETURNING id`,
+        [groupId, userId, status, visibility, `${TAG}-이름`],
       );
       return result.rows[0]!.id;
     };
 
+    // 이 테스트의 모든 픽스처는 한 모임에 있다 — 모임 간 격리는
+    // tests/group-isolation.test.ts 가 따로 검증한다.
+    const groupResult = await sql.query<{ id: string }>(
+      `INSERT INTO groups (name) VALUES ($1) RETURNING id`,
+      [TAG],
+    );
+    const groupId = groupResult.rows[0]!.id;
+
     const adminId = await user("ADMIN", "admin");
+    await sql.query(
+      `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, true)`,
+      [groupId, adminId],
+    );
     const u1 = await user("MEMBER", "m1");
     const u2 = await user("MEMBER", "m2");
     const u3 = await user("MEMBER", "m3");
@@ -71,6 +83,7 @@ afterAll(async () => {
       `DELETE FROM users WHERE display_name IN ('admin','m1','m2','m3') AND (email LIKE $1 OR phone LIKE $2)`,
       [`${TAG}-%`, `${phonePrefix()}%`],
     );
+    await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
   });
   await closePools();
 });

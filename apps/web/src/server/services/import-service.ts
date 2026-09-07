@@ -136,7 +136,11 @@ export async function commitSession(
 
     const profileId = input.targetProfileId
       ? await updateExistingProfile(sql, input.targetProfileId, fields)
-      : await insertProfile(sql, fields, ctx.userId, input.publish);
+      : // 새 프로필은 **Import 세션과 같은 모임**에 만든다. 커밋하는 주선자의 모임이
+        // 아니라 세션의 모임을 쓴다 — 세션을 볼 수 있다는 것 자체가 RLS 로 이미
+        // 그 모임의 주선자임을 뜻하고, 여러 모임에 속한 주선자가 엉뚱한 모임에
+        // 등록하는 일을 막는다.
+        await insertProfile(sql, session.groupId, fields, ctx.userId, input.publish);
 
     await moveImagesToProfile(sql, input.sessionId, profileId);
 
@@ -161,6 +165,7 @@ export async function commitSession(
 
 async function insertProfile(
   sql: Sql,
+  groupId: string,
   fields: ExtractedFields,
   createdBy: string | null,
   publish: boolean,
@@ -168,12 +173,13 @@ async function insertProfile(
   // assertCommittable 이 필수 필드를 이미 확인했다.
   const result = await sql.query<{ id: string }>(
     `INSERT INTO profiles (
-       gender, birth_year, height, job_title, job_category, company, education,
+       group_id, gender, birth_year, height, job_title, job_category, company, education,
        residence_region, workplace_region, religion, mbti, smoking, drinking,
        hobbies, bio, ideal_type_text, status, visibility, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      RETURNING id`,
     [
+      groupId,
       fields.gender,
       fields.birthYear,
       fields.height,

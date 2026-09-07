@@ -21,6 +21,16 @@ export type SessionUser = {
   displayName: string | null;
   /** Claim 이 끝난 회원만 프로필을 가진다. */
   profileId: string | null;
+  /**
+   * 이 사용자가 다루는 모임.
+   *
+   * 주선자는 `group_admins` 로 정해지고, 회원은 자기 프로필이 속한 모임이다.
+   * 가입만 하고 아직 모임이 없는 주선자는 null 이며 아무 데이터도 다룰 수 없다.
+   *
+   * RLS 는 이 값을 믿지 않는다 — 정책이 `group_admins` 를 직접 조회한다.
+   * 여기 있는 값은 애플리케이션 레이어의 중복 검사와 INSERT 시 소속 지정에 쓴다.
+   */
+  groupId: string | null;
 };
 
 function signSessionId(sessionId: string): string {
@@ -86,8 +96,16 @@ export async function readSession(): Promise<SessionUser | null> {
       role: UserRole;
       display_name: string | null;
       profile_id: string | null;
+      group_id: string | null;
     }>(
-      `SELECT u.id AS user_id, u.role, u.display_name, p.id AS profile_id
+      // 주선자의 모임은 group_admins, 회원의 모임은 자기 프로필에서 온다.
+      // 여러 모임에 속한 주선자는 먼저 들어간 모임을 쓴다(모임 전환 UI 는 아직 없다).
+      `SELECT u.id AS user_id, u.role, u.display_name, p.id AS profile_id,
+              COALESCE(
+                (SELECT ga.group_id FROM group_admins ga
+                  WHERE ga.user_id = u.id ORDER BY ga.added_at LIMIT 1),
+                p.group_id
+              ) AS group_id
          FROM sessions s
          JOIN users u ON u.id = s.user_id
          LEFT JOIN profiles p ON p.user_id = u.id
@@ -111,6 +129,7 @@ export async function readSession(): Promise<SessionUser | null> {
       role: row.role,
       displayName: row.display_name,
       profileId: row.profile_id,
+      groupId: row.group_id,
     };
   });
 }

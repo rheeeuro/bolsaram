@@ -22,6 +22,8 @@ import {
 
 export type ImportSessionRecord = {
   id: string;
+  /** 소속 모임. commit 이 만드는 프로필도 같은 모임에 들어간다. */
+  groupId: string;
   createdBy: string;
   source: ImportSource;
   status: ImportStatus;
@@ -58,6 +60,7 @@ export type ImportExtractionRecord = {
 
 type SessionRow = {
   id: string;
+  group_id: string;
   created_by: string;
   source: ImportSource;
   status: ImportStatus;
@@ -70,12 +73,13 @@ type SessionRow = {
   updated_at: Date;
 };
 
-const SESSION_COLUMNS = `id, created_by, source, status, raw_text, error_message,
+const SESSION_COLUMNS = `id, group_id, created_by, source, status, raw_text, error_message,
   committed_profile_id, idempotency_key, committed_at, created_at, updated_at`;
 
 function toSession(row: SessionRow): ImportSessionRecord {
   return {
     id: row.id,
+    groupId: row.group_id,
     createdBy: row.created_by,
     source: row.source,
     status: row.status,
@@ -91,12 +95,13 @@ function toSession(row: SessionRow): ImportSessionRecord {
 
 export async function createSession(
   sql: Sql,
-  input: { createdBy: string; source: ImportSource; rawText?: string },
+  input: { groupId: string; createdBy: string; source: ImportSource; rawText?: string },
 ): Promise<ImportSessionRecord> {
+  // group_id 는 RLS 가 요구한다(import_sessions_admin). 넣지 않으면 정책에 걸린다.
   const result = await sql.query<SessionRow>(
-    `INSERT INTO import_sessions (created_by, source, raw_text)
-     VALUES ($1, $2, $3) RETURNING ${SESSION_COLUMNS}`,
-    [input.createdBy, input.source, input.rawText ?? null],
+    `INSERT INTO import_sessions (group_id, created_by, source, raw_text)
+     VALUES ($1, $2, $3, $4) RETURNING ${SESSION_COLUMNS}`,
+    [input.groupId, input.createdBy, input.source, input.rawText ?? null],
   );
   return toSession(result.rows[0]!);
 }

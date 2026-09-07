@@ -156,6 +156,14 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     expect(ALL).toMatch(/4시 10분/);
   });
 
+  it("관리자 로그인 시도 제한 5회 / 15분", () => {
+    const src = "apps/web/src/server/auth/login.ts";
+    expect(constantOf(src, "ADMIN_LOGIN_MAX_FAILURES")).toBe(5);
+    expect(constantOf(src, "ADMIN_LOGIN_WINDOW_MS") / 60_000).toBe(15);
+    const admin = guide("admin.md");
+    expect(admin).toMatch(/15분 안에 5번/);
+  });
+
   it("봇 연결 코드 유효시간 15분", () => {
     const minutes = constantOf(
       "apps/web/src/server/auth/telegram.ts",
