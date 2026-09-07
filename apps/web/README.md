@@ -17,6 +17,11 @@ Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에
 >
 > **불변식 4: 로그에 프로필 원문·사진 URL·전화번호·초대 토큰을 남기지 않는다.**
 >
+> **불변식 5: 모임(그룹)이 최상위 격리 단위다.**
+> 주선자 가입은 열려 있으므로 `ADMIN` 이라는 사실만으로는 아무 데이터도 볼 수 없다.
+> 데이터를 만들거나 고치는 경로는 `asGroupAdmin` / `requireAdminGroup` 을 쓰고,
+> 새 행에는 반드시 `group_id` 를 넣는다. RLS 는 `app_is_group_admin()` 으로 판정한다.
+>
 > 이 README 는 현재 구조의 소스 오브 트루스다. 라우트·서버 모듈을 추가·삭제하면 함께 갱신한다.
 > 작업 규칙은 [`.ai-harness/project.md`](../../.ai-harness/project.md) 를 따른다.
 
@@ -33,6 +38,7 @@ apps/web/src/
 │   ├── layout.tsx            폰트·메타데이터·noindex
 │   ├── globals.css           Tailwind + 디자인 토큰 + 전역 스타일
 │   ├── login/                로그인 (회원 OTP / 주선자 비밀번호 탭)
+│   ├── signup/               주선자 가입 → 모임 생성
 │   ├── claim/[token]/        초대 링크 → 프로필 연결
 │   ├── (member)/             회원 영역 (하단 탭 레이아웃)
 │   │   ├── discover/         프로필 목록 + 필터 시트
@@ -69,6 +75,7 @@ server/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
 │   ├── login.ts              관리자 비밀번호 · 회원 OTP (재요청·시도 제한)
 │   ├── invite.ts             초대 발급·미리보기·claim (해시 저장, replay 차단)
+│   ├── signup.ts             주선자 가입 (계정 + 모임을 한 트랜잭션으로)
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
 ├── storage/local.ts          private 저장소 + signed download/upload URL
@@ -95,7 +102,7 @@ server/
 ├── views/profile-view.ts     공개 단계 적용 + signed URL 부착
 └── http/
     ├── respond.ts            DomainError → HTTP status, 입력 검증
-    └── context.ts            asUser / asAdmin / asMember (세션 + RLS 묶음)
+    └── context.ts            asUser / asAdmin / asGroupAdmin / asMember (세션 + RLS 묶음)
 ```
 
 ---
@@ -109,7 +116,8 @@ server/
 
 | 경로                                      | 메서드              | 권한              | 용도                                 |
 | ----------------------------------------- | ------------------- | ----------------- | ------------------------------------ |
-| `/api/auth/admin-login`                   | POST                | –                 | 주선자 로그인                        |
+| `/api/auth/signup`                        | POST                | –                 | 주선자 가입 (계정 + 모임 생성)       |
+| `/api/auth/admin-login`                   | POST                | –                 | 주선자 로그인 (15분 5회 시도 제한)   |
 | `/api/auth/otp/request`                   | POST                | –                 | 회원 인증번호 발급                   |
 | `/api/auth/otp/verify`                    | POST                | –                 | 인증번호 확인 → 세션                 |
 | `/api/auth/logout`                        | POST                | –                 | 세션 폐기                            |
@@ -129,6 +137,7 @@ server/
 | `/api/imports/[id]/analyze`               | POST                | 관리자            | AI 추출 실행                         |
 | `/api/imports/[id]/extraction`            | PATCH               | 관리자            | 검토 결과 저장                       |
 | `/api/imports/[id]/commit`                | POST                | 관리자            | 프로필 생성 (idempotent)             |
+| `/api/admin/groups`                       | POST                | 관리자            | 모임 만들기 (모임 없는 주선자)       |
 | `/api/admin/telegram`                     | GET / POST / DELETE | 관리자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |

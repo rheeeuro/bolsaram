@@ -13,6 +13,27 @@ export const adminLoginSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
+/**
+ * 주선자 가입. 계정과 모임을 함께 만든다.
+ *
+ * 비밀번호 최소 길이를 로그인 스키마(8)보다 길게 둔다 — 이 계정 하나로 모임 전체
+ * 회원의 이름·연락처에 접근하므로 새로 만드는 계정은 더 강한 기준을 적용한다.
+ * 로그인은 기존 계정도 받아야 하므로 8 을 유지한다.
+ */
+export const SIGNUP_PASSWORD_MIN = 10;
+
+export const adminSignupSchema = z.object({
+  email: z.email().max(200),
+  password: z
+    .string()
+    .min(SIGNUP_PASSWORD_MIN, `비밀번호는 ${SIGNUP_PASSWORD_MIN}자 이상이어야 합니다.`)
+    .max(200),
+  displayName: z.string().trim().min(1).max(60),
+  /** 만들 모임 이름. groups.name 의 CHECK 와 같은 범위. */
+  groupName: z.string().trim().min(1).max(80),
+});
+export type AdminSignupInput = z.infer<typeof adminSignupSchema>;
+
 export const requestOtpSchema = z.object({
   phone: phoneSchema,
 });

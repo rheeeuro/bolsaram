@@ -5,6 +5,7 @@ import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Card, Stat, Table, Td, Th } from "@/components/admin/table";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { label } from "@/lib/labels";
+import { NoGroupPanel } from "@/components/admin/no-group-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,17 @@ type Kpi = {
 
 export default async function AdminDashboard() {
   const viewer = await requireAdminPage();
+
+  // 모임이 없으면 RLS 가 아무것도 통과시키지 않아 전부 0 으로 보인다.
+  // 빈 대시보드 대신 이유와 다음 행동을 보여준다.
+  if (!viewer.groupId) {
+    return (
+      <div className="max-w-md">
+        <h1 className="mb-4 text-[18px] font-semibold tracking-tight">시작하기</h1>
+        <NoGroupPanel />
+      </div>
+    );
+  }
 
   const { kpi, recent } = await withRls(rlsContextOf(viewer), async (sql) => {
     // 대시보드는 단일 왕복으로 끝낸다. 카운트가 늘어나면 뷰로 뺀다.
