@@ -17,6 +17,8 @@ type Kpi = {
   introducedTotal: number;
   inboxPending: number;
   membersTotal: number;
+  consentPending: number;
+  consentPendingListed: number;
 };
 
 export default async function AdminDashboard() {
@@ -35,7 +37,13 @@ export default async function AdminDashboard() {
         (SELECT count(*) FROM match_requests WHERE status IN ('INTRODUCED','CLOSED'))::int AS "introducedTotal",
         (SELECT count(*) FROM import_sessions
           WHERE status IN ('RECEIVED','UPLOADING','ANALYZING','REVIEW_REQUIRED','READY','FAILED'))::int AS "inboxPending",
-        (SELECT count(*) FROM users WHERE role = 'MEMBER')::int AS "membersTotal"
+        (SELECT count(*) FROM users WHERE role = 'MEMBER')::int AS "membersTotal",
+        -- 합성 데이터(SYNTHETIC)는 확인 대상이 아니라 지울 대상이라 빼둔다.
+        (SELECT count(*) FROM profiles
+          WHERE consent_method IS NULL OR consent_method = 'LEGACY')::int AS "consentPending",
+        (SELECT count(*) FROM profiles
+          WHERE (consent_method IS NULL OR consent_method = 'LEGACY')
+            AND visibility <> 'PRIVATE')::int AS "consentPendingListed"
     `);
 
     const recentRequests = await sql.query<{
@@ -79,6 +87,29 @@ export default async function AdminDashboard() {
           hint={`미연결 프로필 ${kpi.profilesUnclaimed}개`}
         />
       </div>
+
+      {kpi.consentPending > 0 ? (
+        <div className="mt-4 flex items-center justify-between rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/6 px-4 py-3">
+          <p className="text-[13px]">
+            등록 동의를 확인하지 않은 프로필이 <strong>{kpi.consentPending}건</strong>
+            {kpi.consentPendingListed > 0 ? (
+              <>
+                {" "}
+                있고, 그중 <strong>{kpi.consentPendingListed}건</strong>이 회원에게 보이고
+                있습니다.
+              </>
+            ) : (
+              " 있습니다."
+            )}
+          </p>
+          <Link
+            href="/admin/profiles?consent=pending"
+            className="shrink-0 text-[13px] font-medium underline"
+          >
+            확인하러 가기
+          </Link>
+        </div>
+      ) : null}
 
       {kpi.requestsAccepted > 0 ? (
         <div className="mt-4 flex items-center justify-between rounded-lg border border-[var(--surface-accent)]/25 bg-[var(--surface-accent)]/6 px-4 py-3">

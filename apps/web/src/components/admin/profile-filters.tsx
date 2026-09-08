@@ -56,6 +56,14 @@ export function AdminProfileFilters({ statuses }: { statuses: string[] }) {
         <option value="yes">연결됨</option>
         <option value="no">미연결</option>
       </Select>
+      <Select
+        className="h-9 w-40"
+        value={params.get("consent") ?? ""}
+        onChange={(e) => apply({ consent: e.target.value })}
+      >
+        <option value="">동의 전체</option>
+        <option value="pending">동의 확인 필요</option>
+      </Select>
       <Button type="submit" variant="secondary" size="sm">
         검색
       </Button>

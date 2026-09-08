@@ -122,6 +122,8 @@ export const adminProfileQuerySchema = z.object({
   status: csv(PROFILE_STATUSES),
   gender: z.enum(GENDERS).optional(),
   claimed: z.enum(["yes", "no"]).optional(),
+  /** pending = 등록 동의를 아직 확인하지 않은 것(확인 필요·기록 없음). */
+  consent: z.enum(["pending"]).optional(),
   cursor: z.string().trim().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

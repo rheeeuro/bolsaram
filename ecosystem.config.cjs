@@ -59,6 +59,8 @@ module.exports = {
       instances: 1,
       autorestart: false,
       cron_restart: "40 3 * * *",
+      // 다른 디스크·마운트에 사본을 두려면 BACKUP_MIRROR_DIR 을 여기 넣는다.
+      // 경로가 없거나 못 쓰면 경고만 하고 기본 백업은 유지한다.
       env: { NODE_ENV: "production" },
       ...log("bolsaram-backup"),
     },

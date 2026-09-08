@@ -314,6 +314,10 @@ export async function findAdminProfiles(
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
   if (query.claimed === "yes") clauses.push("p.user_id IS NOT NULL");
   if (query.claimed === "no") clauses.push("p.user_id IS NULL");
+  // 합성 데이터(SYNTHETIC)는 확인 대상이 아니라 지울 대상이므로 빼둔다.
+  if (query.consent === "pending") {
+    clauses.push("(p.consent_method IS NULL OR p.consent_method = 'LEGACY')");
+  }
   if (query.q) {
     const term = push(`%${query.q}%`);
     const codeMatch = /^#?(\d+)$/.exec(query.q);
