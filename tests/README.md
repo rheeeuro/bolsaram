@@ -28,7 +28,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | ------------------------------ | ---------------------------------------------- | ---- | ---- |
 | `match-transitions.test.ts`    | 상태 기계·행위자 권한·중복·자기 자신           | –    | 11   |
 | `visibility.test.ts`           | 단계적 정보 공개·노출 규칙                     | –    | 10   |
-| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서                | –    | 12   |
+| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 19   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
 | `rls.test.ts`                  | RLS 정책 강제                                  | 필요 | 21   |

@@ -48,10 +48,16 @@ export default async function IntroPage() {
 
         <div className="animate-fade mt-16 flex flex-col gap-2.5">
           <Link
-            href="/login"
+            href="/signup"
             className="flex h-13 items-center justify-center rounded-xl bg-[var(--color-rose-500)] py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[var(--color-rose-600)]"
           >
-            시작하기
+            주선자로 시작하기
+          </Link>
+          <Link
+            href="/login"
+            className="flex h-13 items-center justify-center rounded-xl border border-[var(--surface-border)] bg-white py-3.5 text-[15px] font-medium text-[var(--color-ink-800)] transition-colors hover:bg-[var(--color-ivory-100)]"
+          >
+            로그인
           </Link>
           <p className="mt-2 text-center text-[12px] leading-relaxed text-[var(--color-ink-600)]">
             볼사람은 주선자가 검증한 분만 참여하는 비공개 서비스입니다.

@@ -52,7 +52,7 @@ export function AdminNav({ displayName }: { displayName: string | null }) {
 
         <div className="ml-4 flex shrink-0 items-center gap-3">
           <span className="hidden text-[12.5px] text-[var(--surface-text-muted)] sm:inline">
-            {displayName ?? "관리자"}
+            {displayName ?? "주선자"}
           </span>
           <button
             type="button"

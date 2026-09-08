@@ -26,10 +26,15 @@ export default async function LoginPage({
         </header>
         <LoginForm next={next ?? null} />
 
-        <p className="mt-8 text-[13px] text-[var(--color-ink-600)]">
-          주선자로 시작하시나요?{" "}
+        <p className="mt-6 rounded-xl bg-[var(--color-ivory-100)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--color-ink-700)]">
+          회원은 비밀번호가 없습니다. 주선자가 보낸 초대 링크로 들어가 주세요. 링크가 만료됐다면
+          주선자에게 다시 요청하시면 됩니다.
+        </p>
+
+        <p className="mt-6 text-[13px] text-[var(--color-ink-600)]">
+          아직 계정이 없으신가요?{" "}
           <Link href="/signup" className="text-[var(--color-rose-600)] underline">
-            모임 만들기
+            주선자로 시작하기
           </Link>
         </p>
       </div>

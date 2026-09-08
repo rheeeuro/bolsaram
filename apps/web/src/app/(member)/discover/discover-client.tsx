@@ -5,13 +5,13 @@ import { GENDERS, GENDER_LABELS } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { ProfileCard } from "@/components/member/profile-card";
+import { FilterSheet } from "@/components/member/filter-sheet";
 import {
   DEFAULT_FILTERS,
-  FilterSheet,
   activeFilterCount,
   filtersToParams,
   type Filters,
-} from "@/components/member/filter-sheet";
+} from "@/components/member/filter-model";
 import { apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import type { ProfileCardView } from "@/server/views/profile-view";

@@ -16,82 +16,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { apiGet } from "@/lib/api-client";
+import {
+  AGE_RANGE,
+  DEFAULT_FILTERS,
+  HEIGHT_RANGE,
+  filtersToParams,
+  rangeLabel,
+  type Filters,
+} from "./filter-model";
 
 /**
  * 조건 설정 bottom sheet (UI 컨셉 03).
  * 값이 바뀔 때마다 결과 개수를 미리 조회해 "N명 보기" 로 보여준다.
+ * 조건 판정은 전부 filter-model 에 있다 — 여기서는 그리는 일만 한다.
  */
-
-export type Filters = {
-  ageMin: number;
-  ageMax: number;
-  heightMin: number;
-  heightMax: number;
-  regions: string[];
-  jobCategories: string[];
-  religions: string[];
-  smoking: string[];
-  drinking: string[];
-};
-
-export const DEFAULT_FILTERS: Filters = {
-  ageMin: 25,
-  ageMax: 38,
-  heightMin: 150,
-  heightMax: 195,
-  regions: [],
-  jobCategories: [],
-  religions: [],
-  smoking: [],
-  drinking: [],
-};
-
-export function filtersToParams(filters: Filters, gender: string | null): URLSearchParams {
-  const params = new URLSearchParams();
-  if (gender) params.set("gender", gender);
-  if (filters.ageMin !== DEFAULT_FILTERS.ageMin) params.set("ageMin", String(filters.ageMin));
-  if (filters.ageMax !== DEFAULT_FILTERS.ageMax) params.set("ageMax", String(filters.ageMax));
-  if (filters.heightMin !== DEFAULT_FILTERS.heightMin) {
-    params.set("heightMin", String(filters.heightMin));
-  }
-  if (filters.heightMax !== DEFAULT_FILTERS.heightMax) {
-    params.set("heightMax", String(filters.heightMax));
-  }
-  for (const [key, values] of [
-    ["regions", filters.regions],
-    ["jobCategories", filters.jobCategories],
-    ["religions", filters.religions],
-    ["smoking", filters.smoking],
-    ["drinking", filters.drinking],
-  ] as const) {
-    if (values.length > 0) params.set(key, values.join(","));
-  }
-  return params;
-}
-
-/** 기본값과 다른 조건 개수. 필터 버튼에 표시한다. */
-export function activeFilterCount(filters: Filters): number {
-  let count = 0;
-  if (filters.ageMin !== DEFAULT_FILTERS.ageMin || filters.ageMax !== DEFAULT_FILTERS.ageMax)
-    count += 1;
-  if (
-    filters.heightMin !== DEFAULT_FILTERS.heightMin ||
-    filters.heightMax !== DEFAULT_FILTERS.heightMax
-  ) {
-    count += 1;
-  }
-  for (const list of [
-    filters.regions,
-    filters.jobCategories,
-    filters.religions,
-    filters.smoking,
-    filters.drinking,
-  ]) {
-    if (list.length > 0) count += 1;
-  }
-  return count;
-}
-
 export function FilterSheet({
   open,
   initial,
@@ -176,8 +114,8 @@ export function FilterSheet({
           <RangeGroup
             title="나이"
             unit="세"
-            min={20}
-            max={55}
+            min={AGE_RANGE.min}
+            max={AGE_RANGE.max}
             valueMin={draft.ageMin}
             valueMax={draft.ageMax}
             onChange={(lo, hi) => setDraft((p) => ({ ...p, ageMin: lo, ageMax: hi }))}
@@ -185,8 +123,8 @@ export function FilterSheet({
           <RangeGroup
             title="키"
             unit="cm"
-            min={145}
-            max={200}
+            min={HEIGHT_RANGE.min}
+            max={HEIGHT_RANGE.max}
             valueMin={draft.heightMin}
             valueMax={draft.heightMax}
             onChange={(lo, hi) => setDraft((p) => ({ ...p, heightMin: lo, heightMax: hi }))}
@@ -311,9 +249,7 @@ function RangeGroup({
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="text-[13px] font-medium text-[var(--color-ink-800)]">{title}</h3>
         <span className="text-[13px] text-[var(--color-ink-600)]">
-          {valueMin}
-          {unit} – {valueMax}
-          {unit}
+          {rangeLabel({ min, max, valueMin, valueMax, unit })}
         </span>
       </div>
       <div className="flex flex-col gap-1.5">

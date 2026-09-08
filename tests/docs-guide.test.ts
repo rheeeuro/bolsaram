@@ -15,6 +15,10 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  AGE_RANGE,
+  HEIGHT_RANGE,
+} from "../apps/web/src/components/member/filter-model";
+import {
   LOW_CONFIDENCE_THRESHOLD,
   MATCH_REQUEST_STATUS_LABELS,
   PROFILE_STATUS_LABELS,
@@ -191,21 +195,12 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     expect(guide("admin.md")).toMatch(/24시간/);
   });
 
-  it("Discover 기본 필터 범위", () => {
-    const source = readFileSync(
-      path.join(ROOT, "apps/web/src/components/member/filter-sheet.tsx"),
-      "utf8",
-    );
-    const block = /DEFAULT_FILTERS[\s\S]*?\};/.exec(source)?.[0] ?? "";
-    const num = (key: string) => Number(new RegExp(`${key}:\\s*(\\d+)`).exec(block)?.[1]);
-    expect(num("ageMin")).toBe(25);
-    expect(num("ageMax")).toBe(38);
-    expect(num("heightMin")).toBe(150);
-    expect(num("heightMax")).toBe(195);
-
+  it("가이드가 고를 수 있는 필터 범위를 코드와 같게 적는다", () => {
+    // 기본값이 양끝이라 "손대지 않으면 전체" 다. 그 규약은 filters.test.ts 가 지킨다.
     const member = guide("member.md");
-    expect(member).toMatch(/25\s*–\s*38세/);
-    expect(member).toMatch(/150\s*–\s*195cm/);
+    expect(member).toMatch(new RegExp(`${AGE_RANGE.min}\\s*–\\s*${AGE_RANGE.max}세`));
+    expect(member).toMatch(new RegExp(`${HEIGHT_RANGE.min}\\s*–\\s*${HEIGHT_RANGE.max}cm`));
+    expect(member).toMatch(/양끝에 두면 그 조건은 걸리지\s*\n?않습니다/);
   });
 });
 

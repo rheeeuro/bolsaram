@@ -24,7 +24,7 @@ export type SignalItem = {
 const TABS = [
   { key: "incoming", label: "받은" },
   { key: "outgoing", label: "보낸" },
-  { key: "connected", label: "연결됨" },
+  { key: "connected", label: "이어짐" },
 ] as const;
 
 const EMPTY_COPY: Record<string, { title: string; description: string }> = {
@@ -37,7 +37,7 @@ const EMPTY_COPY: Record<string, { title: string; description: string }> = {
     description: "마음에 드는 분의 프로필에서 소개를 신청해보세요.",
   },
   connected: {
-    title: "아직 연결된 인연이 없어요",
+    title: "아직 이어진 인연이 없어요",
     description: "서로 마음이 닿으면 주선자가 두 분을 연결해드립니다.",
   },
 };

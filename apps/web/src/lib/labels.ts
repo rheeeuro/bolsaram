@@ -4,7 +4,6 @@
  */
 import {
   DRINKING_LABELS,
-  EDUCATION_LEVEL_LABELS,
   GENDER_LABELS,
   IMPORT_SOURCE_LABELS,
   IMPORT_STATUS_LABELS,
@@ -29,7 +28,6 @@ export const label = {
   religion: (v: string | null | undefined) => lookup(RELIGION_LABELS, v),
   smoking: (v: string | null | undefined) => lookup(SMOKING_LABELS, v),
   drinking: (v: string | null | undefined) => lookup(DRINKING_LABELS, v),
-  education: (v: string | null | undefined) => lookup(EDUCATION_LEVEL_LABELS, v),
   profileStatus: (v: string | null | undefined) => lookup(PROFILE_STATUS_LABELS, v),
   visibility: (v: string | null | undefined) => lookup(VISIBILITY_LABELS, v),
   matchStatus: (v: string | null | undefined) => lookup(MATCH_REQUEST_STATUS_LABELS, v),
