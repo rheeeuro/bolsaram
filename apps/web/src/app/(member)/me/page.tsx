@@ -107,6 +107,15 @@ export default async function MePage() {
             <p className="mt-8 rounded-xl bg-[var(--color-ivory-100)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--color-ink-700)]">
               프로필 수정이 필요하면 주선자에게 알려주세요. 사진과 소개는 주선자가 관리합니다.
             </p>
+
+            {/* 숨김 해제로 가는 유일한 입구. 탭에 두지 않고 여기에 모은다. */}
+            <Link
+              href="/hidden"
+              className="mt-4 flex items-center justify-between rounded-xl border border-[var(--surface-border)] px-4 py-3.5"
+            >
+              <span className="text-[13.5px] text-[var(--color-ink-800)]">숨긴 사람</span>
+              <span className="text-[13px] text-[var(--color-ink-500)]">관리 →</span>
+            </Link>
           </>
         )}
 

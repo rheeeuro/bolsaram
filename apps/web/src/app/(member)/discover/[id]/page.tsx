@@ -4,7 +4,12 @@ import { isDetailAccessible } from "@bolsaram/domain";
 import { withRls } from "@bolsaram/db";
 import { requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { isFavorited } from "@/server/repo/favorites";
-import { findActiveBetween, introducedPartnerIds } from "@/server/repo/matches";
+import { didHide, isHiddenBetween } from "@/server/repo/hides";
+import {
+  findActiveBetween,
+  introducedPartnerIds,
+  isRejectedBetween,
+} from "@/server/repo/matches";
 import { findProfileById } from "@/server/repo/profiles";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 import { ProfileDetail } from "@/components/member/profile-detail";
@@ -15,7 +20,11 @@ export const dynamic = "force-dynamic";
  * 돌아갈 수 있는 화면. 쿼리로 들어온 값을 그대로 링크에 쓰지 않고 이 표에서만 고른다 —
  * `from` 은 외부에서 조작할 수 있는 입력이다.
  */
-const BACK_TO = { favorites: "/favorites", signals: "/signals" } as const;
+const BACK_TO = {
+  favorites: "/favorites",
+  signals: "/signals",
+  hidden: "/hidden",
+} as const;
 const SIGNAL_TABS = ["incoming", "outgoing", "connected"];
 
 function backHrefFrom(from?: string, tab?: string): string {
@@ -61,9 +70,20 @@ export default async function ProfileDetailPage({
       ? await findActiveBetween(sql, viewer.profileId, profile.id)
       : null;
 
+    // 거절·숨김 관계 (마이그레이션 0023). 탐색 목록에서는 이미 빠졌지만 시그널 화면과
+    // 직접 URL 로는 여기까지 올 수 있으므로 버튼 상태를 서버에서 정한다.
+    const relation = viewer.profileId
+      ? {
+          rejected: await isRejectedBetween(sql, profile.id),
+          hiddenBetween: await isHiddenBetween(sql, profile.id),
+          iHid: await didHide(sql, viewer.profileId, profile.id),
+        }
+      : { rejected: false, hiddenBetween: false, iHid: false };
+
     return {
       view: toDetailView(profile, level, { isFavorited: favorited }),
       isSelf: profile.userId === viewer.userId,
+      relation,
       existing: existing
         ? {
             status: existing.status,
@@ -81,6 +101,7 @@ export default async function ProfileDetailPage({
       isSelf={data.isSelf}
       canRequest={viewer.profileId != null && !data.isSelf}
       existing={data.existing}
+      relation={data.relation}
       backHref={backHrefFrom(from, tab)}
     />
   );

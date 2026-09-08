@@ -10,20 +10,31 @@ import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 import { RequestModal } from "./request-modal";
 import { MatchMoment } from "./match-moment";
+import { HideAction } from "./hide-action";
 
 type Existing = { status: string; isRequester: boolean } | null;
+
+/**
+ * 신청을 막는 관계 (마이그레이션 0023).
+ *
+ * `hiddenBetween` 은 방향을 담지 않는다 — 상대가 나를 숨겼다는 사실을 화면에 흘리지
+ * 않기 위해서다. 내가 숨겼는지는 `iHid` 로만 알 수 있고 그때만 해제 버튼이 뜬다.
+ */
+type Relation = { rejected: boolean; hiddenBetween: boolean; iHid: boolean };
 
 export function ProfileDetail({
   profile,
   isSelf,
   canRequest,
   existing,
+  relation,
   backHref,
 }: {
   profile: ProfileDetailView;
   isSelf: boolean;
   canRequest: boolean;
   existing: Existing;
+  relation: Relation;
   backHref: string;
 }) {
   const router = useRouter();
@@ -203,11 +214,25 @@ export function ProfileDetail({
             <RequestAction
               existing={existing}
               canRequest={canRequest}
+              relation={relation}
               onOpen={() => setModalOpen(true)}
             />
           </div>
         </div>
       )}
+
+      {/* 숨기기는 프로필이 연결된 회원만 할 수 있다. 연결된 상대는 새로 숨기지 않는다 —
+          연락처를 이미 주고받은 뒤라 화면에서 지우는 것으로 해결되지 않는다.
+          **이미 숨긴 상대는 상태와 무관하게 해제할 수 있어야 한다** — 해제 버튼을
+          상태로 가리면 되돌릴 수 없는 숨김이 남는다. */}
+      {!isSelf && canRequest && (relation.iHid || existing?.status !== "INTRODUCED") ? (
+        <HideAction
+          profileId={profile.id}
+          code={profile.code}
+          hidden={relation.iHid}
+          onChanged={() => router.refresh()}
+        />
+      ) : null}
 
       <RequestModal
         open={modalOpen}
@@ -234,10 +259,12 @@ export function ProfileDetail({
 function RequestAction({
   existing,
   canRequest,
+  relation,
   onOpen,
 }: {
   existing: Existing;
   canRequest: boolean;
+  relation: Relation;
   onOpen: () => void;
 }) {
   if (existing) {
@@ -257,6 +284,15 @@ function RequestAction({
     return (
       <Button variant="secondary" size="lg" className="flex-[1.4]" disabled>
         프로필 연결 후 가능
+      </Button>
+    );
+  }
+  // 거절과 숨김에 **같은 문구**를 쓴다. 문구가 갈리면 자기가 거절한 사실을 아는
+  // 사람이 「거절」이 아닌 답을 보는 것만으로 상대가 숨겼음을 추론할 수 있다.
+  if (relation.hiddenBetween || relation.rejected) {
+    return (
+      <Button variant="secondary" size="lg" className="flex-[1.4]" disabled>
+        지금은 보낼 수 없어요
       </Button>
     );
   }

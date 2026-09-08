@@ -44,7 +44,13 @@ export function buildDiscoverWhere(
     return `$${i++}`;
   };
 
-  if (ctx.viewerProfileId) clauses.push(`p.id <> ${push(ctx.viewerProfileId)}`);
+  if (ctx.viewerProfileId) {
+    clauses.push(`p.id <> ${push(ctx.viewerProfileId)}`);
+    // 거절·숨김 관계는 양방향으로 목록에서 뺀다(마이그레이션 0023). 판정을 SQL 함수에
+    // 두는 이유는 "상대가 나를 숨겼다" 는 RLS 로 보이지 않는 사실이라서다 — 여기서
+    // 서브쿼리로 직접 훑으면 그 방향이 빠진다.
+    clauses.push(`p.id NOT IN (SELECT app_discover_excluded_profile_ids())`);
+  }
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
 
   const years = birthYearRange(query, ctx.currentYear);

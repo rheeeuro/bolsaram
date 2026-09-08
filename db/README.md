@@ -45,6 +45,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0020_drop_profile_consent.sql`    | 동의 기록 제거 + 시드 표식(`is_seed`)만 남김                                           |
 | `0021_auto_introduce_on_accept.sql`| 수락이 곧 연결 — 주선자 연결 게이트 제거, 알림 트리거를 INTRODUCED 기준으로            |
 | `0022_disclosure_survives_close.sql`| 종료해도 이름·연락처 공개 유지 (`app_is_introduced_with` 에 CLOSED 포함)               |
+| `0023_reject_and_hide.sql`         | 거절 관계 재신청 금지 + `profile_hides` (숨기기). 둘 다 양방향                         |
+| `0024_hide_requires_no_active_request.sql` | 활성 신청이 있는 상대는 숨길 수 없다 (0023 의 반대 방향)                       |
 
 ## 테이블
 
@@ -57,6 +59,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
 | `favorites`                                    | 관심                                               | 본인만                              |
+| `profile_hides`                                | 숨긴 상대. 양방향으로 목록·신청을 막는다           | **숨긴 사람만** (상대·관리자 불가)  |
 | `invites`                                      | **회원 로그인 링크** (토큰 해시만 저장)            | 관리자만                            |
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
@@ -76,6 +79,9 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | ---------------------------------------------------- | --------------------------------------------- |
 | `match_requests_one_active` (부분 유니크)            | 같은 방향 활성 신청 중복 — 동시 요청도 막힌다 |
 | `match_requests_no_self`                             | 자기 자신에게 신청                            |
+| `match_requests_block_closed_relations_trg`          | 거절·숨김 관계의 새 신청 (양방향)             |
+| `profile_hides_block_active_request_trg`             | 활성 신청이 있는 상대를 숨기기                |
+| `profile_hides_no_self`                              | 자기 자신을 숨기기                            |
 | `profile_images_one_primary` (부분 유니크)           | 대표 사진 두 장                               |
 | `profiles.user_id` UNIQUE                            | 한 계정에 프로필 두 개                        |
 | `invites_one_open` (부분 유니크)                     | 프로필당 살아 있는 초대 두 개                 |
@@ -96,6 +102,17 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 `match_requests_notify_created` · `match_requests_notify_introduced` 트리거가 담당 주선자
 (`app_profile_admins()`)에게 보낼 알림을 `notifications` 에 넣는다. 전이가 실제로 성공했을
 때만 돌기 때문에 애플리케이션이 알림을 빠뜨릴 수 없다.
+
+`match_requests_block_closed_relations` 트리거가 거절·숨김 관계의 새 신청을 막는다. 판정은
+방향을 구분하지 않는다 — 한쪽만 막으면 탐색 목록에서 서로 빠지는 것과 어긋난다.
+`app_discover_excluded_profile_ids()` 가 같은 관계를 목록 쿼리에 알려주고,
+`app_is_rejected_between()` · `app_is_hidden_between()` 이 화면의 버튼 상태를 정한다.
+숨김 판정 함수들이 `SECURITY DEFINER` 인 이유는 **누가 숨겼는지는 정책으로 가려 두고**
+판정만 내보내기 위해서다.
+
+`profile_hides_block_active_request` 트리거가 그 반대 방향을 막는다 — 활성 신청이 있는
+상대는 숨기지 못한다. 두 트리거가 함께 있어야 「숨김 + 활성 신청」이 어느 순서로도
+만들어지지 않는다. 그 조합은 회원이 스스로 되돌릴 수 없는 상태다.
 
 ## RLS 요약
 

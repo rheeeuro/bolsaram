@@ -1,9 +1,11 @@
 /** MatchRequest 상태 기계 (부트스트랩 §12 「match transition」). */
 import { describe, expect, it } from "vitest";
 import {
+  CANNOT_REQUEST_MESSAGE,
   DomainError,
   allowedActions,
   assertCanCreateRequest,
+  assertCanHide,
   isActiveStatus,
   isTerminalStatus,
   resolveTransition,
@@ -100,11 +102,108 @@ describe("assertCanCreateRequest", () => {
     }
   });
 
-  it("종결된 신청이 있으면 다시 신청할 수 있다", () => {
+  it("취소·종료로 끝난 뒤에는 다시 신청할 수 있다", () => {
     expect(() =>
       assertCanCreateRequest({
         requesterProfileId: "a",
         targetProfileId: "b",
+        existingActiveStatus: null,
+      }),
+    ).not.toThrow();
+  });
+
+  it("거절된 관계에는 다시 신청할 수 없다", () => {
+    const error = catchError(() =>
+      assertCanCreateRequest({
+        requesterProfileId: "a",
+        targetProfileId: "b",
+        rejectedBetween: true,
+      }),
+    );
+    expect((error as DomainError).code).toBe("FORBIDDEN");
+  });
+
+  it("숨긴 관계에는 신청할 수 없다", () => {
+    const error = catchError(() =>
+      assertCanCreateRequest({
+        requesterProfileId: "a",
+        targetProfileId: "b",
+        hiddenBetween: true,
+      }),
+    );
+    expect((error as DomainError).code).toBe("FORBIDDEN");
+  });
+
+  /**
+   * 이 테스트가 지키는 성질: **막힌 이유를 알려주지 않는다.**
+   *
+   * 문구가 갈리면 자기가 거절한 사실을 아는 사람이 「거절」이 아닌 답을 받는 것만으로
+   * 상대가 자기를 숨겼음을 추론할 수 있다. 세 경우가 글자까지 같아야 한다.
+   */
+  it("거절·숨김·둘 다에 같은 문구를 쓴다 — 이유를 구분할 수 없다", () => {
+    const messageFor = (relation: { rejectedBetween?: boolean; hiddenBetween?: boolean }) =>
+      (
+        catchError(() =>
+          assertCanCreateRequest({
+            requesterProfileId: "a",
+            targetProfileId: "b",
+            ...relation,
+          }),
+        ) as DomainError
+      ).message;
+
+    const messages = [
+      messageFor({ rejectedBetween: true }),
+      messageFor({ hiddenBetween: true }),
+      messageFor({ rejectedBetween: true, hiddenBetween: true }),
+    ];
+    expect(new Set(messages).size).toBe(1);
+    expect(messages[0]).toBe(CANNOT_REQUEST_MESSAGE);
+    // 이유를 드러내는 낱말이 들어가면 위 성질이 깨진다.
+    expect(messages[0]).not.toMatch(/거절|숨/);
+  });
+});
+
+describe("assertCanHide", () => {
+  it("자기 자신은 숨길 수 없다", () => {
+    expect(() => assertCanHide({ hiderProfileId: "a", hiddenProfileId: "a" })).toThrowError(
+      /자기 자신/,
+    );
+  });
+
+  /**
+   * 숨긴 뒤 신청이 수락되면 「숨긴 사이인데 연결된」 상태가 되고, 화면이 연결된
+   * 상대에게 해제를 주지 않아 되돌릴 수 없다. 그래서 활성 신청이 있으면 막는다.
+   */
+  it("진행 중인 신청이 있으면 숨길 수 없다", () => {
+    for (const status of ["REQUESTED", "INTRODUCED"] as const) {
+      const error = catchError(() =>
+        assertCanHide({
+          hiderProfileId: "a",
+          hiddenProfileId: "b",
+          existingActiveStatus: status,
+        }),
+      );
+      expect((error as DomainError).code).toBe("CONFLICT");
+    }
+  });
+
+  it("연결된 상대는 주선자에게 알리라고 안내한다", () => {
+    const error = catchError(() =>
+      assertCanHide({
+        hiderProfileId: "a",
+        hiddenProfileId: "b",
+        existingActiveStatus: "INTRODUCED",
+      }),
+    );
+    expect((error as DomainError).message).toMatch(/주선자/);
+  });
+
+  it("신청이 정리된 뒤에는 숨길 수 있다", () => {
+    expect(() =>
+      assertCanHide({
+        hiderProfileId: "a",
+        hiddenProfileId: "b",
         existingActiveStatus: null,
       }),
     ).not.toThrow();

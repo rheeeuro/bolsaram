@@ -17,7 +17,7 @@ export function ProfileCard({
 }: {
   profile: ProfileCardView;
   /** 돌아갈 화면. 상세의 뒤로가기가 이 값을 읽는다. */
-  from?: "favorites" | "signals";
+  from?: "favorites" | "signals" | "hidden";
 }) {
   const href = from ? `/discover/${profile.id}?from=${from}` : `/discover/${profile.id}`;
   return (

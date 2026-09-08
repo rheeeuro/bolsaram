@@ -52,8 +52,22 @@ REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
 관리자만 할 수 있다. `resolveTransition()` 이 `{from, to}` 를 돌려주고, 호출부는 그것을
 조건부 UPDATE(`WHERE status = from`)에 써서 race condition 을 DB 레벨에서 한 번 더 막는다.
 
-`assertCanCreateRequest()` 가 자기 자신·활성 중복을 막지만 최종 방어선은
-`match_requests_one_active` 부분 유니크 인덱스다.
+`assertCanCreateRequest()` 가 자기 자신·활성 중복·거절·숨김을 막지만 최종 방어선은
+`match_requests_one_active` 부분 유니크 인덱스와 `match_requests_block_closed_relations`
+트리거다.
+
+`assertCanHide()` 는 **활성 신청이 있는 상대를 숨기지 못하게** 한다. 숨긴 뒤 신청이
+수락되면 「숨긴 사이인데 연결된」 상태가 되고, 화면이 연결된 상대에게 해제를 주지 않아
+되돌릴 수 없다. 그래서 숨기기는 거절을 대신하지 않는다 — 받은 신청은 먼저 거절하고,
+보낸 신청은 먼저 취소한다.
+
+**거절과 숨김은 방향을 구분하지 않는다.** 거절된 관계에는 어느 쪽도 다시 신청할 수
+없고, 숨긴 관계는 서로 신청이 막힌다. 한쪽만 막으면 탐색 목록에서 서로 빠지는 것과
+어긋난다.
+
+거절과 숨김은 **같은 문구**(`CANNOT_REQUEST_MESSAGE`)로 거절된다. 문구가 갈리면 자기가
+거절한 사실을 아는 사람이 「거절」이 아닌 답을 받는 것만으로 상대가 자기를 숨겼음을
+추론할 수 있다. 화면도 같은 라벨 하나만 쓴다.
 
 ### `visibility.ts` — 정보 공개 단계
 
@@ -102,6 +116,10 @@ Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가",
 끼워 넣지 않는다. 반환 텍스트는 자리표시자 번호를 `startIndex` 로 이어붙일 수 있다.
 
 나이는 출생연도로 뒤집어 계산한다(`ageMin` 이 클수록 `birthYear` 는 작아진다).
+
+거절·숨김 관계 제외는 파라미터가 아니라 SQL 함수
+(`app_discover_excluded_profile_ids()`)를 부른다. 「상대가 나를 숨겼다」는 RLS 로 보이지
+않는 사실이라 서브쿼리로 직접 훑으면 그 방향이 빠진다.
 
 ---
 

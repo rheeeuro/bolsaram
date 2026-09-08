@@ -395,4 +395,38 @@ describe("가이드가 보안 약속을 정확히 설명한다", () => {
     // assertCommittable 이 강제한다(tests/import-normalization.test.ts).
     expect(guide("admin.md")).toMatch(/확인이 필요한 항목이 남아 있으면/);
   });
+
+  it("거절된 사이에는 다시 신청할 수 없다고 적혀 있다", () => {
+    // assertCanCreateRequest + match_requests_block_closed_relations 트리거가 강제한다
+    // (tests/rls.test.ts 「거절 이력이 있으면 어느 방향으로도 새 신청이 막힌다」).
+    const match = readFileSync(
+      path.join(ROOT, "packages/domain/src/match.ts"),
+      "utf8",
+    );
+    expect(match).toMatch(/rejectedBetween/);
+    expect(guide("member.md")).toMatch(/거절.*다시 신청할 수 없습니다/s);
+    expect(guide("faq.md")).toMatch(/거절.*다시 보낼 수 없/s);
+  });
+
+  it("막힌 이유를 화면이 구분하지 않는다고 적혀 있다", () => {
+    // 거절·숨김에 같은 문구를 쓴다(CANNOT_REQUEST_MESSAGE). 문구가 갈리면 자기가
+    // 거절한 사실을 아는 사람이 상대가 숨겼음을 추론할 수 있다.
+    const match = readFileSync(path.join(ROOT, "packages/domain/src/match.ts"), "utf8");
+    expect(match).toMatch(/CANNOT_REQUEST_MESSAGE/);
+    expect(guide("member.md")).toMatch(/어느 이유인지는 화면에 적지/);
+  });
+
+  it("숨긴 사실이 상대에게도 주선자에게도 보이지 않는다고 적혀 있다", () => {
+    // profile_hides_own 정책이 강제한다
+    // (tests/rls.test.ts 「숨긴 사실은 숨긴 사람만 읽는다」).
+    expect(guide("member.md")).toMatch(/상대에게는 알리지 않습니다/);
+    expect(guide("member.md")).toMatch(/주선자도 누가 누구를 숨겼는지 볼 수 없습니다/);
+    expect(guide("admin.md")).toMatch(/누가 누구를 숨겼는지는 주선자도 볼 수 없습니다/);
+  });
+
+  it("숨기기가 양방향이라고 적혀 있다", () => {
+    // app_discover_excluded_profile_ids 와 삽입 트리거가 방향을 구분하지 않는다.
+    expect(guide("member.md")).toMatch(/\*\*서로\*\* 탐색 목록에 보이지 않습니다/);
+    expect(guide("member.md")).toMatch(/\*\*서로\*\* 마음을 보낼 수 없습니다/);
+  });
 });

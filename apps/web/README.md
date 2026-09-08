@@ -48,6 +48,7 @@ apps/web/src/
 │   │   ├── discover/[id]/    상세 + 신청 모달 + 연출
 │   │   ├── signals/          받은·보낸·연결됨
 │   │   ├── favorites/        관심 목록
+│   │   ├── hidden/           숨긴 사람 (해제는 상세에서)
 │   │   └── me/               내 프로필 + 로그아웃
 │   ├── admin/                관리자 영역 (상단 네비 레이아웃)
 │   │   ├── page.tsx          대시보드 KPI
@@ -98,6 +99,7 @@ server/
 │   ├── profiles.ts           Discover·상세·관리자 목록·수정
 │   ├── matches.ts            신청 생성·전이·시그널 목록·연결 상대
 │   ├── favorites.ts          관심 토글·목록
+│   ├── hides.ts              숨기기 토글·목록 + 양방향 판정
 │   ├── imports.ts            세션·에셋·추출·검토
 │   └── telegram.ts           봇 대화 상태 + 계정 연결 조회/해제
 ├── telegram/                 텔레그램 Import 채널 (Bot API 를 아는 유일한 곳)
@@ -138,6 +140,7 @@ server/
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 관리자            | close                                |
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
+| `/api/hides`                              | GET / POST / DELETE | 회원(프로필 필요) | 숨긴 사람 목록·토글                  |
 | `/api/admin/invites`                      | POST                | 관리자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
 | `/api/imports`                            | GET / POST          | 관리자            | Inbox 목록 / 세션 생성 + 업로드 슬롯 |
 | `/api/imports/[id]`                       | GET / DELETE        | 관리자            | 원본·추출 결과 / 세션 삭제           |

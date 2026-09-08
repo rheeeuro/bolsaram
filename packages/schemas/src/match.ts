@@ -23,3 +23,8 @@ export const rejectMatchRequestSchema = z.object({
 export const favoriteToggleSchema = z.object({
   profileId: uuidSchema,
 });
+
+/** 숨기기 토글. 대상은 프로필 하나이고 관계는 양방향으로 적용된다. */
+export const profileHideSchema = z.object({
+  profileId: uuidSchema,
+});

@@ -26,12 +26,12 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 
 | 파일                           | 대상                                           | DB   | 개수 |
 | ------------------------------ | ---------------------------------------------- | ---- | ---- |
-| `match-transitions.test.ts`    | 상태 기계·행위자 권한·중복·자기 자신           | –    | 11   |
+| `match-transitions.test.ts`    | 상태 기계·행위자 권한·중복·자기 자신·거절·숨김 | –    | 18   |
 | `visibility.test.ts`           | 단계적 정보 공개·노출 규칙                     | –    | 10   |
-| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 19   |
+| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 20   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
-| `rls.test.ts`                  | RLS 정책 강제                                  | 필요 | 21   |
+| `rls.test.ts`                  | RLS 정책 강제·거절·숨김 관계                   | 필요 | 30   |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
@@ -44,7 +44,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 리다이렉트 검증       | –    | 9    |
 | `seed-admin-password.test.ts`   | 시드 관리자 비밀번호 판정·고정값 금지          | –    | 8    |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
-| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 34   |
+| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 59   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
 `setup.ts` 가 리포 루트 `.env` 를 읽어 DB 접속 정보를 채운다.
@@ -69,6 +69,10 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `rls.test.ts` 「익명은 아무 프로필도 보지 못한다」         | 로그인 없이 열람 불가 (DB 레벨)     |
 | `rls.test.ts` 「남의 명의로 신청할 수 없다」               | 신청 사칭 차단                      |
 | `rls.test.ts` 「GUC 가 남지 않는다」                       | 커넥션 재사용 시 권한 유출 없음     |
+| `rls.test.ts` 「거절 이력이 있으면 …막힌다」               | 거절 후 재신청 차단 (양방향)        |
+| `rls.test.ts` 「숨긴 사실은 숨긴 사람만 읽는다」           | 숨기기가 상대·주선자에게 통보되지 않음 |
+| `rls.test.ts` 「활성 신청이 있는 상대는 숨길 수 없다」     | 되돌릴 수 없는 「숨김 + 연결」 방지  |
+| `match-transitions.test.ts` 「거절·숨김·둘 다에 같은 문구」 | 막힌 이유가 숨김을 드러내지 않음    |
 | `visibility.test.ts` 「INTRODUCED 에서만 이름·연락처」     | 연결 전 개인정보 비공개             |
 | `import-normalization.test.ts` 「확인이 남으면 공개 불가」 | AI 자동 게시 차단                   |
 | `import-commit.test.ts` 「동시 호출에도 프로필 하나」      | commit 멱등성                       |

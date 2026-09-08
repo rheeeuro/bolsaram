@@ -13,6 +13,7 @@ import {
   type MatchActor,
 } from "@bolsaram/domain";
 import type { MatchRequestStatus } from "@bolsaram/schemas";
+import { isHiddenBetween } from "./hides";
 
 export type MatchRequestRecord = {
   id: string;
@@ -79,6 +80,20 @@ export async function findActiveBetween(
   return row ? toRecord(row) : null;
 }
 
+/**
+ * 어느 방향이든 거절된 이력이 있는가 (마이그레이션 0023).
+ *
+ * 판정을 DEFINER 함수에 맡긴다 — 정책상 당사자에게는 두 방향이 다 보이지만, 신청
+ * 차단이 호출자에게 보이는 행에 좌우되면 안 된다.
+ */
+export async function isRejectedBetween(sql: Sql, otherProfileId: string): Promise<boolean> {
+  const result = await sql.query<{ rejected: boolean }>(
+    `SELECT app_is_rejected_between($1) AS rejected`,
+    [otherProfileId],
+  );
+  return result.rows[0]?.rejected ?? false;
+}
+
 export async function createMatchRequest(
   sql: Sql,
   input: { requesterProfileId: string; targetProfileId: string; message?: string },
@@ -88,12 +103,19 @@ export async function createMatchRequest(
     input.requesterProfileId,
     input.targetProfileId,
   );
+  const [rejected, hidden] = await Promise.all([
+    isRejectedBetween(sql, input.targetProfileId),
+    isHiddenBetween(sql, input.targetProfileId),
+  ]);
 
-  // 도메인 규칙 먼저(자기 자신 / 활성 중복). DB 의 부분 유니크 인덱스가 최종 방어선이다.
+  // 도메인 규칙 먼저(자기 자신 / 활성 중복 / 거절·숨김 관계).
+  // DB 의 부분 유니크 인덱스와 삽입 트리거가 최종 방어선이다.
   assertCanCreateRequest({
     requesterProfileId: input.requesterProfileId,
     targetProfileId: input.targetProfileId,
     existingActiveStatus: existing?.status ?? null,
+    rejectedBetween: rejected,
+    hiddenBetween: hidden,
   });
 
   try {

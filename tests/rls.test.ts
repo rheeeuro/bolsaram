@@ -17,6 +17,9 @@ type Fixture = {
   p2: string;
   pOutsider: string;
   pHidden: string;
+  /** 관계가 없는 깨끗한 쌍. 거절·숨김 테스트는 쌍에 흔적을 남긴다. */
+  member4: RlsContext;
+  p4: string;
 };
 
 let fx: Fixture;
@@ -60,6 +63,7 @@ beforeAll(async () => {
     const u1 = await user("MEMBER", "m1");
     const u2 = await user("MEMBER", "m2");
     const u3 = await user("MEMBER", "m3");
+    const u4 = await user("MEMBER", "m4");
 
     return {
       adminId,
@@ -71,6 +75,8 @@ beforeAll(async () => {
       p2: await profile(u2, "ACTIVE", "LISTED"),
       pOutsider: await profile(u3, "ACTIVE", "LISTED"),
       pHidden: await profile(null, "INACTIVE", "PRIVATE"),
+      member4: { userId: u4, role: "MEMBER" as const },
+      p4: await profile(u4, "ACTIVE", "LISTED"),
     };
   });
 });
@@ -80,7 +86,7 @@ afterAll(async () => {
   await withOwner(async (sql) => {
     await sql.query(`DELETE FROM profiles WHERE real_name = $1`, [`${TAG}-이름`]);
     await sql.query(
-      `DELETE FROM users WHERE display_name IN ('admin','m1','m2','m3') AND (email LIKE $1 OR phone LIKE $2)`,
+      `DELETE FROM users WHERE display_name IN ('admin','m1','m2','m3','m4') AND (email LIKE $1 OR phone LIKE $2)`,
       [`${TAG}-%`, `${phonePrefix()}%`],
     );
     await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
@@ -322,3 +328,194 @@ function phoneFor(key: string): string {
   const n = { admin: 1, m1: 2, m2: 3, m3: 4 }[key] ?? 9;
   return `${phonePrefix()}${String(Date.now()).slice(-6)}${n}`;
 }
+
+/**
+ * 거절·숨김 관계 (마이그레이션 0023).
+ *
+ * 여기서 지키는 성질은 두 가지다 — **다시 신청할 수 없다**, 그리고 **누가 숨겼는지
+ * 알 수 없다**. 뒤쪽이 더 중요하다: 상대에게 보이면 숨기기가 통보가 된다.
+ */
+describe("거절·숨김 관계", () => {
+  it("거절 이력이 있으면 어느 방향으로도 새 신청이 막힌다", async () => {
+    await withRls(fx.member1, (sql) =>
+      sql.query(
+        `INSERT INTO match_requests (requester_profile_id, target_profile_id) VALUES ($1,$2)`,
+        [fx.p1, fx.pOutsider],
+      ),
+    );
+    await withOwner((sql) =>
+      sql.query(
+        `UPDATE match_requests SET status = 'REJECTED'
+          WHERE requester_profile_id = $1 AND target_profile_id = $2`,
+        [fx.p1, fx.pOutsider],
+      ),
+    );
+
+    // 같은 방향
+    await expect(
+      withRls(fx.member1, (sql) =>
+        sql.query(
+          `INSERT INTO match_requests (requester_profile_id, target_profile_id) VALUES ($1,$2)`,
+          [fx.p1, fx.pOutsider],
+        ),
+      ),
+    ).rejects.toThrow(/거절된 관계/);
+
+    // 반대 방향 — 거절한 쪽이 나중에 마음을 바꿔도 열리지 않는다.
+    await expect(
+      withRls(fx.outsider, (sql) =>
+        sql.query(
+          `INSERT INTO match_requests (requester_profile_id, target_profile_id) VALUES ($1,$2)`,
+          [fx.pOutsider, fx.p1],
+        ),
+      ),
+    ).rejects.toThrow(/거절된 관계/);
+  });
+
+  it("남의 이름으로 숨길 수 없다", async () => {
+    await expect(
+      withRls(fx.member2, (sql) =>
+        sql.query(
+          `INSERT INTO profile_hides (hider_profile_id, hidden_profile_id) VALUES ($1,$2)`,
+          [fx.pOutsider, fx.p2],
+        ),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("자기 자신을 숨기는 행은 제약으로 막힌다", async () => {
+    await expect(
+      withOwner((sql) =>
+        sql.query(
+          `INSERT INTO profile_hides (hider_profile_id, hidden_profile_id) VALUES ($1,$1)`,
+          [fx.p2],
+        ),
+      ),
+    ).rejects.toThrow(/profile_hides_no_self/);
+  });
+
+  it("숨긴 사실은 숨긴 사람만 읽는다 — 상대도 주선자도 보지 못한다", async () => {
+    await withRls(fx.member2, (sql) =>
+      sql.query(
+        `INSERT INTO profile_hides (hider_profile_id, hidden_profile_id) VALUES ($1,$2)`,
+        [fx.p2, fx.pOutsider],
+      ),
+    );
+
+    const mine = await withRls(fx.member2, (sql) =>
+      sql.query(`SELECT 1 FROM profile_hides`),
+    );
+    expect(mine.rowCount).toBe(1);
+
+    // 숨겨진 당사자에게는 한 행도 보이지 않는다.
+    const theirs = await withRls(fx.outsider, (sql) =>
+      sql.query(`SELECT 1 FROM profile_hides`),
+    );
+    expect(theirs.rowCount).toBe(0);
+
+    // 주선자에게도 정책을 주지 않았다. 신고가 아니라 숨기기다.
+    const admin = await withRls(fx.admin, (sql) => sql.query(`SELECT 1 FROM profile_hides`));
+    expect(admin.rowCount).toBe(0);
+  });
+
+  it("숨김 판정은 양방향이다 — 상대도 신청할 수 없다", async () => {
+    const hiddenBetween = (ctx: typeof fx.member2, other: string) =>
+      withRls(ctx, async (sql) => {
+        const r = await sql.query<{ ok: boolean }>(`SELECT app_is_hidden_between($1) AS ok`, [
+          other,
+        ]);
+        return r.rows[0]!.ok;
+      });
+
+    expect(await hiddenBetween(fx.member2, fx.pOutsider)).toBe(true);
+    // 숨겨진 쪽은 행을 볼 수 없지만 판정은 같게 나온다(DEFINER 함수).
+    expect(await hiddenBetween(fx.outsider, fx.p2)).toBe(true);
+
+    await expect(
+      withRls(fx.outsider, (sql) =>
+        sql.query(
+          `INSERT INTO match_requests (requester_profile_id, target_profile_id) VALUES ($1,$2)`,
+          [fx.pOutsider, fx.p2],
+        ),
+      ),
+    ).rejects.toThrow(/숨긴 관계/);
+  });
+
+  it("탐색 제외 목록에 거절·숨김 상대가 담긴다", async () => {
+    const excluded = (ctx: typeof fx.member1) =>
+      withRls(ctx, async (sql) => {
+        const r = await sql.query<{ id: string }>(
+          `SELECT app_discover_excluded_profile_ids() AS id`,
+        );
+        return r.rows.map((row) => row.id);
+      });
+
+    // member1 은 pOutsider 를 거절 이력으로, p2 는 앞선 테스트가 남긴 거절로 뺀다.
+    expect(await excluded(fx.member1)).toContain(fx.pOutsider);
+    // member2 는 숨김으로 pOutsider 를 뺀다.
+    expect(await excluded(fx.member2)).toContain(fx.pOutsider);
+    // 숨겨진 쪽에서도 상대가 빠진다 — 한쪽만 안 보이면 목록과 신청 가능 여부가 어긋난다.
+    expect(await excluded(fx.outsider)).toContain(fx.p2);
+  });
+
+  it("프로필이 없는 주선자에게는 제외 목록이 비어 있다", async () => {
+    const result = await withRls(fx.admin, (sql) =>
+      sql.query(`SELECT app_discover_excluded_profile_ids() AS id`),
+    );
+    expect(result.rowCount).toBe(0);
+  });
+
+  /**
+   * 숨김 + 활성 신청이 겹치면 되돌릴 수 없는 상태가 된다(0024). 두 트리거가 서로
+   * 반대 방향을 막으므로, 어느 순서로 시도해도 그 조합이 만들어지지 않아야 한다.
+   */
+  it("활성 신청이 있는 상대는 숨길 수 없다 — 순서를 바꿔도 조합이 생기지 않는다", async () => {
+    await withRls(fx.member4, (sql) =>
+      sql.query(
+        `INSERT INTO match_requests (requester_profile_id, target_profile_id) VALUES ($1,$2)`,
+        [fx.p4, fx.pOutsider],
+      ),
+    );
+
+    // 보낸 쪽도, 받은 쪽도 숨길 수 없다.
+    for (const [ctx, hider, hidden] of [
+      [fx.member4, fx.p4, fx.pOutsider],
+      [fx.outsider, fx.pOutsider, fx.p4],
+    ] as const) {
+      await expect(
+        withRls(ctx, (sql) =>
+          sql.query(
+            `INSERT INTO profile_hides (hider_profile_id, hidden_profile_id) VALUES ($1,$2)`,
+            [hider, hidden],
+          ),
+        ),
+      ).rejects.toThrow(/진행 중인 신청/);
+    }
+
+    // 신청이 정리되면 숨길 수 있다.
+    await withOwner((sql) =>
+      sql.query(
+        `UPDATE match_requests SET status = 'CANCELED'
+          WHERE requester_profile_id = $1 AND target_profile_id = $2`,
+        [fx.p4, fx.pOutsider],
+      ),
+    );
+    const after = await withRls(fx.member4, (sql) =>
+      sql.query(
+        `INSERT INTO profile_hides (hider_profile_id, hidden_profile_id) VALUES ($1,$2)`,
+        [fx.p4, fx.pOutsider],
+      ),
+    );
+    expect(after.rowCount).toBe(1);
+
+    // 그리고 숨긴 뒤에는 신청이 다시 열리지 않는다 — 반대 방향도 막힌다.
+    await expect(
+      withRls(fx.outsider, (sql) =>
+        sql.query(
+          `INSERT INTO match_requests (requester_profile_id, target_profile_id) VALUES ($1,$2)`,
+          [fx.pOutsider, fx.p4],
+        ),
+      ),
+    ).rejects.toThrow(/숨긴 관계/);
+  });
+});

@@ -47,6 +47,12 @@ describe("buildDiscoverWhere", () => {
   it("프로필이 없는 열람자는 제외 조건을 걸지 않는다", () => {
     const where = buildDiscoverWhere(parse({}), { ...CTX, viewerProfileId: null });
     expect(where.text).not.toContain("p.id <>");
+    expect(where.text).not.toContain("app_discover_excluded_profile_ids");
+  });
+
+  it("거절·숨김 관계를 목록에서 뺀다", () => {
+    const where = buildDiscoverWhere(parse({}), CTX);
+    expect(where.text).toContain("p.id NOT IN (SELECT app_discover_excluded_profile_ids())");
   });
 
   it("값은 전부 파라미터로 넘어간다 — SQL 에 리터럴이 끼지 않는다", () => {
