@@ -122,6 +122,9 @@ server/
 
 인증이 필요 없는 경로는 없다(`/api/auth/*` 제외). 미인증은 401, 회원의 관리자 경로 접근은 403.
 
+`/api/health` 는 예외다. 밖에서 「살아 있는가」를 물어야 하는 경로라 로그인을 요구하지
+않고, 대신 답에 개인정보도 설정값도 담지 않는다(상태 두 글자뿐이다).
+
 알림에는 엔드포인트가 없다 — 신청·수락 경로가 발송을 띄우고 기동 시 스윕이 밀린 것을 줍는다.
 
 텔레그램 webhook 만 세션 쿠키를 쓰지 않는다. 발신자 확인은 `setWebhook` 의 `secret_token`
@@ -155,6 +158,7 @@ server/
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |
 | `/api/uploads`                            | PUT                 | 관리자            | signed 토큰으로 직접 업로드          |
+| `/api/health`                             | GET                 | –                 | 가동 확인 (DB 핑 포함, 실패 시 503)  |
 
 ---
 

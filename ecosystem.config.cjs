@@ -47,6 +47,26 @@ module.exports = {
       ...log("bolsaram-web"),
     },
 
+    // ── 가동 감시 (상시) ───────────────────────────────────────
+    // 1분마다 /api/health 를 로컬과 공개 주소 양쪽에서 확인하고, 연속 실패가 이어지면
+    // OPS_TELEGRAM_CHAT_ID 로 알린다. **앱 코드를 부르지 않는다** — 환경변수 가드에
+    // 걸려 웹이 전부 500 이 되는 장애를 잡는 것이 목적이라, 같은 코드를 지나면 함께
+    // 죽어 아무것도 알리지 못한다.
+    {
+      name: "bolsaram-health",
+      script: "pnpm",
+      args: "health:watch",
+      cwd: ROOT,
+      interpreter: "none",
+      instances: 1,
+      autorestart: true,
+      exp_backoff_restart_delay: 3000,
+      min_uptime: "30s",
+      max_memory_restart: "200M",
+      env: { NODE_ENV: "production" },
+      ...log("bolsaram-health"),
+    },
+
     // ── DB 백업 (매일 03:40) ───────────────────────────────────
     // 정리(04:10)보다 **먼저** 돈다 — 정리가 지운 것도 하루치 백업에는 남아 있어야
     // 실수를 되돌릴 수 있다. 덤프는 var/backup 에 14개까지 쌓인다(같은 호스트다).

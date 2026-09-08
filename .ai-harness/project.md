@@ -75,6 +75,8 @@ pnpm db:backup:list    # 가진 백업 목록
 pnpm db:backup:verify  # 최근 백업을 임시 DB 로 되살려 확인
 pnpm db:purge-seed     # 합성 시드 정리 (기본은 미리보기, --yes 로 실제 삭제)
 
+pnpm health:check      # 가동 확인 1회 (앱 + 공개 주소)
+pnpm health:test       # 알림 경로 확인 (테스트 메시지 한 통)
 pnpm telegram:webhook  # 봇 webhook 등록 상태 (--set 등록, --delete 해제)
 pnpm ai:check          # OpenAI 키·모델 사용 가능 여부
 
@@ -101,6 +103,7 @@ pnpm agents:test       # 셸 가드 판정 케이스 25개
 | 앱                 | 역할             | 비고                                                 |
 | ------------------ | ---------------- | ---------------------------------------------------- |
 | `bolsaram-web`     | 웹 + API (3020)  | 상시. 코드 변경 시 빌드 후 재시작해야 반영된다       |
+| `bolsaram-health`  | 가동 감시        | 상시. 1분마다 확인, 연속 실패 시 텔레그램으로 알린다 |
 | `bolsaram-backup`  | DB 백업          | 매일 03:40 cron. 정리보다 **먼저** 돈다              |
 | `bolsaram-cleanup` | 만료 데이터 정리 | 매일 04:10 cron. 매 실행 새 프로세스라 재시작 불필요 |
 
@@ -112,7 +115,10 @@ pnpm agents:test       # 셸 가드 판정 케이스 25개
 - **환경변수 가드가 걸리면 앱이 아무것도 서비스하지 않는다** — `instrumentation` 훅에서
   던지므로 포트는 열리지만 **모든 요청이 500** 이 된다. 프로세스가 죽지 않으니
   `pm2 status` 에는 `online` 으로 보인다. 설정을 바꾼 뒤에는 상태가 아니라 **기동 로그**를
-  확인한다(실측 2026-09-07).
+  확인한다(실측 2026-09-07). `bolsaram-health` 가 이 상태를 잡아서 알린다 —
+  그래서 감시기는 앱 코드를 부르지 않는다(같은 가드에 걸려 함께 죽으면 안 된다).
+- 알림받을 곳은 `.env` 의 `OPS_TELEGRAM_CHAT_ID` 다. 비어 있으면 감시는 돌지만
+  로그에만 남는다. 붙인 뒤 `pnpm health:test` 로 실제로 도착하는지 확인한다.
 - **다른 프로젝트 앱(jongalab·trading·kiwoom)을 건드리지 않는다.** 항상 이름을 지정해 조작한다.
 
 ## 에이전트 하네스
@@ -180,7 +186,7 @@ packages/
 db/migrations/    번호순 SQL. 적용된 파일은 절대 수정하지 않고 새 파일을 추가합니다.
 tests/            vitest. 도메인 단위 + DB 통합
 .agent-config/    에이전트 하네스 원본 (위 참고)
-scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인)
+scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시)
 ecosystem.config.cjs  PM2 정의
 var/             private 스토리지 · DB 백업 · PM2 로그 (git 제외, 열람 금지)
 ```

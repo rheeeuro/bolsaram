@@ -33,7 +33,7 @@
     "pm2:start": "pm2 start ecosystem.config.cjs && pm2 save",
     "pm2:restart": "pm2 restart bolsaram-web",
     "pm2:stop": "pm2 stop bolsaram-web",
-    "pm2:status": "pm2 status bolsaram-web bolsaram-cleanup",
+    "pm2:status": "pm2 status bolsaram-web bolsaram-health bolsaram-cleanup",
     "pm2:logs": "pm2 logs bolsaram-web --lines 50",
     "pm2:save": "pm2 save",
     "deploy:web": "pnpm build && pm2 restart bolsaram-web",
@@ -41,7 +41,10 @@
     "agents:check": "python3 .agent-config/sync.py --check",
     "agents:test": "python3 .agent-config/guard-cases.py",
     "telegram:webhook": "tsx scripts/telegram-webhook.ts",
-    "ai:check": "tsx scripts/ai-check.ts"
+    "ai:check": "tsx scripts/ai-check.ts",
+    "health:check": "tsx scripts/health-watch.ts --once",
+    "health:watch": "tsx scripts/health-watch.ts",
+    "health:test": "tsx scripts/health-watch.ts --test-alert"
   },
   "devDependencies": {
     "@bolsaram/db": "workspace:^",
