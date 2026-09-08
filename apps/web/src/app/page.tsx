@@ -54,15 +54,21 @@ export default async function IntroPage() {
             주선자로 시작하기
           </Link>
           <Link
-            href="/login"
+            href="/enter"
             className="flex h-13 items-center justify-center rounded-xl border border-[var(--surface-border)] bg-white py-3.5 text-[15px] font-medium text-[var(--color-ink-800)] transition-colors hover:bg-[var(--color-ivory-100)]"
           >
-            로그인 · 입장코드
+            입장코드로 들어가기
           </Link>
-          <p className="mt-2 text-center text-[12px] leading-relaxed text-[var(--color-ink-600)]">
+          <p className="mt-1 text-center text-[13px] text-[var(--color-ink-600)]">
+            주선자 계정이 있으신가요?{" "}
+            <Link href="/login" className="text-[var(--color-rose-600)] underline">
+              로그인
+            </Link>
+          </p>
+          <p className="mt-3 text-center text-[12px] leading-relaxed text-[var(--color-ink-600)]">
             볼사람은 주선자가 검증한 분만 참여하는 비공개 서비스입니다.
             <br />
-            회원은 아이디·비밀번호가 없습니다 — 초대 링크를 열거나 받은 입장코드를 넣어 주세요.
+            회원은 아이디·비밀번호가 없습니다 — 초대 링크를 열면 바로 들어갑니다.
           </p>
         </div>
       </div>

@@ -58,7 +58,9 @@ export async function requireMemberProfile(): Promise<Viewer & { profileId: stri
 /** 페이지(서버 컴포넌트)용. 실패 시 예외 대신 리다이렉트한다. */
 export async function requireUserPage(next?: string): Promise<Viewer> {
   const user = await readSession();
-  if (!user) redirect(loginPath(next));
+  // 회원 화면이다 — 회원에게는 이메일·비밀번호가 없으므로 입장코드 화면으로 보낸다.
+  // 주선자가 회원 화면(`/me`)에서 만료됐다면 그 화면의 링크로 로그인으로 넘어간다.
+  if (!user) redirect(enterPath(next));
   return user;
 }
 
@@ -71,6 +73,10 @@ export async function requireAdminPage(next?: string): Promise<Viewer> {
 
 function loginPath(next?: string): string {
   return next ? `/login?next=${encodeURIComponent(next)}` : "/login";
+}
+
+function enterPath(next?: string): string {
+  return next ? `/enter?next=${encodeURIComponent(next)}` : "/enter";
 }
 
 /** RLS GUC 에 넣을 컨텍스트로 변환한다. */

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/field";
 import { apiPost } from "@/lib/api-client";
 
 /**
@@ -11,7 +12,15 @@ import { apiPost } from "@/lib/api-client";
  * 로그인 화면을 거치지 않는다 — 이 버튼이 곧 로그인이다. 링크를 소비하면 세션이
  * 생기고, 처음이면 회원 계정도 함께 만들어진다.
  */
-export function ClaimForm({ token, alreadyLinked }: { token: string; alreadyLinked: boolean }) {
+export function ClaimForm({
+  token,
+  alreadyLinked,
+  next,
+}: {
+  token: string;
+  alreadyLinked: boolean;
+  next: string | null;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,22 +34,20 @@ export function ClaimForm({ token, alreadyLinked }: { token: string; alreadyLink
           void (async () => {
             setBusy(true);
             setError(null);
-            const result = await apiPost<{ firstTime: boolean }>("/api/claim", {
-              token: decodeURIComponent(token),
-            });
-            setBusy(false);
+            const result = await apiPost<{ firstTime: boolean }>("/api/claim", { token });
             if (!result.ok) {
+              setBusy(false);
               setError(result.message);
               return;
             }
-            // 처음이면 내 프로필을 확인하게, 재로그인이면 바로 탐색으로 보낸다.
-            router.replace(result.data.firstTime ? "/me" : "/discover");
+            // 처음이면 내 프로필을 확인하게, 재로그인이면 보려던 화면으로 보낸다.
+            router.replace(result.data.firstTime ? "/me" : (next ?? "/discover"));
           })();
         }}
       >
         {busy ? "들어가는 중…" : alreadyLinked ? "볼사람 시작하기" : "내 프로필로 시작하기"}
       </Button>
-      {error ? <p className="text-[13px] text-[var(--color-danger)]">{error}</p> : null}
+      <FormError>{error}</FormError>
     </div>
   );
 }

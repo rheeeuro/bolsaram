@@ -41,6 +41,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
+| `auth-links.test.ts`           | 입장코드 정규화·`?next=` 리다이렉트 검증       | –    | 9    |
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 34   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 

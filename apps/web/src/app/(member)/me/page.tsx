@@ -38,7 +38,7 @@ export default async function MePage() {
         {!profile ? (
           <Empty
             title="연결된 프로필이 없습니다"
-            description="주선자에게 받은 초대 링크로 본인 프로필을 연결해 주세요."
+            description="주선자에게 받은 초대 링크나 입장코드로 본인 프로필을 연결해 주세요."
           />
         ) : (
           <>
@@ -111,7 +111,7 @@ export default async function MePage() {
         )}
 
         <div className="mt-10 border-t border-[var(--surface-border)] pt-6">
-          <LogoutButton />
+          <LogoutButton needsInviteAgain={viewer.role !== "ADMIN"} />
         </div>
       </main>
     </>

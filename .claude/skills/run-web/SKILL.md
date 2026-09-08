@@ -23,21 +23,24 @@ curl -s -c /tmp/admin.jar -H 'content-type: application/json' \
   -d '{"email":"admin@bolsaram.local","password":"bolsaram-admin"}' \
   http://127.0.0.1:3020/api/auth/admin-login
 
-# 회원 (APP_ENV 가 production 이 아니면 devCode 가 응답에 들어온다)
-CODE=$(curl -s -c /tmp/m.jar -H 'content-type: application/json' \
-  -d '{"phone":"01020001000"}' http://127.0.0.1:3020/api/auth/otp/request \
-  | python3 -c 'import sys,json;print(json.load(sys.stdin)["devCode"])')
-curl -s -b /tmp/m.jar -c /tmp/m.jar -H 'content-type: application/json' \
-  -d "{\"phone\":\"01020001000\",\"code\":\"$CODE\"}" \
-  http://127.0.0.1:3020/api/auth/otp/verify
+# 회원 — 비밀번호가 없다. 주선자로 초대를 발급해 그 토큰을 소비한다(1회용).
+TOKEN=$(curl -s -b /tmp/admin.jar -H 'content-type: application/json' \
+  -d '{"profileId":"<프로필 UUID>","expiresInHours":72}' \
+  http://127.0.0.1:3020/api/admin/invites \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
+curl -s -c /tmp/m.jar -H 'content-type: application/json' \
+  -d "{\"token\":\"$TOKEN\"}" http://127.0.0.1:3020/api/claim
 ```
 
-시드 회원은 `01020001000` ~ `01020001005`. 신청/수락을 확인하려면 서로 다른 두 계정이 필요하다.
+프로필 UUID 는 `db-query` 스킬로 찾는다(`SELECT id, public_code FROM profiles LIMIT 5`).
+토큰은 **입장코드와 같은 값**이고 한 번 쓰면 무효다 — 다시 로그인하려면 새로 발급한다.
+신청/수락을 확인하려면 서로 다른 두 계정이 필요하다.
 
 ## 확인할 것
 
 변경한 화면에 따라 골라 확인하고, **결과를 추측하지 말고 실제 응답을 인용**한다.
 
+- 인증 화면: `/` `/enter`(회원 입장코드) `/login`(주선자) `/signup` `/claim/<토큰>`
 - 회원 화면: `/discover` `/discover/<id>` `/signals` `/favorites` `/me`
 - 관리자 화면: `/admin` `/admin/imports` `/admin/profiles` `/admin/requests` `/admin/members`
 - 권한: 쿠키 없이 호출해 401, 회원 쿠키로 `/admin` 호출해 `/discover` 리다이렉트인지

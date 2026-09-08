@@ -41,7 +41,9 @@ export function Field({
       {label ? <Label {...(hint ? { hint } : {})}>{label}</Label> : null}
       {children}
       {error ? (
-        <span className="mt-1 block text-[12px] text-[var(--color-danger)]">{error}</span>
+        <span role="alert" className="mt-1 block text-[12px] text-[var(--color-danger)]">
+          {error}
+        </span>
       ) : null}
     </label>
   );
@@ -57,4 +59,17 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={cn(CONTROL, "appearance-none pr-8", className)} {...props} />;
+}
+
+/**
+ * 폼 전체에 대한 오류. 특정 입력에 붙지 않는 실패(인증 거절·시도 제한 등)에 쓴다.
+ * `role="alert"` 로 두어 화면을 보지 않는 사용자에게도 실패가 전달되게 한다.
+ */
+export function FormError({ children }: { children?: string | null }) {
+  if (!children) return null;
+  return (
+    <p role="alert" className="text-[13px] leading-relaxed text-[var(--color-danger)]">
+      {children}
+    </p>
+  );
 }

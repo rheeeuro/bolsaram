@@ -38,9 +38,10 @@ apps/web/src/
 │   ├── page.tsx              인트로 (로그인 상태면 역할별 리다이렉트)
 │   ├── layout.tsx            폰트·메타데이터·noindex
 │   ├── globals.css           Tailwind + 디자인 토큰 + 전역 스타일
-│   ├── login/                주선자 로그인 (회원은 초대 링크로 들어온다)
+│   ├── login/                주선자 로그인 (이메일·비밀번호)
+│   ├── enter/                회원 입장 — 입장코드 하나만 묻는다
 │   ├── signup/               주선자 가입 → 모임 생성
-│   ├── claim/[token]/        초대 링크 → 프로필 연결
+│   ├── claim/[token]/        초대 링크 → 프로필 연결 (실패 시 /enter 로 코드 유지)
 │   ├── (member)/             회원 영역 (하단 탭 레이아웃)
 │   │   ├── discover/         프로필 목록 + 필터 시트
 │   │   ├── discover/[id]/    상세 + 신청 모달 + 연출
@@ -56,12 +57,14 @@ apps/web/src/
 │   │   └── group/            모임 설정 · 주선자 구성원 · 초대 코드
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell)
 │   ├── member/               회원 화면 (감성 톤)
 │   └── admin/                관리자 화면 (CRM 톤)
 ├── lib/
 │   ├── api-client.ts         fetch 래퍼 — 오류를 판별 가능한 결과로 변환
 │   ├── labels.ts             열거형 → 한글 라벨
+│   ├── invite-code.ts        입장코드 정규화 (링크·공백 섞여 들어온 값에서 코드만)
+│   ├── next-path.ts          `?next=` 검증 — 같은 출처 경로만
 │   └── cn.ts                 Tailwind 클래스 병합
 └── server/                   서버 전용 (아래 참고)
 ```
@@ -81,6 +84,7 @@ server/
 │   ├── group-invite.ts       모임 초대 코드 발급·소비, 내 모임 조회
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
+│                             (미로그인: 회원 화면 → /enter, 관리자 화면 → /login)
 ├── storage/local.ts          private 저장소 + signed download/upload URL
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
@@ -131,7 +135,7 @@ server/
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 관리자            | close                                |
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
-| `/api/admin/invites`                      | POST                | 관리자            | 초대 링크 발급                       |
+| `/api/admin/invites`                      | POST                | 관리자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
 | `/api/imports`                            | GET / POST          | 관리자            | Inbox 목록 / 세션 생성 + 업로드 슬롯 |
 | `/api/imports/[id]`                       | GET / DELETE        | 관리자            | 원본·추출 결과 / 세션 삭제           |
 | `/api/imports/[id]/assets`                | POST / DELETE       | 관리자            | 업로드 확정·슬롯 추가 / 제거         |

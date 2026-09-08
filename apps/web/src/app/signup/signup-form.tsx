@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SIGNUP_PASSWORD_MIN } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Field, FormError, Input } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { apiPost } from "@/lib/api-client";
 
 /**
@@ -52,6 +53,7 @@ export function SignupForm() {
           value={displayName}
           maxLength={60}
           autoComplete="name"
+          autoFocus
           onChange={(e) => setDisplayName(e.target.value)}
         />
       </Field>
@@ -68,19 +70,22 @@ export function SignupForm() {
       </Field>
 
       <Field label="비밀번호" hint={`${SIGNUP_PASSWORD_MIN}자 이상`}>
-        <Input
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" />
       </Field>
 
-      {error ? <p className="text-[13px] text-[var(--color-danger)]">{error}</p> : null}
+      <FormError>{error}</FormError>
 
       <Button type="submit" size="lg" className="w-full" disabled={!ready || busy}>
         {busy ? "가입 중…" : "가입하기"}
       </Button>
+
+      {/* 버튼이 잠긴 이유를 화면에서 말해준다 — 비활성 버튼만 보여주지 않는다. */}
+      {!ready ? (
+        <p className="text-[12px] leading-relaxed text-[var(--color-ink-600)]">
+          이름, 이메일, {SIGNUP_PASSWORD_MIN}자 이상의 비밀번호를 모두 채우면 가입할 수
+          있습니다.
+        </p>
+      ) : null}
 
       <p className="text-[12px] leading-relaxed text-[var(--color-ink-600)]">
         가입하면 전체공개 프로필을 둘러볼 수 있습니다. 모임은 그 뒤에 만들거나 초대
