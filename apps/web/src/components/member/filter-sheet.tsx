@@ -128,6 +128,7 @@ export function FilterSheet({
             valueMin={draft.heightMin}
             valueMax={draft.heightMax}
             onChange={(lo, hi) => setDraft((p) => ({ ...p, heightMin: lo, heightMax: hi }))}
+            note="키가 적혀 있지 않은 분은 키 조건을 걸면 나오지 않습니다."
           />
 
           <ChipGroup
@@ -235,6 +236,7 @@ function RangeGroup({
   valueMin,
   valueMax,
   onChange,
+  note,
 }: {
   title: string;
   unit: string;
@@ -243,7 +245,9 @@ function RangeGroup({
   valueMin: number;
   valueMax: number;
   onChange: (lo: number, hi: number) => void;
+  note?: string;
 }) {
+  const narrowed = valueMin > min || valueMax < max;
   return (
     <section className="mb-6">
       <div className="mb-2 flex items-baseline justify-between">
@@ -272,6 +276,9 @@ function RangeGroup({
           className="accent-[var(--color-rose-500)]"
         />
       </div>
+      {note && narrowed ? (
+        <p className="mt-2 text-[11.5px] leading-relaxed text-[var(--color-ink-500)]">{note}</p>
+      ) : null}
     </section>
   );
 }

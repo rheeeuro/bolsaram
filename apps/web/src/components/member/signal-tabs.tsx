@@ -9,6 +9,7 @@ import { Empty } from "@/components/ui/empty";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
+import { MatchMoment } from "@/components/member/match-moment";
 import type { ProfileCardView } from "@/server/views/profile-view";
 
 export type SignalItem = {
@@ -79,6 +80,7 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [matched, setMatched] = useState(false);
 
   async function act(action: "accept" | "reject" | "cancel") {
     setBusy(true);
@@ -89,6 +91,12 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
       setError(result.message);
       return;
     }
+    // 수락은 감정의 정점이다. 연출을 닫을 때 목록을 갱신한다 —
+    // 먼저 갱신하면 이 행이 「이어짐」 탭으로 사라지면서 연출도 같이 사라진다.
+    if (action === "accept") {
+      setMatched(true);
+      return;
+    }
     router.refresh();
   }
 
@@ -96,7 +104,11 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
     <li className="rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-white p-3.5">
       <div className="flex gap-3">
         <Link
-          href={item.profile ? `/discover/${item.profile.id}` : "#"}
+          href={
+            item.profile
+              ? `/discover/${item.profile.id}?from=signals&tab=${direction}`
+              : "#"
+          }
           className="h-18 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--color-ivory-200)]"
         >
           {item.profile?.primaryImage ? (
@@ -175,6 +187,15 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
           ) : null}
         </div>
       </div>
+
+      <MatchMoment
+        open={matched}
+        variant="matched"
+        onClose={() => {
+          setMatched(false);
+          router.refresh();
+        }}
+      />
     </li>
   );
 }

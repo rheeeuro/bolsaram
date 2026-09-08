@@ -210,6 +210,21 @@ export async function listSignals(
 }
 
 /** 관리자 신청 목록. 처리 대기 중인 것을 위로 올린다. */
+/**
+ * 아직 답하지 않은 받은 신청 수. 하단 탭 배지에 쓴다.
+ *
+ * 회원에게는 알림을 보내지 않으므로(주선자만 텔레그램으로 받는다) 회원이 새 신청을
+ * 알아차릴 곳은 이 배지뿐이다.
+ */
+export async function countPendingIncoming(sql: Sql, profileId: string): Promise<number> {
+  const result = await sql.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM match_requests
+      WHERE target_profile_id = $1 AND status = 'REQUESTED'`,
+    [profileId],
+  );
+  return result.rows[0]?.count ?? 0;
+}
+
 export async function listForAdmin(
   sql: Sql,
   filter: { status?: MatchRequestStatus[] },

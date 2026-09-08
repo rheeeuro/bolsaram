@@ -27,7 +27,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // maximumScale 을 두지 않는다 — 사진과 소개글을 읽는 화면에서 확대를 막으면 안 된다.
+  // 입력 포커스 시 iOS 자동 확대는 globals.css 가 폼 컨트롤을 16px 로 올려 막는다.
   themeColor: "#fdfbf7",
 };
 

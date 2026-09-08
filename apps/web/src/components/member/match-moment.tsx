@@ -4,11 +4,34 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
- * 신청 직후 연출 (UI 컨셉 06).
- * 감정 구간이라 유일하게 긴 모션(--duration-emotive)을 쓴다.
- * 실제 "매칭 성공"은 상대 수락 이후이므로 문구로 단계를 정확히 말한다.
+ * 감정 구간 연출 (UI 컨셉 06). 유일하게 긴 모션(--duration-emotive)을 쓴다.
+ *
+ * 두 번 나타난다 — 마음을 보낸 직후와, 받은 마음을 수락한 직후.
+ * 컨셉의 "매칭 성공"은 뒤쪽이므로 문구로 단계를 정확히 갈라 말한다.
+ * 방송식 "IT'S A MATCH" 대신 한글 문장을 쓴다(설계문서 §13).
  */
-export function MatchMoment({ open, onClose }: { open: boolean; onClose: () => void }) {
+export type MomentVariant = "sent" | "matched";
+
+const COPY: Record<MomentVariant, { headline: [string, string]; body: [string, string] }> = {
+  sent: {
+    headline: ["마음을", "보냈습니다"],
+    body: ["상대방이 수락하면", "주선자가 두 분을 연결해드릴게요."],
+  },
+  matched: {
+    headline: ["서로의 마음이", "닿았습니다"],
+    body: ["주선자에게 알렸어요.", "곧 두 분을 연결해드릴게요."],
+  },
+};
+
+export function MatchMoment({
+  open,
+  variant = "sent",
+  onClose,
+}: {
+  open: boolean;
+  variant?: MomentVariant;
+  onClose: () => void;
+}) {
   // ESC 로도 닫을 수 있게 한다.
   useEffect(() => {
     if (!open) return;
@@ -21,6 +44,8 @@ export function MatchMoment({ open, onClose }: { open: boolean; onClose: () => v
 
   if (!open) return null;
 
+  const copy = COPY[variant];
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center px-8 text-center"
@@ -31,9 +56,9 @@ export function MatchMoment({ open, onClose }: { open: boolean; onClose: () => v
     >
       <div className="animate-rise">
         <p className="display text-[34px] leading-tight tracking-wide text-[var(--color-ivory-100)]">
-          마음을
+          {copy.headline[0]}
           <br />
-          보냈습니다
+          {copy.headline[1]}
         </p>
 
         <svg
@@ -53,9 +78,9 @@ export function MatchMoment({ open, onClose }: { open: boolean; onClose: () => v
         </svg>
 
         <p className="text-[14px] leading-relaxed text-[var(--color-ivory-300)]">
-          상대방이 수락하면
+          {copy.body[0]}
           <br />
-          주선자가 두 분을 연결해드릴게요.
+          {copy.body[1]}
         </p>
       </div>
 

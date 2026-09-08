@@ -11,7 +11,13 @@ const TABS = [
   { href: "/me", label: "내 프로필" },
 ] as const;
 
-export function MemberNav({ claimed }: { claimed: boolean }) {
+export function MemberNav({
+  claimed,
+  pendingSignals = 0,
+}: {
+  claimed: boolean;
+  pendingSignals?: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -38,7 +44,17 @@ export function MemberNav({ claimed }: { claimed: boolean }) {
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <TabIcon name={tab.label} active={active} />
+                <span className="relative">
+                  <TabIcon name={tab.label} active={active} />
+                  {tab.href === "/signals" && pendingSignals > 0 ? (
+                    <span
+                      className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--color-rose-500)] px-1 text-[10px] font-medium text-white"
+                      aria-label={`답하지 않은 신청 ${pendingSignals}건`}
+                    >
+                      {pendingSignals > 9 ? "9+" : pendingSignals}
+                    </span>
+                  ) : null}
+                </span>
                 {tab.label}
               </Link>
             </li>

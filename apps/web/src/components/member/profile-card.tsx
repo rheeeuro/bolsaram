@@ -11,10 +11,18 @@ import type { ProfileCardView } from "@/server/views/profile-view";
  * Discover 카드 (UI 컨셉 02).
  * 리스트는 빠르고 기능적으로 — 공개 범위는 익명 코드/사진/출생연도/키/직업군/지역까지.
  */
-export function ProfileCard({ profile }: { profile: ProfileCardView }) {
+export function ProfileCard({
+  profile,
+  from,
+}: {
+  profile: ProfileCardView;
+  /** 돌아갈 화면. 상세의 뒤로가기가 이 값을 읽는다. */
+  from?: "favorites" | "signals";
+}) {
+  const href = from ? `/discover/${profile.id}?from=${from}` : `/discover/${profile.id}`;
   return (
     <article className="group relative">
-      <Link href={`/discover/${profile.id}`} className="block">
+      <Link href={href} className="block">
         <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
           {profile.primaryImage ? (
             // signed URL 은 매 요청마다 새로 발급된다. next/image 최적화를 쓰면
@@ -36,7 +44,7 @@ export function ProfileCard({ profile }: { profile: ProfileCardView }) {
 
       <FavoriteButton profileId={profile.id} initial={profile.isFavorited} />
 
-      <Link href={`/discover/${profile.id}`} className="mt-2.5 block">
+      <Link href={href} className="mt-2.5 block">
         <p className="display text-[15px] text-[var(--color-ink-900)]">{profile.code}</p>
         <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">
           {profile.birthYear}년생{profile.height ? ` · ${profile.height}cm` : ""}

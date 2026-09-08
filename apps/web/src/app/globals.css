@@ -47,6 +47,16 @@
     font: inherit;
     color: inherit;
   }
+
+  /* 확대를 막지 않는 대신, 모바일에서 포커스 시 iOS 가 화면을 당기지 않도록
+     폼 컨트롤만 16px 로 올린다. 이 값 아래면 Safari 가 자동 확대한다. */
+  @media (max-width: 640px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
 }
 
 @layer components {
