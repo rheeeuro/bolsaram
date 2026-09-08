@@ -11,11 +11,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { closePools, withOwner } from "../client";
 import { loadDotEnv } from "./dotenv";
+import { resolveSeedAdminPassword, seedAdminPasswordFromEnv } from "./seed-admin-password";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 
 const ADMIN_EMAIL = "admin@bolsaram.local";
-const ADMIN_PASSWORD = "bolsaram-admin";
 
 /** 실존 인물과 겹치지 않도록 지어낸 두 글자 이름. */
 const GIVEN_NAMES = [
@@ -120,14 +120,38 @@ async function main(): Promise<void> {
     }
 
     // ── 관리자 ──────────────────────────────────────────────
-    const admin = await sql.query<{ id: string }>(
-      `INSERT INTO users (role, email, password_hash, display_name)
-       VALUES ('ADMIN', $1, $2, '주선자')
-       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
-       RETURNING id`,
-      [ADMIN_EMAIL, hashPassword(ADMIN_PASSWORD)],
+    // 계정이 이미 있으면 비밀번호를 그대로 둔다. 새로 만들 때만 값을 정하고 알려준다.
+    const existingAdmin = await sql.query<{ id: string }>(
+      `SELECT id FROM users WHERE email = $1`,
+      [ADMIN_EMAIL],
     );
-    const adminId = admin.rows[0]!.id;
+    let adminId: string;
+    let adminPasswordLine: string;
+    if (existingAdmin.rows[0]) {
+      adminId = existingAdmin.rows[0].id;
+      if (seedAdminPasswordFromEnv()) {
+        const { password } = resolveSeedAdminPassword();
+        await sql.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [
+          adminId,
+          hashPassword(password),
+        ]);
+        adminPasswordLine = `  관리자 — ${ADMIN_EMAIL} / SEED_ADMIN_PASSWORD 값으로 교체했습니다`;
+      } else {
+        adminPasswordLine = `  관리자 — ${ADMIN_EMAIL} / 기존 비밀번호를 그대로 둡니다`;
+      }
+    } else {
+      const { password, fromEnv } = resolveSeedAdminPassword();
+      const created = await sql.query<{ id: string }>(
+        `INSERT INTO users (role, email, password_hash, display_name)
+         VALUES ('ADMIN', $1, $2, '주선자')
+         RETURNING id`,
+        [ADMIN_EMAIL, hashPassword(password)],
+      );
+      adminId = created.rows[0]!.id;
+      adminPasswordLine = fromEnv
+        ? `  관리자 — ${ADMIN_EMAIL} / SEED_ADMIN_PASSWORD 값`
+        : `  관리자 — ${ADMIN_EMAIL} / ${password}  ← 이번 실행에서만 보여줍니다`;
+    }
 
     // ── 프로필 ──────────────────────────────────────────────
     const profileIds: string[] = [];
@@ -236,7 +260,7 @@ async function main(): Promise<void> {
         "시드 완료",
         `  프로필 ${total}개 (공개 20 / 대기 4), 사진 ${total * 2}장`,
         `  회원 계정 6개 — 로그인 번호 01020001000 ~ 01020001005`,
-        `  관리자 — ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`,
+        adminPasswordLine,
         "",
         "  모든 인물 정보와 사진은 합성 데이터입니다.",
         `  회원은 비밀번호가 없습니다 — 관리자 화면에서 초대 링크를 발급해 로그인합니다.`,

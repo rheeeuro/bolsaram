@@ -43,6 +43,13 @@ export function AuthShell({
         {children}
 
         {footer ? <div className="mt-8 flex flex-col gap-2.5">{footer}</div> : null}
+
+        {/* 무엇을 모으는지는 들어오기 전에 읽을 수 있어야 한다. */}
+        <p className="mt-10 text-[12px] text-[var(--color-ink-500)]">
+          <Link href="/privacy" className="underline">
+            개인정보 처리방침
+          </Link>
+        </p>
       </div>
     </main>
   );

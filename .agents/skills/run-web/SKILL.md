@@ -17,10 +17,19 @@ description: 볼사람 웹 앱을 띄우고 실제 화면·API 동작을 확인�
 
 ## 로그인
 
+주선자 비밀번호는 저장소에 없다. 시드가 계정을 만들 때 한 번 출력하고, 이 호스트의
+값은 교체돼 있다. 확인용 계정이 필요하면 `/api/auth/signup` 으로 새로 만든다.
+
 ```bash
-# 주선자
+# 주선자 — 확인용 계정을 만들어 쓴다(가입은 열려 있다. 비밀번호는 10자 이상)
+PW="$(openssl rand -base64 12 | tr -d '/+=')"
 curl -s -c /tmp/admin.jar -H 'content-type: application/json' \
-  -d '{"email":"admin@bolsaram.local","password":"bolsaram-admin"}' \
+  -d "{\"email\":\"check-$$@bolsaram.local\",\"password\":\"$PW\",\"displayName\":\"점검\"}" \
+  http://127.0.0.1:3020/api/auth/signup
+
+# 이미 아는 계정으로 들어갈 때
+curl -s -c /tmp/admin.jar -H 'content-type: application/json' \
+  -d "{\"email\":\"admin@bolsaram.local\",\"password\":\"$PW\"}" \
   http://127.0.0.1:3020/api/auth/admin-login
 
 # 회원 — 비밀번호가 없다. 주선자로 초대를 발급해 그 토큰을 소비한다(1회용).

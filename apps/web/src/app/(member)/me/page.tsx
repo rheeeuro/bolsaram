@@ -112,6 +112,11 @@ export default async function MePage() {
 
         <div className="mt-10 border-t border-[var(--surface-border)] pt-6">
           <LogoutButton needsInviteAgain={viewer.role !== "ADMIN"} />
+          <p className="mt-6 text-[12px] text-[var(--color-ink-500)]">
+            <Link href="/privacy" className="underline">
+              개인정보 처리방침
+            </Link>
+          </p>
         </div>
       </main>
     </>

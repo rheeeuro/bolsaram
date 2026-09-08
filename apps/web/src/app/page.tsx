@@ -70,6 +70,11 @@ export default async function IntroPage() {
             <br />
             회원은 아이디·비밀번호가 없습니다 — 초대 링크를 열면 바로 들어갑니다.
           </p>
+          <p className="text-center text-[12px] text-[var(--color-ink-600)]">
+            <Link href="/privacy" className="underline">
+              개인정보 처리방침
+            </Link>
+          </p>
         </div>
       </div>
     </main>

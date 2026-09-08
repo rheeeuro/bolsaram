@@ -42,6 +42,7 @@ apps/web/src/
 │   ├── enter/                회원 입장 — 입장코드 하나만 묻는다
 │   ├── signup/               주선자 가입 → 모임 생성
 │   ├── claim/[token]/        초대 링크 → 프로필 연결 (실패 시 /enter 로 코드 유지)
+│   ├── privacy/              개인정보 처리방침 — docs/guide/privacy.md 를 그대로 렌더 (로그인 불필요)
 │   ├── (member)/             회원 영역 (하단 탭 레이아웃)
 │   │   ├── discover/         프로필 목록 + 필터 시트
 │   │   ├── discover/[id]/    상세 + 신청 모달 + 연출
@@ -57,7 +58,7 @@ apps/web/src/
 │   │   └── group/            모임 설정 · 주선자 구성원 · 초대 코드
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell·markdown)
 │   ├── member/               회원 화면 (감성 톤)
 │   └── admin/                관리자 화면 (CRM 톤)
 ├── lib/
@@ -65,6 +66,7 @@ apps/web/src/
 │   ├── labels.ts             열거형 → 한글 라벨
 │   ├── invite-code.ts        입장코드 정규화 (링크·공백 섞여 들어온 값에서 코드만)
 │   ├── next-path.ts          `?next=` 검증 — 같은 출처 경로만
+│   ├── markdown.ts           가이드 문서 마크다운 부분집합 → 블록 배열
 │   └── cn.ts                 Tailwind 클래스 병합
 └── server/                   서버 전용 (아래 참고)
 ```
@@ -85,6 +87,7 @@ server/
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
 │                             (미로그인: 회원 화면 → /enter, 관리자 화면 → /login)
+├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)
 ├── storage/local.ts          private 저장소 + signed download/upload URL
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
