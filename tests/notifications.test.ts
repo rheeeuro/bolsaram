@@ -4,7 +4,7 @@
  * 여기서 지키는 성질:
  *   * 신청이 생기면 **회원의 RLS 컨텍스트에서** 담당 주선자에게 알림 행이 생긴다.
  *     회원은 그 행을 만들 권한이 없고, 트리거가 대신 만든다.
- *   * 수락도 알림을 만든다 — 연결은 주선자만 할 수 있으므로 이게 없으면 흐름이 멈춘다.
+ *   * 수락(=연결)도 알림을 만든다 — 실제 소개는 사람이 하므로 주선자가 알아야 한다.
  *   * 거절·취소는 알림을 만들지 않는다.
  *   * 같은 사건으로 두 번 보내지 않는다.
  *   * 알림은 담당 주선자에게만 간다(남의 모임 주선자에게 새지 않는다).
@@ -156,10 +156,10 @@ describe("신청이 알림을 만든다", () => {
     expect(recipients).not.toContain(B.adminId);
   });
 
-  it("수락하면 연결을 요청하는 알림이 하나 더 생긴다", async () => {
+  it("수락해 연결되면 알림이 하나 더 생긴다", async () => {
     const id = await requestAs(A);
     await withRls(A.member, (sql) =>
-      sql.query(`UPDATE match_requests SET status = 'ACCEPTED' WHERE id = $1 AND status = 'REQUESTED'`, [id]),
+      sql.query(`UPDATE match_requests SET status = 'INTRODUCED' WHERE id = $1 AND status = 'REQUESTED'`, [id]),
     );
     const kinds = (await notifications(id)).map((r) => r.kind);
     expect(kinds).toContain("MATCH_ACCEPTED");
@@ -170,9 +170,9 @@ describe("신청이 알림을 만든다", () => {
     const id = await requestAs(A);
     // 트리거가 두 번 돌아도 유니크 인덱스가 접는다.
     await withOwner(async (sql) => {
-      await sql.query(`UPDATE match_requests SET status = 'ACCEPTED' WHERE id = $1`, [id]);
+      await sql.query(`UPDATE match_requests SET status = 'INTRODUCED' WHERE id = $1`, [id]);
       await sql.query(`UPDATE match_requests SET status = 'REQUESTED' WHERE id = $1`, [id]);
-      await sql.query(`UPDATE match_requests SET status = 'ACCEPTED' WHERE id = $1`, [id]);
+      await sql.query(`UPDATE match_requests SET status = 'INTRODUCED' WHERE id = $1`, [id]);
     });
     const accepted = (await notifications(id)).filter((r) => r.kind === "MATCH_ACCEPTED");
     expect(accepted).toHaveLength(1);

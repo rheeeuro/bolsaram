@@ -39,7 +39,7 @@ const EMPTY_COPY: Record<string, { title: string; description: string }> = {
   },
   connected: {
     title: "아직 이어진 인연이 없어요",
-    description: "서로 마음이 닿으면 주선자가 두 분을 연결해드립니다.",
+    description: "서로 마음이 닿으면 바로 연락 방법이 공개됩니다.",
   },
 };
 
@@ -93,6 +93,7 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
     }
     // 수락은 감정의 정점이다. 연출을 닫을 때 목록을 갱신한다 —
     // 먼저 갱신하면 이 행이 「이어짐」 탭으로 사라지면서 연출도 같이 사라진다.
+    // 수락 시점에 이미 연결까지 끝나 있으므로 연출 뒤에 볼 것이 곧 연락 방법이다.
     if (action === "accept") {
       setMatched(true);
       return;
@@ -180,9 +181,9 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
             </div>
           ) : null}
 
-          {item.status === "ACCEPTED" ? (
+          {item.status === "INTRODUCED" ? (
             <p className="mt-2.5 text-[12.5px] text-[var(--color-ink-600)]">
-              서로 마음이 닿았어요. 주선자가 곧 연결해드립니다.
+              서로 마음이 닿았어요. 프로필에서 이름과 연락 방법을 확인하세요.
             </p>
           ) : null}
         </div>

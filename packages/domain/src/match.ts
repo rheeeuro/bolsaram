@@ -2,15 +2,18 @@
  * MatchRequest 상태 기계 (설계문서 §4, 부트스트랩 §6).
  * 모든 전이 판정은 여기에 중앙화한다. API/DB 레이어는 판정을 재구현하지 않는다.
  *
- *   REQUESTED ─accept──► ACCEPTED ─introduce──► INTRODUCED ─close──► CLOSED
- *       │                    │
- *       ├─reject──► REJECTED │
- *       └─cancel──► CANCELED └─close──► CLOSED
+ *   REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
+ *       │
+ *       ├─reject──► REJECTED
+ *       └─cancel──► CANCELED
+ *
+ * 상대의 수락이 곧 연락처 공개 동의다. 그래서 수락은 바로 INTRODUCED 로 간다 —
+ * 그 사이에 주선자 승인 단계를 두지 않는다.
  */
 import { ACTIVE_MATCH_REQUEST_STATUSES, type MatchRequestStatus } from "@bolsaram/schemas";
 import { DomainError } from "./errors";
 
-export type MatchAction = "accept" | "reject" | "cancel" | "introduce" | "close";
+export type MatchAction = "accept" | "reject" | "cancel" | "close";
 
 /** 행위 주체. 상태뿐 아니라 누가 하는지도 전이 조건이다. */
 export type MatchActor = "requester" | "target" | "admin";
@@ -22,11 +25,10 @@ type TransitionRule = {
 };
 
 const TRANSITIONS: Record<MatchAction, TransitionRule> = {
-  accept: { from: ["REQUESTED"], to: "ACCEPTED", actors: ["target", "admin"] },
+  accept: { from: ["REQUESTED"], to: "INTRODUCED", actors: ["target", "admin"] },
   reject: { from: ["REQUESTED"], to: "REJECTED", actors: ["target", "admin"] },
   cancel: { from: ["REQUESTED"], to: "CANCELED", actors: ["requester", "admin"] },
-  introduce: { from: ["ACCEPTED"], to: "INTRODUCED", actors: ["admin"] },
-  close: { from: ["ACCEPTED", "INTRODUCED"], to: "CLOSED", actors: ["admin"] },
+  close: { from: ["INTRODUCED"], to: "CLOSED", actors: ["admin"] },
 };
 
 export const TERMINAL_STATUSES: readonly MatchRequestStatus[] = [

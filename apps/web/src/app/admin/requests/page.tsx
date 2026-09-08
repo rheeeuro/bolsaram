@@ -1,4 +1,4 @@
-/** 신청 관리 — 수락된 건을 연결(INTRODUCED)로 넘긴다 (설계문서 §6). */
+/** 신청 관리 — 연결된 건을 확인하고 종료로 마무리한다 (설계문서 §6). */
 import { withRls } from "@bolsaram/db";
 import { MATCH_REQUEST_STATUSES, type MatchRequestStatus } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";

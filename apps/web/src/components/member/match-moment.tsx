@@ -15,11 +15,11 @@ export type MomentVariant = "sent" | "matched";
 const COPY: Record<MomentVariant, { headline: [string, string]; body: [string, string] }> = {
   sent: {
     headline: ["마음을", "보냈습니다"],
-    body: ["상대방이 수락하면", "주선자가 두 분을 연결해드릴게요."],
+    body: ["상대방이 수락하면", "서로의 연락 방법이 공개돼요."],
   },
   matched: {
     headline: ["서로의 마음이", "닿았습니다"],
-    body: ["주선자에게 알렸어요.", "곧 두 분을 연결해드릴게요."],
+    body: ["이제 서로의 이름과", "연락 방법을 볼 수 있어요."],
   },
 };
 

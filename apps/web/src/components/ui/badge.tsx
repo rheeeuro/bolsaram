@@ -28,7 +28,6 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
 export function toneForStatus(status: string): Tone {
   switch (status) {
     case "ACTIVE":
-    case "ACCEPTED":
     case "READY":
     case "IMPORTED":
       return "active";

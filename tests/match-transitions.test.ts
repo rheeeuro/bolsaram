@@ -11,12 +11,12 @@ import {
 import { MATCH_REQUEST_STATUSES, type MatchRequestStatus } from "@bolsaram/schemas";
 
 describe("resolveTransition", () => {
-  it("대상이 REQUESTED 를 수락하면 ACCEPTED 가 된다", () => {
+  it("대상이 수락하면 곧바로 INTRODUCED 가 된다 — 주선자 승인 단계가 없다", () => {
     expect(
       resolveTransition({ action: "accept", current: "REQUESTED", actor: "target" }),
     ).toEqual({
       from: "REQUESTED",
-      to: "ACCEPTED",
+      to: "INTRODUCED",
     });
   });
 
@@ -32,21 +32,23 @@ describe("resolveTransition", () => {
     ).toThrowError(/수행할 수 없는/);
   });
 
-  it("수락 전에는 연결할 수 없다", () => {
+  it("연결 전에는 종료할 수 없다", () => {
     const error = catchError(() =>
-      resolveTransition({ action: "introduce", current: "REQUESTED", actor: "admin" }),
+      resolveTransition({ action: "close", current: "REQUESTED", actor: "admin" }),
     );
     expect(error).toBeInstanceOf(DomainError);
     expect((error as DomainError).code).toBe("INVALID_STATE");
   });
 
-  it("연결은 관리자만 할 수 있다", () => {
-    expect(() =>
-      resolveTransition({ action: "introduce", current: "ACCEPTED", actor: "target" }),
-    ).toThrowError(DomainError);
+  it("종료는 관리자만 할 수 있다", () => {
+    for (const actor of ["requester", "target"] as const) {
+      expect(() =>
+        resolveTransition({ action: "close", current: "INTRODUCED", actor }),
+      ).toThrowError(DomainError);
+    }
     expect(
-      resolveTransition({ action: "introduce", current: "ACCEPTED", actor: "admin" }).to,
-    ).toBe("INTRODUCED");
+      resolveTransition({ action: "close", current: "INTRODUCED", actor: "admin" }).to,
+    ).toBe("CLOSED");
   });
 
   it("종결 상태에서는 어떤 전이도 불가능하다", () => {
@@ -71,7 +73,7 @@ describe("resolveTransition", () => {
   });
 
   it("활성 상태 판정", () => {
-    const active: MatchRequestStatus[] = ["REQUESTED", "ACCEPTED", "INTRODUCED"];
+    const active: MatchRequestStatus[] = ["REQUESTED", "INTRODUCED"];
     for (const status of MATCH_REQUEST_STATUSES) {
       expect(isActiveStatus(status)).toBe(active.includes(status));
     }
@@ -86,7 +88,7 @@ describe("assertCanCreateRequest", () => {
   });
 
   it("활성 신청이 있으면 중복 신청을 막는다", () => {
-    for (const status of ["REQUESTED", "ACCEPTED", "INTRODUCED"] as const) {
+    for (const status of ["REQUESTED", "INTRODUCED"] as const) {
       const error = catchError(() =>
         assertCanCreateRequest({
           requesterProfileId: "a",

@@ -43,6 +43,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0018_notifications_readonly.sql`  | 알림은 런타임 롤에서 읽기 전용 (기본 권한으로 딸려온 DML 회수)                         |
 | `0019_profile_consent.sql`         | 등록 동의 기록 (0020 에서 되돌림)                                                      |
 | `0020_drop_profile_consent.sql`    | 동의 기록 제거 + 시드 표식(`is_seed`)만 남김                                           |
+| `0021_auto_introduce_on_accept.sql`| 수락이 곧 연결 — 주선자 연결 게이트 제거, 알림 트리거를 INTRODUCED 기준으로            |
 
 ## 테이블
 
@@ -91,7 +92,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을
 DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 
-`match_requests_notify_created` · `match_requests_notify_accepted` 트리거가 담당 주선자
+`match_requests_notify_created` · `match_requests_notify_introduced` 트리거가 담당 주선자
 (`app_profile_admins()`)에게 보낼 알림을 `notifications` 에 넣는다. 전이가 실제로 성공했을
 때만 돌기 때문에 애플리케이션이 알림을 빠뜨릴 수 없다.
 

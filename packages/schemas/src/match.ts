@@ -20,11 +20,6 @@ export const rejectMatchRequestSchema = z.object({
   reason: z.string().trim().max(200).optional(),
 });
 
-export const introduceMatchRequestSchema = z.object({
-  /** 주선자가 양쪽에 전달하는 연결 안내. */
-  note: z.string().trim().max(500).optional(),
-});
-
 export const favoriteToggleSchema = z.object({
   profileId: uuidSchema,
 });

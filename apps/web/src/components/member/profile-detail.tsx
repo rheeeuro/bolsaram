@@ -246,9 +246,7 @@ function RequestAction({
         ? existing.isRequester
           ? "신청 대기 중"
           : "받은 신청 확인"
-        : existing.status === "ACCEPTED"
-          ? "수락됨 · 연결 대기"
-          : "연결됨";
+        : "연결됨";
     return (
       <Button variant="secondary" size="lg" className="flex-[1.4]" disabled>
         {text}

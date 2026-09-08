@@ -13,7 +13,7 @@ type Kpi = {
   profilesTotal: number;
   profilesUnclaimed: number;
   requestsPending: number;
-  requestsAccepted: number;
+  requestsIntroduced: number;
   introducedTotal: number;
   inboxPending: number;
   membersTotal: number;
@@ -31,7 +31,7 @@ export default async function AdminDashboard() {
         (SELECT count(*) FROM profiles)::int AS "profilesTotal",
         (SELECT count(*) FROM profiles WHERE user_id IS NULL)::int AS "profilesUnclaimed",
         (SELECT count(*) FROM match_requests WHERE status = 'REQUESTED')::int AS "requestsPending",
-        (SELECT count(*) FROM match_requests WHERE status = 'ACCEPTED')::int AS "requestsAccepted",
+        (SELECT count(*) FROM match_requests WHERE status = 'INTRODUCED')::int AS "requestsIntroduced",
         (SELECT count(*) FROM match_requests WHERE status IN ('INTRODUCED','CLOSED'))::int AS "introducedTotal",
         (SELECT count(*) FROM import_sessions
           WHERE status IN ('RECEIVED','UPLOADING','ANALYZING','REVIEW_REQUIRED','READY','FAILED'))::int AS "inboxPending",
@@ -68,9 +68,9 @@ export default async function AdminDashboard() {
           hint={`전체 ${kpi.profilesTotal}명`}
         />
         <Stat
-          label="처리 대기 신청"
+          label="답변 대기 신청"
           value={kpi.requestsPending}
-          hint={`수락 후 연결 대기 ${kpi.requestsAccepted}건`}
+          hint={`진행 중인 연결 ${kpi.requestsIntroduced}건`}
         />
         <Stat label="Import 대기" value={kpi.inboxPending} hint="검토·분석 필요" />
         <Stat
@@ -80,17 +80,16 @@ export default async function AdminDashboard() {
         />
       </div>
 
-      {kpi.requestsAccepted > 0 ? (
+      {kpi.requestsIntroduced > 0 ? (
         <div className="mt-4 flex items-center justify-between rounded-lg border border-[var(--surface-accent)]/25 bg-[var(--surface-accent)]/6 px-4 py-3">
           <p className="text-[13px]">
-            서로 마음이 닿은 <strong>{kpi.requestsAccepted}건</strong>이 연결을 기다리고
-            있습니다.
+            서로 마음이 닿은 <strong>{kpi.requestsIntroduced}건</strong>이 진행 중입니다.
           </p>
           <Link
-            href="/admin/requests?status=ACCEPTED"
+            href="/admin/requests?status=INTRODUCED"
             className="text-[13px] font-medium text-[var(--surface-accent)] underline"
           >
-            연결하러 가기
+            연결된 건 보기
           </Link>
         </div>
       ) : null}

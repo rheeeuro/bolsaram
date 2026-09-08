@@ -196,10 +196,12 @@ export const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
   DOCTORATE: "박사",
 };
 
-/** 설계문서 §4 신청/수락 상태 기계 */
+/**
+ * 설계문서 §4 신청/수락 상태 기계.
+ * 수락이 곧 연결이라 중간 상태가 없다 — DB enum 에는 쓰이지 않는 'ACCEPTED' 가 남아 있다.
+ */
 export const MATCH_REQUEST_STATUSES = [
   "REQUESTED",
-  "ACCEPTED",
   "REJECTED",
   "CANCELED",
   "INTRODUCED",
@@ -208,7 +210,6 @@ export const MATCH_REQUEST_STATUSES = [
 export type MatchRequestStatus = (typeof MATCH_REQUEST_STATUSES)[number];
 export const MATCH_REQUEST_STATUS_LABELS: Record<MatchRequestStatus, string> = {
   REQUESTED: "신청함",
-  ACCEPTED: "수락됨",
   REJECTED: "거절됨",
   CANCELED: "취소됨",
   INTRODUCED: "연결됨",
@@ -216,7 +217,7 @@ export const MATCH_REQUEST_STATUS_LABELS: Record<MatchRequestStatus, string> = {
 };
 
 /** 같은 두 사람 사이에 동시에 하나만 존재할 수 있는 상태(설계문서 §4 활성 중복 신청 금지). */
-export const ACTIVE_MATCH_REQUEST_STATUSES = ["REQUESTED", "ACCEPTED", "INTRODUCED"] as const;
+export const ACTIVE_MATCH_REQUEST_STATUSES = ["REQUESTED", "INTRODUCED"] as const;
 
 export const IMPORT_SOURCES = [
   "TELEGRAM",

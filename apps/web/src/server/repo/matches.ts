@@ -21,6 +21,7 @@ export type MatchRequestRecord = {
   status: MatchRequestStatus;
   message: string | null;
   rejectReason: string | null;
+  /** 읽기 전용. 주선자가 연결하며 적던 안내로, 새로 쓰는 경로는 없다. */
   introduceNote: string | null;
   requestedAt: Date;
   respondedAt: Date | null;
@@ -68,7 +69,7 @@ export async function findActiveBetween(
 ): Promise<MatchRequestRecord | null> {
   const result = await sql.query<Row>(
     `SELECT ${COLUMNS} FROM match_requests
-      WHERE status IN ('REQUESTED','ACCEPTED','INTRODUCED')
+      WHERE status IN ('REQUESTED','INTRODUCED')
         AND ((requester_profile_id = $1 AND target_profile_id = $2)
           OR (requester_profile_id = $2 AND target_profile_id = $1))
       ORDER BY requested_at DESC LIMIT 1`,
@@ -148,7 +149,6 @@ export async function transition(
     actor: MatchActor;
     current: MatchRequestStatus;
     rejectReason?: string;
-    introduceNote?: string;
   },
 ): Promise<MatchRequestRecord> {
   const { from, to } = resolveTransition({
@@ -162,10 +162,6 @@ export async function transition(
   if (input.rejectReason !== undefined) {
     values.push(input.rejectReason);
     sets.push(`reject_reason = $${values.length}`);
-  }
-  if (input.introduceNote !== undefined) {
-    values.push(input.introduceNote);
-    sets.push(`introduce_note = $${values.length}`);
   }
 
   const result = await sql.query<Row>(
@@ -197,7 +193,7 @@ export async function listSignals(
       : direction === "outgoing"
         ? `requester_profile_id = $1 AND status IN ('REQUESTED','REJECTED','CANCELED')`
         : `(requester_profile_id = $1 OR target_profile_id = $1)
-           AND status IN ('ACCEPTED','INTRODUCED','CLOSED')`;
+           AND status IN ('INTRODUCED','CLOSED')`;
 
   const result = await sql.query<Row>(
     `SELECT ${COLUMNS} FROM match_requests
@@ -209,7 +205,7 @@ export async function listSignals(
   return result.rows.map(toRecord);
 }
 
-/** 관리자 신청 목록. 처리 대기 중인 것을 위로 올린다. */
+/** 관리자 신청 목록. 실제 소개를 이어줄 연결된 건을 위로 올린다. */
 /**
  * 아직 답하지 않은 받은 신청 수. 하단 탭 배지에 쓴다.
  *
@@ -239,7 +235,7 @@ export async function listForAdmin(
     `SELECT ${COLUMNS} FROM match_requests
       WHERE ${clause}
       ORDER BY
-        CASE status WHEN 'ACCEPTED' THEN 0 WHEN 'REQUESTED' THEN 1 ELSE 2 END,
+        CASE status WHEN 'INTRODUCED' THEN 0 WHEN 'REQUESTED' THEN 1 ELSE 2 END,
         requested_at DESC
       LIMIT 200`,
     values,
@@ -247,13 +243,18 @@ export async function listForAdmin(
   return result.rows.map(toRecord);
 }
 
-/** 상대와 INTRODUCED 상태인 프로필 id 집합. 이름/연락처 공개 판정에 쓴다. */
+/**
+ * 한 번이라도 연결된 상대의 프로필 id 집합. 이름/연락처 공개 판정에 쓴다.
+ *
+ * CLOSED 를 포함한다 — 종료는 주선자가 목록을 정리하는 행위이고 공개 철회가 아니다.
+ * 이미 서로 본 이름과 연락처를 시스템이 되돌릴 수도 없다.
+ */
 export async function introducedPartnerIds(sql: Sql, profileId: string): Promise<Set<string>> {
   const result = await sql.query<{ other: string }>(
     `SELECT CASE WHEN requester_profile_id = $1 THEN target_profile_id
                  ELSE requester_profile_id END AS other
        FROM match_requests
-      WHERE status = 'INTRODUCED'
+      WHERE status IN ('INTRODUCED','CLOSED')
         AND (requester_profile_id = $1 OR target_profile_id = $1)`,
     [profileId],
   );

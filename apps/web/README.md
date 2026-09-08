@@ -129,7 +129,7 @@ server/
 | `/api/profiles/[id]/status`               | PATCH               | 관리자            | 상태·노출 변경                       |
 | `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
-| `/api/admin/match-requests/[id]/[action]` | POST                | 관리자            | introduce · close                    |
+| `/api/admin/match-requests/[id]/[action]` | POST                | 관리자            | close                                |
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
 | `/api/admin/invites`                      | POST                | 관리자            | 초대 링크 발급                       |
 | `/api/imports`                            | GET / POST          | 관리자            | Inbox 목록 / 세션 생성 + 업로드 슬롯 |

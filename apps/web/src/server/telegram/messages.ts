@@ -135,10 +135,10 @@ export const messages = {
   matchRequested: (requesterCode: number | null, targetCode: number | null) =>
     ["새 신청이 들어왔습니다.", "", pairLine(requesterCode, targetCode, "→")].join("\n"),
 
-  /** 수락된 건은 주선자가 연결해야 다음으로 간다. 그래서 할 일을 문장으로 못 박는다. */
+  /** 수락은 곧 연결이다. 주선자가 할 일은 없지만 실제 소개는 사람이 하므로 알린다. */
   matchAccepted: (requesterCode: number | null, targetCode: number | null) =>
     [
-      "신청이 수락됐습니다. 연결해 주세요.",
+      "신청이 수락돼 두 분이 연결됐습니다.",
       "",
       pairLine(requesterCode, targetCode, "↔"),
     ].join("\n"),

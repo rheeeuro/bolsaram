@@ -7,7 +7,6 @@ import { MATCH_REQUEST_STATUSES, MATCH_REQUEST_STATUS_LABELS } from "@bolsaram/s
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, Td, Th } from "@/components/admin/table";
-import { Textarea } from "@/components/ui/field";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
@@ -32,8 +31,6 @@ export function AdminRequestTable({
 }) {
   const router = useRouter();
   const params = useSearchParams();
-  const [introducing, setIntroducing] = useState<string | null>(null);
-  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,17 +41,15 @@ export function AdminRequestTable({
     router.push(`/admin/requests?${search.toString()}`);
   }
 
-  async function act(id: string, action: "introduce" | "close", body?: unknown) {
+  async function close(id: string) {
     setBusy(true);
     setError(null);
-    const result = await apiPost(`/api/admin/match-requests/${id}/${action}`, body);
+    const result = await apiPost(`/api/admin/match-requests/${id}/close`);
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
       return;
     }
-    setIntroducing(null);
-    setNote("");
     router.refresh();
   }
 
@@ -120,54 +115,12 @@ export function AdminRequestTable({
                   })}
                 </Td>
                 <Td>
-                  {item.status === "ACCEPTED" ? (
-                    introducing === item.id ? (
-                      <div className="w-64">
-                        <Textarea
-                          placeholder="두 분께 전달할 안내 (선택)"
-                          value={note}
-                          maxLength={500}
-                          onChange={(e) => setNote(e.target.value)}
-                          className="min-h-16 text-[12.5px]"
-                        />
-                        <div className="mt-1.5 flex gap-1.5">
-                          <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() =>
-                              void act(
-                                item.id,
-                                "introduce",
-                                note.trim() ? { note: note.trim() } : undefined,
-                              )
-                            }
-                          >
-                            연결 완료
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => {
-                              setIntroducing(null);
-                              setNote("");
-                            }}
-                          >
-                            취소
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button size="sm" onClick={() => setIntroducing(item.id)}>
-                        연결하기
-                      </Button>
-                    )
-                  ) : item.status === "INTRODUCED" ? (
+                  {item.status === "INTRODUCED" ? (
                     <Button
                       size="sm"
                       variant="secondary"
                       disabled={busy}
-                      onClick={() => void act(item.id, "close")}
+                      onClick={() => void close(item.id)}
                     >
                       종료
                     </Button>

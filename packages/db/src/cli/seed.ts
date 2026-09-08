@@ -218,10 +218,12 @@ async function main(): Promise<void> {
       [a, b],
     );
     await sql.query(
-      `INSERT INTO match_requests (requester_profile_id, target_profile_id, status, message, responded_at)
-       VALUES ($1,$2,'ACCEPTED','취미가 비슷해서 반가웠어요.', now())`,
+      `INSERT INTO match_requests
+         (requester_profile_id, target_profile_id, status, message, reject_reason, responded_at)
+       VALUES ($1,$2,'REJECTED','취미가 비슷해서 반가웠어요.','지금은 어려울 것 같아요.', now())`,
       [c, d],
     );
+    // 안내문이 있는 연결 건. 새로 쓰는 경로는 없지만 회원 화면이 아직 표시한다.
     await sql.query(
       `INSERT INTO match_requests
          (requester_profile_id, target_profile_id, status, responded_at, introduced_at, introduce_note)

@@ -39,13 +39,16 @@ packages/domain/src/
 ### `match.ts` — 상태 기계
 
 ```
-REQUESTED ─accept──► ACCEPTED ─introduce──► INTRODUCED ─close──► CLOSED
-    │                    │
-    ├─reject──► REJECTED └─close──► CLOSED
+REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
+    │
+    ├─reject──► REJECTED
     └─cancel──► CANCELED
 ```
 
-전이는 **상태와 행위자를 함께** 본다. 신청자는 취소만, 대상은 수락·거절만, 연결과 종료는
+**수락이 곧 연결이다.** 상대의 수락 자체가 연락처 공개 동의이므로 그 뒤에 주선자 승인을
+두지 않는다 — `accept` 가 바로 `INTRODUCED` 로 간다.
+
+전이는 **상태와 행위자를 함께** 본다. 신청자는 취소만, 대상은 수락·거절만, 종료는
 관리자만 할 수 있다. `resolveTransition()` 이 `{from, to}` 를 돌려주고, 호출부는 그것을
 조건부 UPDATE(`WHERE status = from`)에 써서 race condition 을 DB 레벨에서 한 번 더 막는다.
 
