@@ -25,7 +25,12 @@ export default async function SignupPage() {
 
         <SignupForm />
 
-        <p className="mt-8 text-[13px] text-[var(--color-ink-600)]">
+        <p className="mt-8 rounded-xl bg-[var(--color-ivory-100)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--color-ink-700)]">
+          이 가입은 주선자 전용입니다. 회원은 계정을 만들지 않습니다 — 주선자가 보낸 초대
+          링크나 입장코드로 들어옵니다.
+        </p>
+
+        <p className="mt-6 text-[13px] text-[var(--color-ink-600)]">
           이미 계정이 있으신가요?{" "}
           <Link href="/login" className="text-[var(--color-rose-600)] underline">
             로그인

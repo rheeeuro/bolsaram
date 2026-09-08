@@ -35,6 +35,10 @@ export const POST = route(async (request: Request) => {
     }),
   );
 
-  // 평문 토큰은 이 응답에서만 볼 수 있다.
-  return ok({ url: inviteUrl(invite.token), expiresAt: invite.expiresAt }, { status: 201 });
+  // 평문 토큰은 이 응답에서만 볼 수 있다. 링크를 못 여는 회원을 위해 같은 값을
+  // 입장코드로도 내려준다 — 코드와 링크는 같은 것이고 함께 무효가 된다.
+  return ok(
+    { url: inviteUrl(invite.token), code: invite.token, expiresAt: invite.expiresAt },
+    { status: 201 },
+  );
 });

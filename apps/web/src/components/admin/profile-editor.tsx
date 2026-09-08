@@ -64,7 +64,8 @@ export function AdminProfileEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  // 발급 직후 한 번만 보여줄 값. 링크와 입장코드는 같은 토큰이다.
+  const [issued, setIssued] = useState<{ url: string; code: string } | null>(null);
 
   const set = (key: string) => (value: string) => setDraft((p) => ({ ...p, [key]: value }));
 
@@ -380,7 +381,7 @@ export function AdminProfileEditor({
                     day: "numeric",
                     hour: "2-digit",
                   })}
-                  ). 새로 발급하면 기존 링크는 무효가 됩니다.
+                  ). 새로 발급하면 기존 링크와 입장코드는 무효가 됩니다.
                 </p>
               ) : null}
 
@@ -393,16 +394,16 @@ export function AdminProfileEditor({
                   void (async () => {
                     setBusy(true);
                     setError(null);
-                    const result = await apiPost<{ url: string }>("/api/admin/invites", {
-                      profileId: profile.id,
-                      expiresInHours: 72,
-                    });
+                    const result = await apiPost<{ url: string; code: string }>(
+                      "/api/admin/invites",
+                      { profileId: profile.id, expiresInHours: 72 },
+                    );
                     setBusy(false);
                     if (!result.ok) {
                       setError(result.message);
                       return;
                     }
-                    setInviteUrl(result.data.url);
+                    setIssued({ url: result.data.url, code: result.data.code });
                     router.refresh();
                   })();
                 }}
@@ -410,27 +411,43 @@ export function AdminProfileEditor({
                 초대 링크 발급
               </Button>
 
-              {inviteUrl ? (
-                <div className="mt-3">
-                  <p className="mb-1.5 text-[11.5px] text-[var(--surface-text-muted)]">
-                    이 링크는 지금만 볼 수 있습니다. 복사해서 전달하세요.
+              {issued ? (
+                <div className="mt-3 flex flex-col gap-2.5">
+                  <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                    지금만 볼 수 있습니다. 복사해서 전달하세요. 회원은 아이디·비밀번호가
+                    없으므로 이 링크(또는 입장코드)가 곧 로그인입니다.
                   </p>
-                  <div className="flex gap-1.5">
-                    <Input readOnly value={inviteUrl} className="h-8 flex-1 text-[11.5px]" />
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => void navigator.clipboard.writeText(inviteUrl)}
-                    >
-                      복사
-                    </Button>
-                  </div>
+                  <CopyRow label="초대 링크" value={issued.url} />
+                  <CopyRow label="입장코드" value={issued.code} />
+                  <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                    둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 회원은 로그인
+                    화면에서 코드를 넣습니다.
+                  </p>
                 </div>
               ) : null}
             </>
           )}
         </Card>
       </aside>
+    </div>
+  );
+}
+
+/** 발급 직후 한 번만 보이는 값을 읽기 전용으로 보여주고 복사시킨다. */
+function CopyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="mb-1 text-[11.5px] text-[var(--surface-text-muted)]">{label}</p>
+      <div className="flex gap-1.5">
+        <Input readOnly value={value} className="h-8 flex-1 text-[11.5px]" />
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => void navigator.clipboard.writeText(value)}
+        >
+          복사
+        </Button>
+      </div>
     </div>
   );
 }

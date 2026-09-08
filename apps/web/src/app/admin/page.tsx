@@ -159,8 +159,8 @@ export default async function AdminDashboard() {
             />
             <QuickLink
               href="/admin/members"
-              title="초대 링크 발급"
-              description="등록한 프로필의 주인에게 링크를 보냅니다."
+              title="초대 링크 · 입장코드 발급"
+              description="등록한 프로필의 주인에게 보냅니다. 회원은 이것으로 들어옵니다."
             />
             <QuickLink
               href="/admin/group"

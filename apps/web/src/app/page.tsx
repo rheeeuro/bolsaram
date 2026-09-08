@@ -57,12 +57,12 @@ export default async function IntroPage() {
             href="/login"
             className="flex h-13 items-center justify-center rounded-xl border border-[var(--surface-border)] bg-white py-3.5 text-[15px] font-medium text-[var(--color-ink-800)] transition-colors hover:bg-[var(--color-ivory-100)]"
           >
-            로그인
+            로그인 · 입장코드
           </Link>
           <p className="mt-2 text-center text-[12px] leading-relaxed text-[var(--color-ink-600)]">
             볼사람은 주선자가 검증한 분만 참여하는 비공개 서비스입니다.
             <br />
-            초대 링크를 받으셨다면 링크로 접속해 주세요.
+            회원은 아이디·비밀번호가 없습니다 — 초대 링크를 열거나 받은 입장코드를 넣어 주세요.
           </p>
         </div>
       </div>

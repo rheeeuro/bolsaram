@@ -34,8 +34,15 @@ export default async function ClaimPage({ params }: { params: Promise<{ token: s
             <p className="mt-3 text-[14px] leading-relaxed text-[var(--color-ink-700)]">
               {error}
             </p>
-            <Link href="/" className="mt-8 text-[13px] text-[var(--color-rose-600)] underline">
-              처음으로
+            <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-ink-600)]">
+              입장코드를 잘못 옮겨 적었을 수 있습니다. 다시 넣어 보시고, 그래도 안 되면
+              주선자에게 새 링크를 요청해 주세요.
+            </p>
+            <Link
+              href="/login"
+              className="mt-8 text-[13px] text-[var(--color-rose-600)] underline"
+            >
+              입장코드 다시 넣기
             </Link>
           </>
         ) : (
