@@ -6,6 +6,7 @@
 import "server-only";
 import type { Sql } from "@bolsaram/db";
 import {
+  DomainError,
   buildDiscoverWhere,
   decodeCursor,
   encodeCursor,
@@ -231,6 +232,26 @@ const UPDATABLE_COLUMNS: Record<keyof ProfileUpdate, string> = {
   realName: "real_name",
   contactNote: "contact_note",
 };
+
+/**
+ * 이 프로필을 고칠 수 있는지 RLS 와 같은 기준으로 묻는다.
+ *
+ * 읽기와 쓰기가 다르기 때문에 필요하다 — 전체공개 프로필은 모든 주선자가 보지만
+ * 고치는 것은 등록한 사람뿐이다. RLS 정책이 이미 같은 판정을 하지만, owner 커넥션을
+ * 쓰는 경로(초대 발급)는 정책을 지나가므로 애플리케이션 레이어에서 한 번 더 막는다.
+ *
+ * 반드시 `withRls(ctx, ...)` 안에서 호출한다. owner 커넥션에서는 세션 컨텍스트가
+ * 없어 의미 없는 답이 나온다.
+ */
+export async function assertCanEditProfile(sql: Sql, profileId: string): Promise<void> {
+  const result = await sql.query<{ allowed: boolean }>(
+    `SELECT app_can_edit_profile($1) AS allowed`,
+    [profileId],
+  );
+  if (!result.rows[0]?.allowed) {
+    throw new DomainError("FORBIDDEN", "이 프로필을 관리할 권한이 없습니다.");
+  }
+}
 
 export async function updateProfile(
   sql: Sql,

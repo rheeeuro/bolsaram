@@ -44,6 +44,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0019_profile_consent.sql`         | 등록 동의 기록 (0020 에서 되돌림)                                                      |
 | `0020_drop_profile_consent.sql`    | 동의 기록 제거 + 시드 표식(`is_seed`)만 남김                                           |
 | `0021_auto_introduce_on_accept.sql`| 수락이 곧 연결 — 주선자 연결 게이트 제거, 알림 트리거를 INTRODUCED 기준으로            |
+| `0022_disclosure_survives_close.sql`| 종료해도 이름·연락처 공개 유지 (`app_is_introduced_with` 에 CLOSED 포함)               |
 
 ## 테이블
 

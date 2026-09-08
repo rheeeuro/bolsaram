@@ -986,3 +986,30 @@ webhook 은 자동으로 따라오지 않는다. 도메인을 바꾼 뒤 `pnpm t
 
 `match_requests_stamp` 도 함께 고쳤다. 수락이 곧 연결이라 `INTRODUCED` 에서
 `responded_at` 과 `introduced_at` 을 함께 찍는다(이미 찍혀 있으면 덮어쓰지 않는다).
+
+### 딸려 나온 두 가지
+
+**종료가 공개를 회수하고 있었다.** `introducedPartnerIds` 와 RLS 의
+`app_is_introduced_with` 가 둘 다 `status = 'INTRODUCED'` 만 봤다. 게이트가 있던
+동안에는 `연결 → 종료` 2단 조작이라 눈에 띄지 않았지만, 종료가 주선자의 **유일한**
+레버가 된 지금은 목록을 정리하려 누른 버튼이 회원이 보던 연락처를 지운다.
+
+되돌릴 수 없는 것을 되돌리는 척하는 동작이라 판단해 `IN ('INTRODUCED','CLOSED')` 로
+바꿨다(0022). 종료는 주선자의 정리 행위이고 공개 철회가 아니다. 판정이 RLS 와
+애플리케이션에 두 벌 있으므로 **양쪽을 함께** 고쳤다 — `tests/rls.test.ts` 가
+네 상태를 훑어 갈라지지 않는지 지킨다.
+
+**초대 발급에 프로필 권한 검사가 없었다.** `/api/admin/invites` 가 `requireAdmin()`
+만 하고 대상 프로필을 누가 관리하는지 보지 않았다. `invites` 정책은 이미
+`app_can_edit_profile(profile_id)` 를 요구하지만 `issueInvite` 는 owner 커넥션이라
+정책을 지나간다.
+
+주선자 가입이 열려 있어 실제로 체인이 완성됐다 — `/signup` 으로 아무나 주선자가 되고,
+남이 등록한 **이미 주인이 있는** 프로필에 초대를 발급하고, 그 링크로 그 회원 계정에
+로그인된다(`firstTime:false`). 매직 링크가 곧 자격 증명이므로 완전한 계정 사칭이고,
+그 회원이 연결된 모든 상대의 실명·연락처가 함께 열린다. 부수로 정상 초대가
+`revoked_at` 처리돼 실제 회원의 링크까지 죽는다.
+
+`assertCanEditProfile()` 을 `server/repo/profiles.ts` 에 두고 라우트가 발급 전에
+회원 RLS 컨텍스트에서 `app_can_edit_profile` 을 묻게 했다. 「`ADMIN` 이라는 사실만으로
+권한을 주지 않는다 / 읽기와 쓰기를 다르게 준다」 규칙을 어기던 유일한 쓰기 경로였다.

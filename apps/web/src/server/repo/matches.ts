@@ -205,7 +205,6 @@ export async function listSignals(
   return result.rows.map(toRecord);
 }
 
-/** 관리자 신청 목록. 실제 소개를 이어줄 연결된 건을 위로 올린다. */
 /**
  * 아직 답하지 않은 받은 신청 수. 하단 탭 배지에 쓴다.
  *
@@ -221,6 +220,7 @@ export async function countPendingIncoming(sql: Sql, profileId: string): Promise
   return result.rows[0]?.count ?? 0;
 }
 
+/** 관리자 신청 목록. 실제 소개를 이어줄 연결된 건을 위로 올린다. */
 export async function listForAdmin(
   sql: Sql,
   filter: { status?: MatchRequestStatus[] },

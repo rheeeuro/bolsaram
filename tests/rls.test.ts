@@ -201,6 +201,42 @@ describe("match_requests 정책", () => {
       expect(result.rowCount).toBe(1);
     }
   });
+
+  /**
+   * 종료해도 공개는 유지된다(0022). 이름·연락처를 여는 판정이 RLS 와 애플리케이션
+   * 레이어에 두 벌 있으므로, 한쪽만 고쳐 갈라지지 않는지 여기서 잡는다.
+   */
+  it("연결이 종료돼도 이름·연락처 공개 판정은 유지된다", async () => {
+    const introducedWith = (ctx: typeof fx.member1) =>
+      withRls(ctx, async (sql) => {
+        const r = await sql.query<{ ok: boolean }>(
+          `SELECT app_is_introduced_with($1) AS ok`,
+          [fx.p2],
+        );
+        return r.rows[0]!.ok;
+      });
+
+    const setStatus = (status: string) =>
+      withOwner((sql) =>
+        sql.query(`UPDATE match_requests SET status = $1 WHERE requester_profile_id = $2`, [
+          status,
+          fx.p1,
+        ]),
+      );
+
+    await setStatus("REQUESTED");
+    expect(await introducedWith(fx.member1)).toBe(false);
+
+    await setStatus("INTRODUCED");
+    expect(await introducedWith(fx.member1)).toBe(true);
+
+    await setStatus("CLOSED");
+    expect(await introducedWith(fx.member1)).toBe(true);
+
+    // 거절로 끝난 건은 연결된 적이 없다.
+    await setStatus("REJECTED");
+    expect(await introducedWith(fx.member1)).toBe(false);
+  });
 });
 
 describe("관리자 전용 테이블", () => {

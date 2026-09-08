@@ -13,6 +13,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
+import { assertCanEditProfile } from "../apps/web/src/server/repo/profiles";
 
 const TAG = `grouptest-${Date.now()}`;
 
@@ -146,6 +147,22 @@ describe("주선자는 자기 모임만 다룬다", () => {
         ),
       ),
     ).rejects.toThrow();
+  });
+
+  /**
+   * 초대 발급은 owner 커넥션을 쓰므로 위 정책을 지나간다. 초대 링크는 곧 그 회원의
+   * 로그인 수단이라, 애플리케이션 레이어가 같은 판정을 다시 해야 한다.
+   */
+  it("남의 모임 프로필에는 초대를 발급할 권한이 없다", async () => {
+    await expect(
+      withRls(A.admin, (sql) => assertCanEditProfile(sql, B.profileId)),
+    ).rejects.toThrow(/권한이 없습니다/);
+  });
+
+  it("자기 모임 프로필은 발급할 수 있다", async () => {
+    await expect(
+      withRls(A.admin, (sql) => assertCanEditProfile(sql, A.profileId)),
+    ).resolves.toBeUndefined();
   });
 
   it("남의 모임 Import 세션을 읽지 못한다", async () => {
