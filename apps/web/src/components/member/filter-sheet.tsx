@@ -248,6 +248,7 @@ function RangeGroup({
   note?: string;
 }) {
   const narrowed = valueMin > min || valueMax < max;
+  const pct = (value: number) => ((value - min) / (max - min)) * 100;
   return (
     <section className="mb-6">
       <div className="mb-2 flex items-baseline justify-between">
@@ -256,7 +257,13 @@ function RangeGroup({
           {rangeLabel({ min, max, valueMin, valueMax, unit })}
         </span>
       </div>
-      <div className="flex flex-col gap-1.5">
+      {/* 두 손잡이를 같은 트랙 위에 겹친다. 값이 교차하면 서로를 밀어낸다. */}
+      <div className="range-dual">
+        <span className="range-dual__track" />
+        <span
+          className="range-dual__fill"
+          style={{ left: `${pct(valueMin)}%`, right: `${100 - pct(valueMax)}%` }}
+        />
         <input
           type="range"
           aria-label={`${title} 최소`}
@@ -264,7 +271,6 @@ function RangeGroup({
           max={max}
           value={valueMin}
           onChange={(e) => onChange(Math.min(Number(e.target.value), valueMax), valueMax)}
-          className="accent-[var(--color-rose-500)]"
         />
         <input
           type="range"
@@ -273,7 +279,6 @@ function RangeGroup({
           max={max}
           value={valueMax}
           onChange={(e) => onChange(valueMin, Math.max(Number(e.target.value), valueMin))}
-          className="accent-[var(--color-rose-500)]"
         />
       </div>
       {note && narrowed ? (
