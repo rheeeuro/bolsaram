@@ -44,10 +44,15 @@ case "$FILE" in
   */packages/domain/*|*/packages/schemas/*)                            add "domain" ;;
 esac
 # 사용자에게 보이는 동작·정책이 바뀔 수 있는 축. 가이드 동기화를 상기시킨다.
+# 로그인·가입·초대 링크 화면은 (member)/admin 어느 그룹에도 없다 — 빠뜨리면
+# 회원이 처음 만나는 화면이 문서와 어긋난 채로 남는다(실제로 그랬다, 2026-09-08).
 case "$FILE" in
   */apps/web/src/app/\(member\)/*|*/apps/web/src/components/member/*|\
   */apps/web/src/app/admin/*|*/apps/web/src/components/admin/*|\
-  */apps/web/src/server/auth/*|*/packages/schemas/src/enums.ts|\
+  */apps/web/src/app/login/*|*/apps/web/src/app/signup/*|*/apps/web/src/app/claim/*|\
+  */apps/web/src/server/auth/*|*/apps/web/src/server/telegram/messages.ts|\
+  */packages/schemas/src/enums.ts|*/packages/schemas/src/auth.ts|\
+  */packages/domain/src/visibility.ts|*/packages/db/src/cleanup.ts|\
   */apps/web/src/server/storage/local.ts|*/ecosystem.config.cjs)       add "user-guide" ;;
 esac
 # 가이드를 직접 고쳤을 때도 검증을 상기시킨다.
@@ -69,9 +74,12 @@ case "$FILE" in
 esac
 [ -n "$README" ] && add "dir-readme"
 
-[ -z "$KINDS" ] && exit 0
+# 이력성 주석 경고(경고 전용, 차단하지 않음). 판정 기준은 history-comment-check.py 가 단일 소스.
+HISTORY_WARN=$(python3 "$ROOT/.claude/hooks/history-comment-check.py" "$FILE" 2>/dev/null || echo "")
 
-KINDS="$KINDS" README="$README" python3 - <<'PY'
+[ -z "$KINDS" ] && [ -z "$HISTORY_WARN" ] && exit 0
+
+KINDS="$KINDS" README="$README" HISTORY_WARN="$HISTORY_WARN" python3 - <<'PY'
 import json, os
 
 KIND_NOTES = {
@@ -150,6 +158,9 @@ kinds = [k for k in (os.environ.get("KINDS") or "").splitlines() if k]
 parts = [KIND_NOTES[k] for k in dict.fromkeys(kinds) if k in KIND_NOTES]
 readme = os.environ.get("README") or ""
 parts = [p.replace("{README}", readme) for p in parts]
+warn = (os.environ.get("HISTORY_WARN") or "").strip()
+if warn:
+    parts.append(warn)
 if parts:
     print(json.dumps({
         "hookSpecificOutput": {

@@ -14,14 +14,11 @@ __pycache__/
 .turbo/
 *.tsbuildinfo
 
-# 로컬 private 스토리지(프로필 원본/Import 원본). 절대 커밋하지 않는다.
-var/storage/
-
-# PM2 로그
-var/log/
-
-# 테스트가 만드는 임시 스토리지
-var/test-storage/
+# 런타임이 만드는 것 전부 — private 스토리지(프로필·Import 원본), DB 덤프, PM2 로그,
+# 테스트 임시 스토리지. **디렉터리 단위로 막는다.**
+# 하위를 하나씩 나열하면 나중에 생긴 것이 빠진다 — var/backup/ 이 실제로 그렇게
+# 공개 저장소에 올라갔다(2026-09-08).
+var/
 
 # 에이전트 훅 상태 파일 (턴 단위 임시)
 .claude/.pending-changes

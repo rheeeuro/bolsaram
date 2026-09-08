@@ -35,6 +35,9 @@
 ## 고정 인프라
 
 - 웹(프론트+API) 포트: `3020`
+- 공개 도메인: `https://bolsaram.com` (Cloudflare Tunnel → `localhost:3020`).
+  `APP_ORIGIN` 이 이 값이어야 초대 링크와 텔레그램 webhook 이 맞습니다.
+  구 주소 `bolsaram.rheeeuro.com` 은 2026-09-08 에 내렸습니다.
 - PostgreSQL: `127.0.0.1:5442` → 컨테이너 `5432`, DB `bolsaram`
   - `bolsaram_owner` — 마이그레이션·시드·인증 경로 전용 (RLS 우회)
   - `bolsaram_app` — 런타임 전용 (`NOBYPASSRLS`)
@@ -132,7 +135,7 @@ pnpm agents:test       # 셸 가드 판정 케이스 25개
 | SessionStart     | sync.py            | 생성 파일 동기화                            |
 | PreToolUse       | guard-sensitive.sh | 민감 파일 편집·열람 차단 (셸 우회 포함)     |
 | PostToolUse      | quality-gate.sh    | 해당 패키지 타입체크, 마이그레이션 RLS 검사 |
-| PostToolUse      | track-changes.sh   | 변경 기록 + 건드린 축의 규칙 주입           |
+| PostToolUse      | track-changes.sh   | 변경 기록 + 건드린 축의 규칙 주입 + 이력 주석 경고 |
 | UserPromptSubmit | mark-turn-start.sh | 턴 시작 시각 기록                           |
 | Stop             | deploy-on-stop.sh  | 빌드 + PM2 재시작, 미적용 마이그레이션 안내 |
 
@@ -219,6 +222,11 @@ var/             private 스토리지 · DB 백업 · PM2 로그 (git 제외, �
 README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨다"는 문장이 들어가려 하면
 구현 계획 문서로 보낸다.
 
+경계가 새는 것은 `history-comment-check.py` 가 잡는다 — 편집한 코드 파일에 **새로
+추가된** 주석만 보고, 변경 서사나 날짜 박힌 경위가 들어가면 경고한다(차단하지 않는다).
+판정 기준은 이 파일 하나이며 두 에이전트가 공유한다. 마이그레이션 번호 `(0015)` 나
+짧은 날짜 태그 `(2026-09-07)` 같은 추적용 출처 표기는 경고 대상이 아니다.
+
 ## 사용자 문서 동기화
 
 `docs/guide/` 는 **회원과 주선자가 읽는 문서**다. 개발자 문서가 아니다.
@@ -294,7 +302,7 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   텔레그램 봇입니다(`docs/implementation-plan.md` 「텔레그램 Import 채널」).
   `docs/share-spike-plan.md`에 계획만 있고, 실기기 검증 없이 공유 payload를 확정하지 않습니다.
 - **텔레그램 봇 실기기 검증**: 완료했습니다(2026-09-07). `@bolsaram_bot` 이
-  `bolsaram.rheeeuro.com` 의 webhook 으로 붙어 있습니다. 실측으로 확인된 사실 —
+  `bolsaram.com` 의 webhook 으로 붙어 있습니다. 실측으로 확인된 사실 —
   카카오톡 「공유하기」로 여러 장을 보내면 텔레그램은 `media_group_id` 없이 개별
   메시지로 전달합니다. 사진을 묶는 것은 앨범이 아니라 **대화 세션**입니다.
   자세한 내용은 `docs/implementation-plan.md` 「실기기 검증 결과」.

@@ -295,6 +295,75 @@ describe("개인정보 처리방침이 실제 동작과 같다", () => {
   });
 });
 
+describe("가이드가 인용한 오류 문구가 코드에 실제로 있다", () => {
+  /**
+   * 가이드 본문의 표현은 검사하지 않지만, **가이드가 따옴표로 인용한 오류 문구**는
+   * 다르다. 사용자는 화면에 뜬 문장을 그대로 들고 문서를 찾는다. 코드에 없는 문장이
+   * 표에 남아 있으면 그 줄은 아무도 찾지 못하는 죽은 항목이다.
+   *
+   * 실제로 두 건이 그렇게 남아 있었다(2026-09-08) — SMS 를 걷어내면서 사라진
+   * 「초대된 번호가 아닙니다」와, 코드와 다르게 적힌 연결 충돌 문구.
+   *
+   * 문구가 **어딘가에 존재하는지**만 본다. 설명이 맞는지는 사람이 본다.
+   */
+  const SOURCE = (() => {
+    const chunks: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === "node_modules" || entry.name === "dist") continue;
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.tsx?$/.test(entry.name)) chunks.push(readFileSync(full, "utf8"));
+      }
+    };
+    walk(path.join(ROOT, "apps", "web", "src"));
+    walk(path.join(ROOT, "packages"));
+    return chunks.join("\n");
+  })();
+
+  /** faq.md 「문제 해결」 표의 첫 열과, member.md 가 따옴표로 인용한 문구. */
+  const quoted: { message: string; where: string }[] = [];
+  {
+    const faq = guide("faq.md");
+    for (const line of faq.slice(faq.indexOf("## 문제 해결")).split("\n")) {
+      const cell = /^\|([^|]+)\|/.exec(line)?.[1]?.trim();
+      if (!cell || cell === "메시지" || /^-+$/.test(cell.replace(/\s/g, ""))) continue;
+      quoted.push({ message: cell, where: "faq.md" });
+    }
+    for (const m of guide("member.md").matchAll(/"([^"]+)"/g)) {
+      quoted.push({ message: m[1]!, where: "member.md" });
+    }
+  }
+
+  /**
+   * 표에 적힌 형태에서 코드와 대조할 조각을 뽑는다.
+   * `(사진)` 같은 보충 설명은 문구가 아니고, `…` 은 표 폭에 맞춘 생략이라 조각으로 나눈다.
+   */
+  function fragments(message: string): string[] {
+    return message
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/["'.]/g, " ")
+      .split("…")
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  it("검사할 문구를 찾았다", () => {
+    expect(quoted.length).toBeGreaterThan(5);
+  });
+
+  for (const { message, where } of quoted) {
+    it(`${where}: ${message}`, () => {
+      for (const fragment of fragments(message)) {
+        expect(
+          SOURCE.includes(fragment),
+          `가이드가 "${message}" 를 안내하지만 코드에 그런 문구가 없습니다`,
+        ).toBe(true);
+      }
+    });
+  }
+});
+
 describe("가이드가 보안 약속을 정확히 설명한다", () => {
   it("사진을 AI 에 보내지 않는다고 적혀 있다", () => {
     // ExtractionInput 에 이미지 필드가 없어서 구조적으로 불가능하다.
