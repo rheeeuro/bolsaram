@@ -144,12 +144,23 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     expect(ALL).toMatch(/65%/);
   });
 
-  it("정리 작업 시각 04:10", () => {
+  /** cron 앱이 여러 개라 이름으로 찾는다 — 첫 cron_restart 를 집으면 순서에 흔들린다. */
+  const cronOf = (appName: string): { hour: string; minute: string } => {
     const eco = readFileSync(path.join(ROOT, "ecosystem.config.cjs"), "utf8");
-    const match = /cron_restart:\s*"(\d+)\s+(\d+)\s/.exec(eco);
-    expect(match?.[2]).toBe("4");
-    expect(match?.[1]).toBe("10");
+    const block = new RegExp(`name:\\s*"${appName}"[\\s\\S]*?cron_restart:\\s*"(\\d+)\\s+(\\d+)\\s`);
+    const match = block.exec(eco);
+    return { minute: match?.[1] ?? "", hour: match?.[2] ?? "" };
+  };
+
+  it("정리 작업 시각 04:10", () => {
+    expect(cronOf("bolsaram-cleanup")).toEqual({ hour: "4", minute: "10" });
     expect(ALL).toMatch(/4시 10분/);
+  });
+
+  it("백업 시각 03:40 — 정리보다 먼저 돈다", () => {
+    // 정리가 지운 것도 하루치 백업에는 남아 있어야 실수를 되돌릴 수 있다.
+    expect(cronOf("bolsaram-backup")).toEqual({ hour: "3", minute: "40" });
+    expect(ALL).toMatch(/3시 40분/);
   });
 
   it("관리자 로그인 시도 제한 5회 / 15분", () => {
@@ -275,6 +286,19 @@ describe("개인정보 처리방침이 실제 동작과 같다", () => {
   it("전체공개 범위를 분명히 밝힌다", () => {
     // 주선자 가입이 열려 있으므로 이 사실을 숨기면 안 된다.
     expect(privacy()).toMatch(/전체공개로 등록된 프로필은 가입한 모든 주선자가 봅니다/);
+  });
+
+  it("동의 기록 없이는 공개하지 않는다고 적혀 있다", () => {
+    // DB 제약(profiles_listed_requires_consent) + 도메인 게이트가 실제로 막는다.
+    expect(privacy()).toMatch(/기록이 없으면 프로필을 공개할 수 없습니다/);
+    expect(guide("admin.md")).toMatch(/기록이 없으면 공개할 수\s+없습니다/);
+  });
+
+  it("확인 방법으로 고를 수 있는 것이 코드와 같다", () => {
+    const admin = guide("admin.md");
+    for (const label of ["카카오톡", "구두", "서면"]) {
+      expect(admin, `확인 방법 "${label}" 안내 없음`).toContain(label);
+    }
   });
 
   it("아직 정하지 않은 것을 숨기지 않는다", () => {

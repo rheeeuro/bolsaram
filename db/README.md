@@ -39,6 +39,9 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0014_group_description.sql`       | 모임 설명 (주선자끼리 보는 메모)                                                       |
 | `0015_magic_link_login.sql`        | 회원 로그인을 매직 링크로 — `login_codes` 제거, 전화번호 필수 해제                     |
 | `0016_invite_claim_pair.sql`       | `invites_claim_pair` 완화 — 링크를 쓴 회원을 삭제할 수 있게                            |
+| `0017_notifications.sql`           | 알림 아웃박스: `notifications` + 신청·수락 트리거 (담당 주선자에게)                    |
+| `0018_notifications_readonly.sql`  | 알림은 런타임 롤에서 읽기 전용 (기본 권한으로 딸려온 DML 회수)                         |
+| `0019_profile_consent.sql`         | 등록 동의 기록 — 기록 없이는 게시할 수 없다                                            |
 
 ## 테이블
 
@@ -54,6 +57,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `invites`                                      | **회원 로그인 링크** (토큰 해시만 저장)            | 관리자만                            |
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
+| `notifications`                                | 알림 아웃박스. 트리거가 만들고 디스패처가 보낸다   | 받는 사람이 **읽기만**              |
 | `telegram_connections`                         | 텔레그램 계정 ↔ 주선자 연결                        | 관리자만                            |
 | `telegram_import_sessions`                     | 봇 대화 상태 (ImportSession 과 1:1)                | 관리자만                            |
 | `sessions`                                     | 세션                                               | **권한 없음** (owner 커넥션 전용)   |
@@ -80,10 +84,17 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_webhook_events.update_id` PK              | 같은 webhook update 두 번 처리                |
 | `telegram_connections` 양방향 UNIQUE                | 계정 하나에 텔레그램 두 개 / 그 반대          |
 | `group_admins_one_owner` (부분 유니크)              | 모임당 OWNER 두 명                            |
+| `notifications_dedupe_idx` (부분 유니크)            | 같은 사건으로 같은 사람에게 두 번 알림        |
+| `profiles_listed_requires_consent`                  | 동의 기록 없는 프로필의 게시                  |
+| `profiles_consent_pair`                             | 확인했다는데 확인 시각이 없는 기록            |
 | `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을
 DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
+
+`match_requests_notify_created` · `match_requests_notify_accepted` 트리거가 담당 주선자
+(`app_profile_admins()`)에게 보낼 알림을 `notifications` 에 넣는다. 전이가 실제로 성공했을
+때만 돌기 때문에 애플리케이션이 알림을 빠뜨릴 수 없다.
 
 ## RLS 요약
 
@@ -107,6 +118,7 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 | `app_can_edit_profile(uuid)`           | 자기 모임이거나, 전체공개인데 자기가 등록했는가     |
 | `app_can_edit_import(uuid)`            | 위와 같은 판정을 Import 세션에                      |
 | `app_current_member_group()`           | 현재 회원이 속한 풀 (전체공개 회원은 NULL)          |
+| `app_profile_admins(uuid)`             | 그 프로필의 담당 주선자 집합 (알림 수신자)          |
 
 - 익명(둘 다 NULL)은 어떤 프로필도 읽지 못한다.
 - 모임에 속하지 않은 주선자는 아무 데이터도 보지 못한다.
@@ -120,11 +132,15 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 - Import·초대는 관리자 전용이다.
 - 텔레그램 봇 대화·계정 연결도 관리자 전용이다. webhook 은 **RLS 를 우회하지 않는다** —
   신원 확인만 owner 커넥션으로 하고, 그 뒤 모든 접근은 연결된 주선자 명의로 정책을 통과한다.
-- 봇 연결 코드와 webhook 이벤트 테이블은 `sessions`·`login_codes` 와 같은 취급이다.
+- 봇 연결 코드와 webhook 이벤트 테이블은 `sessions` 와 같은 취급이다.
   정책을 주지 않고 권한을 회수해 런타임 롤이 아예 접근하지 못한다.
+- `notifications` 는 **읽기만** 열려 있고 그마저 받는 사람 본인으로 제한된다. 만드는 것은
+  트리거(owner 소유 SECURITY DEFINER), 보냈다고 표시하는 것은 디스패처(owner)뿐이다 —
+  정책과 권한 회수로 두 겹을 걸었다.
 
 `tests/rls.test.ts` 22개, `tests/group-isolation.test.ts` 11개,
-`tests/telegram-import.test.ts` 의 「권한 경계」가 실제 DB 에 붙어 검증한다.
+`tests/notifications.test.ts` 11개, `tests/telegram-import.test.ts` 의 「권한 경계」가
+실제 DB 에 붙어 검증한다.
 
 ## 새 마이그레이션 추가
 

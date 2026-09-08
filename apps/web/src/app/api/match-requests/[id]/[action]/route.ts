@@ -6,6 +6,7 @@ import { DomainError } from "@bolsaram/domain";
 import { rejectMatchRequestSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
 import { asMember } from "@/server/http/context";
+import { scheduleDispatch } from "@/server/notify/dispatch";
 import { ok, route } from "@/server/http/respond";
 import { actorFor, findById, transition } from "@/server/repo/matches";
 
@@ -49,6 +50,9 @@ export const POST = route(async (request: Request, { params }: Params) => {
       entityId: id,
       metadata: { from: record.status, to: updated.status },
     });
+    // 수락은 주선자가 연결해야 다음으로 간다. 알림 행은 트리거가 만들었고
+    // (accept 가 아니면 아무것도 안 만든다) 여기서는 보내기만 띄운다.
+    scheduleDispatch();
     return ok({ id: updated.id, status: updated.status });
   });
 });

@@ -148,8 +148,11 @@ async function main(): Promise<void> {
            gender, birth_year, height, job_title, job_category, company, education,
            residence_region, workplace_region, religion, mbti, smoking, drinking,
            hobbies, bio, ideal_type_text, real_name, contact_note,
-           status, visibility, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+           status, visibility, created_by, consent_method)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+                 -- 합성 데이터라는 표식. 게시 제약을 통과시키면서, 나중에 실데이터와
+                 -- 섞였을 때 pnpm db:purge-seed 가 이걸 보고 걷어낸다.
+                 'SYNTHETIC')
          RETURNING id, public_code`,
         [
           gender,

@@ -23,8 +23,8 @@ async function newProfile(name: string): Promise<string> {
   return withOwner(async (sql) => {
     const r = await sql.query<{ id: string }>(
       `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
-                             status, visibility, real_name, created_by)
-       VALUES (NULL,'FEMALE',1994,'SEOUL','ACTIVE','LISTED',$1,$2) RETURNING id`,
+                             status, visibility, real_name, created_by, consent_method)
+       VALUES (NULL,'FEMALE',1994,'SEOUL','ACTIVE','LISTED',$1,$2,'SYNTHETIC') RETURNING id`,
       [`${TAG}-${name}`, adminId],
     );
     return r.rows[0]!.id;

@@ -38,7 +38,7 @@ apps/web/src/
 │   ├── page.tsx              인트로 (로그인 상태면 역할별 리다이렉트)
 │   ├── layout.tsx            폰트·메타데이터·noindex
 │   ├── globals.css           Tailwind + 디자인 토큰 + 전역 스타일
-│   ├── login/                로그인 (회원 OTP / 주선자 비밀번호 탭)
+│   ├── login/                주선자 로그인 (회원은 초대 링크로 들어온다)
 │   ├── signup/               주선자 가입 → 모임 생성
 │   ├── claim/[token]/        초대 링크 → 프로필 연결
 │   ├── (member)/             회원 영역 (하단 탭 레이아웃)
@@ -70,12 +70,12 @@ apps/web/src/
 
 ```
 server/
-├── env.ts                    환경변수 스키마 (APP_ENV 로 개발 편의 기능 게이트)
-├── crypto.ts                 HMAC·scrypt·OTP 생성·타이밍 안전 비교
+├── env.ts                    환경변수 스키마 (production 은 https·기본 시크릿 금지)
+├── crypto.ts                 HMAC·scrypt·랜덤 토큰·타이밍 안전 비교
 ├── audit.ts                  감사 로그 (민감값 제외)
 ├── auth/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
-│   ├── login.ts              관리자 비밀번호 · 회원 OTP (재요청·시도 제한)
+│   ├── login.ts              관리자 비밀번호 (15분 5회 시도 제한)
 │   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
 │   ├── group-invite.ts       모임 초대 코드 발급·소비, 내 모임 조회
@@ -97,6 +97,9 @@ server/
 │   ├── client.ts             Bot API 호출·파일 다운로드·webhook 서명 확인
 │   ├── adapter.ts            Update → 신원 확인 → 의도 판정 → ImportSession
 │   └── messages.ts           봇 응답 문구
+├── notify/                   알림 아웃박스 → 텔레그램 발송
+│   ├── outbox.ts             미발송 알림 선점·기록 (owner)
+│   └── dispatch.ts           발송 루프 + 기동 시 주기 스윕
 ├── services/import-service.ts  분석 실행 + idempotent commit
 ├── views/profile-view.ts     공개 단계 적용 + signed URL 부착
 └── http/
@@ -110,6 +113,8 @@ server/
 
 인증이 필요 없는 경로는 없다(`/api/auth/*` 제외). 미인증은 401, 회원의 관리자 경로 접근은 403.
 
+알림에는 엔드포인트가 없다 — 신청·수락 경로가 발송을 띄우고 기동 시 스윕이 밀린 것을 줍는다.
+
 텔레그램 webhook 만 세션 쿠키를 쓰지 않는다. 발신자 확인은 `setWebhook` 의 `secret_token`
 (요청 헤더 `X-Telegram-Bot-Api-Secret-Token`)으로 하고, 채널이 꺼져 있으면 404 를 준다.
 
@@ -121,7 +126,8 @@ server/
 | `/api/claim`                              | POST                | **초대 토큰**     | 회원 로그인 (매직 링크) + 최초 계정 생성 |
 | `/api/profiles`                           | GET                 | 회원              | Discover 목록 (필터·커서)            |
 | `/api/profiles/[id]`                      | GET / PATCH         | 회원 / 관리자     | 상세 조회 / 내용 수정                |
-| `/api/profiles/[id]/status`               | PATCH               | 관리자            | 상태·노출 변경                       |
+| `/api/profiles/[id]/status`               | PATCH               | 관리자            | 상태·노출 변경 (동의 기록 확인)      |
+| `/api/profiles/[id]/consent`              | POST                | 관리자            | 등록 동의 기록                       |
 | `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 관리자            | introduce · close                    |
@@ -185,6 +191,23 @@ Inbox·검토·commit 을 거치고, 게시 게이트(`assertCommittable`)를 �
 owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세션 쿠키가 없어 RLS 컨텍스트를
 만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 관리자 요청과 완전히 같다.
 
+### 알림
+
+```
+회원의 신청·수락 (RLS 트랜잭션)
+  → DB 트리거가 notifications 에 행 추가      담당 주선자 = app_profile_admins()
+  → scheduleDispatch()                        응답을 기다리지 않고 띄운다
+  → 디스패처가 선점(attempts+1) → 텔레그램 → sent_at
+```
+
+**요청 트랜잭션 안에서 텔레그램을 호출하지 않는다.** 회원 컨텍스트에서는 주선자의
+텔레그램 연결을 읽을 수 없고(정책이 없다), 봇이 느리면 「마음 보내기」가 같이 느려진다.
+보낼 것을 DB 에 남기므로 발송에 실패해도 신청은 남고 다음 스윕이 다시 시도한다.
+
+`server/notify/` 는 owner 커넥션을 쓰는 유일한 비인증 경로다. 대신 닿는 범위를
+`notifications` 와 `telegram_connections` 로 좁혔다 — 사람은 공개 번호로만 가리키고
+이름·연락처는 알림에 싣지 않는다.
+
 ---
 
 ## 개발
@@ -196,7 +219,8 @@ pnpm deploy:web                # 빌드 + PM2 재시작
 ```
 
 환경변수는 리포 루트 `.env` 하나로 관리하고 `next.config.ts` 가 읽어들인다.
-`APP_ENV=production` 에서는 개발 편의 기능(OTP 화면 노출)이 잠긴다.
+`APP_ENV=production` 에서는 `APP_ORIGIN` 이 https 여야 하고 `.env.example` 의 기본
+시크릿을 쓸 수 없다 — 둘 다 기동 훅에서 검증하며, 걸리면 모든 요청이 500 이 된다.
 
 ## 유지보수
 

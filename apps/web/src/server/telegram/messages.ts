@@ -126,4 +126,28 @@ export const messages = {
   failed: "처리 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.",
 
   reviewButton: "관리자 화면에서 검토",
+
+  /**
+   * 신청 알림 (마이그레이션 0017 의 아웃박스가 보낸다).
+   * **사람을 공개 번호로만 가리킨다** — 이름·나이·연락처를 봇 메시지에 싣지 않는다.
+   * 누가 누구인지는 관리자 화면에서 본다.
+   */
+  matchRequested: (requesterCode: number | null, targetCode: number | null) =>
+    ["새 신청이 들어왔습니다.", "", pairLine(requesterCode, targetCode, "→")].join("\n"),
+
+  /** 수락된 건은 주선자가 연결해야 다음으로 간다. 그래서 할 일을 문장으로 못 박는다. */
+  matchAccepted: (requesterCode: number | null, targetCode: number | null) =>
+    [
+      "신청이 수락됐습니다. 연결해 주세요.",
+      "",
+      pairLine(requesterCode, targetCode, "↔"),
+    ].join("\n"),
+
+  requestsButton: "신청 목록 열기",
 } as const;
+
+/** 공개 번호가 없으면(프로필이 지워진 뒤) 번호 자리를 비워 둔다. */
+function pairLine(a: number | null, b: number | null, arrow: string): string {
+  const code = (value: number | null) => (value === null ? "?" : `${value}번`);
+  return `${code(a)} ${arrow} ${code(b)}`;
+}

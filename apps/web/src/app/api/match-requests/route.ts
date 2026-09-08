@@ -2,6 +2,7 @@
 import { createMatchRequestSchema, matchRequestListQuerySchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
 import { asMember } from "@/server/http/context";
+import { scheduleDispatch } from "@/server/notify/dispatch";
 import { ok, readJson, readQuery, route } from "@/server/http/respond";
 import { createMatchRequest, listSignals } from "@/server/repo/matches";
 import { findProfilesByIds } from "@/server/repo/profiles";
@@ -24,6 +25,9 @@ export const POST = route(async (request: Request) => {
       entityId: created.id,
       metadata: { target: input.targetProfileId },
     });
+    // 담당 주선자에게 알린다. 알림 행은 DB 트리거가 이미 만들었고, 여기서는
+    // 보내기만 띄운다 — 응답을 기다리게 하지 않는다.
+    scheduleDispatch();
     return ok({ id: created.id, status: created.status }, { status: 201 });
   });
 });

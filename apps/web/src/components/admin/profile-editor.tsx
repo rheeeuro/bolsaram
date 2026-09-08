@@ -24,6 +24,7 @@ import {
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/admin/table";
+import { ConsentPanel } from "@/components/admin/consent-panel";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch, apiPost } from "@/lib/api-client";
 import { label } from "@/lib/labels";
@@ -364,6 +365,8 @@ export function AdminProfileEditor({
             </Field>
           </div>
         </Card>
+
+        <ConsentPanel profileId={profile.id} consent={profile.consent} />
 
         <Card title="계정 연결">
           {claimed ? (

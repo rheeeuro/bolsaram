@@ -9,7 +9,7 @@
  */
 import { rm } from "node:fs/promises";
 import path from "node:path";
-import { TELEGRAM_SESSION_TTL_HOURS } from "@bolsaram/domain";
+import { NOTIFICATION_RETRY_WINDOW_DAYS, TELEGRAM_SESSION_TTL_HOURS } from "@bolsaram/domain";
 import type { Sql } from "./client.js";
 
 /** 보존 기간(일). 운영 정책이 정해지면 이 값을 조정한다. */
@@ -24,6 +24,11 @@ export const RETENTION = {
   rawModelOutput: 14,
   /** 감사 로그 */
   auditLogs: 365,
+  /**
+   * 보낸 알림. 발송 여부를 잠시 볼 수 있으면 충분하고, 오래 두면 「누가 누구에게
+   * 신청했다」는 기록이 필요 이상으로 남는다.
+   */
+  notifications: 30,
   /**
    * 처리한 webhook 이벤트. 중복 판정에 쓰이므로 텔레그램이 재전송을 포기하는
    * 기간(최대 하루)보다 넉넉히 길게 둔다.
@@ -135,6 +140,20 @@ export const STEPS: Step[] = [
         `DELETE FROM admin_login_failures
           WHERE failed_at < now() - make_interval(days => $1)`,
         [RETENTION.adminLoginFailures],
+      );
+      return r.rowCount ?? 0;
+    },
+  },
+  {
+    label: "오래된 알림",
+    run: async (sql) => {
+      // 보낸 것은 보관 기간이 지나면 지운다. 못 보낸 것은 재시도 창(3일)을 넘기면
+      // 보낼 일이 없으므로 같이 정리한다 — 늦은 알림은 알림이 아니다.
+      const r = await sql.query(
+        `DELETE FROM notifications
+          WHERE (sent_at IS NOT NULL AND sent_at < now() - make_interval(days => $1))
+             OR (sent_at IS NULL AND created_at < now() - make_interval(days => $2))`,
+        [RETENTION.notifications, NOTIFICATION_RETRY_WINDOW_DAYS],
       );
       return r.rowCount ?? 0;
     },

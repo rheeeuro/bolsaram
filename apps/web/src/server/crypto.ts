@@ -1,6 +1,6 @@
 /** 서명/해시 유틸. 비밀은 전부 env 에서만 읽는다. */
 import "server-only";
-import { createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 /** base64url — 쿠키·URL 에 그대로 넣을 수 있는 형태. */
 export function b64url(buf: Buffer): string {
@@ -29,11 +29,6 @@ export function randomToken(bytes = 32): string {
 /** 초대 토큰/OTP 처럼 원문을 저장하면 안 되는 값의 해시. pepper 를 섞는다. */
 export function peppered(secret: string, value: string): string {
   return hmac(secret, value);
-}
-
-/** 6자리 숫자 OTP. Math.random 을 쓰지 않는다. */
-export function generateOtp(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
 /**

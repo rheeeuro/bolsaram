@@ -14,6 +14,7 @@ NEW_MIG = "db/migrations/0008_brand_new.sql"
 ENVF = "." + "env"
 STORE = "var/" + "storage"
 LOGD = "var/" + "log"
+BACKUP = "var/" + "backup"
 
 # (설명, 명령, 차단되어야 하는가)
 CASES = [
@@ -30,6 +31,8 @@ CASES = [
     ("운영 로그 편집",                   f"truncate -s 0 {LOGD}/bolsaram-web.out.log", True),
     ("grep 대상이 비밀 파일",            f'grep -rn "SECRET" {ENVF}', True),
     ("rg 대상이 스토리지 디렉터리",       f'rg "x" {STORE}/', True),
+    ("DB 덤프 열람",                     f"pg_restore --list {BACKUP}/bolsaram-1.dump", True),
+    ("DB 덤프 삭제",                     f"rm {BACKUP}/bolsaram-1.dump", True),
 
     # ── 통과 ──────────────────────────────────────────────
     ("마이그레이션 경로 단순 언급",       f"echo {MIG} > /tmp/list.txt", False),

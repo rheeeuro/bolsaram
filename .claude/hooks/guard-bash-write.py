@@ -6,7 +6,8 @@ file_path 기반 가드(guard-sensitive.sh)는 Edit/Write 도구만 본다. 같�
 이 모듈은 Bash 도구의 command 문자열을 세그먼트로 쪼개 **민감 경로 + 쓰기 동작**이
 함께 있을 때만 차단한다(단순 조회·문자열 검색은 통과).
 
-비밀·개인정보 경로(.env · var/storage · var/log)는 읽기도 금지라 읽기 명령에서도 막는다.
+비밀·개인정보 경로(.env · var/storage · var/log · var/backup)는 읽기도 금지라
+읽기 명령에서도 막는다.
 단 정규식 토큰(`"\\.env"` 같은)은 경로가 아니므로 통과시킨다.
 
 사용: echo "$COMMAND" | guard-bash-write.py  → 차단이면 stderr 사유 + exit 2
@@ -27,7 +28,7 @@ GENERATED = (
 )
 # 비밀·개인정보 — 읽기도 금지.
 SECRETS = (".env", ".env.local")
-PROTECTED_DIRS = ("var/storage", "var/log")
+PROTECTED_DIRS = ("var/storage", "var/log", "var/backup")
 
 # 사용자가 명시적으로 요청했을 때만 비밀 파일 가드를 내린다(guard-sensitive.sh 와 같은 마커).
 # 마커가 있어도 생성 설정 파일·적용된 마이그레이션 가드는 그대로 걸린다.
@@ -63,7 +64,7 @@ INLINE_RE = re.compile(r"\b(?:python3?|node|npx|tsx|ruby|perl|pnpm)\b[^\n;|&]*?(
 # 경로 경계에서만 잡아 `.environ`·`process.env` 같은 식별자를 피한다.
 # 비밀 파일과 보호 디렉터리를 나눠 둔다 — 승인 마커는 앞엣것만 해제한다.
 SECRET_FILE_RE = re.compile(r"""(?:^|[\s'"=(,/])\.env(?:\.local)?(?:$|[\s'"),;:])""")
-PROTECTED_DIR_RE = re.compile(r"""(?:^|[\s'"=(,/])var/(?:storage|log)/""")
+PROTECTED_DIR_RE = re.compile(r"""(?:^|[\s'"=(,/])var/(?:storage|log|backup)/""")
 
 # 마이그레이션 — **이미 적용된** 파일만 수정 금지. 새 파일 작성은 정상 작업이다.
 MIGRATION_RE = re.compile(r"db/migrations/(\d{4}_[\w-]+\.sql)")
@@ -121,7 +122,8 @@ def classify(token: str) -> str | None:
                 "   사용자가 명시적으로 요청했다면 .claude/.allow-secret-edit 마커로 일시 해제할 수 있습니다.")
     if any(f"{d}/" in t or t.endswith(d) for d in PROTECTED_DIRS):
         return (f"🚫 {t} 는 보호된 디렉터리입니다.\n"
-                "   var/storage 는 프로필 사진(개인정보), var/log 는 운영 로그입니다. 읽기·편집 금지.")
+                "   var/storage 는 프로필 사진, var/backup 은 DB 덤프(둘 다 개인정보),\n"
+                "   var/log 는 운영 로그입니다. 읽기·편집 금지.")
     hit = migration_hit(t)
     if hit:
         return (f"🚫 {hit} 은 이미 적용된 마이그레이션입니다.\n"
@@ -192,7 +194,7 @@ def check(command: str) -> str | None:
                 SECRET_FILE_RE.search(line) and not secret_guard_off()
             ):
                 return ("🚫 비밀 파일·보호된 디렉터리는 읽기·편집 금지입니다.\n"
-                        "   (.env · .env.local · var/storage/ · var/log/)\n"
+                        "   (.env · .env.local · var/storage/ · var/log/ · var/backup/)\n"
                         "   이 경로를 문자열로만 다뤄야 한다면(문서·테스트 케이스 등)\n"
                         "   Bash heredoc 대신 Write 도구로 파일을 만드세요.")
             hit = sensitive_text_hit(line)
@@ -247,7 +249,11 @@ def check(command: str) -> str | None:
         for arg in scan_args:
             if not path_like(arg):
                 continue
-            if writes or (reads and is_read_forbidden(arg)):
+            # 개인정보 디렉터리는 **어떤 명령이든** 인자로 받으면 막는다.
+            # 읽기 명령 목록에 기대면 목록 밖의 도구(pg_restore·rsync·tar…)가 그대로
+            # 통과한다 — 도구를 쫓아다니는 대신 경로를 기준으로 판정한다.
+            in_protected = any(f"{d}/" in arg or arg.endswith(d) for d in PROTECTED_DIRS)
+            if writes or in_protected or (reads and is_read_forbidden(arg)):
                 reason = classify(arg)
                 if reason:
                     return reason

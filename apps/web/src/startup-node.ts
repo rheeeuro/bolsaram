@@ -8,6 +8,7 @@
 import "server-only";
 import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 import { env } from "./server/env";
+import { startNotificationSweep } from "./server/notify/dispatch";
 
 /**
  * Node 의 Happy Eyeballs 는 주소 하나당 이 시간만 기다리고 다음 주소로 넘어간다.
@@ -26,6 +27,11 @@ export function startup(): void {
   // env() 는 lazy 라서 검증이 첫 요청까지 미뤄진다. 설정 실수(운영에서 OTP 노출,
   // 시크릿 누락 등)는 트래픽을 받기 전에 드러나야 하므로 여기서 강제로 평가한다.
   const config = env();
+
+  // 밀린 알림을 줍는 그물. 요청 경로가 즉시 발송을 띄우지만, 그때 프로세스가 죽었거나
+  // 텔레그램이 잠깐 죽어 있었다면 아웃박스에 남는다.
+  startNotificationSweep();
+
   console.info(
     `볼사람 서버 기동 — APP_ENV=${config.APP_ENV} (NODE_ENV=${config.NODE_ENV})` +
       ` / AI 프로바이더 ${config.AI_PROVIDER}` +

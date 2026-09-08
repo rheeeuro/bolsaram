@@ -47,6 +47,22 @@ module.exports = {
       ...log("bolsaram-web"),
     },
 
+    // ── DB 백업 (매일 03:40) ───────────────────────────────────
+    // 정리(04:10)보다 **먼저** 돈다 — 정리가 지운 것도 하루치 백업에는 남아 있어야
+    // 실수를 되돌릴 수 있다. 덤프는 var/backup 에 14개까지 쌓인다(같은 호스트다).
+    {
+      name: "bolsaram-backup",
+      script: "bash",
+      args: "scripts/db-backup.sh",
+      cwd: ROOT,
+      interpreter: "none",
+      instances: 1,
+      autorestart: false,
+      cron_restart: "40 3 * * *",
+      env: { NODE_ENV: "production" },
+      ...log("bolsaram-backup"),
+    },
+
     // ── 만료 데이터 정리 (매일 04:10) ──────────────────────────
     // 세션·OTP·초대·감사 로그 정리 + 방치된 Import 원본 사진 삭제.
     // cron 워커라 매 실행 새 프로세스로 뜬다 — 코드를 고쳐도 재시작할 필요가 없다.

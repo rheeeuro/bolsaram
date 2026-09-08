@@ -31,16 +31,18 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서                | –    | 12   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
-| `rls.test.ts`                  | RLS 정책 강제                                  | 필요 | 22   |
+| `rls.test.ts`                  | RLS 정책 강제                                  | 필요 | 21   |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
-| `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 7    |
-| `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 32   |
+| `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
+| `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·사진 묶기·권한 경계   | 필요 | 23   |
 | `admin-login.test.ts`          | 관리자 비밀번호 시도 제한·창 만료·권한 경계    | 필요 | 7    |
 | `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
-| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 21   |
+| `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
+| `consent.test.ts`              | 등록 동의 — 게시 게이트·짝 제약·도메인 판정    | 필요 | 12   |
+| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 34   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
 `setup.ts` 가 리포 루트 `.env` 를 읽어 DB 접속 정보를 채운다.
@@ -84,6 +86,10 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `group-isolation.test.ts` 「남의 프로필을 자기 것으로」    | 초대 없는 claim 차단 (0013)          |
 | `member-magic-link.test.ts` 「같은 링크를 두 번」          | 링크 replay 차단 (회원 로그인 수단)  |
 | `member-magic-link.test.ts` 「링크를 쓴 회원을 삭제」      | 탈퇴 처리가 제약에 막히지 않음 (0016)|
+| `notifications.test.ts` 「남의 모임 주선자에게는」         | 알림이 담당자 밖으로 새지 않음      |
+| `notifications.test.ts` 「런타임 롤은 …만들지 못한다」     | 남의 봇으로 임의 발송 차단          |
+| `consent.test.ts` 「기록 없이 LISTED 로」                  | 동의 없는 게시 차단 (DB 제약)       |
+| `consent.test.ts` 「비공개로 내리는 것은 언제나」          | 문제 발견 시 즉시 내릴 수 있음      |
 | `docs-guide.test.ts`                                       | 사용자 문서와 구현의 정합성         |
 | `docs-readme.test.ts`                                      | 디렉터리 문서와 코드 구조의 정합성  |
 

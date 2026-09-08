@@ -33,12 +33,18 @@ pnpm dev          # http://127.0.0.1:3020
 
 ### 시드 계정
 
-| 역할   | 로그인                                                        |
-| ------ | ------------------------------------------------------------- |
-| 주선자 | `admin@bolsaram.local` / `bolsaram-admin`                     |
-| 회원   | `01020001000` ~ `01020001005` (OTP는 화면과 서버 콘솔에 표시) |
+| 역할   | 로그인                                                                 |
+| ------ | ---------------------------------------------------------------------- |
+| 주선자 | `admin@bolsaram.local` / `bolsaram-admin` (시드 기본값)                |
+| 회원   | `01020001000` ~ `01020001005` — **비밀번호 없음. 초대 링크로 들어갑니다** |
 
-`DEV_EXPOSE_OTP=true`인 개발 환경에서만 OTP가 노출됩니다. 운영 모드에서는 서버가 기동을 거부합니다.
+회원 계정은 관리자 화면에서 프로필 상세 → 초대 링크를 발급해 그 링크로 로그인합니다.
+자유 가입이 없고, 전화번호는 신원이 아니라 주선자가 기록하는 연락 수단입니다.
+
+> 이 호스트의 주선자 비밀번호는 공개 도메인에 열려 있어 임의 값으로 교체했습니다(2026-09-07).
+> 값을 모르면 `/signup`으로 새 주선자 계정을 만드세요. **새로 시드한 환경을 공개 주소에
+> 붙이면 위 기본값이 그대로 열립니다.**
+
 시드의 이름·사진·연락처는 **전부 합성 데이터**이며 실존 인물과 무관합니다.
 
 ## 기술 스택
@@ -46,9 +52,11 @@ pnpm dev          # http://127.0.0.1:3020
 - **모노레포** pnpm workspace
 - **웹/API** Next.js 16 App Router · React 19 · TypeScript strict · Tailwind v4 · Zod 4
 - **DB** PostgreSQL 17 · 순수 SQL 마이그레이션 · Row Level Security
-- **인증** 자체 세션(서명 쿠키 + DB 세션). 관리자 이메일/비밀번호, 회원 전화 OTP
+- **인증** 자체 세션(서명 쿠키 + DB 세션). 주선자 이메일/비밀번호, **회원은 초대 링크**
 - **스토리지** 로컬 private 디렉터리 + 단기 HMAC signed URL
 - **AI** provider 추상화 — 기본 `mock`, `AI_PROVIDER=openai`로 전환
+- **Import** 텔레그램 봇 webhook(1차) + 관리자 웹 업로드
+- **알림** DB 아웃박스 → 텔레그램 (주선자에게 신청·수락)
 
 설계 문서는 Supabase를 전제하지만, 외부 계정 없이 전체 플로우를 실제로 돌려 검증할 수 있도록
 로컬 대체물로 구현했습니다. 대응표는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있습니다.
@@ -63,13 +71,13 @@ pnpm dev          # http://127.0.0.1:3020
 | -------------------- | ----------------------------------------------------------- | -------------------------------------- |
 | `apps/web`           | Next.js 앱 — 회원 화면 + 관리자 화면 + API                  | [README](apps/web/README.md)           |
 | `packages/schemas`   | Zod 스키마 · 도메인 열거형 · AI 추출 스키마(단일 원본)      | [README](packages/schemas/README.md)   |
-| `packages/domain`    | 순수 도메인 로직 — 상태 기계, 정보 공개, 필터               | [README](packages/domain/README.md)    |
+| `packages/domain`    | 순수 도메인 로직 — 상태 기계, 정보 공개, 동의, 필터         | [README](packages/domain/README.md)    |
 | `packages/db`        | 커넥션 풀 · RLS 컨텍스트 · 마이그레이션/시드 CLI            | [README](packages/db/README.md)        |
 | `packages/ui-tokens` | 디자인 토큰                                                 | [README](packages/ui-tokens/README.md) |
 | `packages/config`    | 공용 tsconfig / eslint                                      | –                                      |
 | `db`                 | 스키마와 마이그레이션 (RLS 정책 포함)                       | [README](db/README.md)                 |
 | `tests`              | vitest — 도메인 단위 + DB 통합                              | [README](tests/README.md)              |
-| `scripts`            | 운영 스크립트 (텔레그램 webhook 등록, AI 키 확인) |
+| `scripts`            | 운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인) | –                                      |
 | `docs`               | 설계 문서 · 구현 계획 · [사용 가이드](docs/guide/README.md) | –                                      |
 
 이 README 들은 코드가 바뀌면 함께 갱신합니다. 어긋나면 `tests/docs-readme.test.ts` 가 잡습니다.
@@ -83,6 +91,7 @@ pnpm dev          # http://127.0.0.1:3020
 | 컨테이너         | `bolsaram_postgres` (`postgres:17`)               |
 | 데이터 볼륨      | `bolsaram_pg_data`                                |
 | private 스토리지 | `var/storage/` (git 제외, 정적 서빙 안 됨)        |
+| DB 백업          | `var/backup/` (git 제외, 열람 금지 — 실명·연락처) |
 
 - 비밀번호를 포함한 접속 정보 원본은 [docker-compose.yml](docker-compose.yml)에 있습니다.
 - DB 포트는 `127.0.0.1`에만 바인딩합니다. `0.0.0.0`으로 열어둔 동안 외부 스캐너가 접근한 이력이 있습니다(2026-07-29).
@@ -98,25 +107,41 @@ pnpm pm2:status   # 상태
 pnpm pm2:logs     # 로그
 ```
 
-| 앱                 | 역할                                             | 스케줄     |
-| ------------------ | ------------------------------------------------ | ---------- |
-| `bolsaram-web`     | 웹 + API (3020)                                  | 상시       |
-| `bolsaram-cleanup` | 만료 세션·OTP·초대 정리, 방치된 Import 원본 삭제 | 매일 04:10 |
+| 앱                 | 역할                                              | 스케줄     |
+| ------------------ | ------------------------------------------------- | ---------- |
+| `bolsaram-web`     | 웹 + API (3020)                                   | 상시       |
+| `bolsaram-backup`  | `pg_dump` 백업 (14개 보관)                        | 매일 03:40 |
+| `bolsaram-cleanup` | 만료 세션·초대·알림 정리, 방치된 Import 원본 삭제 | 매일 04:10 |
 
 정의는 [ecosystem.config.cjs](ecosystem.config.cjs)에 있습니다. 이 호스트에는 다른 프로젝트의
 PM2 앱도 함께 떠 있으니 항상 앱 이름을 지정해 조작하세요.
 
-`APP_ENV`는 `NODE_ENV`와 분리된 축입니다. PM2로 띄우면 `NODE_ENV=production`이지만
-아직 실제 사용자를 받지 않는 스테이징이므로 `APP_ENV=staging`으로 두어 회원 OTP 로그인을
-확인할 수 있습니다. **실제 배포 시 `production`으로 바꾸고 `DEV_EXPOSE_OTP`를 지우세요** —
-그 조합이면 서버가 기동을 거부합니다.
+`APP_ENV`는 `NODE_ENV`와 분리된 축입니다. 웹 앱은 `APP_ENV=production`으로 뜨며,
+이때 `APP_ORIGIN`이 https여야 하고 `.env.example`의 기본 시크릿을 쓸 수 없습니다.
+둘 다 기동 훅에서 검증하므로 **걸리면 프로세스는 살아 있고 모든 요청이 500**이 됩니다 —
+설정을 바꾼 뒤에는 `pm2 status`가 아니라 기동 로그를 확인하세요.
+
+`pm2 restart`는 ecosystem의 env를 다시 읽지 않습니다. 환경을 바꿨다면
+`pm2 restart ecosystem.config.cjs --only bolsaram-web --update-env`로 띄웁니다.
+
+### 백업
+
+```bash
+pnpm db:backup          # 지금 한 개 만들기 (평소엔 PM2 cron 이 03:40 에)
+pnpm db:backup:list     # 가진 백업
+pnpm db:backup:verify   # 최근 백업을 임시 DB 로 되살려 확인
+```
+
+덤프는 14개까지 쌓이고 오래된 것부터 지워집니다. **같은 호스트에 보관하므로 디스크가
+통째로 죽는 경우는 막지 못합니다** — 막는 것은 실수로 지운 데이터, 잘못된 마이그레이션,
+컨테이너 볼륨 손상입니다.
 
 ## 검증
 
 ```bash
-pnpm verify        # typecheck + lint + test (171개)
+pnpm verify        # typecheck + lint + test (311개)
 pnpm agents:check  # 에이전트 설정 드리프트 검사
-pnpm agents:test   # 셸 가드 판정 케이스 23개
+pnpm agents:test   # 셸 가드 판정 케이스 25개
 ```
 
 DB 통합 테스트가 포함되어 있어 `pnpm db:up`이 필요합니다.
@@ -128,8 +153,8 @@ Claude Code와 Codex가 같은 규칙으로 움직이도록 `.agent-config/`를 
 훅이 편집을 막습니다.
 
 편집할 때마다 해당 패키지 타입체크와 마이그레이션 RLS 검사가 돌고, 턴이 끝나면 변경된 코드를
-빌드해 PM2 앱을 재시작합니다. 비밀 파일·프로필 사진 저장소·이미 적용된 마이그레이션은
-Edit 도구와 셸 양쪽에서 차단합니다.
+빌드해 PM2 앱을 재시작합니다. 비밀 파일·프로필 사진 저장소·DB 백업·운영 로그·이미 적용된
+마이그레이션은 Edit 도구와 셸 양쪽에서 차단합니다.
 
 자세한 내용은 [.ai-harness/project.md](.ai-harness/project.md)를 보세요.
 
@@ -140,6 +165,7 @@ Edit 도구와 셸 양쪽에서 차단합니다.
   상세(소개·취미·이상형) → 연결 후(이름·연락처).
 - 사진은 private 저장소에 있고 매 응답마다 새로 발급되는 단기 signed URL로만 접근합니다.
 - 초대 토큰은 pepper를 섞은 해시로만 저장하며, claim은 원자적이라 재사용(replay)이 불가능합니다.
+- 주선자에게 가는 텔레그램 알림에는 **공개 번호만** 싣습니다(이름·연락처 없음).
 - 검색엔진 색인을 금지합니다.
 
 ## 아직 안 된 것
@@ -148,5 +174,14 @@ Edit 도구와 셸 양쪽에서 차단합니다.
   [docs/share-spike-plan.md](docs/share-spike-plan.md)에 실기기 검증 계획이 있습니다.
   카카오톡의 공유 payload는 실기기 확인 전까지 확정하지 않습니다.
   현재 웹 Import Inbox가 같은 API 계약을 쓰므로, 모바일 추가 시 서버 변경은 필요 없습니다.
-- **SMS 발송** — 미연동. 운영 배포 전 어댑터가 필요합니다.
-- **배포 구성(PM2 등)** — 없음.
+- **SMS 발송** — 쓰지 않기로 했습니다. 회원 로그인은 주선자가 카카오톡으로 보내는
+  초대 링크(매직 링크)입니다.
+- **회원 알림** — 채널이 없습니다. 주선자는 텔레그램으로 알림을 받지만, 회원은 직접
+  들어와야 신청·수락을 확인합니다.
+- **개인정보 처리방침 확정** — [docs/guide/privacy.md](docs/guide/privacy.md)는 코드 기준
+  초안이며 **법률 검토를 받지 않았습니다.** 동의는 기록할 자리를 만들었지만(기록 없이는
+  게시되지 않습니다) 무엇을 어떤 문구로 알릴지와 동의 철회 절차, 보호책임자 연락처가
+  비어 있습니다.
+- **호스트 밖 백업** — 백업은 DB와 같은 디스크에 쌓입니다.
+- **시드 데이터 정리** — 이 호스트에는 아직 합성 프로필이 떠 있습니다. 실회원을 받기 전에
+  `pnpm db:purge-seed --yes`로 걷어내세요.

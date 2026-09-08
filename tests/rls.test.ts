@@ -37,8 +37,8 @@ beforeAll(async () => {
 
     const profile = async (userId: string | null, status: string, visibility: string) => {
       const result = await sql.query<{ id: string }>(
-        `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status, visibility, real_name)
-         VALUES ($1,$2,'FEMALE',1993,'SEOUL',$3,$4,$5) RETURNING id`,
+        `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status, visibility, real_name, consent_method)
+         VALUES ($1,$2,'FEMALE',1993,'SEOUL',$3,$4,$5,'SYNTHETIC') RETURNING id`,
         [groupId, userId, status, visibility, `${TAG}-이름`],
       );
       return result.rows[0]!.id;

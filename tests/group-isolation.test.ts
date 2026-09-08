@@ -53,8 +53,8 @@ async function makeParty(sql: Parameters<Parameters<typeof withOwner>[0]>[0], ke
 
   const p = await sql.query<{ id: string }>(
     `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
-                           status, visibility, real_name, created_by)
-     VALUES ($1, $2, 'FEMALE', 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4) RETURNING id`,
+                           status, visibility, real_name, created_by, consent_method)
+     VALUES ($1, $2, 'FEMALE', 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4, 'SYNTHETIC') RETURNING id`,
     [groupId, memberId, `${TAG}-${key}-이름`, adminId],
   );
 
@@ -255,8 +255,8 @@ describe("모임에 속하지 않은 주선자", () => {
     const publicId = await withOwner(async (sql) => {
       const r = await sql.query<{ id: string }>(
         `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
-                               status, visibility, real_name)
-         VALUES (NULL,'FEMALE',1996,'SEOUL','ACTIVE','LISTED',$1) RETURNING id`,
+                               status, visibility, real_name, consent_method)
+         VALUES (NULL,'FEMALE',1996,'SEOUL','ACTIVE','LISTED',$1,'SYNTHETIC') RETURNING id`,
         [`${TAG}-전체공개`],
       );
       return r.rows[0]!.id;

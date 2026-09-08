@@ -47,6 +47,8 @@ export type ProfileDetailView = ProfileCardView & {
   contactNote?: string | null;
   status?: string;
   visibility?: string;
+  /** 등록 동의 기록. 주선자에게만 보인다 — 공개 가능 여부를 화면이 알아야 한다. */
+  consent?: { method: string | null; confirmedAt: string | null };
 };
 
 function toImageView(image: {
@@ -117,6 +119,12 @@ export function toDetailView(
   if (level === "ADMIN" || level === "OWNER") {
     base.status = profile.status;
     base.visibility = profile.visibility;
+  }
+  if (level === "ADMIN") {
+    base.consent = {
+      method: profile.consent.method,
+      confirmedAt: profile.consent.confirmedAt?.toISOString() ?? null,
+    };
   }
   return base;
 }

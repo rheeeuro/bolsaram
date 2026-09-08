@@ -66,6 +66,11 @@ case "$FILE" in
     echo "🚫 $FILE 는 운영 로그입니다. 직접 편집 금지 (조회는 pm2 logs 를 쓰세요)." >&2
     exit 2
     ;;
+  */var/backup/*)
+    echo "🚫 $FILE 는 DB 덤프입니다. 실명·연락처가 들어 있어 열람·편집 금지." >&2
+    echo "   목록은 pnpm db:backup:list, 복구 확인은 pnpm db:backup:verify 를 쓰세요." >&2
+    exit 2
+    ;;
 esac
 
 # ── 적용된 마이그레이션 보호 ─────────────────────────────────────────────

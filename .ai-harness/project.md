@@ -67,13 +67,17 @@ pnpm deploy:web        # 빌드 후 bolsaram-web 재시작
 pnpm pm2:status        # 앱 상태
 pnpm pm2:logs          # 로그 50줄
 pnpm db:cleanup        # 만료 데이터 정리 (평소엔 cron 이 돌린다)
+pnpm db:backup         # DB 백업 (평소엔 cron 이 03:40 에 돌린다)
+pnpm db:backup:list    # 가진 백업 목록
+pnpm db:backup:verify  # 최근 백업을 임시 DB 로 되살려 확인
+pnpm db:purge-seed     # 합성 시드 정리 (기본은 미리보기, --yes 로 실제 삭제)
 
 pnpm telegram:webhook  # 봇 webhook 등록 상태 (--set 등록, --delete 해제)
 pnpm ai:check          # OpenAI 키·모델 사용 가능 여부
 
 pnpm agents:sync       # 하네스 원본 → 에이전트별 설정 생성
 pnpm agents:check      # 생성 파일 드리프트 검사
-pnpm agents:test       # 셸 가드 판정 케이스 23개
+pnpm agents:test       # 셸 가드 판정 케이스 25개
 ```
 
 회원 계정은 **초대 링크를 소비할 때만** 만들어집니다(`consumeInvite`).
@@ -93,6 +97,7 @@ pnpm agents:test       # 셸 가드 판정 케이스 23개
 | 앱                 | 역할             | 비고                                                 |
 | ------------------ | ---------------- | ---------------------------------------------------- |
 | `bolsaram-web`     | 웹 + API (3020)  | 상시. 코드 변경 시 빌드 후 재시작해야 반영된다       |
+| `bolsaram-backup`  | DB 백업          | 매일 03:40 cron. 정리보다 **먼저** 돈다              |
 | `bolsaram-cleanup` | 만료 데이터 정리 | 매일 04:10 cron. 매 실행 새 프로세스라 재시작 불필요 |
 
 - 정의는 `ecosystem.config.cjs`. 루트 package.json 이 `type: module` 이라 확장자가 `.cjs` 다.
@@ -131,8 +136,9 @@ pnpm agents:test       # 셸 가드 판정 케이스 23개
 | UserPromptSubmit | mark-turn-start.sh | 턴 시작 시각 기록                           |
 | Stop             | deploy-on-stop.sh  | 빌드 + PM2 재시작, 미적용 마이그레이션 안내 |
 
-가드가 막는 대상: 생성된 에이전트 설정, 비밀 파일, private 스토리지, 운영 로그,
-**이미 적용된 마이그레이션**. 판정 기준은 `guard-bash-write.py` 가 단일 소스이며
+가드가 막는 대상: 생성된 에이전트 설정, 비밀 파일, private 스토리지, **DB 백업**, 운영 로그,
+**이미 적용된 마이그레이션**. 개인정보 디렉터리(`var/storage` · `var/backup` · `var/log`)는
+어떤 명령의 인자로 나와도 막힌다 — 읽기 명령 목록에 없는 도구로 우회할 수 없다. 판정 기준은 `guard-bash-write.py` 가 단일 소스이며
 `pnpm agents:test` 로 검증한다. 경로를 문자열로만 다뤄야 하는 경우(문서·테스트)는
 Bash heredoc 대신 Write 도구를 쓴다.
 
@@ -160,18 +166,19 @@ rm .claude/.allow-secret-edit      # 즉시 복구
 apps/web/src/
   app/            라우트. (member) 그룹 = 회원, admin/ = 관리자, api/ = Route Handler
   components/     ui/(공용) member/(감성 톤) admin/(CRM 톤)
-  server/         서버 전용. auth/ repo/ services/ storage/ ai/ telegram/ views/ http/
+  server/         서버 전용. auth/ repo/ services/ storage/ ai/ telegram/ notify/ views/ http/
 packages/
   schemas/        Zod 스키마 + 도메인 열거형 (AI 추출 스키마의 single source)
-  domain/         순수 도메인 로직 (상태 기계, 공개 규칙, 필터 → SQL)
+  domain/         순수 도메인 로직 (상태 기계, 공개 규칙, 동의 판정, 필터 → SQL)
   db/             커넥션 풀 + RLS 컨텍스트 + 마이그레이션/시드 CLI
   ui-tokens/      디자인 토큰 (CSS + TS)
   config/         공용 tsconfig / eslint
 db/migrations/    번호순 SQL. 적용된 파일은 절대 수정하지 않고 새 파일을 추가합니다.
 tests/            vitest. 도메인 단위 + DB 통합
 .agent-config/    에이전트 하네스 원본 (위 참고)
+scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인)
 ecosystem.config.cjs  PM2 정의
-var/             private 스토리지와 PM2 로그 (git 제외, 열람 금지)
+var/             private 스토리지 · DB 백업 · PM2 로그 (git 제외, 열람 금지)
 ```
 
 ## 디렉터리 README
@@ -273,6 +280,12 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   (`ExtractionInput` 에 이미지 필드가 없습니다). 실측에서 사진은 기여가 없었고,
   실제 인물 사진을 외부로 보낼 이유가 없습니다.
 - AI 결과를 자동 게시하지 않습니다. 게시 게이트는 UI가 아니라 도메인 레이어(`assertCommittable`)에 있습니다.
+- **동의 기록 없이 게시하지 않습니다.** DB 가 「기록이 있는가」를 막고
+  (`profiles_listed_requires_consent`), 「실제로 확인한 동의인가」는 도메인
+  (`assertConsentForVisibility`)이 막습니다. 비공개로 내리는 것은 언제나 허용합니다.
+- **알림은 아웃박스로 보냅니다.** 요청 트랜잭션 안에서 텔레그램을 호출하지 않습니다 —
+  DB 트리거가 `notifications` 에 남기고 `server/notify/` 가 보냅니다. 알림 문구에는
+  공개 번호만 싣습니다.
 - 실제 인물 정보를 seed/fixture로 쓰지 않습니다. 시드는 전부 합성 데이터입니다.
 - 로그에 프로필 원문·사진 URL·전화번호·초대 토큰을 남기지 않습니다.
 - 상태 전이는 도메인 레이어에서 판정하고, DB에는 조건부 UPDATE(`WHERE status = <from>`)로 적용합니다.
@@ -299,10 +312,13 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 - **주선자 비밀번호**: 이 호스트는 교체했습니다(2026-09-07). 다만 `pnpm db:seed` 는
   여전히 문서화된 기본값을 씁니다 — 새로 시드한 환경을 공개 주소에 붙이면 같은 문제가
   생깁니다. 시도 제한(15분 5회)은 **이미 알려진 비밀번호를 막지 못합니다.**
-- **개인정보 처리방침 확정**: `docs/guide/privacy.md` 는 코드 기준 초안입니다.
-  **법률 검토를 받지 않았고**, 등록되는 사람의 동의 절차와 개인정보 보호책임자·연락처가
-  비어 있습니다. 실제 회원을 받기 전에 채워야 합니다.
-- **시크릿 재발급**: 봇 토큰·OpenAI 키·세션 시크릿이 작업 기록에 남았습니다.
-  공개 운영 전에 전부 재발급하세요. **새 값은 대화에 붙여넣지 말고 환경 파일에 직접
-  넣습니다** — `pnpm telegram:webhook --set` 과 `pnpm ai:check` 가 값을 출력하지 않고
-  확인·등록해 줍니다.
+- **개인정보 처리방침 확정**: `docs/guide/privacy.md` 는 코드 기준 초안이며 **법률 검토를
+  받지 않았습니다.** 등록 동의는 기록할 자리를 만들었고(0019) 기록 없이는 게시되지
+  않지만, **무엇을 어떤 문구로 알릴지와 동의 철회 절차는 정해지지 않았습니다.**
+  개인정보 보호책임자·문의 창구·사업자 정보도 비어 있습니다.
+- **회원 알림**: 채널이 없습니다. 주선자는 텔레그램으로 신청·수락 알림을 받지만
+  (`server/notify/`), 회원은 직접 들어와야 확인합니다.
+- **호스트 밖 백업**: `pnpm db:backup` 은 같은 디스크의 `var/backup` 에 쌓입니다.
+  디스크가 통째로 죽는 경우는 막지 못합니다.
+- **시드 데이터 정리**: 이 호스트에는 아직 합성 프로필이 떠 있습니다.
+  실회원을 받기 전에 `pnpm db:purge-seed --yes` 로 걷어내세요(표식은 `SYNTHETIC`).
