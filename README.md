@@ -71,7 +71,7 @@ pnpm dev          # http://127.0.0.1:3020
 | -------------------- | ----------------------------------------------------------- | -------------------------------------- |
 | `apps/web`           | Next.js 앱 — 회원 화면 + 관리자 화면 + API                  | [README](apps/web/README.md)           |
 | `packages/schemas`   | Zod 스키마 · 도메인 열거형 · AI 추출 스키마(단일 원본)      | [README](packages/schemas/README.md)   |
-| `packages/domain`    | 순수 도메인 로직 — 상태 기계, 정보 공개, 동의, 필터         | [README](packages/domain/README.md)    |
+| `packages/domain`    | 순수 도메인 로직 — 상태 기계, 정보 공개, 필터               | [README](packages/domain/README.md)    |
 | `packages/db`        | 커넥션 풀 · RLS 컨텍스트 · 마이그레이션/시드 CLI            | [README](packages/db/README.md)        |
 | `packages/ui-tokens` | 디자인 토큰                                                 | [README](packages/ui-tokens/README.md) |
 | `packages/config`    | 공용 tsconfig / eslint                                      | –                                      |
@@ -183,9 +183,9 @@ Claude Code와 Codex가 같은 규칙으로 움직이도록 `.agent-config/`를 
 - **회원 알림** — 보내지 않기로 했습니다. 주선자는 텔레그램으로 신청·수락 알림을 받고,
   회원은 시그널 화면에서 직접 확인합니다. 연락이 필요한 일은 주선자가 카카오톡으로 합니다.
 - **개인정보 처리방침 확정** — [docs/guide/privacy.md](docs/guide/privacy.md)는 코드 기준
-  초안이며 **법률 검토를 받지 않았습니다.** 동의는 기록할 자리를 만들었지만(기록 없이는
-  게시되지 않습니다) 무엇을 어떤 문구로 알릴지와 동의 철회 절차, 보호책임자 연락처가
-  비어 있습니다.
+  초안이며 **법률 검토를 받지 않았습니다.** 등록되는 사람의 동의는 **주선자 책임**으로
+  두고 시스템이 기록하지 않습니다. 동의를 받을 때 무엇을 알릴지, 철회는 어떻게 받을지,
+  보호책임자 연락처가 비어 있습니다.
 - **호스트 밖 백업** — 기본 백업은 DB와 같은 디스크에 쌓입니다. 다른 마운트에 사본을
   두려면 `BACKUP_MIRROR_DIR`를 설정하세요(원격 저장소 연동은 아직 없습니다).
 - **시드 데이터 정리** — 이 호스트에는 아직 합성 프로필이 떠 있습니다. 실회원을 받기 전에

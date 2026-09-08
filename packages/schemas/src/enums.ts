@@ -52,27 +52,6 @@ export const VISIBILITY_LABELS: Record<Visibility, string> = {
   PRIVATE: "비공개",
 };
 
-/**
- * 등록 동의를 어떻게 확인했는가 (마이그레이션 0019).
- * 프로필은 주선자가 남을 대신해 등록하므로, 게시하려면 기록이 있어야 한다.
- *
- * SYNTHETIC·LEGACY 는 **실제 동의가 아니다** — 각각 합성 시드와 「확인 필요」다.
- * 새로 게시할 때는 도메인 레이어가 이 둘을 거절한다.
- */
-export const CONSENT_METHODS = ["KAKAO", "VERBAL", "WRITTEN", "SYNTHETIC", "LEGACY"] as const;
-export type ConsentMethod = (typeof CONSENT_METHODS)[number];
-export const CONSENT_METHOD_LABELS: Record<ConsentMethod, string> = {
-  KAKAO: "카카오톡 대화로 확인",
-  VERBAL: "구두로 확인",
-  WRITTEN: "서면·양식으로 확인",
-  SYNTHETIC: "합성 데이터(동의 대상 아님)",
-  LEGACY: "확인 필요",
-};
-
-/** 주선자가 직접 고를 수 있는 것 — 실제로 사람에게 확인한 방법만. */
-export const RECORDABLE_CONSENT_METHODS = ["KAKAO", "VERBAL", "WRITTEN"] as const;
-export type RecordableConsentMethod = (typeof RECORDABLE_CONSENT_METHODS)[number];
-
 export const JOB_CATEGORIES = [
   "IT",
   "FINANCE",

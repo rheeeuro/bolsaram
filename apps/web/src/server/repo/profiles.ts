@@ -9,13 +9,10 @@ import {
   buildDiscoverWhere,
   decodeCursor,
   encodeCursor,
-  type ConsentState,
   type FullProfile,
 } from "@bolsaram/domain";
 import type {
   AdminProfileQuery,
-  ConsentMethod,
-  ConsentRecord,
   DiscoverQuery,
   ProfileStatus,
   ProfileUpdate,
@@ -28,7 +25,6 @@ const PROFILE_COLUMNS = `
   p.residence_region, p.workplace_region, p.religion, p.mbti,
   p.smoking, p.drinking, p.hobbies, p.bio, p.ideal_type_text,
   p.real_name, p.contact_note, p.status, p.visibility,
-  p.consent_method, p.consent_at,
   p.created_at, p.updated_at`;
 
 type ProfileRow = {
@@ -55,16 +51,12 @@ type ProfileRow = {
   contact_note: string | null;
   status: ProfileStatus;
   visibility: Visibility;
-  consent_method: ConsentMethod | null;
-  consent_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
 
 export type ProfileRecord = FullProfile & {
   userId: string | null;
-  /** 등록 동의 기록. 게시 판정은 도메인의 assertConsentForVisibility 가 한다. */
-  consent: ConsentState;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -102,7 +94,6 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     contactNote: row.contact_note,
     status: row.status,
     visibility: row.visibility,
-    consent: { method: row.consent_method, confirmedAt: row.consent_at },
     images,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -278,25 +269,6 @@ export async function updateProfileStatus(
   return (result.rowCount ?? 0) > 0;
 }
 
-/**
- * 등록 동의를 기록한다. 방법과 시각을 함께 쓴다 —
- * DB 제약(`profiles_consent_pair`)이 한쪽만 있는 상태를 거부한다.
- */
-export async function recordConsent(
-  sql: Sql,
-  id: string,
-  input: ConsentRecord,
-  recordedBy: string,
-): Promise<boolean> {
-  const result = await sql.query(
-    `UPDATE profiles
-        SET consent_method = $2, consent_at = $3, consent_note = $4, consent_recorded_by = $5
-      WHERE id = $1`,
-    [id, input.method, input.confirmedAt, input.note ?? null, recordedBy],
-  );
-  return (result.rowCount ?? 0) > 0;
-}
-
 // ── 관리자 목록 ───────────────────────────────────────────────
 
 export async function findAdminProfiles(
@@ -314,10 +286,6 @@ export async function findAdminProfiles(
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
   if (query.claimed === "yes") clauses.push("p.user_id IS NOT NULL");
   if (query.claimed === "no") clauses.push("p.user_id IS NULL");
-  // 합성 데이터(SYNTHETIC)는 확인 대상이 아니라 지울 대상이므로 빼둔다.
-  if (query.consent === "pending") {
-    clauses.push("(p.consent_method IS NULL OR p.consent_method = 'LEGACY')");
-  }
   if (query.q) {
     const term = push(`%${query.q}%`);
     const codeMatch = /^#?(\d+)$/.exec(query.q);

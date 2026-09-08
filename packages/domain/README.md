@@ -29,7 +29,6 @@ packages/domain/src/
 ├── filters.ts      Discover 필터 → SQL 조각 · 커서 페이지네이션
 ├── telegram.ts     봇 대화 상태 기계 · 메시지 분류 · 원문 합치기 · 앨범 판정
 ├── notify.ts       알림 재시도 창·시도 상한 (발송과 정리가 같은 값을 본다)
-├── consent.ts      등록 동의 판정 — 공개하려면 실제로 확인한 기록이 있어야 한다
 └── index.ts        위 전부 재수출
 ```
 

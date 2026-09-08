@@ -1,8 +1,7 @@
 /** 프로필 목록 — 검색/필터/상태 관리 (설계문서 §6). */
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
-import { adminProfileQuerySchema, PROFILE_STATUSES, type ConsentMethod } from "@bolsaram/schemas";
-import { needsConsentReview } from "@bolsaram/domain";
+import { adminProfileQuerySchema, PROFILE_STATUSES } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Table, Td, Th } from "@/components/admin/table";
@@ -99,12 +98,6 @@ export default async function AdminProfilesPage({
                       <span className="text-[11.5px] text-[var(--surface-text-muted)]">
                         {label.visibility(view.visibility)}
                       </span>
-                      {needsConsentReview({
-                        method: (view.consent?.method ?? null) as ConsentMethod | null,
-                        confirmedAt: null,
-                      }) ? (
-                        <Badge tone="warning">동의 확인 필요</Badge>
-                      ) : null}
                     </div>
                   </Td>
                   <Td>

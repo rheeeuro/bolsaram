@@ -5,4 +5,3 @@ export * from "./import";
 export * from "./filters";
 export * from "./telegram";
 export * from "./notify";
-export * from "./consent";

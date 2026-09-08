@@ -41,7 +41,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0016_invite_claim_pair.sql`       | `invites_claim_pair` 완화 — 링크를 쓴 회원을 삭제할 수 있게                            |
 | `0017_notifications.sql`           | 알림 아웃박스: `notifications` + 신청·수락 트리거 (담당 주선자에게)                    |
 | `0018_notifications_readonly.sql`  | 알림은 런타임 롤에서 읽기 전용 (기본 권한으로 딸려온 DML 회수)                         |
-| `0019_profile_consent.sql`         | 등록 동의 기록 — 기록 없이는 게시할 수 없다                                            |
+| `0019_profile_consent.sql`         | 등록 동의 기록 (0020 에서 되돌림)                                                      |
+| `0020_drop_profile_consent.sql`    | 동의 기록 제거 + 시드 표식(`is_seed`)만 남김                                           |
 
 ## 테이블
 
@@ -50,7 +51,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `groups`                                       | 모임. 이름·설명. 가입과 별개로 만든다              | 소속 주선자 + 소속 회원             |
 | `group_admins`                                 | 모임 ↔ 주선자 (여러 명 가능, OWNER 한 명)          | 같은 모임 주선자만 조회             |
 | `users`                                        | 계정 (ADMIN 이메일/비밀번호, MEMBER 전화)          | 본인 + 같은 모임 관계자             |
-| `profiles`                                     | 프로필. `public_code` 가 화면의 `#17`              | 공개분 + 본인 + 관리자              |
+| `profiles`                                     | 프로필. `public_code` 가 화면의 `#17`, `is_seed` 는 합성 표식 | 공개분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
 | `favorites`                                    | 관심                                               | 본인만                              |
@@ -85,8 +86,6 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_connections` 양방향 UNIQUE                | 계정 하나에 텔레그램 두 개 / 그 반대          |
 | `group_admins_one_owner` (부분 유니크)              | 모임당 OWNER 두 명                            |
 | `notifications_dedupe_idx` (부분 유니크)            | 같은 사건으로 같은 사람에게 두 번 알림        |
-| `profiles_listed_requires_consent`                  | 동의 기록 없는 프로필의 게시                  |
-| `profiles_consent_pair`                             | 확인했다는데 확인 시각이 없는 기록            |
 | `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을

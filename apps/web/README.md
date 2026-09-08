@@ -126,8 +126,7 @@ server/
 | `/api/claim`                              | POST                | **초대 토큰**     | 회원 로그인 (매직 링크) + 최초 계정 생성 |
 | `/api/profiles`                           | GET                 | 회원              | Discover 목록 (필터·커서)            |
 | `/api/profiles/[id]`                      | GET / PATCH         | 회원 / 관리자     | 상세 조회 / 내용 수정                |
-| `/api/profiles/[id]/status`               | PATCH               | 관리자            | 상태·노출 변경 (동의 기록 확인)      |
-| `/api/profiles/[id]/consent`              | POST                | 관리자            | 등록 동의 기록                       |
+| `/api/profiles/[id]/status`               | PATCH               | 관리자            | 상태·노출 변경                       |
 | `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 관리자            | introduce · close                    |

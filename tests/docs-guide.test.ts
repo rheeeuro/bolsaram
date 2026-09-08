@@ -288,19 +288,6 @@ describe("개인정보 처리방침이 실제 동작과 같다", () => {
     expect(privacy()).toMatch(/전체공개로 등록된 프로필은 가입한 모든 주선자가 봅니다/);
   });
 
-  it("동의 기록 없이는 공개하지 않는다고 적혀 있다", () => {
-    // DB 제약(profiles_listed_requires_consent) + 도메인 게이트가 실제로 막는다.
-    expect(privacy()).toMatch(/기록이 없으면 프로필을 공개할 수 없습니다/);
-    expect(guide("admin.md")).toMatch(/기록이 없으면 공개할 수\s+없습니다/);
-  });
-
-  it("확인 방법으로 고를 수 있는 것이 코드와 같다", () => {
-    const admin = guide("admin.md");
-    for (const label of ["카카오톡", "구두", "서면"]) {
-      expect(admin, `확인 방법 "${label}" 안내 없음`).toContain(label);
-    }
-  });
-
   it("아직 정하지 않은 것을 숨기지 않는다", () => {
     // 동의 절차와 책임자가 비어 있다 — 공개 전에 채워야 한다.
     expect(privacy()).toMatch(/동의/);

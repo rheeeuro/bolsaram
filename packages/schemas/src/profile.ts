@@ -6,7 +6,6 @@ import {
   JOB_CATEGORIES,
   MBTI_TYPES,
   PROFILE_STATUSES,
-  RECORDABLE_CONSENT_METHODS,
   REGIONS,
   RELIGIONS,
   SMOKING_LEVELS,
@@ -59,28 +58,6 @@ export const profileStatusUpdateSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 });
 
-/**
- * 등록 동의 기록 (마이그레이션 0019).
- * 주선자가 **직접 확인한 방법만** 고를 수 있다 — SYNTHETIC·LEGACY 는 시스템이 붙인
- * 표식이라 입력으로 받지 않는다.
- */
-export const consentRecordSchema = z.object({
-  method: z.enum(RECORDABLE_CONSENT_METHODS),
-  /** 확인한 시각. 미래는 받지 않는다 — 아직 받지 않은 동의를 기록할 수 없다. */
-  confirmedAt: z.iso
-    .datetime({ offset: true })
-    .refine((v) => new Date(v).getTime() <= Date.now() + 60_000, "미래 시각은 기록할 수 없습니다."),
-  /** 어떻게 확인했는지 한 줄. 대화 원문을 옮겨 적는 자리가 아니다. */
-  note: z
-    .string()
-    .trim()
-    .max(500)
-    .transform((v) => (v.length === 0 ? null : v))
-    .nullable()
-    .optional(),
-});
-export type ConsentRecord = z.infer<typeof consentRecordSchema>;
-
 /** Discover 필터 (설계문서 §4 탐색). 쿼리스트링에서 오므로 문자열을 강제 변환한다. */
 const csv = <T extends readonly [string, ...string[]]>(values: T) =>
   z
@@ -122,8 +99,6 @@ export const adminProfileQuerySchema = z.object({
   status: csv(PROFILE_STATUSES),
   gender: z.enum(GENDERS).optional(),
   claimed: z.enum(["yes", "no"]).optional(),
-  /** pending = 등록 동의를 아직 확인하지 않은 것(확인 필요·기록 없음). */
-  consent: z.enum(["pending"]).optional(),
   cursor: z.string().trim().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

@@ -8,9 +8,9 @@
  *   pnpm db:purge-seed          무엇이 지워질지만 보여준다 (기본)
  *   pnpm db:purge-seed --yes    실제로 지운다
  *
- * 판별 기준은 이름이나 날짜 추측이 아니라 **표식**이다 — 시드가 만든 프로필은
- * `consent_method = 'SYNTHETIC'` 이다(마이그레이션 0019). 실제 사람의 프로필에는
- * 이 값이 붙지 않으므로 잘못 지울 수 없다.
+ * 판별 기준은 이름이나 날짜 추측이 아니라 **표식**이다 — 시드가 만든 프로필만
+ * `is_seed = true` 다(마이그레이션 0020). 주선자가 등록한 프로필에는 이 값이 붙지
+ * 않으므로 잘못 지울 수 없다.
  *
  * 지우는 것: 합성 프로필, 그 사진 파일, 그 프로필에 연결된 회원 계정.
  * 신청·관심·초대는 FK CASCADE 로 함께 사라진다.
@@ -37,7 +37,7 @@ async function main(): Promise<void> {
       `SELECT p.id, p.public_code, i.storage_key, p.user_id
          FROM profiles p
          LEFT JOIN profile_images i ON i.profile_id = p.id
-        WHERE p.consent_method = 'SYNTHETIC'
+        WHERE p.is_seed
         ORDER BY p.public_code`,
     );
 
@@ -51,18 +51,13 @@ async function main(): Promise<void> {
     }
 
     // 남는 것도 함께 보여준다 — "다 지웠는데 왜 아직 있지"를 없앤다.
-    const rest = await sql.query<{ method: string | null; count: number }>(
-      `SELECT consent_method AS method, count(*)::int AS count
-         FROM profiles WHERE consent_method IS DISTINCT FROM 'SYNTHETIC'
-        GROUP BY 1 ORDER BY 1`,
+    const rest = await sql.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM profiles WHERE NOT is_seed`,
     );
 
     console.info(`합성 프로필 ${profileIds.length}건, 사진 ${keys.length}장, 회원 계정 ${userIds.length}개`);
     console.info(`  번호: ${found.rows.map((r) => r.public_code).filter((v, i, a) => a.indexOf(v) === i).join(", ")}`);
-    console.info("남는 것:");
-    for (const row of rest.rows) {
-      console.info(`  ${row.method ?? "기록 없음"}: ${row.count}건`);
-    }
+    console.info(`남는 프로필: ${rest.rows[0]?.count ?? 0}건`);
 
     if (!apply) {
       console.info("\n실제로 지우려면 --yes 를 붙이세요.");

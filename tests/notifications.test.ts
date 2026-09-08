@@ -53,14 +53,14 @@ async function makeParty(sql: Sql, key: string): Promise<Party> {
 
   const requester = await sql.query<{ id: string }>(
     `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
-                           status, visibility, real_name, created_by, consent_method)
-     VALUES ($1, $2, 'MALE', 1992, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4, 'SYNTHETIC') RETURNING id`,
+                           status, visibility, real_name, created_by)
+     VALUES ($1, $2, 'MALE', 1992, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4) RETURNING id`,
     [groupId, memberId, `${TAG}-${key}-신청자`, adminId],
   );
   const target = await sql.query<{ id: string }>(
     `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
-                           status, visibility, real_name, created_by, consent_method)
-     VALUES ($1, 'FEMALE', 1994, 'SEOUL', 'ACTIVE', 'LISTED', $2, $3, 'SYNTHETIC') RETURNING id`,
+                           status, visibility, real_name, created_by)
+     VALUES ($1, 'FEMALE', 1994, 'SEOUL', 'ACTIVE', 'LISTED', $2, $3) RETURNING id`,
     [groupId, `${TAG}-${key}-대상`, adminId],
   );
 

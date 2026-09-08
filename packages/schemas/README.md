@@ -22,7 +22,7 @@ Zod 스키마와 도메인 열거형의 **단일 원본**. 웹 앱·도메인 �
 packages/schemas/src/
 ├── enums.ts        도메인 열거형 + 한글 라벨 (성별·지역·직업군·종교·흡연·음주·상태 등)
 ├── extraction.ts   AI 추출 스키마 · strict JSON Schema 생성 · 신뢰도 기준
-├── profile.ts      프로필 읽기/쓰기 · 등록 동의 기록 · Discover 필터 · 관리자 목록 쿼리
+├── profile.ts      프로필 읽기/쓰기 · Discover 필터 · 관리자 목록 쿼리
 ├── match.ts        소개 신청 생성·거절·연결, 관심 토글
 ├── import.ts       Import 세션·에셋·원문·검토·commit
 ├── auth.ts         전화번호 정규화, 주선자 로그인, 초대 링크·모임 코드

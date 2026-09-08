@@ -49,8 +49,8 @@ async function seedProfile(input: {
   return withOwner(async (sql) => {
     const r = await sql.query<{ id: string }>(
       `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
-                             status, visibility, real_name, created_by, consent_method)
-       VALUES ($1,'FEMALE',1993,'SEOUL','ACTIVE','LISTED',$2,$3,'SYNTHETIC') RETURNING id`,
+                             status, visibility, real_name, created_by)
+       VALUES ($1,'FEMALE',1993,'SEOUL','ACTIVE','LISTED',$2,$3) RETURNING id`,
       [input.groupId, `${TAG}-${input.name}`, input.createdBy],
     );
     return r.rows[0]!.id;
