@@ -51,8 +51,8 @@ curl -s -c /tmp/m.jar -H 'content-type: application/json' \
 
 - 인증 화면: `/` `/enter`(회원 입장코드) `/login`(주선자) `/signup` `/claim/<토큰>`
 - 회원 화면: `/discover` `/discover/<id>` `/signals` `/favorites` `/me`
-- 관리자 화면: `/admin` `/admin/imports` `/admin/profiles` `/admin/requests` `/admin/members`
-- 권한: 쿠키 없이 호출해 401, 회원 쿠키로 `/admin` 호출해 `/discover` 리다이렉트인지
+- 주선자 화면: `/home` `/imports` `/profiles` `/requests` `/members` `/group`
+- 권한: 쿠키 없이 호출해 401, 회원 쿠키로 `/home` 호출해 `/discover` 리다이렉트인지
 - 정보 공개: 연결되지 않은 상대의 상세에 `realName` 키가 **없는지**
 
 ## 브라우저 스크린샷

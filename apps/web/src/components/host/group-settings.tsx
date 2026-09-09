@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/admin/table";
+import { Panel } from "@/components/host/surface";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { apiDelete, apiPatch, apiPost, apiPut } from "@/lib/api-client";
 
@@ -35,8 +35,8 @@ function NoGroup() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="모임 만들기">
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Panel title="모임 만들기">
         <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
           모임에 등록한 회원은 같은 모임 주선자만 봅니다. 모임 없이도 전체공개 프로필은
           다룰 수 있습니다.
@@ -71,9 +71,9 @@ function NoGroup() {
         >
           {busy === "create" ? "만드는 중…" : "모임 만들기"}
         </Button>
-      </Card>
+      </Panel>
 
-      <Card title="초대 코드로 참여">
+      <Panel title="초대 코드로 참여">
         <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
           동료 주선자에게 받은 코드를 넣으면 그 모임에 합류합니다. 한 사람은 한 모임에만
           속합니다.
@@ -93,7 +93,7 @@ function NoGroup() {
         >
           {busy === "join" ? "참여 중…" : "모임 참여"}
         </Button>
-      </Card>
+      </Panel>
 
       {error ? (
         <p className="text-[12.5px] text-[var(--color-danger)] lg:col-span-2">{error}</p>
@@ -115,8 +115,8 @@ function HasGroup({ group }: { group: Group }) {
   const dirty = name !== group.name || description !== (group.description ?? "");
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="모임 정보">
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Panel title="모임 정보">
         <Field label="모임 이름">
           <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
         </Field>
@@ -154,9 +154,9 @@ function HasGroup({ group }: { group: Group }) {
         {message ? (
           <p className="mt-2 text-[12.5px] text-[var(--surface-text-muted)]">{message}</p>
         ) : null}
-      </Card>
+      </Panel>
 
-      <Card title={`주선자 ${group.admins.length}명`}>
+      <Panel title={`주선자 ${group.admins.length}명`}>
         <ul className="mb-4 space-y-1.5 text-[12.5px]">
           {group.admins.map((a) => (
             <li key={a.userId} className="flex items-center gap-2">
@@ -200,9 +200,9 @@ function HasGroup({ group }: { group: Group }) {
             {busy === "invite" ? "발급 중…" : "주선자 초대 코드 받기"}
           </Button>
         )}
-      </Card>
+      </Panel>
 
-      <Card title="모임 나가기">
+      <Panel title="모임 나가기">
         <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
           나가면 이 모임의 회원이 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다.
           <br />
@@ -225,7 +225,7 @@ function HasGroup({ group }: { group: Group }) {
         >
           {busy === "leave" ? "나가는 중…" : "모임 나가기"}
         </Button>
-      </Card>
+      </Panel>
 
       {error ? (
         <p className="text-[12.5px] text-[var(--color-danger)] lg:col-span-2">{error}</p>

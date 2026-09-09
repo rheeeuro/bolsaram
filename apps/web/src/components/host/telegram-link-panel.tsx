@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/admin/table";
+import { Panel } from "@/components/host/surface";
 import { apiDelete, apiPost } from "@/lib/api-client";
 
 type Issued = { code: string; expiresAt: string; deepLink: string | null };
@@ -51,16 +51,16 @@ export function TelegramLinkPanel({
 
   if (!enabled) {
     return (
-      <Card title="텔레그램 연결">
+      <Panel title="텔레그램 연결">
         <p className="text-[12.5px] text-[var(--surface-text-muted)]">
           텔레그램 Import 채널이 꺼져 있습니다. 운영자에게 문의해 주세요.
         </p>
-      </Card>
+      </Panel>
     );
   }
 
   return (
-    <Card title="텔레그램 연결">
+    <Panel title="텔레그램 연결">
       {linked ? (
         <div className="space-y-2.5">
           <p className="text-[12.5px]">
@@ -92,7 +92,7 @@ export function TelegramLinkPanel({
               href={issued.deepLink}
               target="_blank"
               rel="noreferrer"
-              className="inline-block text-[12.5px] text-[var(--surface-accent)] underline"
+              className="inline-block text-[12.5px] text-[var(--color-rose-600)] underline"
             >
               봇 열고 바로 연결하기
             </a>
@@ -114,6 +114,6 @@ export function TelegramLinkPanel({
       )}
 
       {error ? <p className="mt-3 text-[12.5px] text-[var(--color-danger)]">{error}</p> : null}
-    </Card>
+    </Panel>
   );
 }

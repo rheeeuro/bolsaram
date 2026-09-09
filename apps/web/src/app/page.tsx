@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function IntroPage() {
   const user = await readSession();
-  if (user) redirect(user.role === "ADMIN" ? "/admin" : "/discover");
+  if (user) redirect(user.role === "ADMIN" ? "/home" : "/discover");
 
   return (
     <main className="member-surface relative flex min-h-dvh flex-col overflow-hidden bg-[var(--color-ivory-100)]">

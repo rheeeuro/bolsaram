@@ -35,7 +35,7 @@ export async function dispatchPending(): Promise<{ sent: number; failed: number 
   let sent = 0;
   let failed = 0;
   const items = await claimPending();
-  const requestsUrl = `${env().APP_ORIGIN}/admin/requests`;
+  const requestsUrl = `${env().APP_ORIGIN}/requests`;
 
   for (const item of items) {
     try {

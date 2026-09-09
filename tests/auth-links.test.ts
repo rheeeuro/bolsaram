@@ -45,9 +45,7 @@ describe("입장코드 정규화", () => {
 describe("로그인 뒤 돌아갈 경로", () => {
   it("같은 출처의 경로만 통과시킨다", () => {
     expect(safeNextPath("/discover")).toBe("/discover");
-    expect(safeNextPath("/admin/profiles?status=INACTIVE")).toBe(
-      "/admin/profiles?status=INACTIVE",
-    );
+    expect(safeNextPath("/profiles?status=INACTIVE")).toBe("/profiles?status=INACTIVE");
   });
 
   it("다른 출처로 나가는 값을 막는다", () => {

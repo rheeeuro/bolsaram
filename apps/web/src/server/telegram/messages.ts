@@ -3,7 +3,7 @@
  *
  * 운영자 도구답게 짧고 직접적으로 쓴다. 다음 행동을 항상 한 줄로 알려준다.
  * **프로필 원문·사진·전화번호를 문구에 싣지 않는다** — 분석 결과 요약은
- * 예외적으로 몇 줄만 보여주고, 자세한 내용은 관리자 화면 링크로 넘긴다.
+ * 예외적으로 몇 줄만 보여주고, 자세한 내용은 볼사람 화면 링크로 넘긴다.
  */
 import "server-only";
 import { TELEGRAM_MAX_ASSETS_PER_SESSION, type ExtractedFields } from "@bolsaram/schemas";
@@ -12,14 +12,14 @@ export const messages = {
   notLinked: [
     "연결되지 않은 계정입니다.",
     "",
-    "볼사람 관리자 화면 → Import Inbox → 「텔레그램 연결」에서",
+    "볼사람 → 가져오기 → 「텔레그램 연결」에서",
     "연결 코드를 받아 /start <코드> 로 보내주세요.",
   ].join("\n"),
 
   startWithoutCode: [
     "볼사람 Import 봇입니다.",
     "",
-    "관리자 화면 → Import Inbox → 「텔레그램 연결」에서 코드를 받아",
+    "볼사람 → 가져오기 → 「텔레그램 연결」에서 코드를 받아",
     "/start <코드> 로 보내주세요.",
   ].join("\n"),
 
@@ -37,7 +37,7 @@ export const messages = {
   noGroup: [
     "아직 모임에 속해 있지 않습니다.",
     "",
-    "볼사람 관리자 화면에서 모임을 만들거나,",
+    "볼사람에서 모임을 만들거나,",
     "동료 주선자에게 초대를 받아 주세요.",
   ].join("\n"),
 
@@ -95,7 +95,7 @@ export const messages = {
     ].join(" · "),
 
   /**
-   * 분석 완료 안내. 요약은 관리자가 이미 아는 항목만 몇 줄로 보여준다.
+   * 분석 완료 안내. 요약은 주선자가 이미 아는 항목만 몇 줄로 보여준다.
    * 자기소개·이상형 같은 긴 원문은 넣지 않는다.
    */
   analyzed: (fields: ExtractedFields, needsReview: boolean) => {
@@ -113,24 +113,24 @@ export const messages = {
     lines.push("");
     lines.push(
       needsReview
-        ? "확인이 필요한 항목이 있습니다. 관리자 화면에서 검토해 주세요."
-        : "관리자 화면에서 확인하고 등록해 주세요.",
+        ? "확인이 필요한 항목이 있습니다. 볼사람에서 검토해 주세요."
+        : "볼사람에서 확인하고 등록해 주세요.",
     );
     return lines.join("\n");
   },
 
-  analyzeFailed: "분석에 실패했습니다. 관리자 화면에서 다시 시도해 주세요.",
+  analyzeFailed: "분석에 실패했습니다. 볼사람에서 다시 시도해 주세요.",
 
   unsupported: "사진이나 프로필 글만 처리합니다.",
-  tooLarge: "사진이 너무 커서 받지 못했습니다. 관리자 화면에서 직접 올려주세요.",
+  tooLarge: "사진이 너무 커서 받지 못했습니다. 볼사람에서 직접 올려주세요.",
   failed: "처리 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.",
 
-  reviewButton: "관리자 화면에서 검토",
+  reviewButton: "볼사람에서 검토",
 
   /**
    * 신청 알림 (마이그레이션 0017 의 아웃박스가 보낸다).
    * **사람을 공개 번호로만 가리킨다** — 이름·나이·연락처를 봇 메시지에 싣지 않는다.
-   * 누가 누구인지는 관리자 화면에서 본다.
+   * 누가 누구인지는 볼사람 화면에서 본다.
    */
   matchRequested: (requesterCode: number | null, targetCode: number | null) =>
     ["새 신청이 들어왔습니다.", "", pairLine(requesterCode, targetCode, "→")].join("\n"),

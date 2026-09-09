@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SignupPage() {
   const user = await readSession();
-  if (user) redirect(user.role === "ADMIN" ? "/admin" : "/discover");
+  if (user) redirect(user.role === "ADMIN" ? "/home" : "/discover");
 
   return (
     <AuthShell

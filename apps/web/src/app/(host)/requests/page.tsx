@@ -3,12 +3,14 @@ import { withRls } from "@bolsaram/db";
 import { MATCH_REQUEST_STATUSES, type MatchRequestStatus } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { listForAdmin } from "@/server/repo/matches";
-import { findProfilesByIds } from "@/server/repo/profiles";
-import { AdminRequestTable } from "@/components/admin/request-table";
+import { findProfilesByIds, type ProfileRecord } from "@/server/repo/profiles";
+import { toCardView } from "@/server/views/profile-view";
+import { HostRequestList } from "@/components/host/request-list";
+import { Count, PageHeader } from "@/components/host/surface";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminRequestsPage({
+export default async function HostRequestsPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
@@ -37,18 +39,25 @@ export default async function AdminRequestsPage({
 
   return (
     <>
-      <header className="mb-4 flex items-baseline justify-between">
-        <h1 className="text-[18px] font-semibold tracking-tight">신청</h1>
-        <span className="text-[12.5px] text-[var(--surface-text-muted)]">{items.length}건</span>
-      </header>
-      <AdminRequestTable items={items} activeStatus={status ?? ""} />
+      <PageHeader
+        title="신청"
+        description="누가 누구에게 마음을 보냈는지 봅니다. 서로 수락하면 연결이 되고, 만남이 끝나면 종료합니다."
+        aside={<Count>{items.length}건</Count>}
+      />
+      <HostRequestList items={items} activeStatus={status ?? ""} />
     </>
   );
 }
 
-function describe(
-  profile: { id: string; publicCode: number; realName: string | null } | undefined,
-) {
+/** 목록에 사람이 보이게 사진과 공개 번호를 함께 싣는다. 이름은 주선자만 본다. */
+function describe(profile: ProfileRecord | undefined) {
   if (!profile) return null;
-  return { id: profile.id, code: `#${profile.publicCode}`, name: profile.realName };
+  const card = toCardView(profile);
+  return {
+    id: profile.id,
+    code: card.code,
+    name: profile.realName,
+    imageUrl: card.primaryImage?.url ?? null,
+    birthYear: card.birthYear,
+  };
 }

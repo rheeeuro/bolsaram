@@ -12,7 +12,7 @@ import {
 } from "@/server/repo/imports";
 import { findConversationByImportSession } from "@/server/repo/telegram";
 import { signDownloadUrl } from "@/server/storage/local";
-import { ImportReview } from "@/components/admin/import-review";
+import { ImportReview } from "@/components/host/import-review";
 import { TELEGRAM_SESSION_STATE_LABELS } from "@bolsaram/schemas";
 
 export const dynamic = "force-dynamic";
@@ -74,12 +74,12 @@ export default async function ImportDetailPage({
 
   return (
     <>
-      <nav className="mb-4 text-[12.5px] text-[var(--surface-text-muted)]">
-        <Link href="/admin/imports" className="underline">
-          Import Inbox
+      <nav className="mb-5 text-[12.5px] text-[var(--surface-text-muted)]">
+        <Link href="/imports" className="hover:text-[var(--color-rose-600)]">
+          가져오기
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>검토</span>
+        <span className="mx-2">·</span>
+        <span className="text-[var(--surface-text)]">검토</span>
       </nav>
 
       <ImportReview session={data.session} assets={data.assets} extraction={data.extraction} />

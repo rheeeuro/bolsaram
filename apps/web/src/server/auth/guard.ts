@@ -1,6 +1,7 @@
 /**
  * 서버 권한 검증. RLS 와 별개로 애플리케이션 레이어에서도 한 번 더 막는다
  * (부트스트랩 §4 「server authorization, admin route guard」).
+ * 역할 이름은 DB 의 `ADMIN` 을 그대로 쓰고, 화면에서는 「주선자」로 부른다.
  */
 import "server-only";
 import { redirect } from "next/navigation";
@@ -20,7 +21,7 @@ export async function requireUser(): Promise<Viewer> {
 export async function requireAdmin(): Promise<Viewer> {
   const user = await requireUser();
   if (user.role !== "ADMIN") {
-    throw new DomainError("FORBIDDEN", "관리자만 접근할 수 있습니다.");
+    throw new DomainError("FORBIDDEN", "주선자만 접근할 수 있습니다.");
   }
   return user;
 }

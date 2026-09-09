@@ -1,8 +1,9 @@
 /*
  * 볼사람 디자인 토큰 (설계문서 §13).
  *
- * 회원 화면: warm ivory 바탕, muted rose/burgundy 강조, serif display + clean sans.
- * 관리자 화면: 같은 토큰 위에 채도를 죽인 CRM 팔레트(`.admin-surface`)를 얹는다.
+ * 볼사람은 주선자를 위한 서비스다. 회원 화면과 주선자 화면이 같은 팔레트를 쓰고,
+ * warm ivory 바탕에 muted rose/burgundy 강조, serif display + clean sans 로 통일한다.
+ * 두 표면은 밀도만 다르다 — 주선자 화면은 바탕을 한 단 낮춰 카드가 떠 보이게 한다.
  * 특정 방송 프로그램의 디자인/로고를 복제하지 않는다.
  */
 
@@ -63,15 +64,16 @@
   --duration-emotive: 520ms;
 }
 
-/* 관리자 화면은 감성보다 밀도. 배경을 중성 회색으로 눌러 회원 화면과 구분한다. */
-.admin-surface {
-  --surface-page: #f7f7f8;
+/* 주선자 화면. 회원 화면과 같은 팔레트를 쓰되 바탕을 한 단 낮춘다 —
+   목록과 폼이 길어지는 화면이라 흰 카드가 떠 보여야 읽힌다. */
+.host-surface {
+  --surface-page: var(--color-ivory-100);
   --surface-card: #ffffff;
-  --surface-muted: #f0f0f2;
-  --surface-border: #e2e2e6;
-  --surface-text: #1c1c1f;
-  --surface-text-muted: #6b6b73;
-  --surface-accent: var(--color-burgundy-700);
+  --surface-muted: var(--color-ivory-200);
+  --surface-border: var(--color-ivory-300);
+  --surface-text: var(--color-ink-900);
+  --surface-text-muted: var(--color-ink-600);
+  --surface-accent: var(--color-rose-500);
 }
 
 /* 회원 화면 기본 표면. */

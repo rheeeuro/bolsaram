@@ -20,7 +20,7 @@ import {
 } from "@bolsaram/schemas";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/admin/table";
+import { Panel } from "@/components/host/surface";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch, apiPost, uploadFile } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
@@ -166,16 +166,17 @@ export function ImportReview({
       setError(result.message);
       return;
     }
-    router.push(`/admin/profiles/${result.data.profileId}`);
+    router.push(`/profiles/${result.data.profileId}`);
   }
 
   const attention = extraction?.review.filter((f) => f.needsAttention) ?? [];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[400px_1fr]">
+    <div className="grid gap-5 lg:grid-cols-[400px_1fr]">
       {/* 원본 */}
-      <div className="flex flex-col gap-4">
-        <Card
+      <div className="flex flex-col gap-5">
+        <Panel
+          tight
           title="원본"
           action={
             <Badge tone={toneForStatus(session.status)}>
@@ -255,17 +256,17 @@ export function ImportReview({
               </div>
             ) : null}
           </div>
-        </Card>
+        </Panel>
       </div>
 
       {/* AI 결과 + 검토 */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
         {extraction == null ? (
-          <Card title="AI 결과">
+          <Panel title="AI 결과">
             <p className="py-8 text-center text-[13px] text-[var(--surface-text-muted)]">
               아직 분석하지 않았습니다. 왼쪽에서 「AI 분석」을 눌러주세요.
             </p>
-          </Card>
+          </Panel>
         ) : (
           <>
             {extraction.notes.length > 0 ? (
@@ -283,7 +284,8 @@ export function ImportReview({
               </div>
             ) : null}
 
-            <Card
+            <Panel
+              tight
               title="추출 결과"
               action={
                 <span className="text-[11.5px] text-[var(--surface-text-muted)]">
@@ -308,7 +310,7 @@ export function ImportReview({
                   />
                 ))}
               </div>
-            </Card>
+            </Panel>
 
             {error ? <p className="text-[13px] text-[var(--color-danger)]">{error}</p> : null}
             {message ? (

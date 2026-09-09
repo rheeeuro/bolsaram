@@ -38,7 +38,7 @@ pnpm dev          # http://127.0.0.1:3020
 | 주선자 | `admin@bolsaram.local` / **시드 실행 결과에 출력되는 임의 비밀번호**   |
 | 회원   | `01020001000` ~ `01020001005` — **비밀번호 없음. 초대 링크로 들어갑니다** |
 
-회원 계정은 관리자 화면에서 프로필 상세 → 초대 링크를 발급해 그 링크로 로그인합니다.
+회원 계정은 주선자 화면에서 프로필 상세 → 초대 링크를 발급해 그 링크로 로그인합니다.
 자유 가입이 없고, 전화번호는 신원이 아니라 주선자가 기록하는 연락 수단입니다.
 
 주선자 비밀번호는 **고정값이 아닙니다.** `pnpm db:seed` 가 계정을 새로 만들 때마다
@@ -57,7 +57,7 @@ pnpm dev          # http://127.0.0.1:3020
 - **인증** 자체 세션(서명 쿠키 + DB 세션). 주선자 이메일/비밀번호, **회원은 초대 링크**
 - **스토리지** 로컬 private 디렉터리 + 단기 HMAC signed URL
 - **AI** provider 추상화 — 기본 `mock`, `AI_PROVIDER=openai`로 전환
-- **Import** 텔레그램 봇 webhook(1차) + 관리자 웹 업로드
+- **Import** 텔레그램 봇 webhook(1차) + 주선자 웹 업로드
 - **알림** DB 아웃박스 → 텔레그램 (주선자에게 신청·수락)
 
 설계 문서는 Supabase를 전제하지만, 외부 계정 없이 전체 플로우를 실제로 돌려 검증할 수 있도록
@@ -71,7 +71,7 @@ pnpm dev          # http://127.0.0.1:3020
 
 | 디렉터리             | 역할                                                        | 문서                                   |
 | -------------------- | ----------------------------------------------------------- | -------------------------------------- |
-| `apps/web`           | Next.js 앱 — 회원 화면 + 관리자 화면 + API                  | [README](apps/web/README.md)           |
+| `apps/web`           | Next.js 앱 — 주선자 화면 + 회원 화면 + API                  | [README](apps/web/README.md)           |
 | `packages/schemas`   | Zod 스키마 · 도메인 열거형 · AI 추출 스키마(단일 원본)      | [README](packages/schemas/README.md)   |
 | `packages/domain`    | 순수 도메인 로직 — 상태 기계, 정보 공개, 필터               | [README](packages/domain/README.md)    |
 | `packages/db`        | 커넥션 풀 · RLS 컨텍스트 · 마이그레이션/시드 CLI            | [README](packages/db/README.md)        |

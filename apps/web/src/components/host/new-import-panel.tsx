@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/admin/table";
+import { Panel } from "@/components/host/surface";
 import { Field, Textarea } from "@/components/ui/field";
 import { apiPost, uploadFile } from "@/lib/api-client";
 
@@ -73,7 +73,7 @@ export function NewImportPanel() {
       // 분석에 실패해도 세션은 남는다. 검토 화면에서 재시도한다.
       if (!analyzed.ok) setError(analyzed.message);
 
-      router.push(`/admin/imports/${created.data.id}`);
+      router.push(`/imports/${created.data.id}`);
     } finally {
       setBusy(false);
       setProgress(null);
@@ -81,7 +81,7 @@ export function NewImportPanel() {
   }
 
   return (
-    <Card title="새로 가져오기">
+    <Panel title="새로 가져오기">
       <Field label="사진" hint="카카오톡에서 받은 프로필 사진 (여러 장 선택 가능)">
         <input
           type="file"
@@ -131,6 +131,6 @@ export function NewImportPanel() {
       <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
         AI 결과는 자동으로 게시되지 않습니다. 다음 화면에서 확인하고 수정한 뒤 등록하세요.
       </p>
-    </Card>
+    </Panel>
   );
 }

@@ -3,8 +3,8 @@
 
 /*
  * 볼사람 전역 스타일.
- * 회원 화면은 warm ivory + serif display, 관리자 화면은 중성 CRM 톤.
- * 표면 색은 .member-surface / .admin-surface 가 정의한 --surface-* 변수를 쓴다.
+ * 회원 화면과 주선자 화면 모두 warm ivory + serif display 를 쓴다.
+ * 표면 색은 .member-surface / .host-surface 가 정의한 --surface-* 변수를 쓴다.
  */
 
 @layer base {

@@ -19,7 +19,7 @@ export default async function EnterPage({
   searchParams: Promise<{ code?: string; next?: string }>;
 }) {
   const user = await readSession();
-  if (user) redirect(user.role === "ADMIN" ? "/admin" : "/discover");
+  if (user) redirect(user.role === "ADMIN" ? "/home" : "/discover");
   const { code, next } = await searchParams;
 
   return (

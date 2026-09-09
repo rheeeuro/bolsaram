@@ -17,7 +17,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const user = await readSession();
-  if (user) redirect(user.role === "ADMIN" ? "/admin" : "/discover");
+  if (user) redirect(user.role === "ADMIN" ? "/home" : "/discover");
   const { next } = await searchParams;
 
   return (

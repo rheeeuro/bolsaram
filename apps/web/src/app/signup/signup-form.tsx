@@ -36,7 +36,7 @@ export function SignupForm() {
       setError(result.message);
       return;
     }
-    router.replace("/admin");
+    router.replace("/home");
   }
 
   return (

@@ -27,8 +27,8 @@ export default async function MePage() {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5">
           <h1 className="display text-[22px] text-[var(--color-ink-900)]">내 프로필</h1>
           {viewer.role === "ADMIN" ? (
-            <Link href="/admin" className="text-[13px] text-[var(--color-rose-600)] underline">
-              관리자 화면
+            <Link href="/home" className="text-[13px] text-[var(--color-rose-600)] underline">
+              주선자 화면
             </Link>
           ) : null}
         </div>

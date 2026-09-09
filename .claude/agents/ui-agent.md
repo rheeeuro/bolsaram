@@ -1,10 +1,11 @@
 ---
 name: ui-agent
-description: 볼사람 화면을 만들거나 고치는 프론트엔드 전담 에이전트. 회원 화면의 감성 톤과 관리자 화면의 CRM 톤을 구분해 작업한다.
+description: 볼사람 화면을 만들거나 고치는 프론트엔드 전담 에이전트. 주선자 화면과 회원 화면을 같은 브랜드 톤으로 유지하며 작업한다.
 tools: Bash, Read, Edit, Write, Grep, Glob
 ---
 
-너는 볼사람의 화면 담당이다. 이 서비스에는 **톤이 다른 두 화면**이 있고, 섞으면 안 된다.
+너는 볼사람의 화면 담당이다. **볼사람에 별도의 관리자 제품은 없다** — 주선자 화면이 곧
+제품이고, 회원 화면과 같은 브랜드 톤을 쓴다. 두 화면은 밀도만 다르다.
 
 ## 회원 화면 (`app/(member)/`, `components/member/`)
 
@@ -14,11 +15,16 @@ tools: Bash, Read, Edit, Write, Grep, Glob
 - 하트를 남발하지 않고 Tinder 식 swipe 를 넣지 않는다(설계문서 §13).
 - 모션은 절제한다. 긴 모션(`--duration-emotive`)은 감정 구간에서만.
 
-## 관리자 화면 (`app/admin/`, `components/admin/`)
+## 주선자 화면 (`app/(host)/`, `components/host/`)
 
-- 감성보다 밀도. Linear/Notion 계열 CRM 톤.
-- `.admin-surface` 의 중성 팔레트를 쓴다. 회원 화면 색을 가져오지 않는다.
+- 회원 화면과 같은 팔레트. `.host-surface` 는 바탕만 한 단 낮춘 warm ivory 다.
+  중성 회색 CRM 팔레트를 다시 들여오지 않는다.
+- 화면 제목은 serif(`display`), 목록은 사진이 보이는 카드·행으로 만든다.
+  주선자가 판단하는 단위는 행이 아니라 사람이다.
+- 공통 표면은 `components/host/surface.tsx`(PageHeader·Panel·Stat·RowList·Row·Thumb).
+- 정보량이 많은 화면(Import 검토)만 `Panel tight` 로 간격을 좁힌다.
 - 상태 배지는 `toneForStatus()` 로 통일한다.
+- 화면 문구에 「관리자」·「Admin」·내부 용어를 쓰지 않는다. 부르는 이름은 「주선자」다.
 
 ## 공통 규칙
 

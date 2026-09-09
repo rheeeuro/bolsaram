@@ -100,7 +100,7 @@ describe("가이드가 언급하는 화면이 실제로 있다", () => {
 
   for (const route of [...mentioned].sort()) {
     it(`${route} 페이지가 존재한다`, () => {
-      // 동적 구간(/admin/profiles/[id])은 정적 경로로 매칭되지 않으므로 접두어로 확인한다.
+      // 동적 구간(/profiles/[id])은 정적 경로로 매칭되지 않으므로 접두어로 확인한다.
       const exists =
         pageRoutes.has(route) || [...pageRoutes].some((r) => r.startsWith(`${route}/`));
       expect(exists, `${route} 를 가이드가 안내하지만 페이지가 없습니다`).toBe(true);

@@ -1,4 +1,4 @@
-# @bolsaram/web — 웹 앱 (회원 화면 + 관리자 화면 + API)
+# @bolsaram/web — 웹 앱 (주선자 화면 + 회원 화면 + API)
 
 Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에 있고 `:3020` 에서 뜬다.
 별도 백엔드 프로세스는 없다.
@@ -50,18 +50,18 @@ apps/web/src/
 │   │   ├── favorites/        관심 목록
 │   │   ├── hidden/           숨긴 사람 (해제는 상세에서)
 │   │   └── me/               내 프로필 + 로그아웃
-│   ├── admin/                관리자 영역 (상단 네비 레이아웃)
-│   │   ├── page.tsx          대시보드 KPI
-│   │   ├── imports/          Import Inbox + 검토 상세
-│   │   ├── profiles/         목록 + 상세 편집·게시·초대
+│   ├── (host)/               주선자 영역 (상단 네비 레이아웃)
+│   │   ├── home/             오늘 할 일 + 지표 + 최근 신청
+│   │   ├── imports/          가져오기 + 검토 상세
+│   │   ├── profiles/         카드 목록 + 상세 편집·게시·초대
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
 │   │   └── group/            모임 설정 · 주선자 구성원 · 초대 코드
 │   └── api/                  Route Handler (아래 표)
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell·markdown)
-│   ├── member/               회원 화면 (감성 톤)
-│   └── admin/                관리자 화면 (CRM 톤)
+│   ├── member/               회원 화면
+│   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
 │   ├── api-client.ts         fetch 래퍼 — 오류를 판별 가능한 결과로 변환
 │   ├── labels.ts             열거형 → 한글 라벨
@@ -81,13 +81,13 @@ server/
 ├── audit.ts                  감사 로그 (민감값 제외)
 ├── auth/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
-│   ├── login.ts              관리자 비밀번호 (15분 5회 시도 제한)
+│   ├── login.ts              주선자 비밀번호 (15분 5회 시도 제한)
 │   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
 │   ├── group-invite.ts       모임 초대 코드 발급·소비, 내 모임 조회
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
-│                             (미로그인: 회원 화면 → /enter, 관리자 화면 → /login)
+│                             (미로그인: 회원 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)
 ├── storage/local.ts          private 저장소 + signed download/upload URL
 ├── ai/
@@ -96,7 +96,7 @@ server/
 │   ├── openai.ts             OpenAI multimodal + Structured Outputs
 │   └── index.ts              AI_PROVIDER 로 선택
 ├── repo/                     SQL 접근 (모두 withRls 트랜잭션 안에서 호출된다)
-│   ├── profiles.ts           Discover·상세·관리자 목록·수정
+│   ├── profiles.ts           Discover·상세·주선자 목록·수정
 │   ├── matches.ts            신청 생성·전이·시그널 목록·연결 상대
 │   ├── favorites.ts          관심 토글·목록
 │   ├── hides.ts              숨기기 토글·목록 + 양방향 판정
@@ -120,7 +120,10 @@ server/
 
 ## API
 
-인증이 필요 없는 경로는 없다(`/api/auth/*` 제외). 미인증은 401, 회원의 관리자 경로 접근은 403.
+인증이 필요 없는 경로는 없다(`/api/auth/*` 제외). 미인증은 401, 회원의 주선자 경로 접근은 403.
+
+권한 열의 「주선자」는 DB 의 `ADMIN` 역할이다. 화면 경로에서 `/admin` 은 없앴지만
+API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한다.
 
 `/api/health` 는 예외다. 밖에서 「살아 있는가」를 물어야 하는 경로라 로그인을 요구하지
 않고, 대신 답에 개인정보도 설정값도 담지 않는다(상태 두 글자뿐이다).
@@ -137,27 +140,27 @@ server/
 | `/api/auth/logout`                        | POST                | –                 | 세션 폐기                            |
 | `/api/claim`                              | POST                | **초대 토큰**     | 회원 로그인 (매직 링크) + 최초 계정 생성 |
 | `/api/profiles`                           | GET                 | 회원              | Discover 목록 (필터·커서)            |
-| `/api/profiles/[id]`                      | GET / PATCH         | 회원 / 관리자     | 상세 조회 / 내용 수정                |
-| `/api/profiles/[id]/status`               | PATCH               | 관리자            | 상태·노출 변경                       |
+| `/api/profiles/[id]`                      | GET / PATCH         | 회원 / 주선자     | 상세 조회 / 내용 수정                |
+| `/api/profiles/[id]/status`               | PATCH               | 주선자            | 상태·노출 변경                       |
 | `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
-| `/api/admin/match-requests/[id]/[action]` | POST                | 관리자            | close                                |
+| `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | close                                |
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 회원(프로필 필요) | 숨긴 사람 목록·토글                  |
-| `/api/admin/invites`                      | POST                | 관리자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
-| `/api/imports`                            | GET / POST          | 관리자            | Inbox 목록 / 세션 생성 + 업로드 슬롯 |
-| `/api/imports/[id]`                       | GET / DELETE        | 관리자            | 원본·추출 결과 / 세션 삭제           |
-| `/api/imports/[id]/assets`                | POST / DELETE       | 관리자            | 업로드 확정·슬롯 추가 / 제거         |
-| `/api/imports/[id]/text`                  | PATCH               | 관리자            | 원문 저장                            |
-| `/api/imports/[id]/analyze`               | POST                | 관리자            | AI 추출 실행                         |
-| `/api/imports/[id]/extraction`            | PATCH               | 관리자            | 검토 결과 저장                       |
-| `/api/imports/[id]/commit`                | POST                | 관리자            | 프로필 생성 (idempotent)             |
-| `/api/admin/groups`                       | POST                | 관리자            | 모임 만들기 (모임 없는 주선자)       |
-| `/api/admin/group`                        | GET / PATCH / POST / PUT | 관리자       | 내 모임 / 이름·설명 수정 / 초대 코드 발급 / 코드로 참여 |
-| `/api/admin/telegram`                     | GET / POST / DELETE | 관리자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
+| `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
+| `/api/imports`                            | GET / POST          | 주선자            | 가져오기 목록 / 세션 생성 + 업로드 슬롯 |
+| `/api/imports/[id]`                       | GET / DELETE        | 주선자            | 원본·추출 결과 / 세션 삭제           |
+| `/api/imports/[id]/assets`                | POST / DELETE       | 주선자            | 업로드 확정·슬롯 추가 / 제거         |
+| `/api/imports/[id]/text`                  | PATCH               | 주선자            | 원문 저장                            |
+| `/api/imports/[id]/analyze`               | POST                | 주선자            | AI 추출 실행                         |
+| `/api/imports/[id]/extraction`            | PATCH               | 주선자            | 검토 결과 저장                       |
+| `/api/imports/[id]/commit`                | POST                | 주선자            | 프로필 생성 (idempotent)             |
+| `/api/admin/groups`                       | POST                | 주선자            | 모임 만들기 (모임 없는 주선자)       |
+| `/api/admin/group`                        | GET / PATCH / POST / PUT | 주선자       | 내 모임 / 이름·설명 수정 / 초대 코드 발급 / 코드로 참여 |
+| `/api/admin/telegram`                     | GET / POST / DELETE | 주선자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |
-| `/api/uploads`                            | PUT                 | 관리자            | signed 토큰으로 직접 업로드          |
+| `/api/uploads`                            | PUT                 | 주선자            | signed 토큰으로 직접 업로드          |
 | `/api/health`                             | GET                 | –                 | 가동 확인 (DB 핑 포함, 실패 시 503)  |
 
 ---
@@ -199,10 +202,10 @@ webhook
 ```
 
 **입력 채널만 추가한 것이며 Import 도메인은 그대로다.** 봇으로 들어온 세션도 같은
-Inbox·검토·commit 을 거치고, 게시 게이트(`assertCommittable`)를 우회하지 않는다.
+목록·검토·commit 을 거치고, 게시 게이트(`assertCommittable`)를 우회하지 않는다.
 
 owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세션 쿠키가 없어 RLS 컨텍스트를
-만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 관리자 요청과 완전히 같다.
+만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 주선자 요청과 완전히 같다.
 
 ### 알림
 

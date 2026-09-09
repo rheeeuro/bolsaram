@@ -466,7 +466,7 @@ function triggerAnalyze(ctx: RlsContext, identity: TelegramIdentity, sessionId: 
         messages.analyzed(fields, result.status === "REVIEW_REQUIRED"),
         {
           buttonText: messages.reviewButton,
-          buttonUrl: `${env().APP_ORIGIN}/admin/imports/${sessionId}`,
+          buttonUrl: `${env().APP_ORIGIN}/imports/${sessionId}`,
         },
       );
     } catch (error) {

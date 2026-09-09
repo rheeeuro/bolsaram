@@ -5,11 +5,11 @@ import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { findProfileById } from "@/server/repo/profiles";
 import { toDetailView } from "@/server/views/profile-view";
-import { AdminProfileEditor } from "@/components/admin/profile-editor";
+import { HostProfileEditor } from "@/components/host/profile-editor";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminProfileDetail({
+export default async function HostProfileDetail({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -44,15 +44,15 @@ export default async function AdminProfileDetail({
 
   return (
     <>
-      <nav className="mb-4 text-[12.5px] text-[var(--surface-text-muted)]">
-        <Link href="/admin/profiles" className="underline">
+      <nav className="mb-5 text-[12.5px] text-[var(--surface-text-muted)]">
+        <Link href="/profiles" className="hover:text-[var(--color-rose-600)]">
           프로필
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>{data.view.code}</span>
+        <span className="mx-2">·</span>
+        <span className="display text-[13px] text-[var(--surface-text)]">{data.view.code}</span>
       </nav>
 
-      <AdminProfileEditor profile={data.view} claimed={data.claimed} invite={data.invite} />
+      <HostProfileEditor profile={data.view} claimed={data.claimed} invite={data.invite} />
     </>
   );
 }

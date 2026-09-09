@@ -11,8 +11,15 @@
   시작합니다. `profiles.group_id IS NULL` 이면 전체공개(모든 주선자가 봄),
   아니면 그 모임 주선자만 봅니다. 회원도 자기와 같은 쪽만 보고 그 경계를 넘는 신청은
   DB 가 막습니다.
-- 운영 흐름: `카카오톡 → 텔레그램 봇 또는 관리자 업로드 → AI 구조화 → 검토 → 게시`
+- 운영 흐름: `카카오톡 → 텔레그램 봇 또는 주선자 웹 업로드 → AI 구조화 → 검토 → 게시`
 - 카피: `좋은 사람을, 좋은 방식으로.`
+
+**볼사람에 별도의 관리자 제품은 없습니다.** 주선자가 쓰는 화면이 곧 볼사람이고,
+회원 화면과 같은 브랜드 톤(warm ivory · serif display · muted rose)으로 만듭니다.
+화면 경로에 `/admin` 을 두지 않습니다 — 주선자 화면은 `/home` `/profiles` `/requests`
+`/imports` `/members` `/group` 입니다. DB 역할 이름 `ADMIN` 과 권한 경계를 드러내는
+API 경로 `/api/admin/*` 은 그대로 둡니다(설계문서 §13에서 벗어난 결정은
+`docs/implementation-plan.md`).
 
 상세 설계는 `docs/v2/`(원본 설계 문서)와 `docs/implementation-plan.md`(실제 구현 결정)를 봅니다.
 
@@ -27,7 +34,7 @@
 | 인증     | 자체 세션(서명 쿠키 + `sessions`). 주선자 이메일/비밀번호, **회원은 초대 링크** |
 | 스토리지 | 로컬 private 디렉터리 + HMAC signed URL                                         |
 | AI       | provider 추상화. 기본 `mock`, `AI_PROVIDER=openai` 로 전환                      |
-| Import   | 텔레그램 Bot API webhook (1차) + 관리자 웹 업로드. `TELEGRAM_ENABLED` 게이트     |
+| Import   | 텔레그램 Bot API webhook (1차) + 주선자 웹 업로드. `TELEGRAM_ENABLED` 게이트     |
 
 설계 문서의 Supabase는 로컬 대체물로 구현했습니다. 이유와 대응표는 `docs/implementation-plan.md`에 있습니다.
 **RLS는 대체하지 않았습니다** — 런타임 롤 `bolsaram_app`은 `NOBYPASSRLS`이며 모든 접근이 정책을 통과합니다.
@@ -95,7 +102,7 @@ pnpm agents:test       # 셸 가드 판정 케이스 25개
   `SEED_ADMIN_PASSWORD`(10자 이상)를 설정합니다. 계정이 이미 있으면 시드는 비밀번호를
   건드리지 않습니다 — 이 호스트의 값은 교체돼 있고 저장소에 없습니다. 모르면
   `SEED_ADMIN_PASSWORD` 를 주고 다시 시드하거나 `/signup` 으로 새 계정을 만듭니다.
-- 회원 `01020001000` ~ `01020001005` — **비밀번호가 없습니다.** 관리자 화면에서
+- 회원 `01020001000` ~ `01020001005` — **비밀번호가 없습니다.** 주선자 화면에서
   프로필 상세 → 초대 링크를 발급해 그 링크로 들어갑니다(매직 링크).
 
 ## PM2
@@ -174,8 +181,8 @@ rm .claude/.allow-secret-edit      # 즉시 복구
 
 ```
 apps/web/src/
-  app/            라우트. (member) 그룹 = 회원, admin/ = 관리자, api/ = Route Handler
-  components/     ui/(공용) member/(감성 톤) admin/(CRM 톤)
+  app/            라우트. (member) 그룹 = 회원, (host) 그룹 = 주선자, api/ = Route Handler
+  components/     ui/(공용) member/ host/ — 두 화면 모두 같은 브랜드 톤
   server/         서버 전용. auth/ repo/ services/ storage/ ai/ telegram/ notify/ views/ http/
 packages/
   schemas/        Zod 스키마 + 도메인 열거형 (AI 추출 스키마의 single source)
@@ -247,7 +254,7 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 | `privacy.md`| 개인정보 처리방침 (코드 기준, 법률 검토 전). **`/privacy` 화면이 이 파일을 그대로 렌더한다** |
 
 **사용자에게 보이는 동작이나 정책을 바꾸면 같은 턴에 가이드도 고친다.** 대상 축:
-회원·관리자 화면, 인증(`server/auth/`), 상태 enum, 업로드 제한, PM2 스케줄.
+회원·주선자 화면, 인증(`server/auth/`), 상태 enum, 업로드 제한, PM2 스케줄.
 
 어긋남은 `tests/docs-guide.test.ts` 가 잡는다(`pnpm verify` 에 포함). 검사하는 것:
 
@@ -289,6 +296,8 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   owner 커넥션의 가입·초대 경로만이 소속을 만듭니다.
 - **claim 은 RLS 정책으로 열지 않습니다.** 주인 없는 프로필 연결은 해시된 초대 토큰을
   검증하는 인증 레이어에서만 일어납니다(0013 에서 열린 정책을 제거했습니다).
+- **주선자 화면을 CRM 처럼 만들지 않습니다.** `.host-surface` 는 `.member-surface` 와 같은
+  팔레트를 쓰고 바탕 단계만 다릅니다. 밀도가 필요한 곳(Import 검토)에서만 간격을 좁힙니다.
 - private 이미지의 영구 URL을 만들지 않습니다. 응답마다 단기 signed URL을 새로 발급합니다.
 - AI raw 출력은 반드시 Zod로 검증한 뒤에 씁니다. 검증 없이 저장·표시하지 않습니다.
 - **사진을 AI 프로바이더에 보내지 않습니다.** 추출 근거는 프로필 원문뿐입니다
@@ -320,7 +329,7 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   전화번호 OTP 경로·`server/sms/`·`DEV_EXPOSE_OTP` 는 제거했습니다(0015).
   세션(30일)이 만료되면 주선자가 링크를 재발급합니다.
 - **모임 전환 UI**: 없습니다. 한 사람은 한 모임에만 속하고, 옮기려면 나갔다가 초대
-  코드로 다시 들어와야 합니다(나가기·참여는 `/admin/group` 에 있습니다).
+  코드로 다시 들어와야 합니다(나가기·참여는 `/group` 에 있습니다).
 - **주선자 비밀번호**: 고정 기본값은 없앴습니다(2026-09-08). 남은 위험은 사람 쪽입니다 —
   `SEED_ADMIN_PASSWORD` 에 약한 값을 넣거나 출력된 값을 어딘가에 적어 두면 시도
   제한(15분 5회)이 막아 주지 못합니다.

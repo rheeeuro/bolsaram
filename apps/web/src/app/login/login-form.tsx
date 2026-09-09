@@ -34,7 +34,7 @@ export function LoginForm({ next }: { next: string | null }) {
             setError(result.message);
             return;
           }
-          router.replace(next ?? "/admin");
+          router.replace(next ?? "/home");
         })();
       }}
     >
