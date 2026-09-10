@@ -8,9 +8,12 @@ import type {
 
 const CONTROL = cn(
   "w-full rounded-xl border border-[var(--surface-border)] bg-white",
-  "px-3 py-2 text-[14px] placeholder:text-[var(--color-ink-400)]",
+  "px-3 py-2 text-[14px] placeholder:text-[var(--color-ink-500)]",
   "transition-colors duration-[var(--duration-quick)]",
-  "focus:border-[var(--color-rose-400)] focus:outline-none",
+  // outline-none 을 두면 globals.css 의 :focus-visible 링을 덮는다
+  // (utilities 레이어가 base 를 이긴다). 테두리 색만으로는 키보드 위치를
+  // 알 수 없어 링을 그대로 살린다.
+  "focus:border-[var(--color-rose-400)]",
   "disabled:bg-[var(--surface-muted)] disabled:text-[var(--color-ink-500)]",
 );
 

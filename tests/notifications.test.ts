@@ -203,6 +203,17 @@ describe("신청이 알림을 만든다", () => {
     expect(rejected).toHaveLength(0);
   });
 
+  // 취소는 거절의 대칭이다 — 답을 기다리던 쪽 담당자가 알아야 한다(0033).
+  it("취소하면 받는 쪽 담당 주선자에게 알린다", async () => {
+    const id = await requestAs(A);
+    await withRls(A.member, (sql) =>
+      sql.query(`UPDATE match_requests SET status = 'CANCELED' WHERE id = $1`, [id]),
+    );
+    const canceled = (await notifications(id)).filter((r) => r.kind === "MATCH_CANCELED");
+    expect(canceled).toHaveLength(1);
+    expect(canceled[0]!.recipient_user_id).toBe(A.adminId);
+  });
+
   it("거절 payload 에도 공개 번호만 있다", async () => {
     const id = await requestAs(A);
     await withRls(A.member, (sql) =>

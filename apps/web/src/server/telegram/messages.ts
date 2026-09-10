@@ -195,6 +195,16 @@ export const messages = {
       "회원에게 알려주세요. 두 분은 서로 목록에서 빠집니다.",
     ].join("\n"),
 
+  /** 신청이 취소됐다 (0033). 답을 기다리던 쪽 담당자가 알아야 한다. */
+  matchCanceled: (requesterCode: number | null, targetCode: number | null) =>
+    [
+      "신청이 취소됐습니다.",
+      "",
+      pairLine(requesterCode, targetCode, "→"),
+      "",
+      "답을 기다리던 회원에게 알려주세요.",
+    ].join("\n"),
+
   requestsButton: "신청 목록 열기",
 } as const;
 

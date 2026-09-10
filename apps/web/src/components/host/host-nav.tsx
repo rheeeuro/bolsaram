@@ -75,7 +75,7 @@ export function HostNav({ displayName }: { displayName: string | null }) {
                   "shrink-0 rounded-[var(--radius-pill)] px-3.5 py-1.5 text-[13.5px]",
                   "transition-colors duration-[var(--duration-quick)]",
                   active
-                    ? "bg-[var(--color-rose-500)] text-white"
+                    ? "bg-[var(--color-rose-600)] text-white"
                     : "text-[var(--color-ink-600)] hover:bg-[var(--color-ivory-200)]",
                 )}
               >

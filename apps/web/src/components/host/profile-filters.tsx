@@ -89,7 +89,7 @@ function StatusPill({
         "shrink-0 rounded-[var(--radius-pill)] border px-3.5 py-1.5 text-[13px]",
         "transition-colors duration-[var(--duration-quick)]",
         active
-          ? "border-[var(--color-rose-500)] bg-[var(--color-rose-500)] text-white"
+          ? "border-[var(--color-rose-600)] bg-[var(--color-rose-600)] text-white"
           : "border-[var(--surface-border)] bg-[var(--surface-card)] text-[var(--surface-text-muted)] hover:border-[var(--color-rose-300)]",
       )}
     >

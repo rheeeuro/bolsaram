@@ -24,6 +24,7 @@ export type ClaimedNotification = {
     | "MATCH_REQUESTED"
     | "MATCH_ACCEPTED"
     | "MATCH_REJECTED"
+    | "MATCH_CANCELED"
     | "MEMBER_INTENT"
     | "INTENT_DECLINED";
   chatId: number;

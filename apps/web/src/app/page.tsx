@@ -49,7 +49,7 @@ export default async function IntroPage() {
         <div className="animate-fade mt-16 flex flex-col gap-2.5">
           <Link
             href="/signup"
-            className="flex h-13 items-center justify-center rounded-xl bg-[var(--color-rose-500)] py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[var(--color-rose-600)]"
+            className="flex h-13 items-center justify-center rounded-xl bg-[var(--color-rose-600)] py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[var(--color-burgundy-700)]"
           >
             주선자로 시작하기
           </Link>

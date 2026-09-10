@@ -35,7 +35,7 @@ export function ProfileCard({
               className="h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.02]"
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-400)]">
+            <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-700)]">
               사진 준비 중
             </div>
           )}

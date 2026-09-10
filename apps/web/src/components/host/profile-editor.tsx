@@ -21,6 +21,7 @@ import {
   VISIBILITIES,
   VISIBILITY_LABELS,
 } from "@bolsaram/schemas";
+import { isDiscoverable } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
@@ -126,6 +127,14 @@ export function HostProfileEditor({
     router.refresh();
   }
 
+  // 상태와 노출은 직교한다 — 「공개」인데 노출이 「비공개」면 아무도 못 본다.
+  // 두 드롭다운을 나란히 두기만 하면 그 조합을 사람이 머릿속에서 계산해야 한다.
+  const visible = isDiscoverable({
+    status: (profile.status ?? "INACTIVE") as Parameters<typeof isDiscoverable>[0]["status"],
+    visibility: (profile.visibility ??
+      "PRIVATE") as Parameters<typeof isDiscoverable>[0]["visibility"],
+  });
+
   const summary = [
     label.gender(profile.gender),
     `${profile.birthYear}년생`,
@@ -148,7 +157,7 @@ export function HostProfileEditor({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="grid h-full place-items-center text-[11.5px] text-[var(--color-ink-400)]">
+            <div className="grid h-full place-items-center text-[11.5px] text-[var(--color-ink-700)]">
               사진 없음
             </div>
           )}
@@ -162,6 +171,9 @@ export function HostProfileEditor({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={toneForStatus(profile.status ?? "")}>
               {label.profileStatus(profile.status)}
+            </Badge>
+            <Badge tone={visible ? "active" : "neutral"}>
+              {visible ? "회원에게 보임" : "회원에게 안 보임"}
             </Badge>
             <span className="text-[12.5px] text-[var(--surface-text-muted)]">
               {label.visibility(profile.visibility)}
@@ -384,6 +396,17 @@ export function HostProfileEditor({
           </Panel>
 
           <Panel title="공개 설정">
+            <p
+              className={
+                visible
+                  ? "mb-3.5 rounded-[10px] bg-[var(--color-success)]/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--color-success)]"
+                  : "mb-3.5 rounded-[10px] bg-[var(--color-ivory-100)] px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]"
+              }
+            >
+              {visible
+                ? "지금 회원 목록에 보입니다."
+                : `지금 회원 목록에 보이지 않습니다 — ${reasonHidden(profile.status, profile.visibility)}.`}
+            </p>
             <div className="flex flex-col gap-3.5">
               <Field label="상태">
                 <Select
@@ -518,6 +541,22 @@ export function HostProfileEditor({
       </div>
     </div>
   );
+}
+
+/**
+ * 왜 안 보이는지 한 마디로 말한다.
+ *
+ * 「상태를 공개로 바꿨는데 왜 안 보이지」가 가장 흔한 막힘이다 — 노출이 따로 남아
+ * 있기 때문인데 화면이 말해주지 않으면 알 길이 없다.
+ */
+function reasonHidden(
+  status: string | null | undefined,
+  visibility: string | null | undefined,
+): string {
+  if (status !== "ACTIVE" && status !== "MATCHING") {
+    return `상태가 「${label.profileStatus(status) ?? status}」입니다`;
+  }
+  return `노출이 「${label.visibility(visibility) ?? visibility}」입니다`;
 }
 
 /** 발급 직후 한 번만 보이는 값을 읽기 전용으로 보여주고 복사시킨다. */

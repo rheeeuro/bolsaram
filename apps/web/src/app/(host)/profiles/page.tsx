@@ -1,9 +1,10 @@
 /** 프로필 목록 — 검색/필터/상태 관리 (설계문서 §6). */
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
+import { isDiscoverable } from "@bolsaram/domain";
 import { adminProfileQuerySchema, PROFILE_STATUSES } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
-import { Badge, toneForStatus } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Count, PageHeader, Panel } from "@/components/host/surface";
 import { findAdminProfiles } from "@/server/repo/profiles";
 import { toDetailView } from "@/server/views/profile-view";
@@ -27,12 +28,28 @@ export default async function HostProfilesPage({
     const result = await findAdminProfiles(sql, query);
     return {
       total: result.total,
+      nextCursor: result.nextCursor,
       items: result.items.map((profile) => ({
         view: toDetailView(profile, "ADMIN"),
         claimed: profile.userId != null,
+        // 상태와 노출은 직교한다 — 「공개」인데 안 보이는 조합이 있으므로
+        // 두 값을 따로 읽게 두지 않고 결론을 낸다.
+        visible: isDiscoverable({ status: profile.status, visibility: profile.visibility }),
       })),
     };
   });
+
+  /** 지금 조건을 유지한 채 커서만 바꾼 주소. 필터를 잃지 않고 넘긴다. */
+  function pageHref(cursor: string | null): string {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(raw)) {
+      if (key === "cursor") continue;
+      if (typeof value === "string") search.set(key, value);
+    }
+    if (cursor) search.set("cursor", cursor);
+    const qs = search.toString();
+    return qs ? `/profiles?${qs}` : "/profiles";
+  }
 
   return (
     <>
@@ -52,7 +69,7 @@ export default async function HostProfilesPage({
         </Panel>
       ) : (
         <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-          {page.items.map(({ view, claimed }) => (
+          {page.items.map(({ view, claimed, visible }) => (
             <li key={view.id}>
               <Link href={`/profiles/${view.id}`} className="group block">
                 <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
@@ -67,7 +84,7 @@ export default async function HostProfilesPage({
                       className="h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.02]"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-400)]">
+                    <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-700)]">
                       사진 없음
                     </div>
                   )}
@@ -101,8 +118,9 @@ export default async function HostProfilesPage({
                       .join(" · ")}
                   </p>
                   <p className="mt-1.5">
-                    <Badge tone={toneForStatus(view.status ?? "")}>
-                      {label.visibility(view.visibility)}
+                    {/* 사진 위 칩이 상태를, 여기가 결론을 말한다. */}
+                    <Badge tone={visible ? "active" : "neutral"}>
+                      {visible ? "회원에게 보임" : "회원에게 안 보임"}
                     </Badge>
                   </p>
                 </div>
@@ -111,6 +129,27 @@ export default async function HostProfilesPage({
           ))}
         </ul>
       )}
+
+      {page.nextCursor || query.cursor ? (
+        <div className="mt-7 flex items-center justify-center gap-3">
+          {query.cursor ? (
+            <Link
+              href={pageHref(null)}
+              className="rounded-[var(--radius-pill)] border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-2 text-[13px] text-[var(--surface-text-muted)] transition-colors hover:border-[var(--color-rose-300)]"
+            >
+              처음으로
+            </Link>
+          ) : null}
+          {page.nextCursor ? (
+            <Link
+              href={pageHref(page.nextCursor)}
+              className="rounded-[var(--radius-pill)] border border-[var(--color-rose-300)] bg-[var(--surface-card)] px-4 py-2 text-[13px] text-[var(--color-rose-600)] transition-colors hover:bg-[var(--color-rose-100)]"
+            >
+              다음 {query.limit}명
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
     </>
   );
 }

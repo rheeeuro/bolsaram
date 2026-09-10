@@ -35,7 +35,10 @@ export default async function HostHomePage() {
     // 홈은 단일 왕복으로 끝낸다. 카운트가 늘어나면 뷰로 뺀다.
     const stats = await sql.query<Kpi>(`
       SELECT
-        (SELECT count(*) FROM profiles WHERE status IN ('ACTIVE','MATCHING'))::int AS "profilesActive",
+        -- 회원이 실제로 보는 조건과 같아야 한다. 상태만 세면 「공개인데 안 보이는」
+        -- 프로필까지 들어가 숫자가 부풀려진다(isDiscoverable · filters.ts).
+        (SELECT count(*) FROM profiles
+          WHERE status IN ('ACTIVE','MATCHING') AND visibility = 'LISTED')::int AS "profilesActive",
         (SELECT count(*) FROM profiles)::int AS "profilesTotal",
         (SELECT count(*) FROM profiles WHERE user_id IS NULL)::int AS "profilesUnclaimed",
         (SELECT count(*) FROM match_requests WHERE status = 'REQUESTED')::int AS "requestsPending",
@@ -99,7 +102,7 @@ export default async function HostHomePage() {
           accent={kpi.inboxPending > 0}
         />
         <Stat
-          label="공개 중인 프로필"
+          label="회원에게 보이는 프로필"
           value={kpi.profilesActive}
           hint={`등록한 프로필 ${kpi.profilesTotal}명`}
           href="/profiles?status=ACTIVE"

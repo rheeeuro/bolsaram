@@ -27,6 +27,8 @@ function textFor(item: ClaimedNotification): string {
       return messages.matchAccepted(item.requesterCode, item.targetCode);
     case "MATCH_REJECTED":
       return messages.matchRejected(item.requesterCode, item.targetCode);
+    case "MATCH_CANCELED":
+      return messages.matchCanceled(item.requesterCode, item.targetCode);
     case "MEMBER_INTENT":
       return messages.memberIntent(item.intentKind, item.requesterCode, item.targetCode);
     case "INTENT_DECLINED":

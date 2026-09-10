@@ -39,7 +39,9 @@
 
   /* ── 상태 ─────────────────────────────────────────── */
   --color-success: #4b7a5b;
-  --color-warning: #b07d33;
+  /* 아이보리 바탕 위 작은 글씨로 쓰인다. 이전 #b07d33 은 약 2:1 로
+     Import 검토의 핵심 경고가 가장 안 읽혔다. */
+  --color-warning: #96631a;
   --color-danger: #a34a42;
   --color-info: #4a6b8a;
 
