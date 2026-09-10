@@ -111,9 +111,10 @@ export async function readSession(): Promise<SessionUser | null> {
     }>(
       // 주선자의 모임은 group_admins, 회원의 모임은 자기 프로필에서 온다.
       // 여러 모임에 속한 주선자는 먼저 들어간 모임을 쓴다(모임 전환 UI 는 아직 없다).
-      // 대행(ap)은 주선자가, 아직 아무 계정에도 연결되지 않은 프로필에 대해서만
-      // 붙는다. 최종 판정은 RLS 의 app_current_profile_id() 가 하고 여기서는 같은
-      // 조건을 애플리케이션 레이어에 한 번 더 둔다(권한 검사는 두 곳에 중복으로).
+      // 대행(ap)은 주선자에게만 붙는다. 본인 계정이 연결된 프로필도 대상이다(0035) —
+      // 연결은 초대를 한 번 열었다는 뜻일 뿐 직접 쓰고 있다는 뜻이 아니다.
+      // 최종 판정은 RLS 의 app_current_profile_id() 가 하고 여기서는 같은 조건을
+      // 애플리케이션 레이어에 한 번 더 둔다(권한 검사는 두 곳에 중복으로).
       `SELECT u.id AS user_id, u.role, u.display_name, p.id AS profile_id,
               ap.id AS acting_profile_id,
               COALESCE(
@@ -125,7 +126,6 @@ export async function readSession(): Promise<SessionUser | null> {
          JOIN users u ON u.id = s.user_id
          LEFT JOIN profiles p ON p.user_id = u.id
          LEFT JOIN profiles ap ON ap.id = s.acting_profile_id
-                              AND ap.user_id IS NULL
                               AND u.role = 'ADMIN'
         WHERE s.id = $1
           AND s.revoked_at IS NULL
@@ -159,6 +159,7 @@ export async function readSession(): Promise<SessionUser | null> {
  * 쿠키가 아니라 서버 측 상태로 둔다 — 세션을 폐기하면 대행도 같이 끝나고, 대상
  * 프로필이 지워지면 참조가 저절로 풀린다(0025). 호출부(`/api/admin/acting`)가
  * 먼저 `app_can_edit_profile` 로 권한을 확인하고, RLS 가 요청마다 한 번 더 본다.
+ * 끝내는 것은 주선자이거나 세션 폐기다 — 당사자의 로그인이 대행을 닫지는 않는다(0035).
  */
 export async function setActingProfile(profileId: string | null): Promise<void> {
   const store = await cookies();

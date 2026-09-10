@@ -166,7 +166,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |
-| `/api/admin/acting`                       | POST / DELETE       | 주선자            | 대행 시작 / 종료 (미연결 프로필만)   |
+| `/api/admin/acting`                       | POST / DELETE       | 주선자            | 대행 시작 / 종료 (고칠 수 있는 프로필) |
 | `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 회원 요청 approve · decline          |
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 회원(프로필 필요) | 숨긴 사람 목록·토글                  |

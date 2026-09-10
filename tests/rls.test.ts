@@ -13,6 +13,8 @@ type Fixture = {
   member2: RlsContext;
   outsider: RlsContext;
   admin: RlsContext;
+  /** 같은 모임이 아닌 주선자. 대행 경계를 확인하는 데 쓴다. */
+  strangerAdmin: RlsContext;
   p1: string;
   p2: string;
   pOutsider: string;
@@ -60,6 +62,8 @@ beforeAll(async () => {
       `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, true)`,
       [groupId, adminId],
     );
+    // 모임에 넣지 않는다 — group_admins 행이 없으므로 이 픽스처의 프로필을 고칠 수 없다.
+    const strangerAdminId = await user("ADMIN", "admin2");
     const u1 = await user("MEMBER", "m1");
     const u2 = await user("MEMBER", "m2");
     const u3 = await user("MEMBER", "m3");
@@ -68,6 +72,7 @@ beforeAll(async () => {
     return {
       adminId,
       admin: { userId: adminId, role: "ADMIN" as const },
+      strangerAdmin: { userId: strangerAdminId, role: "ADMIN" as const },
       member1: { userId: u1, role: "MEMBER" as const },
       member2: { userId: u2, role: "MEMBER" as const },
       outsider: { userId: u3, role: "MEMBER" as const },
@@ -86,7 +91,7 @@ afterAll(async () => {
   await withOwner(async (sql) => {
     await sql.query(`DELETE FROM profiles WHERE real_name = $1`, [`${TAG}-이름`]);
     await sql.query(
-      `DELETE FROM users WHERE display_name IN ('admin','m1','m2','m3','m4') AND (email LIKE $1 OR phone LIKE $2)`,
+      `DELETE FROM users WHERE display_name IN ('admin','admin2','m1','m2','m3','m4') AND (email LIKE $1 OR phone LIKE $2)`,
       [`${TAG}-%`, `${phonePrefix()}%`],
     );
     await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
@@ -294,6 +299,44 @@ describe("favorites 정책", () => {
     const others = await withRls(fx.member2, (sql) => sql.query(`SELECT * FROM favorites`));
     expect(mine.rowCount).toBe(1);
     expect(others.rowCount).toBe(0);
+  });
+});
+
+describe("주선자 대행", () => {
+  /** 대행 컨텍스트에서 회원으로 인식되는 프로필. NULL 이면 대행이 성립하지 않은 것이다. */
+  async function actingAs(ctx: RlsContext, profileId: string): Promise<string | null> {
+    const result = await withRls({ ...ctx, actingProfileId: profileId }, (sql) =>
+      sql.query<{ id: string | null }>(`SELECT app_current_profile_id() AS id`),
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
+  it("본인 계정이 연결된 프로필도 대행한다", async () => {
+    // 0035 에서 연결 여부를 조건에서 뺐다 — 연결은 초대를 한 번 열었다는 뜻일 뿐이다.
+    expect(await actingAs(fx.admin, fx.p1)).toBe(fx.p1);
+  });
+
+  it("아직 연결되지 않은 프로필도 대행한다", async () => {
+    expect(await actingAs(fx.admin, fx.pHidden)).toBe(fx.pHidden);
+  });
+
+  it("고칠 수 없는 프로필은 대행하지 못한다", async () => {
+    // 모임 밖 주선자다. 연결 여부와 무관하게 app_can_edit_profile 이 막는다.
+    expect(await actingAs(fx.strangerAdmin, fx.p1)).toBeNull();
+    expect(await actingAs(fx.strangerAdmin, fx.pHidden)).toBeNull();
+  });
+
+  it("회원은 대행하지 못한다 — 자기 프로필로 떨어진다", async () => {
+    // 대행 값을 직접 넣어도 app_is_admin() 이 막고 COALESCE 가 본인 프로필을 준다.
+    expect(await actingAs(fx.member2, fx.p1)).toBe(fx.p2);
+  });
+
+  it("대행하지 않는 주선자에게는 회원 프로필이 없다", async () => {
+    // COALESCE 의 두 번째 가지. 주선자 계정에는 프로필이 붙지 않으므로 NULL 이다.
+    const result = await withRls(fx.admin, (sql) =>
+      sql.query<{ id: string | null }>(`SELECT app_current_profile_id() AS id`),
+    );
+    expect(result.rows[0]?.id).toBeNull();
   });
 });
 

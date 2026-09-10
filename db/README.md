@@ -57,6 +57,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0032_match_rejected_notification.sql` | 거절을 **신청자 쪽** 담당 주선자에게 알린다 (누른 사람 제외)                    |
 | `0033_match_canceled_notification.sql` | 취소를 **받는 쪽** 담당 주선자에게 알린다 (누른 사람 제외)                      |
 | `0034_profile_images_owner_write.sql` | 사진 쓰기를 `app_is_admin()` 에서 `app_can_edit_profile` 로 조인다              |
+| `0035_acting_allows_claimed_profile.sql` | 본인 계정이 연결된 프로필도 대행 대상 — `app_current_profile_id()` 에서 연결 조건 제거 |
 
 ## 테이블
 
