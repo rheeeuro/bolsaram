@@ -7,6 +7,7 @@
  *   * 연결되지 않은 텔레그램 계정은 아무것도 못 한다.
  *   * 연결 코드는 한 번만 쓰이고 만료된다.
  *   * 사진 여러 장이 하나의 ImportSession 에 순서대로 묶인다.
+ *   * 모임 없는 주선자도 봇으로 Import 를 만든다(그 결과는 전체공개).
  *   * 봇 전용 테이블에 런타임 롤이 접근하지 못한다.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -40,12 +41,16 @@ const UPDATE_BASE = 900_000_000 + Math.floor(Math.random() * 1_000_000);
 const TG_ADMIN = UPDATE_BASE + 1;
 const TG_MEMBER = UPDATE_BASE + 2;
 const TG_STRANGER = UPDATE_BASE + 3;
+const TG_SOLO = UPDATE_BASE + 4;
 
 let adminId: string;
 let memberId: string;
+/** 가입만 하고 아직 모임이 없는 주선자. 봇도 이 상태에서 동작해야 한다. */
+let soloAdminId: string;
 let admin: RlsContext;
 let member: RlsContext;
-/** 주선자는 모임에 속해야 Import 를 만들 수 있다(RLS). */
+let soloAdmin: RlsContext;
+/** 모임에 속한 주선자용. 모임 없는 주선자도 Import 를 만들 수 있다(아래 테스트). */
 let groupId: string;
 
 beforeAll(async () => {
@@ -65,17 +70,30 @@ beforeAll(async () => {
        VALUES ('MEMBER', $1, $2) RETURNING id`,
       [`0109${String(UPDATE_BASE).slice(-7)}`, `${TAG}-member`],
     );
+    // 모임에 넣지 않는다 — group_admins 행이 없는 주선자다.
+    const solo = await sql.query<{ id: string }>(
+      `INSERT INTO users (role, email, password_hash, display_name)
+       VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+      [`${TAG}-solo@test.local`, `${TAG}-solo`],
+    );
     await sql.query(
       `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, true)`,
       [group, a.rows[0]!.id],
     );
-    return { adminId: a.rows[0]!.id, memberId: m.rows[0]!.id, group };
+    return {
+      adminId: a.rows[0]!.id,
+      memberId: m.rows[0]!.id,
+      soloAdminId: solo.rows[0]!.id,
+      group,
+    };
   });
   adminId = ids.adminId;
   memberId = ids.memberId;
+  soloAdminId = ids.soloAdminId;
   groupId = ids.group;
   admin = { userId: adminId, role: "ADMIN" };
   member = { userId: memberId, role: "MEMBER" };
+  soloAdmin = { userId: soloAdminId, role: "ADMIN" };
 });
 
 afterAll(async () => {
@@ -242,6 +260,43 @@ describe("계정 연결", () => {
         telegramChatId: TG_ADMIN,
       }),
     ).rejects.toThrow(/다른 주선자/);
+  });
+});
+
+describe("모임 없는 주선자", () => {
+  /**
+   * 가입은 열려 있고 모임 없이 시작한다. 웹 업로드가 그 상태를 허용하므로
+   * 봇도 같아야 한다 — group_id 가 null 인 세션은 전체공개 프로필이 된다.
+   */
+  it("모임이 없어도 텔레그램 Import 세션을 만든다", async () => {
+    const session = await withRls(soloAdmin, (sql) =>
+      createSession(sql, { groupId: null, createdBy: soloAdminId, source: "TELEGRAM" }),
+    );
+    expect(session.groupId).toBeNull();
+
+    const conversation = await withRls(soloAdmin, async (sql) => {
+      await createConversation(sql, {
+        importSessionId: session.id,
+        telegramUserId: TG_SOLO,
+        telegramChatId: TG_SOLO,
+      });
+      return findActiveConversation(sql, TG_SOLO);
+    });
+    expect(conversation?.importSessionId).toBe(session.id);
+
+    await withRls(soloAdmin, async (sql) => {
+      const active = await findActiveConversation(sql, TG_SOLO);
+      if (active) await updateConversation(sql, active, { state: "CANCELED" });
+    });
+  });
+
+  it("다른 주선자의 전체공개 세션에는 손대지 못한다", async () => {
+    const session = await withRls(soloAdmin, (sql) =>
+      createSession(sql, { groupId: null, createdBy: soloAdminId, source: "TELEGRAM" }),
+    );
+    // group_id 가 null 이어도 만든 사람만 통과한다(import_sessions_admin 정책).
+    const seen = await withRls(admin, (sql) => findConversationByImportSession(sql, session.id));
+    expect(seen).toBeNull();
   });
 });
 

@@ -35,7 +35,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
-| `telegram-import.test.ts`      | webhook 멱등성·계정 연결·사진 묶기·권한 경계   | 필요 | 23   |
+| `telegram-import.test.ts`      | webhook 멱등성·계정 연결·사진 묶기·권한 경계   | 필요 | 25   |
 | `admin-login.test.ts`          | 관리자 비밀번호 시도 제한·창 만료·권한 경계    | 필요 | 7    |
 | `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
@@ -83,6 +83,7 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `telegram-import.test.ts` 「회원 계정으로는 …없다」        | 텔레그램은 주선자 전용 채널         |
 | `telegram-import.test.ts` 「같은 앨범이 동시에」           | 앨범 사진의 순서·번호 충돌 없음     |
 | `telegram-import.test.ts` 「런타임 롤은 …접근할 수 없다」  | 봇 연결 코드·webhook 이벤트 격리    |
+| `telegram-import.test.ts` 「모임이 없어도 …만든다」        | 모임 없는 주선자도 봇을 쓸 수 있음  |
 | `telegram-state.test.ts` 「직접 보낸 글이 …우선한다」      | 원문 우선순위(§5.4)                 |
 | `admin-login.test.ts` 「실패가 쌓이면 …거절한다」          | 관리자 비밀번호 무한 시도 차단      |
 | `admin-login.test.ts` 「창이 지난 실패는 세지 않는다」     | 영구 락아웃 없음(계정 잠그기 방지)  |
