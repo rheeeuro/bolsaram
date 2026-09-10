@@ -10,6 +10,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { BRAND } from "@bolsaram/ui-tokens";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { Markdown } from "@/components/ui/markdown";
 import { readGuide } from "@/server/docs/guide";
 
@@ -25,11 +26,8 @@ export default function PrivacyPage() {
   return (
     <main className="member-surface min-h-dvh bg-[var(--color-ivory-50)]">
       <div className="mx-auto w-full max-w-2xl px-6 py-12">
-        <Link
-          href="/"
-          className="display text-[19px] leading-none text-[var(--color-ink-700)] transition-colors hover:text-[var(--color-ink-900)]"
-        >
-          {BRAND.nameKo}
+        <Link href="/" className="inline-block opacity-80 transition-opacity hover:opacity-100">
+          <BrandLogo variant="wordmark" height={22} />
         </Link>
 
         <article className="mt-8">

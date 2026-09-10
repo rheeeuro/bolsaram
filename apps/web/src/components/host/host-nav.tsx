@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { BRAND } from "@bolsaram/ui-tokens";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { BrandLogo } from "@/components/ui/brand-logo";
 
 /**
  * 주선자 네비게이션.
@@ -33,11 +34,9 @@ export function HostNav({ displayName }: { displayName: string | null }) {
     <header className="sticky top-0 z-30 border-b border-[var(--surface-border)] bg-[var(--color-ivory-50)]/92 backdrop-blur">
       <div className="mx-auto max-w-6xl px-5">
         <div className="flex items-center justify-between gap-4 pt-4">
-          <Link href="/home" className="shrink-0">
-            <span className="display text-[22px] leading-none text-[var(--color-ink-900)]">
-              {BRAND.nameKo}
-            </span>
-            <span className="ml-2 hidden text-[12px] text-[var(--color-ink-500)] sm:inline">
+          <Link href="/home" className="flex shrink-0 items-baseline">
+            <BrandLogo variant="wordmark" height={22} eager />
+            <span className="ml-2.5 hidden text-[12px] text-[var(--color-ink-500)] sm:inline">
               {BRAND.tagline}
             </span>
           </Link>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BRAND } from "@bolsaram/ui-tokens";
+import { BrandLogo } from "./brand-logo";
 
 /**
  * 로그인·입장·가입·초대 확인 화면의 공용 껍데기.
@@ -24,11 +24,8 @@ export function AuthShell({
     <main className="member-surface flex min-h-dvh flex-col bg-[var(--color-ivory-50)]">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-7 py-12">
         <header className="mb-8">
-          <Link
-            href="/"
-            className="display text-[19px] leading-none text-[var(--color-ink-700)] transition-colors hover:text-[var(--color-ink-900)]"
-          >
-            {BRAND.nameKo}
+          <Link href="/" className="inline-block opacity-80 transition-opacity hover:opacity-100">
+            <BrandLogo variant="wordmark" height={22} eager />
           </Link>
           <h1 className="display mt-7 text-[27px] leading-tight text-[var(--color-ink-900)]">
             {title}

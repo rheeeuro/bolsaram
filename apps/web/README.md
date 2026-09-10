@@ -59,7 +59,7 @@ apps/web/src/
 │   │   └── group/            모임 설정 · 주선자 구성원 · 초대 코드
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell·markdown)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell·markdown·brand-logo)
 │   ├── member/               회원 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
@@ -71,6 +71,25 @@ apps/web/src/
 │   └── cn.ts                 Tailwind 클래스 병합
 └── server/                   서버 전용 (아래 참고)
 ```
+
+정적 파일은 `apps/web/public/` 에 있다. 리포 루트 `assets/` 의 브랜드 에셋을 그대로
+복사한 것이고, 파일명을 바꾸지 않아 원본과 1:1 로 대응한다.
+
+```
+apps/web/public/
+├── favicon.ico               레거시 경로 (/favicon.ico 로 직접 요청된다)
+├── favicon-16/32/48.png      브라우저 탭
+├── favicon-180.png           apple-touch-icon
+├── favicon-192/512.png       manifest 아이콘 · 홈 화면
+├── site.webmanifest          홈 화면 이름·색 — app/layout.tsx 가 link 를 낸다
+├── bolsaram-logo-primary.png     세로 락업 (볼사람 / BOLSARAM)
+├── bolsaram-logo-horizontal.png  가로 락업 (볼사람 | BOLSARAM)
+└── bolsaram-symbol.png           심볼 마크
+```
+
+> 원본 캔버스에 여백이 비대칭으로 들어 있어서 로고는 `BrandLogo` 를 통해서만 쓴다.
+> 실측한 글리프 경계를 잘라 그리고, 화면 크기에 맞는 변형(`wordmark`·`lockup`·
+> `stacked`·`symbol`)을 고른다. `assets/` 를 새 버전으로 갈면 그 좌표를 다시 재야 한다.
 
 ### `server/` — 서버 전용 모듈
 

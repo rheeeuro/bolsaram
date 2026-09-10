@@ -1,5 +1,5 @@
-import { BRAND } from "@bolsaram/ui-tokens";
 import { requireUserPage } from "@/server/auth/guard";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { DiscoverClient } from "./discover-client";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,9 @@ export default async function DiscoverPage() {
     <>
       <header className="sticky top-0 z-20 border-b border-[var(--surface-border)] bg-[var(--surface-page)]/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5">
-          <h1 className="display text-[22px] text-[var(--color-ink-900)]">{BRAND.nameKo}</h1>
+          <h1>
+            <BrandLogo variant="wordmark" height={21} eager />
+          </h1>
         </div>
       </header>
       <DiscoverClient />

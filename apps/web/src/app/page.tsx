@@ -6,6 +6,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BRAND } from "@bolsaram/ui-tokens";
 import { readSession } from "@/server/auth/session";
+import { BrandLogo } from "@/components/ui/brand-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +34,10 @@ export default async function IntroPage() {
             좋은 방식으로.
           </p>
 
-          <h1 className="display mt-10 text-[56px] leading-none text-[var(--color-ink-900)]">
-            {BRAND.nameKo}
+          {/* 로고 락업에 한글·영문이 함께 들어 있으므로 글자로 다시 쓰지 않는다. */}
+          <h1 className="mt-10">
+            <BrandLogo variant="stacked" height={104} eager />
           </h1>
-          <p className="display mt-1 text-[20px] tracking-wide text-[var(--color-ink-600)]">
-            {BRAND.nameEn}
-          </p>
 
           <p className="mt-8 text-[14px] leading-relaxed text-[var(--color-ink-700)]">
             {BRAND.subTagline}

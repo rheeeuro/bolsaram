@@ -1,0 +1,19 @@
+{
+  "name": "볼사람",
+  "short_name": "볼사람",
+  "icons": [
+    {
+      "src": "/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#7A3345",
+  "background_color": "#F6F1EA",
+  "display": "standalone"
+}
