@@ -144,7 +144,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/profiles/[id]/status`               | PATCH               | 주선자            | 상태·노출 변경                       |
 | `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
-| `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | close                                |
+| `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 회원(프로필 필요) | 숨긴 사람 목록·토글                  |
 | `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰) |

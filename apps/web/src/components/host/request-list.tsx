@@ -53,10 +53,16 @@ export function HostRequestList({
     router.push(`/requests?${search.toString()}`);
   }
 
-  async function close(id: string) {
+  /**
+   * 당사자를 대신해 상태를 옮긴다.
+   *
+   * 회원은 초대 링크로만 세션이 생긴다 — 자기 폰을 쓰지 않거나 30일이 지난 회원은
+   * 스스로 누를 수 없다. 그 의사를 주선자가 확인해 여기서 기록한다.
+   */
+  async function act(id: string, action: "accept" | "reject" | "cancel" | "close") {
     setBusy(true);
     setError(null);
-    const result = await apiPost(`/api/admin/match-requests/${id}/close`);
+    const result = await apiPost(`/api/admin/match-requests/${id}/${action}`);
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
@@ -132,7 +138,7 @@ export function HostRequestList({
                         size="sm"
                         variant="secondary"
                         disabled={busy}
-                        onClick={() => void close(item.id)}
+                        onClick={() => void act(item.id, "close")}
                       >
                         종료
                       </Button>
@@ -145,12 +151,106 @@ export function HostRequestList({
                     “{item.message}”
                   </p>
                 ) : null}
+
+                {item.status === "REQUESTED" ? (
+                  <OnBehalf
+                    busy={busy}
+                    target={item.target?.code ?? "상대"}
+                    requester={item.requester?.code ?? "신청자"}
+                    onAct={(action) => void act(item.id, action)}
+                  />
+                ) : null}
               </li>
             );
           })}
         </ul>
       )}
     </>
+  );
+}
+
+type BehalfAction = "accept" | "reject" | "cancel";
+
+/** 되돌릴 수 없는 전이라 한 번 더 묻는다. 특히 수락은 그 자리에서 연락처를 공개한다. */
+const BEHALF_CONFIRM: Record<BehalfAction, (p: { requester: string; target: string }) => string> =
+  {
+    accept: ({ requester, target }) =>
+      `${target} 님이 수락했다고 기록할까요? 두 분이 연결되고 ${requester} 님과 서로의 이름·연락 방법이 공개됩니다.`,
+    reject: ({ target }) =>
+      `${target} 님이 거절했다고 기록할까요? 두 사람은 서로의 목록에서 빠지고 다시 신청할 수 없습니다.`,
+    cancel: ({ requester }) =>
+      `${requester} 님이 마음을 거뒀다고 기록할까요? 이 신청은 취소로 닫힙니다.`,
+  };
+
+const BEHALF_LABELS: Record<BehalfAction, string> = {
+  accept: "수락",
+  reject: "거절",
+  cancel: "신청 취소",
+};
+
+/**
+ * 당사자를 대신해 처리하는 줄.
+ *
+ * 회원은 초대 링크로만 세션이 생기므로 자기 폰을 쓰지 않는 분은 직접 누를 수 없다.
+ * 주선자가 카카오톡·대면으로 의사를 확인한 뒤 그 답을 여기에 기록한다.
+ */
+function OnBehalf({
+  busy,
+  requester,
+  target,
+  onAct,
+}: {
+  busy: boolean;
+  requester: string;
+  target: string;
+  onAct: (action: BehalfAction) => void;
+}) {
+  const [pending, setPending] = useState<BehalfAction | null>(null);
+
+  if (pending) {
+    return (
+      <div className="mt-3 rounded-[10px] border border-[var(--color-rose-200)] bg-[var(--color-rose-100)] px-3.5 py-3">
+        <p className="text-[12.5px] leading-relaxed text-[var(--color-burgundy-800)]">
+          {BEHALF_CONFIRM[pending]({ requester, target })}
+        </p>
+        <div className="mt-2.5 flex gap-2">
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              onAct(pending);
+              setPending(null);
+            }}
+          >
+            {BEHALF_LABELS[pending]}으로 기록
+          </Button>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => setPending(null)}>
+            그만두기
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--surface-border)] pt-3">
+      <span className="text-[12px] text-[var(--surface-text-muted)]">
+        본인 대신 처리 — 카카오톡·대면으로 확인한 답을 기록합니다
+      </span>
+      <div className="ml-auto flex gap-2">
+        {(["accept", "reject", "cancel"] as const).map((action) => (
+          <Button
+            key={action}
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => setPending(action)}
+          >
+            {BEHALF_LABELS[action]}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
 

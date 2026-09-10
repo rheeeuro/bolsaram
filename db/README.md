@@ -47,6 +47,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0022_disclosure_survives_close.sql`| 종료해도 이름·연락처 공개 유지 (`app_is_introduced_with` 에 CLOSED 포함)               |
 | `0023_reject_and_hide.sql`         | 거절 관계 재신청 금지 + `profile_hides` (숨기기). 둘 다 양방향                         |
 | `0024_hide_requires_no_active_request.sql` | 활성 신청이 있는 상대는 숨길 수 없다 (0023 의 반대 방향)                       |
+| `0025_acting_profile.sql`          | 주선자 대행 컨텍스트 (`app_current_profile_id` 분기). **아직 적용하지 않았다**         |
 
 ## 테이블
 
