@@ -78,6 +78,8 @@ export type TelegramIdentity = {
    * null 이면 전체공개로 들어간다(웹 업로드와 같다).
    */
   groupId: string | null;
+  /** 봇이 「어디에 담고 있는지」를 말해 주기 위한 이름. 전체공개면 null 이다. */
+  groupName: string | null;
 };
 
 /**
@@ -133,9 +135,10 @@ export async function consumeTelegramLinkCode(input: {
 
     // 연결 시점에 보고 있는 채널. 소속이 아닌 값이면 전체공개로 떨어뜨린다 —
     // 소속 판정은 group_admins 가 하고 active_group_id 는 그중 어디인지만 말한다(0036).
-    const group = await sql.query<{ group_id: string }>(
-      `SELECT ga.group_id FROM group_admins ga
+    const group = await sql.query<{ group_id: string; name: string }>(
+      `SELECT ga.group_id, g.name FROM group_admins ga
          JOIN users u ON u.id = ga.user_id AND u.active_group_id = ga.group_id
+         JOIN groups g ON g.id = ga.group_id
         WHERE ga.user_id = $1`,
       [row.user_id],
     );
@@ -146,6 +149,7 @@ export async function consumeTelegramLinkCode(input: {
       telegramUserId: input.telegramUserId,
       telegramChatId: input.telegramChatId,
       groupId: group.rows[0]?.group_id ?? null,
+      groupName: group.rows[0]?.name ?? null,
     };
   });
 }
@@ -163,14 +167,17 @@ export async function findTelegramIdentity(
       role: "ADMIN" | "MEMBER";
       telegram_chat_id: string | number;
       group_id: string | null;
+      group_name: string | null;
     }>(
       // 봇은 웹에서 보고 있는 채널과 같은 모임에 넣는다. 매 요청에 다시 읽으므로
       // 웹에서 채널을 바꾸면 다음 사진부터 그 모임으로 들어간다.
       `SELECT c.user_id, u.role, c.telegram_chat_id,
-              (SELECT ga.group_id FROM group_admins ga
-                WHERE ga.user_id = c.user_id AND ga.group_id = u.active_group_id) AS group_id
+              g.id AS group_id, g.name AS group_name
          FROM telegram_connections c
          JOIN users u ON u.id = c.user_id
+         LEFT JOIN group_admins ga ON ga.user_id = c.user_id
+                                  AND ga.group_id = u.active_group_id
+         LEFT JOIN groups g ON g.id = ga.group_id
         WHERE c.telegram_user_id = $1`,
       [telegramUserId],
     );
@@ -184,6 +191,7 @@ export async function findTelegramIdentity(
       telegramUserId,
       telegramChatId: Number(row.telegram_chat_id),
       groupId: row.group_id,
+      groupName: row.group_name,
     };
   });
 }

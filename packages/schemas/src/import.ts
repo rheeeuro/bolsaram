@@ -47,6 +47,16 @@ export const createImportSessionSchema = z.object({
 });
 export type CreateImportSessionInput = z.infer<typeof createImportSessionSchema>;
 
+/**
+ * 가져온 것을 어느 모임에 등록할지 바꾼다. `null` 이면 전체공개다.
+ *
+ * 세션을 만들 때 보고 있던 모임이 그대로 들어가지만, 검토하다가 다른 방에 넣기로
+ * 정할 수 있다. 서버는 호출자가 그 모임에 속하는지 확인하고 RLS 가 한 번 더 본다.
+ */
+export const updateImportGroupSchema = z.object({
+  groupId: z.uuid().nullable(),
+});
+
 export const registerImportAssetSchema = z.object({
   type: z.enum(IMPORT_ASSET_TYPES).default("IMAGE"),
   filename: z.string().trim().min(1).max(255),

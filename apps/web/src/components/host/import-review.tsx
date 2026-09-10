@@ -49,6 +49,10 @@ type Session = {
   rawText: string | null;
   errorMessage: string | null;
   committedProfileId: string | null;
+  /** 등록될 모임. null 이면 전체공개다. */
+  groupId: string | null;
+  /** 전체공개로 되돌릴 수 있는가 — 세션을 만든 사람만 할 수 있다. */
+  canUsePublic: boolean;
   /**
    * 텔레그램으로 들어온 경우의 대화 정보 (설계 변경 문서 TELEGRAM v1 §13).
    * 텔레그램 사용자명·식별값은 담지 않는다 — 검토에 필요하지 않다.
@@ -86,10 +90,13 @@ export function ImportReview({
   session,
   assets,
   extraction,
+  groups,
 }: {
   session: Session;
   assets: Asset[];
   extraction: Extraction | null;
+  /** 주선자가 속한 모임 전부. 여기서 등록될 방을 고른다. */
+  groups: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -102,6 +109,32 @@ export function ImportReview({
   const [message, setMessage] = useState<string | null>(null);
 
   const committed = session.committedProfileId != null;
+  const [groupId, setGroupId] = useState<string | null>(session.groupId);
+
+  /**
+   * 등록될 방을 바꾼다. 즉시 저장한다 — 「검토 저장」은 추출 필드만 다루고,
+   * 이 값은 세션 자체의 것이라 같이 묶으면 어느 쪽이 저장됐는지 헷갈린다.
+   */
+  async function moveGroup(next: string | null) {
+    const previous = groupId;
+    setGroupId(next);
+    setBusy("group");
+    setError(null);
+    setMessage(null);
+    const result = await apiPatch(`/api/imports/${session.id}/group`, { groupId: next });
+    setBusy(null);
+    if (result.ok) {
+      setMessage(
+        next
+          ? `${groups.find((g) => g.id === next)?.name ?? "선택한 모임"} 에 등록합니다.`
+          : "전체공개로 등록합니다.",
+      );
+      router.refresh();
+    } else {
+      setGroupId(previous);
+      setError(result.message);
+    }
+  }
 
   function edit(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -259,8 +292,34 @@ export function ImportReview({
         </Panel>
       </div>
 
-      {/* AI 결과 + 검토 */}
+      {/* 등록할 곳 + AI 결과 + 검토 */}
       <div className="flex flex-col gap-5">
+        <Panel tight title="등록할 모임">
+          <div className="flex flex-wrap items-center gap-2">
+            <GroupChoiceButton
+              label="전체공개"
+              active={groupId == null}
+              // 전체공개로 되돌리는 것은 세션을 만든 사람만 할 수 있다.
+              disabled={committed || busy != null || (!session.canUsePublic && groupId != null)}
+              onSelect={() => void moveGroup(null)}
+            />
+            {groups.map((group) => (
+              <GroupChoiceButton
+                key={group.id}
+                label={group.name}
+                active={group.id === groupId}
+                disabled={committed || busy != null}
+                onSelect={() => void moveGroup(group.id)}
+              />
+            ))}
+          </div>
+          <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+            {committed
+              ? "이미 등록했습니다. 옮기려면 프로필 화면에서 다뤄야 합니다."
+              : "여기서 고른 방에 프로필이 만들어집니다. 방을 바꾸면 이 건은 그 방의 가져오기 목록으로 옮겨 갑니다."}
+          </p>
+        </Panel>
+
         {extraction == null ? (
           <Panel title="AI 결과">
             <p className="py-8 text-center text-[13px] text-[var(--surface-text-muted)]">
@@ -521,4 +580,36 @@ function parseFieldValue(key: string, raw: string): unknown {
     return items.length > 0 ? items : null;
   }
   return trimmed;
+}
+
+/** 등록될 방 하나. 지금 고른 것만 채워진 알약으로 보인다. */
+function GroupChoiceButton({
+  label: text,
+  active,
+  disabled,
+  onSelect,
+}: {
+  label: string;
+  active: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={onSelect}
+      className={cn(
+        "max-w-[200px] truncate rounded-[var(--radius-pill)] px-3 py-1.5 text-[12.5px]",
+        "transition-colors duration-[var(--duration-quick)]",
+        active
+          ? "bg-[var(--color-rose-600)] text-white"
+          : "border border-[var(--surface-border)] bg-[var(--surface-card)] text-[var(--color-ink-700)] hover:border-[var(--color-rose-300)]",
+        disabled && "cursor-not-allowed opacity-50",
+      )}
+    >
+      {text}
+    </button>
+  );
 }

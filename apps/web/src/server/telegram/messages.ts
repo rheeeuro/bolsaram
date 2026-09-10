@@ -62,8 +62,17 @@ export const messages = {
    * 첫 사진을 받은 뒤 한 번만 보낸다.
    * 장수를 말하지 않는 이유 — 카카오톡 「공유하기」로 보내면 사진이 하나씩 따로 도착해서
    * 이 시점의 장수는 최종 장수가 아니다. 총 장수는 글을 받을 때 알려준다.
+   *
+   * **어느 방에 담고 있는지 여기서 말한다.** 봇에는 방을 고르는 화면이 없고 웹에서
+   * 보고 있는 방을 그대로 쓰므로, 잘못 담기고 있다면 이 첫 응답에서 알아채야 한다.
    */
-  mediaReceiving: "사진을 받고 있습니다.\n다 보내신 뒤 프로필 글을 보내주세요.",
+  mediaReceiving: (groupName: string | null) =>
+    [
+      "사진을 받고 있습니다.",
+      `담는 곳 — ${roomName(groupName)}`,
+      "",
+      "다 보내신 뒤 프로필 글을 보내주세요.",
+    ].join("\n"),
 
   mediaFull: `사진은 한 세션에 ${TELEGRAM_MAX_ASSETS_PER_SESSION}장까지 받습니다. 프로필 글을 보내주세요.`,
 
@@ -96,8 +105,8 @@ export const messages = {
    * 분석 완료 안내. 요약은 주선자가 이미 아는 항목만 몇 줄로 보여준다.
    * 자기소개·이상형 같은 긴 원문은 넣지 않는다.
    */
-  analyzed: (fields: ExtractedFields, needsReview: boolean) => {
-    const lines: string[] = ["분석이 완료됐습니다.", ""];
+  analyzed: (fields: ExtractedFields, needsReview: boolean, groupName: string | null) => {
+    const lines: string[] = ["분석이 완료됐습니다.", `담긴 곳 — ${roomName(groupName)}`, ""];
     const first = [
       fields.birthYear ? `${fields.birthYear}년생` : null,
       fields.height ? `${fields.height}cm` : null,
@@ -114,6 +123,8 @@ export const messages = {
         ? "확인이 필요한 항목이 있습니다. 볼사람에서 검토해 주세요."
         : "볼사람에서 확인하고 등록해 주세요.",
     );
+    // 방은 검토 화면에서 바꿀 수 있다. 다시 보내지 않아도 된다는 것을 알려준다.
+    lines.push("등록할 모임은 검토 화면에서 바꿀 수 있습니다.");
     return lines.join("\n");
   },
 
@@ -200,6 +211,11 @@ export const messages = {
 
   requestsButton: "신청 목록 열기",
 } as const;
+
+/** 소속이 없으면 전체공개다 — 봇 문구에서도 하나의 방처럼 부른다. */
+function roomName(groupName: string | null): string {
+  return groupName ?? "전체공개";
+}
 
 /** 공개 번호가 없으면(프로필이 지워진 뒤) 번호 자리를 비워 둔다. */
 function pairLine(a: number | null, b: number | null, arrow: string): string {

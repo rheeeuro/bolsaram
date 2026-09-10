@@ -14,6 +14,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import { assertCanEditProfile } from "../apps/web/src/server/repo/profiles";
+import { createSession, setSessionGroup } from "../apps/web/src/server/repo/imports";
 
 const TAG = `grouptest-${Date.now()}`;
 
@@ -283,5 +284,68 @@ describe("모임에 속하지 않은 주선자", () => {
       return r.rowCount ?? 0;
     });
     expect(seesPublic).toBe(1);
+  });
+});
+
+describe("가져온 것을 다른 모임으로 옮기기", () => {
+  it("두 모임에 다 속하면 옮길 수 있다", async () => {
+    // A 의 주선자를 B 에도 넣는다. 여러 모임에 속하는 것이 정상이다.
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, false)`,
+        [B.groupId, A.adminId],
+      ),
+    );
+
+    const moved = await withRls(A.admin, async (sql) => {
+      const session = await createSession(sql, {
+        groupId: A.groupId,
+        createdBy: A.adminId,
+        source: "TEXT",
+      });
+      const after = await setSessionGroup(sql, session.id, B.groupId);
+      return after.groupId;
+    });
+    expect(moved).toBe(B.groupId);
+
+    await withOwner((sql) =>
+      sql.query(`DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2`, [
+        B.groupId,
+        A.adminId,
+      ]),
+    );
+  });
+
+  it("속하지 않은 모임으로는 옮길 수 없다", async () => {
+    await expect(
+      withRls(A.admin, async (sql) => {
+        const session = await createSession(sql, {
+          groupId: A.groupId,
+          createdBy: A.adminId,
+          source: "TEXT",
+        });
+        // RLS 의 WITH CHECK 가 막는다 — 애플리케이션 레이어를 지나쳐도 통과하지 못한다.
+        return setSessionGroup(sql, session.id, B.groupId);
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("이미 등록한 세션은 옮길 수 없다", async () => {
+    await expect(
+      withRls(A.admin, async (sql) => {
+        const session = await createSession(sql, {
+          groupId: A.groupId,
+          createdBy: A.adminId,
+          source: "TEXT",
+        });
+        await sql.query(
+          `UPDATE import_sessions
+              SET status = 'IMPORTED', committed_profile_id = $2, committed_at = now()
+            WHERE id = $1`,
+          [session.id, A.profileId],
+        );
+        return setSessionGroup(sql, session.id, null);
+      }),
+    ).rejects.toThrow(/이미 등록한 세션/);
   });
 });

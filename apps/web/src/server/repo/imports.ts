@@ -153,6 +153,35 @@ export async function listInbox(
   return result.rows.map((row) => ({ ...toSession(row), assetCount: row.asset_count }));
 }
 
+/**
+ * 등록될 모임을 바꾼다. **아직 등록하지 않은 세션만** 옮길 수 있다 —
+ * 이미 프로필이 만들어졌으면 옮겨야 하는 것은 세션이 아니라 그 프로필이다.
+ *
+ * 정책이 양쪽을 본다 — 지금 모임의 세션을 볼 수 있어야 하고(USING), 옮겨 갈 모임의
+ * 주선자여야 한다(WITH CHECK). 전체공개로 되돌리는 것은 만든 사람만 할 수 있다.
+ */
+export async function setSessionGroup(
+  sql: Sql,
+  id: string,
+  groupId: string | null,
+): Promise<ImportSessionRecord> {
+  const current = await requireSession(sql, id);
+  if (current.committedProfileId) {
+    throw new DomainError("CONFLICT", "이미 등록한 세션은 모임을 바꿀 수 없습니다.");
+  }
+  const result = await sql.query<SessionRow>(
+    `UPDATE import_sessions SET group_id = $2
+      WHERE id = $1 AND committed_profile_id IS NULL
+      RETURNING ${SESSION_COLUMNS}`,
+    [id, groupId],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new DomainError("FORBIDDEN", "그 모임으로 옮길 수 없습니다.");
+  }
+  return toSession(row);
+}
+
 export async function setStatus(
   sql: Sql,
   id: string,

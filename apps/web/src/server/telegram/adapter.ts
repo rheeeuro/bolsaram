@@ -345,7 +345,7 @@ async function handlePhoto(
     `텔레그램 응답: 사진 ${result.uploadedCount}장째 · 안내 ${result.announce ? "전송" : "생략"}`,
   );
   if (result.announce) {
-    await sendMessage(identity.telegramChatId, messages.mediaReceiving);
+    await sendMessage(identity.telegramChatId, messages.mediaReceiving(identity.groupName));
     if (result.captionStored) {
       await sendMessage(identity.telegramChatId, messages.captionStored);
     }
@@ -448,13 +448,24 @@ function triggerAnalyze(ctx: RlsContext, identity: TelegramIdentity, sessionId: 
   void (async () => {
     try {
       const result = await analyzeSession(ctx, sessionId);
-      const fields = await withRls(ctx, async (sql) => {
+      // 방 이름은 **세션의 지금 값**으로 읽는다. 사진을 보내는 사이에 웹에서 방을
+      // 옮겼을 수 있고, 그때 봇이 옛 방을 말하면 잘못 안내하는 셈이 된다.
+      const { fields, groupName } = await withRls(ctx, async (sql) => {
         const extraction = await imports.latestExtraction(sql, sessionId);
-        return imports.effectiveFields(extraction);
+        const session = await imports.findSession(sql, sessionId);
+        const group = session?.groupId
+          ? await sql.query<{ name: string }>(`SELECT name FROM groups WHERE id = $1`, [
+              session.groupId,
+            ])
+          : null;
+        return {
+          fields: imports.effectiveFields(extraction),
+          groupName: group?.rows[0]?.name ?? null,
+        };
       });
       await sendMessage(
         identity.telegramChatId,
-        messages.analyzed(fields, result.status === "REVIEW_REQUIRED"),
+        messages.analyzed(fields, result.status === "REVIEW_REQUIRED", groupName),
         {
           buttonText: messages.reviewButton,
           buttonUrl: `${env().APP_ORIGIN}/imports/${sessionId}`,

@@ -42,6 +42,10 @@ export default async function ImportDetailPage({
         rawText: session.rawText,
         errorMessage: session.errorMessage,
         committedProfileId: session.committedProfileId,
+        groupId: session.groupId,
+        // 전체공개로 되돌리는 것은 정책상 세션을 만든 사람만 할 수 있다
+        // (`import_sessions_admin` 의 WITH CHECK). 화면에서도 같은 판정을 한다.
+        canUsePublic: session.createdBy === viewer.userId,
         telegram: conversation
           ? {
               state: TELEGRAM_SESSION_STATE_LABELS[conversation.state],
@@ -82,7 +86,12 @@ export default async function ImportDetailPage({
         <span className="text-[var(--surface-text)]">검토</span>
       </nav>
 
-      <ImportReview session={data.session} assets={data.assets} extraction={data.extraction} />
+      <ImportReview
+        session={data.session}
+        assets={data.assets}
+        extraction={data.extraction}
+        groups={viewer.groups}
+      />
     </>
   );
 }
