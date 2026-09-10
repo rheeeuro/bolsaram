@@ -28,3 +28,9 @@ export const favoriteToggleSchema = z.object({
 export const profileHideSchema = z.object({
   profileId: uuidSchema,
 });
+
+/** 주선자가 회원의 요청을 반려할 때 남기는 사유. 회원에게 그대로 보인다. */
+export const declineIntentSchema = z.object({
+  reason: z.string().trim().max(200).optional(),
+});
+export type DeclineIntent = z.infer<typeof declineIntentSchema>;

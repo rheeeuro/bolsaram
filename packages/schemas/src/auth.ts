@@ -63,6 +63,17 @@ export const verifyOtpSchema = z.object({
     .regex(/^[0-9]{6}$/, "6자리 숫자를 입력하세요."),
 });
 
+/**
+ * 대행 시작 — 주선자가 대신 조작할 프로필.
+ *
+ * 대상이 아직 아무 계정에도 연결되지 않았는지, 호출자가 그 프로필을 다룰 수 있는지는
+ * 서버와 RLS 가 판정한다. 여기서는 모양만 본다.
+ */
+export const actingStartSchema = z.object({
+  profileId: z.uuid(),
+});
+export type ActingStart = z.infer<typeof actingStartSchema>;
+
 export const inviteCreateSchema = z.object({
   profileId: z.uuid(),
   /** 초대 유효기간(시간). 기본 72시간. */

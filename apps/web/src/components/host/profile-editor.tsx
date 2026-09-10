@@ -416,6 +416,41 @@ export function HostProfileEditor({
             </div>
           </Panel>
 
+          {!claimed ? (
+            <Panel title="대신 둘러보기">
+              <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                휴대폰 쓰기를 꺼리는 분은 주선자가 자기 폰으로 대신 봅니다. 초대는
+                소진되지 않고 주선자 로그인도 그대로 유지됩니다.
+              </p>
+              <Button
+                variant="secondary"
+                className="w-full"
+                disabled={busy}
+                onClick={() => {
+                  void (async () => {
+                    setBusy(true);
+                    setError(null);
+                    const result = await apiPost("/api/admin/acting", {
+                      profileId: profile.id,
+                    });
+                    setBusy(false);
+                    if (!result.ok) {
+                      setError(result.message);
+                      return;
+                    }
+                    router.push("/discover");
+                  })();
+                }}
+              >
+                이 분으로 둘러보기
+              </Button>
+              <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                대행 중에는 화면 아래에 띠가 뜨고, 거기서 언제든 주선자로 돌아옵니다.
+                본인이 초대 링크로 직접 들어오면 대행은 자동으로 끝납니다.
+              </p>
+            </Panel>
+          ) : null}
+
           <Panel title="본인에게 보내기">
             {claimed ? (
               <p className="text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">

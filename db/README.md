@@ -47,7 +47,11 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0022_disclosure_survives_close.sql`| 종료해도 이름·연락처 공개 유지 (`app_is_introduced_with` 에 CLOSED 포함)               |
 | `0023_reject_and_hide.sql`         | 거절 관계 재신청 금지 + `profile_hides` (숨기기). 둘 다 양방향                         |
 | `0024_hide_requires_no_active_request.sql` | 활성 신청이 있는 상대는 숨길 수 없다 (0023 의 반대 방향)                       |
-| `0025_acting_profile.sql`          | 주선자 대행 컨텍스트 (`app_current_profile_id` 분기). **아직 적용하지 않았다**         |
+| `0025_acting_profile.sql`          | 주선자 대행 — `sessions.acting_profile_id` + `app_current_profile_id()` 대행 분기      |
+| `0026_match_intents.sql`           | `match_intents` — 회원의 의사는 요청이고 확정은 주선자가 한다                          |
+| `0027_match_request_admin_both_sides.sql` | 신청 읽기·수정을 **양쪽** 담당 주선자에게                                       |
+| `0028_admin_creates_request_on_approval.sql` | 담당 주선자가 회원을 대신해 신청을 만든다 (승인 경로)                       |
+| `0029_intent_notification_payload.sql` | 요청 알림 payload 키를 아웃박스가 읽는 이름으로                                 |
 
 ## 테이블
 
@@ -61,6 +65,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
 | `favorites`                                    | 관심                                               | 본인만                              |
 | `profile_hides`                                | 숨긴 상대. 양방향으로 목록·신청을 막는다           | **숨긴 사람만** (상대·관리자 불가)  |
+| `match_intents`                                | 회원이 낸 요청. 승인 전까지 **상대는 못 읽는다**   | 본인 + 담당 주선자                  |
 | `invites`                                      | **회원 로그인 링크** (토큰 해시만 저장)            | 관리자만                            |
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
@@ -80,6 +85,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | ---------------------------------------------------- | --------------------------------------------- |
 | `match_requests_one_active` (부분 유니크)            | 같은 방향 활성 신청 중복 — 동시 요청도 막힌다 |
 | `match_requests_no_self`                             | 자기 자신에게 신청                            |
+| `match_intents_one_pending_send` (부분 유니크)       | 같은 상대에게 확인 대기 요청 중복             |
+| `match_intents_one_pending_answer` (부분 유니크)     | 한 신청에 수락·거절이 동시에 대기             |
 | `match_requests_block_closed_relations_trg`          | 거절·숨김 관계의 새 신청 (양방향)             |
 | `profile_hides_block_active_request_trg`             | 활성 신청이 있는 상대를 숨기기                |
 | `profile_hides_no_self`                              | 자기 자신을 숨기기                            |

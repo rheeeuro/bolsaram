@@ -13,16 +13,19 @@
 import "server-only";
 import { NOTIFICATION_MAX_ATTEMPTS, NOTIFICATION_RETRY_WINDOW_DAYS } from "@bolsaram/domain";
 import { withOwner } from "@bolsaram/db";
+import type { MatchIntentKind } from "@bolsaram/schemas";
 
 /** 한 번에 집는 개수. */
 const BATCH = 20;
 
 export type ClaimedNotification = {
   id: string;
-  kind: "MATCH_REQUESTED" | "MATCH_ACCEPTED";
+  kind: "MATCH_REQUESTED" | "MATCH_ACCEPTED" | "MEMBER_INTENT";
   chatId: number;
   requesterCode: number | null;
   targetCode: number | null;
+  /** MEMBER_INTENT 일 때만 채워진다 — 무슨 요청인지(0026). */
+  intentKind: MatchIntentKind | null;
 };
 
 type ClaimRow = {
@@ -31,6 +34,7 @@ type ClaimRow = {
   telegram_chat_id: number;
   requester_code: number | null;
   target_code: number | null;
+  intent_kind: MatchIntentKind | null;
 };
 
 /**
@@ -62,7 +66,8 @@ export async function claimPending(): Promise<ClaimedNotification[]> {
                   (SELECT tc.telegram_chat_id FROM telegram_connections tc
                     WHERE tc.user_id = n.recipient_user_id) AS telegram_chat_id,
                   (n.payload->>'requesterCode')::int AS requester_code,
-                  (n.payload->>'targetCode')::int AS target_code`,
+                  (n.payload->>'targetCode')::int AS target_code,
+                  n.payload->>'intentKind' AS intent_kind`,
       [NOTIFICATION_MAX_ATTEMPTS, NOTIFICATION_RETRY_WINDOW_DAYS, BATCH],
     );
     return result.rows.map((row) => ({
@@ -71,6 +76,7 @@ export async function claimPending(): Promise<ClaimedNotification[]> {
       chatId: row.telegram_chat_id,
       requesterCode: row.requester_code,
       targetCode: row.target_code,
+      intentKind: row.intent_kind,
     }));
   });
 }

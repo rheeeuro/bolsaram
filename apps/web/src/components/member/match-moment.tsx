@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
  * 컨셉의 "매칭 성공"은 뒤쪽이므로 문구로 단계를 정확히 갈라 말한다.
  * 방송식 "IT'S A MATCH" 대신 한글 문장을 쓴다(설계문서 §13).
  */
-export type MomentVariant = "sent" | "matched";
+export type MomentVariant = "sent" | "matched" | "requestPending" | "acceptPending";
 
 const COPY: Record<MomentVariant, { headline: [string, string]; body: [string, string] }> = {
   sent: {
@@ -20,6 +20,15 @@ const COPY: Record<MomentVariant, { headline: [string, string]; body: [string, s
   matched: {
     headline: ["서로의 마음이", "닿았습니다"],
     body: ["이제 서로의 이름과", "연락 방법을 볼 수 있어요."],
+  },
+  // 볼사람은 주선자가 사이에서 말을 옮긴다. 확인 전까지 상대는 아무것도 모른다.
+  requestPending: {
+    headline: ["주선자에게", "전했습니다"],
+    body: ["주선자가 확인하면", "상대방에게 전달돼요."],
+  },
+  acceptPending: {
+    headline: ["수락을", "전했습니다"],
+    body: ["주선자가 확인하면", "서로의 연락 방법이 공개돼요."],
   },
 };
 

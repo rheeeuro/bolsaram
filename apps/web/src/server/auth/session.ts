@@ -19,8 +19,18 @@ export type SessionUser = {
   userId: string;
   role: UserRole;
   displayName: string | null;
-  /** Claim 이 끝난 회원만 프로필을 가진다. */
+  /**
+   * 회원으로서 보는 프로필.
+   *
+   * Claim 이 끝난 회원은 자기 프로필, 주선자가 대행 중이면 그 대상이다.
+   * 그래서 `asMember` · `actorFor` 같은 회원 경로가 대행에서도 그대로 동작한다.
+   */
   profileId: string | null;
+  /**
+   * 대행 중일 때만 채워진다. 배너를 띄우고 「직접 누른 것」과 구분하는 데 쓴다.
+   * 대상이 자기 계정으로 들어오는 순간(`user_id` 가 채워지면) 여기서도 사라진다.
+   */
+  actingProfileId: string | null;
   /**
    * 이 사용자가 다루는 모임.
    *
@@ -96,11 +106,16 @@ export async function readSession(): Promise<SessionUser | null> {
       role: UserRole;
       display_name: string | null;
       profile_id: string | null;
+      acting_profile_id: string | null;
       group_id: string | null;
     }>(
       // 주선자의 모임은 group_admins, 회원의 모임은 자기 프로필에서 온다.
       // 여러 모임에 속한 주선자는 먼저 들어간 모임을 쓴다(모임 전환 UI 는 아직 없다).
+      // 대행(ap)은 주선자가, 아직 아무 계정에도 연결되지 않은 프로필에 대해서만
+      // 붙는다. 최종 판정은 RLS 의 app_current_profile_id() 가 하고 여기서는 같은
+      // 조건을 애플리케이션 레이어에 한 번 더 둔다(권한 검사는 두 곳에 중복으로).
       `SELECT u.id AS user_id, u.role, u.display_name, p.id AS profile_id,
+              ap.id AS acting_profile_id,
               COALESCE(
                 (SELECT ga.group_id FROM group_admins ga
                   WHERE ga.user_id = u.id ORDER BY ga.added_at LIMIT 1),
@@ -109,6 +124,9 @@ export async function readSession(): Promise<SessionUser | null> {
          FROM sessions s
          JOIN users u ON u.id = s.user_id
          LEFT JOIN profiles p ON p.user_id = u.id
+         LEFT JOIN profiles ap ON ap.id = s.acting_profile_id
+                              AND ap.user_id IS NULL
+                              AND u.role = 'ADMIN'
         WHERE s.id = $1
           AND s.revoked_at IS NULL
           AND s.expires_at > now()`,
@@ -128,8 +146,31 @@ export async function readSession(): Promise<SessionUser | null> {
       userId: row.user_id,
       role: row.role,
       displayName: row.display_name,
-      profileId: row.profile_id,
+      profileId: row.acting_profile_id ?? row.profile_id,
+      actingProfileId: row.acting_profile_id,
       groupId: row.group_id,
     };
   });
+}
+
+/**
+ * 대행 대상을 세션에 붙이거나 뗀다.
+ *
+ * 쿠키가 아니라 서버 측 상태로 둔다 — 세션을 폐기하면 대행도 같이 끝나고, 대상
+ * 프로필이 지워지면 참조가 저절로 풀린다(0025). 호출부(`/api/admin/acting`)가
+ * 먼저 `app_can_edit_profile` 로 권한을 확인하고, RLS 가 요청마다 한 번 더 본다.
+ */
+export async function setActingProfile(profileId: string | null): Promise<void> {
+  const store = await cookies();
+  const raw = store.get(SESSION_COOKIE)?.value;
+  if (!raw) return;
+  const sessionId = parseCookieValue(raw);
+  if (!sessionId) return;
+  // owner 커넥션: sessions 테이블은 app 롤에 권한이 없다(0006_rls.sql).
+  await withOwner((sql) =>
+    sql.query(`UPDATE sessions SET acting_profile_id = $2 WHERE id = $1`, [
+      sessionId,
+      profileId,
+    ]),
+  );
 }

@@ -9,7 +9,7 @@ import { Empty } from "@/components/ui/empty";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
-import { MatchMoment } from "@/components/member/match-moment";
+import { MatchMoment, type MomentVariant } from "@/components/member/match-moment";
 import type { ProfileCardView } from "@/server/views/profile-view";
 
 export type SignalItem = {
@@ -80,12 +80,14 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [matched, setMatched] = useState(false);
+  const [moment, setMoment] = useState<MomentVariant | null>(null);
 
   async function act(action: "accept" | "reject" | "cancel") {
     setBusy(true);
     setError(null);
-    const result = await apiPost(`/api/match-requests/${item.id}/${action}`);
+    const result = await apiPost<{ pending: boolean }>(
+      `/api/match-requests/${item.id}/${action}`,
+    );
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
@@ -95,7 +97,8 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
     // 먼저 갱신하면 이 행이 「이어짐」 탭으로 사라지면서 연출도 같이 사라진다.
     // 수락 시점에 이미 연결까지 끝나 있으므로 연출 뒤에 볼 것이 곧 연락 방법이다.
     if (action === "accept") {
-      setMatched(true);
+      // 주선자가 확인해야 연결된다. 대행 중이면 그 자리에서 끝난다(0026).
+      setMoment(result.data.pending ? "acceptPending" : "matched");
       return;
     }
     router.refresh();
@@ -190,10 +193,10 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
       </div>
 
       <MatchMoment
-        open={matched}
-        variant="matched"
+        open={moment != null}
+        variant={moment ?? "matched"}
         onClose={() => {
-          setMatched(false);
+          setMoment(null);
           router.refresh();
         }}
       />

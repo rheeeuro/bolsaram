@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 import { RequestModal } from "./request-modal";
-import { MatchMoment } from "./match-moment";
+import { MatchMoment, type MomentVariant } from "./match-moment";
 import { HideAction } from "./hide-action";
 
 type Existing = { status: string; isRequester: boolean } | null;
@@ -41,7 +41,8 @@ export function ProfileDetail({
   const [imageIndex, setImageIndex] = useState(0);
   const [favorited, setFavorited] = useState(profile.isFavorited);
   const [modalOpen, setModalOpen] = useState(false);
-  const [moment, setMoment] = useState(false);
+  // 마음 보내기는 주선자를 거친다 — 대행 중일 때만 그 자리에서 전달된다(0026).
+  const [moment, setMoment] = useState<MomentVariant | null>(null);
 
   const images = profile.images.length > 0 ? profile.images : [];
   const current = images[imageIndex];
@@ -238,17 +239,18 @@ export function ProfileDetail({
         open={modalOpen}
         code={profile.code}
         onClose={() => setModalOpen(false)}
-        onSent={() => {
+        onSent={(pending) => {
           setModalOpen(false);
-          setMoment(true);
+          setMoment(pending ? "requestPending" : "sent");
         }}
         profileId={profile.id}
       />
 
       <MatchMoment
-        open={moment}
+        open={moment != null}
+        {...(moment ? { variant: moment } : {})}
         onClose={() => {
-          setMoment(false);
+          setMoment(null);
           router.refresh();
         }}
       />

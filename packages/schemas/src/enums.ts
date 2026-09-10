@@ -278,3 +278,28 @@ export const TELEGRAM_SESSION_STATE_LABELS: Record<TelegramSessionState, string>
   CANCELED: "취소됨",
   EXPIRED: "만료됨",
 };
+
+/**
+ * 회원이 낸 의사 (마이그레이션 0026).
+ *
+ * 회원이 누르는 것은 결정이 아니라 **요청**이다. 주선자가 확인해야 실제 신청이
+ * 만들어지거나 상태가 옮겨진다. 상대는 확인 전까지 이 행을 읽을 수 없다.
+ */
+export const MATCH_INTENT_KINDS = ["SEND", "ACCEPT", "REJECT", "CANCEL"] as const;
+export type MatchIntentKind = (typeof MATCH_INTENT_KINDS)[number];
+
+export const MATCH_INTENT_KIND_LABELS: Record<MatchIntentKind, string> = {
+  SEND: "마음 보내기",
+  ACCEPT: "수락",
+  REJECT: "거절",
+  CANCEL: "신청 취소",
+};
+
+export const MATCH_INTENT_STATUSES = ["PENDING", "APPROVED", "DECLINED"] as const;
+export type MatchIntentStatus = (typeof MATCH_INTENT_STATUSES)[number];
+
+export const MATCH_INTENT_STATUS_LABELS: Record<MatchIntentStatus, string> = {
+  PENDING: "주선자 확인 중",
+  APPROVED: "전달됨",
+  DECLINED: "반려됨",
+};

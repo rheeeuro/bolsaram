@@ -20,7 +20,7 @@ export function RequestModal({
   code: string;
   profileId: string;
   onClose: () => void;
-  onSent: () => void;
+  onSent: (pending: boolean) => void;
 }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function RequestModal({
           마음을 보내시겠어요?
         </h2>
         <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--color-ink-600)]">
-          상대방에게 회원님의 프로필이 전달됩니다.
+          주선자가 확인한 뒤 상대방에게 전달됩니다.
         </p>
 
         <div className="mt-5 text-left">
@@ -78,20 +78,24 @@ export function RequestModal({
               void (async () => {
                 setBusy(true);
                 setError(null);
-                const result = await apiPost("/api/match-requests", {
-                  targetProfileId: profileId,
-                  ...(message.trim() ? { message: message.trim() } : {}),
-                });
+                const result = await apiPost<{ pending: boolean }>(
+                  "/api/match-requests",
+                  {
+                    targetProfileId: profileId,
+                    ...(message.trim() ? { message: message.trim() } : {}),
+                  },
+                );
                 setBusy(false);
                 if (!result.ok) {
                   setError(result.message);
                   return;
                 }
-                onSent();
+                // 주선자가 대행 중이면 그 자리에서 전달된다(pending=false).
+                onSent(result.data.pending);
               })();
             }}
           >
-            {busy ? "보내는 중…" : "마음 보내기"}
+            {busy ? "보내는 중…" : "주선자에게 보내기"}
           </Button>
           <Button variant="ghost" size="lg" onClick={onClose} disabled={busy}>
             아직 고민할게요

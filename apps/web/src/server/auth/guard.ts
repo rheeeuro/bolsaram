@@ -82,5 +82,11 @@ function enterPath(next?: string): string {
 
 /** RLS GUC 에 넣을 컨텍스트로 변환한다. */
 export function rlsContextOf(user: Viewer | null): RlsContext {
-  return user ? { userId: user.userId, role: user.role } : { userId: null, role: null };
+  return user
+    ? {
+        userId: user.userId,
+        role: user.role,
+        actingProfileId: user.actingProfileId,
+      }
+    : { userId: null, role: null };
 }

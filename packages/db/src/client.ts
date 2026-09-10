@@ -61,6 +61,14 @@ export async function closePools(): Promise<void> {
 export type RlsContext = {
   userId: string | null;
   role: "ADMIN" | "MEMBER" | null;
+  /**
+   * 주선자가 대신 조작 중인 프로필.
+   *
+   * 값이 있다는 것만으로는 아무 권한도 생기지 않는다 — 대상이 아직 아무 계정에도
+   * 연결되지 않았고 호출자가 그 프로필을 고칠 수 있는지는 `app_current_profile_id()`
+   * 가 판정한다(0025).
+   */
+  actingProfileId?: string | null;
 };
 
 export const ANONYMOUS: RlsContext = { userId: null, role: null };
@@ -77,6 +85,9 @@ export async function withRls<T>(ctx: RlsContext, fn: (sql: Sql) => Promise<T>):
     // set_config 로 넘겨 파라미터 바인딩을 쓴다(SET LOCAL 은 리터럴만 받는다).
     await client.query("SELECT set_config('app.user_id', $1, true)", [ctx.userId ?? ""]);
     await client.query("SELECT set_config('app.role', $1, true)", [ctx.role ?? ""]);
+    await client.query("SELECT set_config('app.acting_profile_id', $1, true)", [
+      ctx.actingProfileId ?? "",
+    ]);
     const result = await fn(client);
     await client.query("COMMIT");
     return result;

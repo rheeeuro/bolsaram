@@ -20,9 +20,14 @@ import { claimPending, markFailed, markSent, type ClaimedNotification } from "./
 const SWEEP_INTERVAL_MS = 5 * 60_000;
 
 function textFor(item: ClaimedNotification): string {
-  return item.kind === "MATCH_REQUESTED"
-    ? messages.matchRequested(item.requesterCode, item.targetCode)
-    : messages.matchAccepted(item.requesterCode, item.targetCode);
+  switch (item.kind) {
+    case "MATCH_REQUESTED":
+      return messages.matchRequested(item.requesterCode, item.targetCode);
+    case "MATCH_ACCEPTED":
+      return messages.matchAccepted(item.requesterCode, item.targetCode);
+    case "MEMBER_INTENT":
+      return messages.memberIntent(item.intentKind, item.requesterCode, item.targetCode);
+  }
 }
 
 /**

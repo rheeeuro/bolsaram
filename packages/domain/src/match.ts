@@ -10,7 +10,11 @@
  * 상대의 수락이 곧 연락처 공개 동의다. 그래서 수락은 바로 INTRODUCED 로 간다 —
  * 그 사이에 주선자 승인 단계를 두지 않는다.
  */
-import { ACTIVE_MATCH_REQUEST_STATUSES, type MatchRequestStatus } from "@bolsaram/schemas";
+import {
+  ACTIVE_MATCH_REQUEST_STATUSES,
+  type MatchIntentKind,
+  type MatchRequestStatus,
+} from "@bolsaram/schemas";
 import { DomainError } from "./errors";
 
 export type MatchAction = "accept" | "reject" | "cancel" | "close";
@@ -159,4 +163,23 @@ export function describeReciprocalHint(
     return "상대가 먼저 마음을 보냈습니다. 받은 시그널에서 수락해 주세요.";
   }
   return null;
+}
+
+/**
+ * 승인된 회원 요청이 무슨 전이를 뜻하는가 (마이그레이션 0026).
+ *
+ * `SEND` 만 전이가 아니다 — 그때는 옮길 신청이 아직 없고 새로 만든다.
+ * 여기서 매핑만 하고 전이 가능 여부는 `resolveTransition` 이 그대로 판정한다.
+ */
+export function actionForIntent(kind: MatchIntentKind): MatchAction | null {
+  switch (kind) {
+    case "ACCEPT":
+      return "accept";
+    case "REJECT":
+      return "reject";
+    case "CANCEL":
+      return "cancel";
+    case "SEND":
+      return null;
+  }
 }

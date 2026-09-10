@@ -98,6 +98,7 @@ server/
 ├── repo/                     SQL 접근 (모두 withRls 트랜잭션 안에서 호출된다)
 │   ├── profiles.ts           Discover·상세·주선자 목록·수정
 │   ├── matches.ts            신청 생성·전이·시그널 목록·연결 상대
+│   ├── match-intents.ts      회원이 낸 요청(주선자 확인 대기) — 승인해야 신청이 된다
 │   ├── favorites.ts          관심 토글·목록
 │   ├── hides.ts              숨기기 토글·목록 + 양방향 판정
 │   ├── imports.ts            세션·에셋·추출·검토
@@ -145,6 +146,8 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |
+| `/api/admin/acting`                       | POST / DELETE       | 주선자            | 대행 시작 / 종료 (미연결 프로필만)   |
+| `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 회원 요청 approve · decline          |
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 회원(프로필 필요) | 숨긴 사람 목록·토글                  |
 | `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰) |

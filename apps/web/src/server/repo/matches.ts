@@ -94,29 +94,39 @@ export async function isRejectedBetween(sql: Sql, otherProfileId: string): Promi
   return result.rows[0]?.rejected ?? false;
 }
 
-export async function createMatchRequest(
+/**
+ * 신청을 만들 수 있는 관계인지 본다(자기 자신 / 활성 중복 / 거절·숨김).
+ *
+ * 신청을 바로 만드는 경로와, 주선자 확인을 기다리는 요청(0026)을 남기는 경로가
+ * **같은 판정**을 써야 한다. 회원에게 「확인 중」이라고 해놓고 주선자가 승인할 때
+ * 비로소 막히면 안 된다.
+ */
+export async function assertRequestable(
   sql: Sql,
-  input: { requesterProfileId: string; targetProfileId: string; message?: string },
-): Promise<MatchRequestRecord> {
-  const existing = await findActiveBetween(
-    sql,
-    input.requesterProfileId,
-    input.targetProfileId,
-  );
+  requesterProfileId: string,
+  targetProfileId: string,
+): Promise<void> {
+  const existing = await findActiveBetween(sql, requesterProfileId, targetProfileId);
   const [rejected, hidden] = await Promise.all([
-    isRejectedBetween(sql, input.targetProfileId),
-    isHiddenBetween(sql, input.targetProfileId),
+    isRejectedBetween(sql, targetProfileId),
+    isHiddenBetween(sql, targetProfileId),
   ]);
 
-  // 도메인 규칙 먼저(자기 자신 / 활성 중복 / 거절·숨김 관계).
-  // DB 의 부분 유니크 인덱스와 삽입 트리거가 최종 방어선이다.
+  // 도메인 규칙 먼저. DB 의 부분 유니크 인덱스와 삽입 트리거가 최종 방어선이다.
   assertCanCreateRequest({
-    requesterProfileId: input.requesterProfileId,
-    targetProfileId: input.targetProfileId,
+    requesterProfileId,
+    targetProfileId,
     existingActiveStatus: existing?.status ?? null,
     rejectedBetween: rejected,
     hiddenBetween: hidden,
   });
+}
+
+export async function createMatchRequest(
+  sql: Sql,
+  input: { requesterProfileId: string; targetProfileId: string; message?: string },
+): Promise<MatchRequestRecord> {
+  await assertRequestable(sql, input.requesterProfileId, input.targetProfileId);
 
   try {
     const result = await sql.query<Row>(

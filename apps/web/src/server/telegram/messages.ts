@@ -6,7 +6,12 @@
  * 예외적으로 몇 줄만 보여주고, 자세한 내용은 볼사람 화면 링크로 넘긴다.
  */
 import "server-only";
-import { TELEGRAM_MAX_ASSETS_PER_SESSION, type ExtractedFields } from "@bolsaram/schemas";
+import {
+  MATCH_INTENT_KIND_LABELS,
+  TELEGRAM_MAX_ASSETS_PER_SESSION,
+  type ExtractedFields,
+  type MatchIntentKind,
+} from "@bolsaram/schemas";
 
 export const messages = {
   notLinked: [
@@ -141,6 +146,23 @@ export const messages = {
       "신청이 수락돼 두 분이 연결됐습니다.",
       "",
       pairLine(requesterCode, targetCode, "↔"),
+    ].join("\n"),
+
+  /**
+   * 회원이 낸 요청 (0026). 아직 상대에게 가지 않았다 — 주선자가 확인해야 움직인다.
+   * 그래서 「들어왔다」가 아니라 「확인이 필요하다」로 말한다.
+   */
+  memberIntent: (
+    kind: MatchIntentKind | null,
+    fromCode: number | null,
+    toCode: number | null,
+  ) =>
+    [
+      `확인이 필요한 요청이 있습니다 — ${kind ? MATCH_INTENT_KIND_LABELS[kind] : "요청"}.`,
+      "",
+      pairLine(fromCode, toCode, "→"),
+      "",
+      "확인해야 상대에게 전달됩니다.",
     ].join("\n"),
 
   requestsButton: "신청 목록 열기",
