@@ -3,8 +3,8 @@ import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { findProfilesByIds } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
-import { Badge } from "@/components/ui/badge";
 import { Blank, Count, PageHeader, Panel, Row, RowList, Thumb } from "@/components/host/surface";
+import { InviteRow } from "@/components/host/invite-row";
 
 export const dynamic = "force-dynamic";
 
@@ -87,16 +87,15 @@ export default async function HostMembersPage() {
               <div className="-mx-5 -my-5">
                 <RowList>
                   {waiting.map((row) => (
-                    <Row key={row.profile_id} href={`/profiles/${row.profile_id}`}>
-                      <Thumb url={row.imageUrl} size="sm" />
-                      <Identity code={row.public_code} name={row.real_name} />
-                      <div className="ml-auto flex items-center gap-3">
-                        {inviteState(row)}
-                        <span className="text-[12.5px] text-[var(--color-rose-600)]">
-                          {row.invite_expires_at ? "다시 보내기" : "초대 발급"}
-                        </span>
-                      </div>
-                    </Row>
+                    <InviteRow
+                      key={row.profile_id}
+                      profileId={row.profile_id}
+                      code={row.public_code}
+                      name={row.real_name}
+                      imageUrl={row.imageUrl}
+                      expiresAt={row.invite_expires_at?.toISOString() ?? null}
+                      claimedAt={row.invite_claimed_at?.toISOString() ?? null}
+                    />
                   ))}
                 </RowList>
               </div>
@@ -157,15 +156,3 @@ function maskPhone(phone: string | null): string {
   return `${phone.slice(0, 3)}-****-${phone.slice(-4)}`;
 }
 
-function inviteState(row: MemberRow) {
-  if (!row.invite_expires_at) {
-    return <Badge tone="neutral">미발급</Badge>;
-  }
-  if (row.invite_claimed_at) return <Badge tone="active">사용됨</Badge>;
-  if (row.invite_expires_at.getTime() < Date.now()) return <Badge tone="danger">만료</Badge>;
-  return (
-    <span className="text-[12.5px] text-[var(--surface-text-muted)]">
-      {row.invite_expires_at.toLocaleDateString("ko-KR")}까지
-    </span>
-  );
-}

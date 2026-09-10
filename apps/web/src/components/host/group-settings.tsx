@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { Field, Input, Textarea } from "@/components/ui/field";
+import { CopyField } from "@/components/ui/copy-field";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { apiDelete, apiPatch, apiPost, apiPut } from "@/lib/api-client";
 
 type Admin = { userId: string; displayName: string | null; isOwner: boolean };
@@ -173,9 +175,7 @@ function HasGroup({ group }: { group: Group }) {
             <p className="text-[12.5px]">
               동료에게 이 코드를 전달하세요. 다시 볼 수 없습니다.
             </p>
-            <code className="block overflow-x-auto rounded-md border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2 text-[12.5px]">
-              {issued.code}
-            </code>
+            <CopyField value={issued.code} />
             <p className="text-[11.5px] text-[var(--surface-text-muted)]">
               {new Date(issued.expiresAt).toLocaleString("ko-KR")} 까지 · 1회용
             </p>
@@ -209,10 +209,14 @@ function HasGroup({ group }: { group: Group }) {
           마지막 주선자라면 <strong>회원이 남아 있는 동안 나갈 수 없습니다</strong> —
           전체공개로 옮기거나 동료를 먼저 초대해 주세요.
         </p>
-        <Button
+        <ConfirmButton
+          size="md"
           variant="danger"
+          label={busy === "leave" ? "나가는 중…" : "모임 나가기"}
+          confirmLabel="나가기"
+          message="이 모임의 회원이 더 이상 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다."
           disabled={busy != null}
-          onClick={() =>
+          onConfirm={() =>
             void (async () => {
               setBusy("leave");
               setError(null);
@@ -222,9 +226,7 @@ function HasGroup({ group }: { group: Group }) {
               else setError(result.message);
             })()
           }
-        >
-          {busy === "leave" ? "나가는 중…" : "모임 나가기"}
-        </Button>
+        />
       </Panel>
 
       {error ? (

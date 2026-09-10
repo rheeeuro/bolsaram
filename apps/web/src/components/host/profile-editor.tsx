@@ -26,6 +26,7 @@ import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { ProfilePhotos } from "@/components/host/profile-photos";
+import { CopyField } from "@/components/ui/copy-field";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch, apiPost } from "@/lib/api-client";
 import { label } from "@/lib/labels";
@@ -513,8 +514,8 @@ export function HostProfileEditor({
                     <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
                       지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요.
                     </p>
-                    <CopyRow label="초대 링크" value={issued.url} />
-                    <CopyRow label="입장코드" value={issued.code} />
+                    <CopyField label="초대 링크" value={issued.url} />
+                    <CopyField label="입장코드" value={issued.code} />
                     <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
                       둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 회원은 입장
                       화면에서 코드를 넣습니다.
@@ -546,21 +547,3 @@ function reasonHidden(
   return `노출이 「${label.visibility(visibility) ?? visibility}」입니다`;
 }
 
-/** 발급 직후 한 번만 보이는 값을 읽기 전용으로 보여주고 복사시킨다. */
-function CopyRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="mb-1 text-[11.5px] text-[var(--surface-text-muted)]">{label}</p>
-      <div className="flex gap-1.5">
-        <Input readOnly value={value} className="h-9 flex-1 text-[11.5px]" />
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => void navigator.clipboard.writeText(value)}
-        >
-          복사
-        </Button>
-      </div>
-    </div>
-  );
-}

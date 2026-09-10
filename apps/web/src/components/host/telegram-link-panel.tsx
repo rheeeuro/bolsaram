@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
+import { CopyField } from "@/components/ui/copy-field";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { apiDelete, apiPost } from "@/lib/api-client";
 
 type Issued = { code: string; expiresAt: string; deepLink: string | null };
@@ -75,18 +77,21 @@ export function TelegramLinkPanel({
             봇에게 프로필 사진을 보내고 이어서 프로필 글을 보내면 여기 Inbox 에 올라옵니다.
             글을 받는 즉시 분석하고, 등록은 검토 후에만 이루어집니다.
           </p>
-          <Button variant="ghost" disabled={busy} onClick={() => void unlink()}>
-            연결 해제
-          </Button>
+          <ConfirmButton
+            variant="ghost"
+            label="연결 해제"
+            confirmLabel="해제하기"
+            message="봇으로 올리던 등록이 함께 취소됩니다. 다시 쓰려면 연결 코드를 새로 받아야 합니다."
+            disabled={busy}
+            onConfirm={() => void unlink()}
+          />
         </div>
       ) : issued ? (
         <div className="space-y-2.5">
           <p className="text-[12.5px]">
             봇 대화창에 아래 명령을 그대로 보내세요. 이 코드는 다시 볼 수 없습니다.
           </p>
-          <code className="block overflow-x-auto rounded-md border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2 text-[12.5px]">
-            /start {issued.code}
-          </code>
+          <CopyField value={`/start ${issued.code}`} />
           {issued.deepLink ? (
             <a
               href={issued.deepLink}

@@ -7,6 +7,7 @@ import { MATCH_REQUEST_STATUSES, MATCH_REQUEST_STATUS_LABELS } from "@bolsaram/s
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
@@ -134,14 +135,13 @@ export function HostRequestList({
                       })}
                     </span>
                     {connected ? (
-                      <Button
-                        size="sm"
-                        variant="secondary"
+                      <ConfirmButton
+                        label="종료"
+                        confirmLabel="종료하기"
+                        message="이 연결을 마무리합니다. 이미 공개된 이름과 연락 방법은 그대로 남습니다."
                         disabled={busy}
-                        onClick={() => void act(item.id, "close")}
-                      >
-                        종료
-                      </Button>
+                        onConfirm={() => void act(item.id, "close")}
+                      />
                     ) : null}
                   </div>
                 </div>
