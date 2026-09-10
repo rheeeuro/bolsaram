@@ -25,6 +25,7 @@ import { isDiscoverable } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
+import { ProfilePhotos } from "@/components/host/profile-photos";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch, apiPost } from "@/lib/api-client";
 import { label } from "@/lib/labels";
@@ -371,28 +372,14 @@ export function HostProfileEditor({
 
         <aside className="flex flex-col gap-5">
           <Panel title="사진">
-            {profile.images.length === 0 ? (
-              <p className="text-[12.5px] text-[var(--surface-text-muted)]">
-                등록된 사진이 없습니다.
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                {profile.images.map((image) => (
-                  <div
-                    key={image.id}
-                    className="relative aspect-3/4 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.url} alt="" className="h-full w-full object-cover" />
-                    {image.isPrimary ? (
-                      <span className="absolute left-1 top-1 rounded bg-[var(--color-burgundy-900)]/70 px-1.5 py-0.5 text-[10px] text-white">
-                        대표
-                      </span>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
+            <ProfilePhotos
+              profileId={profile.id}
+              images={profile.images.map((image) => ({
+                id: image.id,
+                url: image.url,
+                isPrimary: image.isPrimary,
+              }))}
+            />
           </Panel>
 
           <Panel title="공개 설정">

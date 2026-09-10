@@ -103,3 +103,25 @@ export const adminProfileQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type AdminProfileQuery = z.infer<typeof adminProfileQuerySchema>;
+
+/**
+ * 프로필 사진 추가. 두 단계다 — 슬롯을 받고(uploadUrl), 올린 뒤 확정한다.
+ * 확정 시점에만 DB 행이 생기므로 실패한 업로드가 깨진 사진으로 남지 않는다.
+ */
+export const profileImageSlotSchema = z.object({
+  mimeType: z.string().min(1).max(100),
+  size: z.number().int().positive(),
+});
+export type ProfileImageSlot = z.infer<typeof profileImageSlotSchema>;
+
+export const profileImageConfirmSchema = z.object({
+  confirm: z.object({
+    key: z.string().min(1).max(400),
+    mimeType: z.string().min(1).max(100),
+  }),
+});
+
+export const profileImagePatchSchema = z.object({
+  /** 지금은 대표 지정만 바꾼다. 순서 변경은 아직 없다. */
+  primary: z.literal(true),
+});
