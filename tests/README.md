@@ -28,7 +28,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | ------------------------------ | ---------------------------------------------- | ---- | ---- |
 | `match-transitions.test.ts`    | 상태 기계·행위자 권한·중복·자기 자신·거절·숨김 | –    | 18   |
 | `visibility.test.ts`           | 단계적 정보 공개·노출 규칙                     | –    | 10   |
-| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 20   |
+| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 21   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
 | `rls.test.ts`                  | RLS 정책 강제·거절·숨김 관계                   | 필요 | 30   |
@@ -41,6 +41,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
+| `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 리다이렉트 검증       | –    | 9    |
 | `seed-admin-password.test.ts`   | 시드 관리자 비밀번호 판정·고정값 금지          | –    | 8    |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |

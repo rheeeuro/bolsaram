@@ -7,6 +7,8 @@ import "server-only";
 import type { Sql } from "@bolsaram/db";
 import {
   DomainError,
+  HAS_PHOTO_SQL,
+  PROFILE_ORDER_BY,
   buildDiscoverWhere,
   decodeCursor,
   encodeCursor,
@@ -55,6 +57,13 @@ type ProfileRow = {
   created_at: Date;
   updated_at: Date;
 };
+
+/**
+ * 목록 쿼리는 사진 유무를 함께 뽑는다. 커서에 실어야 다음 페이지가 같은 자리에서 이어진다.
+ */
+type ProfileListRow = ProfileRow & { has_photo: boolean };
+
+const LIST_COLUMNS = `${PROFILE_COLUMNS}, ${HAS_PHOTO_SQL} AS has_photo`;
 
 export type ProfileRecord = FullProfile & {
   userId: string | null;
@@ -154,16 +163,16 @@ export async function findDiscoverProfiles(
   let clause = where.text;
   const cursor = decodeCursor(query.cursor);
   if (cursor) {
-    values.push(cursor.createdAt, cursor.id);
-    clause += ` AND (p.created_at, p.id) < ($${values.length - 1}, $${values.length})`;
+    values.push(cursor.hasPhoto, cursor.createdAt, cursor.id);
+    clause += ` AND (${HAS_PHOTO_SQL}, p.created_at, p.id) < ($${values.length - 2}, $${values.length - 1}, $${values.length})`;
   }
   values.push(query.limit + 1);
 
-  const result = await sql.query<ProfileRow>(
-    `SELECT ${PROFILE_COLUMNS}
+  const result = await sql.query<ProfileListRow>(
+    `SELECT ${LIST_COLUMNS}
        FROM profiles p
       WHERE ${clause}
-      ORDER BY p.created_at DESC, p.id DESC
+      ORDER BY ${PROFILE_ORDER_BY}
       LIMIT $${values.length}`,
     values,
   );
@@ -181,7 +190,13 @@ export async function findDiscoverProfiles(
     items,
     total,
     nextCursor:
-      hasMore && last ? encodeCursor({ createdAt: last.created_at, id: last.id }) : null,
+      hasMore && last
+        ? encodeCursor({
+            hasPhoto: last.has_photo,
+            createdAt: last.created_at,
+            id: last.id,
+          })
+        : null,
   };
 }
 
@@ -325,15 +340,15 @@ export async function findAdminProfiles(
   let clause = where;
   const cursor = decodeCursor(query.cursor);
   if (cursor) {
-    values.push(cursor.createdAt, cursor.id);
-    clause += ` AND (p.created_at, p.id) < ($${values.length - 1}, $${values.length})`;
+    values.push(cursor.hasPhoto, cursor.createdAt, cursor.id);
+    clause += ` AND (${HAS_PHOTO_SQL}, p.created_at, p.id) < ($${values.length - 2}, $${values.length - 1}, $${values.length})`;
   }
   values.push(query.limit + 1);
 
-  const result = await sql.query<ProfileRow>(
-    `SELECT ${PROFILE_COLUMNS} FROM profiles p
+  const result = await sql.query<ProfileListRow>(
+    `SELECT ${LIST_COLUMNS} FROM profiles p
       WHERE ${clause}
-      ORDER BY p.created_at DESC, p.id DESC
+      ORDER BY ${PROFILE_ORDER_BY}
       LIMIT $${values.length}`,
     values,
   );
@@ -350,6 +365,12 @@ export async function findAdminProfiles(
     items: rows.map((r) => toRecord(r, images.get(r.id) ?? [])),
     total: countResult.rows[0]?.total ?? 0,
     nextCursor:
-      hasMore && last ? encodeCursor({ createdAt: last.created_at, id: last.id }) : null,
+      hasMore && last
+        ? encodeCursor({
+            hasPhoto: last.has_photo,
+            createdAt: last.created_at,
+            id: last.id,
+          })
+        : null,
   };
 }

@@ -88,22 +88,36 @@ export function buildDiscoverWhere(
 }
 
 /**
- * 커서 페이지네이션. 정렬은 (created_at DESC, id DESC) 고정.
- * 커서는 `<iso8601>|<uuid>` 형식이며 잘못된 값은 무시하고 첫 페이지를 준다.
+ * 사진 유무 판정식. `profiles p` 별칭을 전제한다.
+ * 정렬과 커서 비교가 **같은 식**을 봐야 페이지 경계에서 행이 새거나 겹치지 않는다.
  */
-export function encodeCursor(row: { createdAt: Date; id: string }): string {
-  return `${row.createdAt.toISOString()}|${row.id}`;
+export const HAS_PHOTO_SQL =
+  "EXISTS (SELECT 1 FROM profile_images pi WHERE pi.profile_id = p.id)";
+
+/**
+ * 목록 정렬. 사진 없는 프로필을 뒤로 민다 — 카드 그리드가 빈 회색으로 시작하면
+ * 첫 화면이 못 쓰게 된다. 사진 유무 안에서는 최신순이 그대로 유지된다.
+ * 세 키 모두 DESC 라 커서는 튜플 비교 하나로 이어진다(boolean 은 false < true).
+ */
+export const PROFILE_ORDER_BY = `${HAS_PHOTO_SQL} DESC, p.created_at DESC, p.id DESC`;
+
+export type ProfileCursor = { hasPhoto: boolean; createdAt: Date; id: string };
+
+/**
+ * 커서 페이지네이션. 정렬 키와 같은 순서로 `<0|1>|<iso8601>|<uuid>` 를 싣는다.
+ * 잘못된 값은 무시하고 첫 페이지를 준다.
+ */
+export function encodeCursor(row: ProfileCursor): string {
+  return `${row.hasPhoto ? "1" : "0"}|${row.createdAt.toISOString()}|${row.id}`;
 }
 
-export function decodeCursor(
-  cursor: string | undefined,
-): { createdAt: Date; id: string } | null {
+export function decodeCursor(cursor: string | undefined): ProfileCursor | null {
   if (!cursor) return null;
-  const sep = cursor.indexOf("|");
-  if (sep < 0) return null;
-  const iso = cursor.slice(0, sep);
-  const id = cursor.slice(sep + 1);
+  const parts = cursor.split("|");
+  if (parts.length !== 3) return null;
+  const [flag, iso, id] = parts as [string, string, string];
+  if (flag !== "0" && flag !== "1") return null;
   const createdAt = new Date(iso);
   if (Number.isNaN(createdAt.getTime()) || id.length === 0) return null;
-  return { createdAt, id };
+  return { hasPhoto: flag === "1", createdAt, id };
 }

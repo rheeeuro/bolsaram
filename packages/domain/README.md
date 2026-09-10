@@ -121,12 +121,22 @@ Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가",
 (`app_discover_excluded_profile_ids()`)를 부른다. 「상대가 나를 숨겼다」는 RLS 로 보이지
 않는 사실이라 서브쿼리로 직접 훑으면 그 방향이 빠진다.
 
+**목록 정렬은 사진 유무를 먼저 본다** — `PROFILE_ORDER_BY` 는
+`(사진 있음 DESC, created_at DESC, id DESC)` 다. 회원 Discover 와 주선자 프로필 목록이
+모두 카드 그리드라, 사진 없는 프로필이 앞에 오면 첫 화면이 빈 회색으로 채워진다.
+사진 유무 안에서는 최신순이 그대로 유지된다.
+
+정렬 키가 셋이므로 **커서도 셋을 싣는다**(`<0|1>|<iso8601>|<uuid>`). 세 키가 모두 DESC 라
+페이지 경계는 튜플 비교 하나(`(...) < (...)`)로 이어진다. 사진 유무 판정식
+(`HAS_PHOTO_SQL`)은 정렬과 커서 비교가 **같은 식**을 봐야 행이 겹치거나 빠지지 않으므로
+상수 하나로 둔다. 형식이 맞지 않는 커서는 무시하고 첫 페이지를 준다.
+
 ---
 
 ## 유지보수
 
 - 규칙을 바꾸면 `tests/` 의 해당 파일에 케이스를 **먼저** 추가한다.
-  (`match-transitions` · `visibility` · `filters` · `import-normalization`)
+  (`match-transitions` · `visibility` · `filters` · `profile-order` · `import-normalization`)
 - 상태를 추가하면 `packages/schemas/src/enums.ts` 와 Postgres enum 도 함께 고친다.
 - 검증: `pnpm --filter @bolsaram/domain typecheck`,
   `npx vitest run tests/match-transitions.test.ts tests/visibility.test.ts`
