@@ -16,7 +16,8 @@ import {
   consumeGroupInvite,
   issueGroupInvite,
   leaveGroup,
-  readMyGroup,
+  readMyGroups,
+  setActiveGroup,
   updateGroup,
 } from "../apps/web/src/server/auth/group-invite";
 import { loginAdmin } from "../apps/web/src/server/auth/login";
@@ -29,6 +30,24 @@ let seq = 0;
 function nextEmail(): string {
   seq += 1;
   return `${TAG}-${seq}@test.local`;
+}
+
+/** 속한 모임 하나. 여러 모임에 속할 수 있으므로 어느 것인지 지정해 꺼낸다. */
+async function readGroup(userId: string, groupId?: string) {
+  const groups = await readMyGroups(userId);
+  if (!groupId) return groups[0] ?? null;
+  return groups.find((g) => g.groupId === groupId) ?? null;
+}
+
+/** 지금 보고 있는 모임(채널). */
+async function readActiveGroupId(userId: string): Promise<string | null> {
+  return withOwner(async (sql) => {
+    const r = await sql.query<{ active_group_id: string | null }>(
+      `SELECT active_group_id FROM users WHERE id = $1`,
+      [userId],
+    );
+    return r.rows[0]?.active_group_id ?? null;
+  });
 }
 
 async function newAdmin(label: string): Promise<RlsContext & { userId: string }> {
@@ -242,16 +261,58 @@ describe("모임 참여 (초대 코드)", () => {
     ).rejects.toThrow(/만료되었거나 이미 사용된/);
   });
 
-  it("이미 모임에 속해 있으면 합류할 수 없다", async () => {
+  it("이미 모임이 있어도 다른 모임에 함께 들어간다", async () => {
     const owner = await newAdmin("A모임장");
     const a = await createGroupForAdmin({ userId: owner.userId, name: `${TAG}-A모임` });
     const other = await newAdmin("B모임장");
-    await createGroupForAdmin({ userId: other.userId, name: `${TAG}-B모임` });
+    const b = await createGroupForAdmin({ userId: other.userId, name: `${TAG}-B모임` });
 
     const issued = await issueGroupInvite({ groupId: a.groupId, createdBy: owner.userId });
-    await expect(
-      consumeGroupInvite({ code: issued.code, userId: other.userId }),
-    ).rejects.toThrow(/이미 모임에 속해/);
+    await consumeGroupInvite({ code: issued.code, userId: other.userId });
+
+    // 두 모임 다 남아 있고, 합류한 모임이 보고 있는 채널이 된다.
+    const mine = await readMyGroups(other.userId);
+    expect(mine.map((g) => g.groupId).sort()).toEqual([a.groupId, b.groupId].sort());
+    expect(await readActiveGroupId(other.userId)).toBe(a.groupId);
+  });
+
+  it("같은 모임에 다시 합류해도 소속이 늘지 않는다", async () => {
+    const owner = await newAdmin("중복초대자");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-중복모임`,
+    });
+    const invited = await newAdmin("중복참여자");
+    const first = await issueGroupInvite({ groupId, createdBy: owner.userId });
+    await consumeGroupInvite({ code: first.code, userId: invited.userId });
+    const second = await issueGroupInvite({ groupId, createdBy: owner.userId });
+    await consumeGroupInvite({ code: second.code, userId: invited.userId });
+
+    expect(await readMyGroups(invited.userId)).toHaveLength(1);
+  });
+
+  it("여러 모임에 속하면 양쪽 회원을 모두 다룰 수 있다", async () => {
+    const owner = await newAdmin("겸업초대자");
+    const a = await createGroupForAdmin({ userId: owner.userId, name: `${TAG}-겸업A` });
+    const worker = await newAdmin("겸업주선자");
+    const b = await createGroupForAdmin({ userId: worker.userId, name: `${TAG}-겸업B` });
+
+    const issued = await issueGroupInvite({ groupId: a.groupId, createdBy: owner.userId });
+    await consumeGroupInvite({ code: issued.code, userId: worker.userId });
+
+    const inA = await seedProfile({ groupId: a.groupId, createdBy: owner.userId, name: "A회원" });
+    const inB = await seedProfile({ groupId: b.groupId, createdBy: worker.userId, name: "B회원" });
+
+    // 보고 있는 채널과 무관하게 **두 모임 모두** RLS 를 통과한다 — 채널은 화면
+    // 필터이지 권한이 아니다.
+    const seen = await withRls(worker, async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `SELECT id FROM profiles WHERE id = ANY($1)`,
+        [[inA, inB]],
+      );
+      return r.rows.map((row) => row.id).sort();
+    });
+    expect(seen).toEqual([inA, inB].sort());
   });
 
   it("합류한 사람은 개설자가 아니다", async () => {
@@ -285,7 +346,7 @@ describe("모임 정보", () => {
       name: `${TAG}-설명모임`,
       description: "계리사·회계사 중심으로 봅니다",
     });
-    const group = await readMyGroup(owner.userId);
+    const group = await readGroup(owner.userId);
     expect(group).toMatchObject({
       name: `${TAG}-설명모임`,
       description: "계리사·회계사 중심으로 봅니다",
@@ -300,7 +361,7 @@ describe("모임 정보", () => {
       name: `${TAG}-수정전`,
     });
     await updateGroup({ groupId, name: `${TAG}-수정후`, description: "새 설명" });
-    const group = await readMyGroup(owner.userId);
+    const group = await readGroup(owner.userId);
     expect(group).toMatchObject({ name: `${TAG}-수정후`, description: "새 설명" });
   });
 
@@ -313,7 +374,7 @@ describe("모임 정보", () => {
     });
     // 이름만 보내면 설명은 그대로여야 한다.
     await updateGroup({ groupId, name: `${TAG}-부분2` });
-    expect(await readMyGroup(owner.userId)).toMatchObject({
+    expect(await readGroup(owner.userId)).toMatchObject({
       name: `${TAG}-부분2`,
       description: "원래 설명",
     });
@@ -327,7 +388,7 @@ describe("모임 정보", () => {
       description: "지울 설명",
     });
     await updateGroup({ groupId, description: "" });
-    expect(await readMyGroup(owner.userId)).toMatchObject({ description: null });
+    expect(await readGroup(owner.userId)).toMatchObject({ description: null });
   });
 
   it("합류한 주선자는 개설자로 표시되지 않는다", async () => {
@@ -340,8 +401,8 @@ describe("모임 정보", () => {
     const invited = await newAdmin("표시참여자");
     await consumeGroupInvite({ code: issued.code, userId: invited.userId });
 
-    expect(await readMyGroup(owner.userId)).toMatchObject({ isOwner: true });
-    expect(await readMyGroup(invited.userId)).toMatchObject({ isOwner: false });
+    expect(await readGroup(owner.userId)).toMatchObject({ isOwner: true });
+    expect(await readGroup(invited.userId)).toMatchObject({ isOwner: false });
   });
 });
 
@@ -352,9 +413,9 @@ describe("모임 나가기", () => {
       userId: admin.userId,
       name: `${TAG}-빈모임`,
     });
-    const result = await leaveGroup(admin.userId);
+    const result = await leaveGroup(admin.userId, groupId);
     expect(result.deletedGroup).toBe(true);
-    expect(await readMyGroup(admin.userId)).toBeNull();
+    expect(await readGroup(admin.userId)).toBeNull();
 
     const left = await withOwner(async (sql) => {
       const r = await sql.query(`SELECT 1 FROM groups WHERE id = $1`, [groupId]);
@@ -373,8 +434,8 @@ describe("모임 나가기", () => {
     await seedProfile({ groupId, createdBy: admin.userId, name: "남는회원" });
 
     // 나가면 그 회원을 아무도 볼 수 없게 된다 — 되돌릴 방법이 없으므로 막는다.
-    await expect(leaveGroup(admin.userId)).rejects.toThrow(/남아 있어 나갈 수 없습니다/);
-    expect(await readMyGroup(admin.userId)).not.toBeNull();
+    await expect(leaveGroup(admin.userId, groupId)).rejects.toThrow(/남아 있어 나갈 수 없습니다/);
+    expect(await readGroup(admin.userId)).not.toBeNull();
   });
 
   it("동료가 있으면 회원이 남아 있어도 나갈 수 있다", async () => {
@@ -389,12 +450,12 @@ describe("모임 나가기", () => {
     const successor = await newAdmin("후임");
     await consumeGroupInvite({ code: issued.code, userId: successor.userId });
 
-    const result = await leaveGroup(owner.userId);
+    const result = await leaveGroup(owner.userId, groupId);
     expect(result.deletedGroup).toBe(false);
-    expect(await readMyGroup(owner.userId)).toBeNull();
+    expect(await readGroup(owner.userId)).toBeNull();
 
     // 개설자가 후임에게 넘어가야 한다 — 개설자 없는 모임을 만들 수 없다.
-    const after = await readMyGroup(successor.userId);
+    const after = await readGroup(successor.userId);
     expect(after).toMatchObject({ groupId, isOwner: true });
     expect(after?.admins).toHaveLength(1);
   });
@@ -414,7 +475,7 @@ describe("모임 나가기", () => {
       name: "나간뒤안보임",
     });
 
-    await leaveGroup(owner.userId);
+    await leaveGroup(owner.userId, groupId);
     const visible = await withRls(owner, async (sql) => {
       const r = await sql.query(`SELECT id FROM profiles WHERE id = $1`, [hidden]);
       return r.rowCount ?? 0;
@@ -422,8 +483,105 @@ describe("모임 나가기", () => {
     expect(visible).toBe(0);
   });
 
-  it("모임이 없으면 나갈 수 없다", async () => {
-    const admin = await newAdmin("무소속나가기");
-    await expect(leaveGroup(admin.userId)).rejects.toThrow(/속한 모임이 없습니다/);
+  it("속하지 않은 모임에서는 나갈 수 없다", async () => {
+    const stranger = await newAdmin("무소속나가기");
+    const owner = await newAdmin("남의모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-남의모임`,
+    });
+    await expect(leaveGroup(stranger.userId, groupId)).rejects.toThrow(/속하지 않은 모임/);
+  });
+
+  it("여러 모임 중 하나만 나가면 나머지는 남는다", async () => {
+    const admin = await newAdmin("한곳만나가기");
+    const stay = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-남길모임` });
+    const go = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-떠날모임` });
+
+    await leaveGroup(admin.userId, go.groupId);
+
+    const mine = await readMyGroups(admin.userId);
+    expect(mine.map((g) => g.groupId)).toEqual([stay.groupId]);
+    // 나간 모임을 보고 있었으므로 남은 모임으로 옮겨 간다.
+    expect(await readActiveGroupId(admin.userId)).toBe(stay.groupId);
+  });
+
+  it("마지막 모임을 나가면 전체공개로 떨어진다", async () => {
+    const admin = await newAdmin("전체공개로");
+    const { groupId } = await createGroupForAdmin({
+      userId: admin.userId,
+      name: `${TAG}-마지막모임`,
+    });
+    await leaveGroup(admin.userId, groupId);
+    expect(await readActiveGroupId(admin.userId)).toBeNull();
+  });
+});
+
+describe("보고 있는 모임(채널)", () => {
+  it("속한 모임으로 전환하고 전체공개로 돌아온다", async () => {
+    const admin = await newAdmin("채널전환자");
+    const one = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-채널1` });
+    const two = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-채널2` });
+
+    // 마지막으로 만든 모임을 보고 있다.
+    expect(await readActiveGroupId(admin.userId)).toBe(two.groupId);
+
+    await setActiveGroup(admin.userId, one.groupId);
+    expect(await readActiveGroupId(admin.userId)).toBe(one.groupId);
+
+    // null 은 전체공개 채널이다.
+    await setActiveGroup(admin.userId, null);
+    expect(await readActiveGroupId(admin.userId)).toBeNull();
+  });
+
+  it("속하지 않은 모임은 볼 수 없다", async () => {
+    const stranger = await newAdmin("남의채널");
+    const owner = await newAdmin("채널주인");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-남의채널`,
+    });
+    await expect(setActiveGroup(stranger.userId, groupId)).rejects.toThrow(/속하지 않은 모임/);
+    expect(await readActiveGroupId(stranger.userId)).toBeNull();
+  });
+
+  it("런타임 롤은 채널을 바꿀 수 없다", async () => {
+    const admin = await newAdmin("직접변경시도");
+    const { groupId } = await createGroupForAdmin({
+      userId: admin.userId,
+      name: `${TAG}-직접변경`,
+    });
+    // 앱 롤에는 이 컬럼의 UPDATE 권한이 없다(0036). 채널 전환은 인증 레이어만 한다.
+    await expect(
+      withRls(admin, (sql) =>
+        sql.query(`UPDATE users SET active_group_id = NULL WHERE id = $1`, [admin.userId]),
+      ),
+    ).rejects.toThrow();
+    expect(await readActiveGroupId(admin.userId)).toBe(groupId);
+  });
+});
+
+describe("나가기와 보고 있는 모임", () => {
+  it("전체공개를 보고 있으면 모임을 나가도 그대로 둔다", async () => {
+    const admin = await newAdmin("전체공개유지");
+    const { groupId } = await createGroupForAdmin({
+      userId: admin.userId,
+      name: `${TAG}-유지확인모임`,
+    });
+    // 일부러 전체공개로 옮겨 둔 상태다. 무관한 모임을 나갔다고 끌려가면 안 된다.
+    await setActiveGroup(admin.userId, null);
+    const result = await leaveGroup(admin.userId, groupId);
+    expect(result.activeGroupId).toBeNull();
+    expect(await readActiveGroupId(admin.userId)).toBeNull();
+  });
+
+  it("다른 모임을 보고 있으면 그 모임을 계속 본다", async () => {
+    const admin = await newAdmin("다른방유지");
+    const watching = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-보는방` });
+    const leaving = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-떠나는방` });
+    await setActiveGroup(admin.userId, watching.groupId);
+
+    const result = await leaveGroup(admin.userId, leaving.groupId);
+    expect(result.activeGroupId).toBe(watching.groupId);
   });
 });

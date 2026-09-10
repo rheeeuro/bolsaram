@@ -73,7 +73,10 @@ export type TelegramIdentity = {
   role: "ADMIN" | "MEMBER";
   telegramUserId: number;
   telegramChatId: number;
-  /** 이 주선자가 Import 를 넣을 모임. 없으면 봇을 쓸 수 없다. */
+  /**
+   * 이 주선자가 Import 를 넣을 모임 — 웹에서 보고 있는 채널과 같은 값이다.
+   * null 이면 전체공개로 들어간다(웹 업로드와 같다).
+   */
   groupId: string | null;
 };
 
@@ -128,9 +131,12 @@ export async function consumeTelegramLinkCode(input: {
       [row.user_id, input.telegramUserId, input.telegramChatId],
     );
 
-    // 연결 시점의 모임. 없으면 봇이 그 사실을 알려준다.
+    // 연결 시점에 보고 있는 채널. 소속이 아닌 값이면 전체공개로 떨어뜨린다 —
+    // 소속 판정은 group_admins 가 하고 active_group_id 는 그중 어디인지만 말한다(0036).
     const group = await sql.query<{ group_id: string }>(
-      `SELECT group_id FROM group_admins WHERE user_id = $1 ORDER BY added_at LIMIT 1`,
+      `SELECT ga.group_id FROM group_admins ga
+         JOIN users u ON u.id = ga.user_id AND u.active_group_id = ga.group_id
+        WHERE ga.user_id = $1`,
       [row.user_id],
     );
 
@@ -158,9 +164,11 @@ export async function findTelegramIdentity(
       telegram_chat_id: string | number;
       group_id: string | null;
     }>(
+      // 봇은 웹에서 보고 있는 채널과 같은 모임에 넣는다. 매 요청에 다시 읽으므로
+      // 웹에서 채널을 바꾸면 다음 사진부터 그 모임으로 들어간다.
       `SELECT c.user_id, u.role, c.telegram_chat_id,
               (SELECT ga.group_id FROM group_admins ga
-                WHERE ga.user_id = c.user_id ORDER BY ga.added_at LIMIT 1) AS group_id
+                WHERE ga.user_id = c.user_id AND ga.group_id = u.active_group_id) AS group_id
          FROM telegram_connections c
          JOIN users u ON u.id = c.user_id
         WHERE c.telegram_user_id = $1`,

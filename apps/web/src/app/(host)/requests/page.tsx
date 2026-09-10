@@ -24,9 +24,12 @@ export default async function HostRequestsPage({
     : undefined;
 
   const { items, intents } = await withRls(rlsContextOf(viewer), async (sql) => {
-    const requests = await listForAdmin(sql, filter ? { status: filter } : {});
+    const requests = await listForAdmin(sql, {
+      groupId: viewer.groupId,
+      ...(filter ? { status: filter } : {}),
+    });
     // 회원이 낸 요청은 아직 신청이 아니다 — 승인해야 상대에게 간다(0026).
-    const pending = await listPendingIntents(sql);
+    const pending = await listPendingIntents(sql, { groupId: viewer.groupId });
 
     const byRequestId = new Map(requests.map((r) => [r.id, r]));
     const ids = new Set([

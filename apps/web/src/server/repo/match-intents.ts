@@ -104,11 +104,19 @@ export async function findIntentById(
 }
 
 /** 주선자 큐. RLS 가 이미 담당분만 남기므로 여기서 다시 거르지 않는다. */
-export async function listPendingIntents(sql: Sql): Promise<MatchIntentRecord[]> {
+export async function listPendingIntents(
+  sql: Sql,
+  /** 지금 보고 있는 채널. 요청을 낸 회원이 그 풀에 있는 것만 본다. */
+  scope: { groupId: string | null },
+): Promise<MatchIntentRecord[]> {
   const result = await sql.query<Row>(
     `SELECT ${COLUMNS} FROM match_intents
       WHERE status = 'PENDING'
+        AND EXISTS (SELECT 1 FROM profiles p
+                     WHERE p.id = profile_id
+                       AND p.group_id IS NOT DISTINCT FROM $1)
       ORDER BY created_at ASC`,
+    [scope.groupId],
   );
   return result.rows.map(toRecord);
 }

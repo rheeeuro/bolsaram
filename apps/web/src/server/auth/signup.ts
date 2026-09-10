@@ -51,9 +51,9 @@ export async function signupAdmin(input: {
 /**
  * 이미 있는 주선자 계정에 모임을 만들어 준다.
  *
- * 가입은 계정만 만들므로 모임이 필요하면 여기를 지난다.
- * **이미 모임이 있으면 만들지 않는다** — 실수로 모임이 늘어나면 어느 모임에서
- * 일하는지 헷갈린다(모임 전환 UI 는 아직 없다).
+ * 가입은 계정만 만들므로 모임이 필요하면 여기를 지난다. **몇 개든 만들 수 있다** —
+ * 한 주선자가 여러 모임에서 일하고 화면에서 채널처럼 오간다(0036). 만든 모임을 바로
+ * 활성 채널로 만들어 준다.
  *
  * `groups` INSERT 정책을 앱 롤에 주지 않았으므로 owner 커넥션으로만 가능하다 —
  * 모임 소속은 데이터가 아니라 신원에 가깝다는 판단이다.
@@ -64,12 +64,6 @@ export async function createGroupForAdmin(input: {
   description?: string;
 }): Promise<{ groupId: string }> {
   return withOwnerTx(async (sql) => {
-    const existing = await sql.query(`SELECT 1 FROM group_admins WHERE user_id = $1`, [
-      input.userId,
-    ]);
-    if ((existing.rowCount ?? 0) > 0) {
-      throw new DomainError("CONFLICT", "이미 모임에 속해 있습니다.");
-    }
     const group = await sql.query<{ id: string }>(
       `INSERT INTO groups (name, description, created_by) VALUES ($1, $2, $3) RETURNING id`,
       [input.name, input.description?.trim() || null, input.userId],
@@ -80,6 +74,11 @@ export async function createGroupForAdmin(input: {
        VALUES ($1, $2, true, $2)`,
       [groupId, input.userId],
     );
+    // 방금 만든 모임을 보고 있게 한다 — 만들자마자 그 안에서 일할 것이다.
+    await sql.query(`UPDATE users SET active_group_id = $2 WHERE id = $1`, [
+      input.userId,
+      groupId,
+    ]);
     return { groupId };
   });
 }

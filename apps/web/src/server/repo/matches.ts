@@ -255,13 +255,19 @@ export async function countPendingIncoming(sql: Sql, profileId: string): Promise
 /** 관리자 신청 목록. 실제 소개를 이어줄 연결된 건을 위로 올린다. */
 export async function listForAdmin(
   sql: Sql,
-  filter: { status?: MatchRequestStatus[] },
+  /**
+   * `groupId` 는 지금 보고 있는 채널이다. 신청은 **양쪽 다 같은 풀** 안에서만
+   * 만들어지므로(`match_requests_create`) 한쪽만 봐도 채널이 정해진다.
+   */
+  filter: { status?: MatchRequestStatus[]; groupId: string | null },
 ): Promise<MatchRequestRecord[]> {
-  const values: unknown[] = [];
-  let clause = "TRUE";
+  const values: unknown[] = [filter.groupId];
+  let clause = `EXISTS (SELECT 1 FROM profiles p
+                         WHERE p.id = requester_profile_id
+                           AND p.group_id IS NOT DISTINCT FROM $1)`;
   if (filter.status?.length) {
     values.push(filter.status);
-    clause = `status = ANY($1)`;
+    clause += ` AND status = ANY($2)`;
   }
   const result = await sql.query<Row>(
     `SELECT ${COLUMNS} FROM match_requests

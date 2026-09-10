@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function ImportInboxPage() {
   const viewer = await requireAdminPage();
   const { items, connection } = await withRls(rlsContextOf(viewer), async (sql) => ({
-    items: await listInbox(sql, {}),
+    items: await listInbox(sql, { groupId: viewer.groupId }),
     connection: await findConnectionForUser(sql, viewer.userId),
   }));
 

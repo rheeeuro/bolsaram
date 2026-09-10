@@ -139,7 +139,7 @@ describe("회원 Discover", () => {
 describe("주선자 프로필 목록", () => {
   it("같은 정렬을 쓴다", async () => {
     const page = await withRls(admin, (sql) =>
-      findAdminProfiles(sql, adminProfileQuerySchema.parse({ limit: 100 })),
+      findAdminProfiles(sql, adminProfileQuerySchema.parse({ limit: 100 }), { groupId }),
     );
     expect(labels(page.items)).toEqual(EXPECTED);
   });
@@ -152,6 +152,7 @@ describe("주선자 프로필 목록", () => {
         findAdminProfiles(
           sql,
           adminProfileQuerySchema.parse(cursor ? { limit: 2, cursor } : { limit: 2 }),
+          { groupId },
         ),
       );
       seen.push(...labels(result.items));

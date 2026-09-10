@@ -310,13 +310,20 @@ export async function updateProfileStatus(
 export async function findAdminProfiles(
   sql: Sql,
   query: AdminProfileQuery,
+  /** 지금 보고 있는 채널. null 이면 전체공개 풀만 본다. */
+  scope: { groupId: string | null },
 ): Promise<{ items: ProfileRecord[]; nextCursor: string | null; total: number }> {
-  const clauses: string[] = ["TRUE"];
+  const clauses: string[] = [];
   const values: unknown[] = [];
   const push = (v: unknown) => {
     values.push(v);
     return `$${values.length}`;
   };
+
+  // 채널 필터다. RLS 가 이미 볼 수 없는 것을 걸러내므로 여기서 좁히는 것은 권한이
+  // 아니라 「지금 이 모임」이라는 화면의 약속이다. NULL 끼리도 같게 보려고
+  // IS NOT DISTINCT FROM 을 쓴다(전체공개 채널).
+  clauses.push(`p.group_id IS NOT DISTINCT FROM ${push(scope.groupId)}`);
 
   if (query.status?.length) clauses.push(`p.status = ANY(${push(query.status)})`);
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);

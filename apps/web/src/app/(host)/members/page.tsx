@@ -25,7 +25,10 @@ export default async function HostMembersPage() {
   const viewer = await requireAdminPage();
 
   const rows = await withRls(rlsContextOf(viewer), async (sql) => {
-    const result = await sql.query<MemberRow>(`
+    const result = await sql.query<MemberRow>(
+      // 지금 보고 있는 채널의 회원만 본다. 볼 수 있는 범위는 RLS 가 이미 정했고
+      // 여기서 좁히는 것은 「지금 이 모임」이라는 화면의 약속이다.
+      `
       SELECT u.id AS user_id, u.phone, u.last_login_at,
              p.id AS profile_id, p.public_code, p.real_name,
              i.expires_at AS invite_expires_at, i.claimed_at AS invite_claimed_at
@@ -36,9 +39,12 @@ export default async function HostMembersPage() {
            WHERE profile_id = p.id AND revoked_at IS NULL
            ORDER BY created_at DESC LIMIT 1
         ) i ON true
+       WHERE p.group_id IS NOT DISTINCT FROM $1
        ORDER BY (p.user_id IS NOT NULL), p.created_at DESC
        LIMIT 300
-    `);
+    `,
+      [viewer.groupId],
+    );
 
     // 사진은 목록에서 사람을 알아보는 유일한 단서다 — 이름은 여기서만 보인다.
     const profiles = await findProfilesByIds(

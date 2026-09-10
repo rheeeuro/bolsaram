@@ -7,6 +7,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { DomainError } from "@bolsaram/domain";
 import type { RlsContext } from "@bolsaram/db";
+import { assertGroupAdmin } from "./group-invite";
 import { readSession, type SessionUser } from "./session";
 
 export type Viewer = SessionUser;
@@ -27,21 +28,15 @@ export async function requireAdmin(): Promise<Viewer> {
 }
 
 /**
- * 모임에 속한 주선자만 통과. 데이터를 만들거나 고치는 관리자 동작에 쓴다.
+ * 모임 하나를 지정해 다루는 주선자만 통과. 모임 설정·초대 코드·나가기에 쓴다.
  *
- * 주선자 가입은 자유롭게 열려 있으므로 **모임이 없는 주선자 계정이 존재한다.**
- * 그 계정은 RLS 에서도 아무것도 보지 못하지만, 애플리케이션 레이어에서 먼저 막아
- * 빈 화면 대신 이유를 알려준다(권한 검사는 두 곳에 중복으로 둔다).
+ * 이 경로들은 owner 커넥션으로 도는 인증 레이어라 RLS 정책이 걸리지 않는다 —
+ * 소속 확인이 전적으로 여기 달려 있다(`assertGroupAdmin`).
  */
-export async function requireAdminGroup(): Promise<Viewer & { groupId: string }> {
+export async function requireGroupAdmin(groupId: string): Promise<Viewer> {
   const user = await requireAdmin();
-  if (!user.groupId) {
-    throw new DomainError(
-      "FORBIDDEN",
-      "아직 모임에 속해 있지 않습니다. 모임을 만들거나 초대를 받아 주세요.",
-    );
-  }
-  return { ...user, groupId: user.groupId };
+  await assertGroupAdmin(user.userId, groupId);
+  return user;
 }
 
 /**

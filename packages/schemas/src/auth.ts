@@ -51,6 +51,21 @@ export const groupUpdateSchema = z
     message: "바꿀 항목이 없습니다.",
   });
 
+/**
+ * 보고 있는 모임(채널) 전환. `null` 이면 전체공개다.
+ *
+ * 권한을 주는 값이 아니다 — 어느 모임을 볼 수 있는지는 RLS 가 정하고, 서버는 여기
+ * 들어온 모임에 실제로 속해 있는지 다시 확인한다.
+ */
+export const groupActivateSchema = z.object({
+  groupId: z.uuid().nullable(),
+});
+
+/** 동료 주선자가 준 초대 코드. 여러 모임에 동시에 속할 수 있다. */
+export const groupJoinSchema = z.object({
+  code: z.string().trim().min(8).max(200),
+});
+
 export const requestOtpSchema = z.object({
   phone: phoneSchema,
 });

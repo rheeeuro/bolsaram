@@ -126,13 +126,14 @@ export async function requireSession(sql: Sql, id: string): Promise<ImportSessio
 
 export async function listInbox(
   sql: Sql,
-  filter: { status?: ImportStatus[] },
+  /** `groupId` 는 지금 보고 있는 채널이다. null 이면 전체공개 세션만 본다. */
+  filter: { status?: ImportStatus[]; groupId: string | null },
 ): Promise<(ImportSessionRecord & { assetCount: number })[]> {
-  const values: unknown[] = [];
-  let clause = "TRUE";
+  const values: unknown[] = [filter.groupId];
+  let clause = "s.group_id IS NOT DISTINCT FROM $1";
   if (filter.status?.length) {
     values.push(filter.status);
-    clause = `s.status = ANY($1)`;
+    clause += ` AND s.status = ANY($2)`;
   }
   const result = await sql.query<SessionRow & { asset_count: number }>(
     `SELECT ${SESSION_COLUMNS.split(", ")

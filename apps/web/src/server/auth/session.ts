@@ -32,15 +32,23 @@ export type SessionUser = {
    */
   actingProfileId: string | null;
   /**
-   * 이 사용자가 다루는 모임.
+   * 지금 보고 있는 모임(채널). **null 이면 전체공개**다.
    *
-   * 주선자는 `group_admins` 로 정해지고, 회원은 자기 프로필이 속한 모임이다.
-   * 가입만 하고 아직 모임이 없는 주선자는 null 이며 아무 데이터도 다룰 수 없다.
+   * 주선자는 `users.active_group_id` 이고 실제 소속(`group_admins`)일 때만 살아난다 —
+   * 나간 모임을 가리키고 있으면 전체공개로 떨어뜨린다. 회원은 자기 프로필의 모임이며
+   * 바꿀 수 없다.
    *
    * RLS 는 이 값을 믿지 않는다 — 정책이 `group_admins` 를 직접 조회한다.
-   * 여기 있는 값은 애플리케이션 레이어의 중복 검사와 INSERT 시 소속 지정에 쓴다.
+   * 여기 있는 값은 목록 화면의 채널 필터와 INSERT 시 소속 지정에 쓴다.
    */
   groupId: string | null;
+  /**
+   * 주선자가 속한 모임 전부. 채널 전환기가 쓴다. 회원은 빈 배열이다.
+   *
+   * 한 사람이 여러 모임에 속할 수 있다 — 어느 모임의 데이터를 다룰 수 있는지는
+   * 이 목록이 아니라 RLS 가 정한다.
+   */
+  groups: { id: string; name: string }[];
 };
 
 function signSessionId(sessionId: string): string {
@@ -108,20 +116,30 @@ export async function readSession(): Promise<SessionUser | null> {
       profile_id: string | null;
       acting_profile_id: string | null;
       group_id: string | null;
+      groups: { id: string; name: string }[];
     }>(
-      // 주선자의 모임은 group_admins, 회원의 모임은 자기 프로필에서 온다.
-      // 여러 모임에 속한 주선자는 먼저 들어간 모임을 쓴다(모임 전환 UI 는 아직 없다).
+      // 주선자의 채널은 users.active_group_id, 회원의 모임은 자기 프로필에서 온다.
+      // 주선자의 활성 채널은 **지금도 그 모임에 속해 있을 때만** 살린다 — 나간 모임을
+      // 가리키고 있으면 전체공개(null)로 떨어진다. 소속 판정은 group_admins 가 하고
+      // active_group_id 는 그중 어디를 보고 있는지만 말한다(0036).
       // 대행(ap)은 주선자에게만 붙는다. 본인 계정이 연결된 프로필도 대상이다(0035) —
       // 연결은 초대를 한 번 열었다는 뜻일 뿐 직접 쓰고 있다는 뜻이 아니다.
       // 최종 판정은 RLS 의 app_current_profile_id() 가 하고 여기서는 같은 조건을
       // 애플리케이션 레이어에 한 번 더 둔다(권한 검사는 두 곳에 중복으로).
       `SELECT u.id AS user_id, u.role, u.display_name, p.id AS profile_id,
               ap.id AS acting_profile_id,
+              CASE WHEN u.role = 'ADMIN' THEN (
+                     SELECT ga.group_id FROM group_admins ga
+                      WHERE ga.user_id = u.id AND ga.group_id = u.active_group_id
+                   )
+                   ELSE p.group_id END AS group_id,
               COALESCE(
-                (SELECT ga.group_id FROM group_admins ga
-                  WHERE ga.user_id = u.id ORDER BY ga.added_at LIMIT 1),
-                p.group_id
-              ) AS group_id
+                (SELECT json_agg(json_build_object('id', g.id, 'name', g.name)
+                                 ORDER BY ga.added_at)
+                   FROM group_admins ga JOIN groups g ON g.id = ga.group_id
+                  WHERE ga.user_id = u.id AND u.role = 'ADMIN'),
+                '[]'::json
+              ) AS groups
          FROM sessions s
          JOIN users u ON u.id = s.user_id
          LEFT JOIN profiles p ON p.user_id = u.id
@@ -149,6 +167,7 @@ export async function readSession(): Promise<SessionUser | null> {
       profileId: row.acting_profile_id ?? row.profile_id,
       actingProfileId: row.acting_profile_id,
       groupId: row.group_id,
+      groups: row.groups,
     };
   });
 }

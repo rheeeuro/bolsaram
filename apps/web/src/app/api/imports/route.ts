@@ -14,8 +14,8 @@ import { buildStorageKey, isAllowedImageType, signUploadToken } from "@/server/s
 export const dynamic = "force-dynamic";
 
 export const GET = route(async () =>
-  asAdmin(async (sql) => {
-    const items = await listInbox(sql, {});
+  asAdmin(async (sql, viewer) => {
+    const items = await listInbox(sql, { groupId: viewer.groupId });
     return ok({ items });
   }),
 );

@@ -33,27 +33,49 @@ export default async function HostHomePage() {
 
   const { kpi, recent } = await withRls(rlsContextOf(viewer), async (sql) => {
     // 홈은 단일 왕복으로 끝낸다. 카운트가 늘어나면 뷰로 뺀다.
-    const stats = await sql.query<Kpi>(`
+    // 모든 숫자가 **지금 보고 있는 채널** 안의 것이다. 채널을 바꾸면 홈도 그 모임의
+    // 오늘 할 일로 바뀐다. `$1` 이 null 이면 전체공개 풀을 센다.
+    const stats = await sql.query<Kpi>(
+      `
       SELECT
         -- 회원이 실제로 보는 조건과 같아야 한다. 상태만 세면 「공개인데 안 보이는」
         -- 프로필까지 들어가 숫자가 부풀려진다(isDiscoverable · filters.ts).
         (SELECT count(*) FROM profiles
-          WHERE status IN ('ACTIVE','MATCHING') AND visibility = 'LISTED')::int AS "profilesActive",
-        (SELECT count(*) FROM profiles)::int AS "profilesTotal",
-        (SELECT count(*) FROM profiles WHERE user_id IS NULL)::int AS "profilesUnclaimed",
-        (SELECT count(*) FROM match_requests WHERE status = 'REQUESTED')::int AS "requestsPending",
-        (SELECT count(*) FROM match_requests WHERE status = 'INTRODUCED')::int AS "requestsIntroduced",
+          WHERE group_id IS NOT DISTINCT FROM $1
+            AND status IN ('ACTIVE','MATCHING') AND visibility = 'LISTED')::int AS "profilesActive",
+        (SELECT count(*) FROM profiles
+          WHERE group_id IS NOT DISTINCT FROM $1)::int AS "profilesTotal",
+        (SELECT count(*) FROM profiles
+          WHERE group_id IS NOT DISTINCT FROM $1 AND user_id IS NULL)::int AS "profilesUnclaimed",
+        (SELECT count(*) FROM match_requests r
+          WHERE r.status = 'REQUESTED' AND EXISTS (
+            SELECT 1 FROM profiles p WHERE p.id = r.requester_profile_id
+                                       AND p.group_id IS NOT DISTINCT FROM $1))::int AS "requestsPending",
+        (SELECT count(*) FROM match_requests r
+          WHERE r.status = 'INTRODUCED' AND EXISTS (
+            SELECT 1 FROM profiles p WHERE p.id = r.requester_profile_id
+                                       AND p.group_id IS NOT DISTINCT FROM $1))::int AS "requestsIntroduced",
         (SELECT count(*) FROM import_sessions
-          WHERE status IN ('RECEIVED','UPLOADING','ANALYZING','REVIEW_REQUIRED','READY','FAILED'))::int AS "inboxPending",
-        (SELECT count(*) FROM users WHERE role = 'MEMBER')::int AS "membersTotal"
-    `);
+          WHERE group_id IS NOT DISTINCT FROM $1
+            AND status IN ('RECEIVED','UPLOADING','ANALYZING','REVIEW_REQUIRED','READY','FAILED'))::int AS "inboxPending",
+        (SELECT count(*) FROM profiles
+          WHERE group_id IS NOT DISTINCT FROM $1 AND user_id IS NOT NULL)::int AS "membersTotal"
+    `,
+      [viewer.groupId],
+    );
 
-    const requests = await sql.query<RecentRow>(`
-      SELECT id, status, requested_at, requester_profile_id, target_profile_id
-        FROM match_requests
-       ORDER BY requested_at DESC
+    const requests = await sql.query<RecentRow>(
+      `
+      SELECT r.id, r.status, r.requested_at, r.requester_profile_id, r.target_profile_id
+        FROM match_requests r
+       WHERE EXISTS (SELECT 1 FROM profiles p
+                      WHERE p.id = r.requester_profile_id
+                        AND p.group_id IS NOT DISTINCT FROM $1)
+       ORDER BY r.requested_at DESC
        LIMIT 6
-    `);
+    `,
+      [viewer.groupId],
+    );
 
     // 사람이 보이는 목록이라야 주선자가 판단한다 — 사진과 공개 번호를 같이 싣는다.
     const ids = new Set(

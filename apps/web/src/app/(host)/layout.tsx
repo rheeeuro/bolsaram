@@ -15,7 +15,11 @@ export default async function HostLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="host-surface min-h-dvh bg-[var(--surface-page)] text-[var(--surface-text)]">
-      <HostNav displayName={viewer.displayName} />
+      <HostNav
+        displayName={viewer.displayName}
+        groups={viewer.groups}
+        activeGroupId={viewer.groupId}
+      />
       <div className="mx-auto max-w-6xl px-5 pb-16 pt-7">{children}</div>
     </div>
   );

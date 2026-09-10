@@ -23,6 +23,12 @@ Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에
 > **읽기와 쓰기를 다르게 준다.** 전체공개 프로필은 누구나 보지만 고치는 것은 등록한
 > 주선자만이다. 모임 소속을 바꾸는 것(`group_admins`)은 인증 레이어만 할 수 있다.
 >
+> **불변식 6: 보고 있는 모임은 화면 필터이지 권한이 아니다.**
+> 한 주선자가 여러 모임에 속한다. `viewer.groupId`(= `users.active_group_id`)는 그중
+> 지금 보고 있는 하나이고 `null` 이면 전체공개다. 주선자 목록은 이 값으로 좁히지만,
+> **무엇을 볼 수 있는지는 RLS 가 속한 모임 전부로 판정한다.** 목록에서 좁히는 것을
+> 권한 검사로 세지 않는다.
+>
 > 이 README 는 현재 구조의 소스 오브 트루스다. 라우트·서버 모듈을 추가·삭제하면 함께 갱신한다.
 > 작업 규칙은 [`.ai-harness/project.md`](../../.ai-harness/project.md) 를 따른다.
 
@@ -56,7 +62,7 @@ apps/web/src/
 │   │   ├── profiles/         카드 목록 + 상세 편집·게시·초대
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
-│   │   └── group/            모임 설정 · 주선자 구성원 · 초대 코드
+│   │   └── group/            속한 모임들 · 주선자 구성원 · 초대 코드 · 나가기
 │   └── api/                  Route Handler (아래 표)
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell·markdown·brand-logo)
@@ -103,9 +109,9 @@ server/
 │   ├── login.ts              주선자 비밀번호 (15분 5회 시도 제한)
 │   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
-│   ├── group-invite.ts       모임 초대 코드 발급·소비, 내 모임 조회
+│   ├── group-invite.ts       모임 소속·초대 코드·보고 있는 모임 전환
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
-│   └── guard.ts              requireUser / requireAdmin / requireMemberProfile
+│   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireMemberProfile
 │                             (미로그인: 회원 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)
 ├── storage/local.ts          private 저장소 + signed download/upload URL
@@ -134,7 +140,7 @@ server/
 ├── views/profile-view.ts     공개 단계 적용 + signed URL 부착
 └── http/
     ├── respond.ts            DomainError → HTTP status, 입력 검증
-    └── context.ts            asUser / asAdmin / asGroupAdmin / asMember (세션 + RLS 묶음)
+    └── context.ts            asUser / asAdmin / asMember (세션 + RLS 묶음)
 ```
 
 ---
@@ -178,8 +184,11 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/imports/[id]/analyze`               | POST                | 주선자            | AI 추출 실행                         |
 | `/api/imports/[id]/extraction`            | PATCH               | 주선자            | 검토 결과 저장                       |
 | `/api/imports/[id]/commit`                | POST                | 주선자            | 프로필 생성 (idempotent)             |
-| `/api/admin/groups`                       | POST                | 주선자            | 모임 만들기 (모임 없는 주선자)       |
-| `/api/admin/group`                        | GET / PATCH / POST / PUT | 주선자       | 내 모임 / 이름·설명 수정 / 초대 코드 발급 / 코드로 참여 |
+| `/api/admin/groups`                       | GET / POST          | 주선자            | 속한 모임들 + 보고 있는 모임 / 모임 만들기 |
+| `/api/admin/groups/join`                  | POST                | 주선자            | 초대 코드로 모임 합류                |
+| `/api/admin/groups/active`                | PUT                 | 주선자            | 보고 있는 모임 전환 (`null` = 전체공개) |
+| `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
+| `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급           |
 | `/api/admin/telegram`                     | GET / POST / DELETE | 주선자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |

@@ -58,14 +58,16 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0033_match_canceled_notification.sql` | 취소를 **받는 쪽** 담당 주선자에게 알린다 (누른 사람 제외)                      |
 | `0034_profile_images_owner_write.sql` | 사진 쓰기를 `app_is_admin()` 에서 `app_can_edit_profile` 로 조인다              |
 | `0035_acting_allows_claimed_profile.sql` | 본인 계정이 연결된 프로필도 대행 대상 — `app_current_profile_id()` 에서 연결 조건 제거 |
+| `0036_multi_group_admins.sql`      | 주선자 다중 소속 + 보고 있는 모임(`users.active_group_id`)                              |
+| `0037_group_invite_consume_pair.sql` | `group_invite_codes_consume_pair` 완화 — 코드를 쓴 주선자를 삭제할 수 있게             |
 
 ## 테이블
 
 | 테이블                                         | 역할                                               | 앱 롤 접근                          |
 | ---------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
 | `groups`                                       | 모임. 이름·설명. 가입과 별개로 만든다              | 소속 주선자 + 소속 회원             |
-| `group_admins`                                 | 모임 ↔ 주선자 (여러 명 가능, OWNER 한 명)          | 같은 모임 주선자만 조회             |
-| `users`                                        | 계정 (ADMIN 이메일/비밀번호, MEMBER 전화)          | 본인 + 같은 모임 관계자             |
+| `group_admins`                                 | 모임 ↔ 주선자 (**다대다**, 모임마다 OWNER 한 명)   | 같은 모임 주선자만 조회             |
+| `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임 | 본인 + 같은 모임 관계자             |
 | `profiles`                                     | 프로필. `public_code` 가 화면의 `#17`, `is_seed` 는 합성 표식 | 공개분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
@@ -107,6 +109,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_webhook_events.update_id` PK              | 같은 webhook update 두 번 처리                |
 | `telegram_connections` 양방향 UNIQUE                | 계정 하나에 텔레그램 두 개 / 그 반대          |
 | `group_admins_one_owner` (부분 유니크)              | 모임당 OWNER 두 명                            |
+| `users.active_group_id` 의 컬럼 UPDATE 권한 회수    | 런타임 롤이 보고 있는 모임을 바꾸는 것        |
 | `notifications_dedupe_idx` (부분 유니크)            | 같은 사건으로 같은 사람에게 두 번 알림        |
 | `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
 
@@ -128,6 +131,9 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 상대는 숨기지 못한다. 두 트리거가 함께 있어야 「숨김 + 활성 신청」이 어느 순서로도
 만들어지지 않는다. 그 조합은 회원이 스스로 되돌릴 수 없는 상태다.
 
+`group_admins_clear_active_group` 트리거가 모임에서 나간 주선자의 `users.active_group_id`
+를 비운다. 소속이 끊겼는데 그 모임을 보고 있는 상태를 남기지 않는다.
+
 ## RLS 요약
 
 정책은 `app_current_user_id()` · `app_is_admin()` · `app_current_profile_id()` 를 참조한다.
@@ -143,6 +149,11 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 주선자 가입이 자유롭게 열려 있으므로 관리자 조건은 `app_is_admin()` 이 될 수 없다.
 **읽기와 쓰기를 다르게 준다** — 전체공개 프로필은 누구나 보지만 남이 고칠 수 없다.
 
+`group_admins` 는 다대다다 — 한 주선자가 여러 모임에 속하고, 정책은 속한 **모든** 모임을
+통과시킨다. `users.active_group_id` 는 그중 지금 화면이 보여줄 하나를 가리킬 뿐이며
+**정책은 이 값을 보지 않는다.** 그래서 그 값이 무엇이든 볼 수 있는 범위는 달라지지 않고,
+런타임 롤은 컬럼 UPDATE 권한이 없어 바꾸지도 못한다.
+
 | 함수                                   | 판정                                                |
 | -------------------------------------- | --------------------------------------------------- |
 | `app_is_group_admin(uuid)`             | 그 모임의 주선자인가                                |
@@ -153,7 +164,7 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 | `app_profile_admins(uuid)`             | 그 프로필의 담당 주선자 집합 (알림 수신자)          |
 
 - 익명(둘 다 NULL)은 어떤 프로필도 읽지 못한다.
-- 모임에 속하지 않은 주선자는 아무 데이터도 보지 못한다.
+- 모임에 속하지 않은 주선자는 전체공개 프로필만 보고, 고치는 것은 자기가 등록한 것뿐이다.
 - 회원은 **자기와 같은 풀** 안의 공개 프로필만 보고, 풀을 넘는 소개 신청은 만들 수 없다
   (`IS NOT DISTINCT FROM` 이라 전체공개 회원끼리도 서로 보인다).
 - **claim 정책은 없다.** 주인 없는 프로필을 자기 것으로 만드는 것은 해시된 초대 토큰을

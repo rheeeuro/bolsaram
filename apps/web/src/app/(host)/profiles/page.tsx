@@ -25,7 +25,7 @@ export default async function HostProfilesPage({
   const query = parsed.success ? parsed.data : adminProfileQuerySchema.parse({});
 
   const page = await withRls(rlsContextOf(viewer), async (sql) => {
-    const result = await findAdminProfiles(sql, query);
+    const result = await findAdminProfiles(sql, query, { groupId: viewer.groupId });
     return {
       total: result.total,
       nextCursor: result.nextCursor,
