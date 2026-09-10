@@ -20,11 +20,16 @@ const BATCH = 20;
 
 export type ClaimedNotification = {
   id: string;
-  kind: "MATCH_REQUESTED" | "MATCH_ACCEPTED" | "MEMBER_INTENT";
+  kind:
+    | "MATCH_REQUESTED"
+    | "MATCH_ACCEPTED"
+    | "MATCH_REJECTED"
+    | "MEMBER_INTENT"
+    | "INTENT_DECLINED";
   chatId: number;
   requesterCode: number | null;
   targetCode: number | null;
-  /** MEMBER_INTENT 일 때만 채워진다 — 무슨 요청인지(0026). */
+  /** 요청 알림(MEMBER_INTENT · INTENT_DECLINED)일 때만 채워진다 — 무슨 요청인지. */
   intentKind: MatchIntentKind | null;
 };
 

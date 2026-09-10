@@ -25,8 +25,12 @@ function textFor(item: ClaimedNotification): string {
       return messages.matchRequested(item.requesterCode, item.targetCode);
     case "MATCH_ACCEPTED":
       return messages.matchAccepted(item.requesterCode, item.targetCode);
+    case "MATCH_REJECTED":
+      return messages.matchRejected(item.requesterCode, item.targetCode);
     case "MEMBER_INTENT":
       return messages.memberIntent(item.intentKind, item.requesterCode, item.targetCode);
+    case "INTENT_DECLINED":
+      return messages.intentDeclined(item.intentKind, item.requesterCode, item.targetCode);
   }
 }
 

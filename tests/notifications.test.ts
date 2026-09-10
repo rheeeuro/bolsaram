@@ -178,13 +178,40 @@ describe("신청이 알림을 만든다", () => {
     expect(accepted).toHaveLength(1);
   });
 
-  it("거절은 알림을 만들지 않는다", async () => {
+  // 거절당한 회원 화면에는 알림이 뜨지 않고 상대는 목록에서 조용히 사라진다.
+  // 사정을 말해줄 사람이 필요하므로 신청한 쪽 담당자에게 알린다(0032).
+  it("거절하면 신청한 쪽 담당 주선자에게 알린다", async () => {
     const id = await requestAs(A);
     await withRls(A.member, (sql) =>
       sql.query(`UPDATE match_requests SET status = 'REJECTED' WHERE id = $1`, [id]),
     );
-    const kinds = (await notifications(id)).map((r) => r.kind);
-    expect(kinds).toEqual(["MATCH_REQUESTED"]);
+    const rows = await notifications(id);
+    expect(rows.map((r) => r.kind).sort()).toEqual(["MATCH_REJECTED", "MATCH_REQUESTED"]);
+
+    const rejected = rows.filter((r) => r.kind === "MATCH_REJECTED");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]!.recipient_user_id).toBe(A.adminId);
+  });
+
+  it("거절을 처리한 주선자에게는 알리지 않는다", async () => {
+    const id = await requestAs(A);
+    // 주선자가 회원을 대신해 거절을 기록한 경우. 자기가 방금 한 일이다.
+    await withRls(A.admin, (sql) =>
+      sql.query(`UPDATE match_requests SET status = 'REJECTED' WHERE id = $1`, [id]),
+    );
+    const rejected = (await notifications(id)).filter((r) => r.kind === "MATCH_REJECTED");
+    expect(rejected).toHaveLength(0);
+  });
+
+  it("거절 payload 에도 공개 번호만 있다", async () => {
+    const id = await requestAs(A);
+    await withRls(A.member, (sql) =>
+      sql.query(`UPDATE match_requests SET status = 'REJECTED' WHERE id = $1`, [id]),
+    );
+    const rejected = (await notifications(id)).find((r) => r.kind === "MATCH_REJECTED")!;
+    expect(Object.keys(rejected.payload).sort()).toEqual(["requesterCode", "targetCode"]);
+    // 거절 사유도 이름도 싣지 않는다.
+    expect(JSON.stringify(rejected.payload)).not.toContain(TAG);
   });
 });
 

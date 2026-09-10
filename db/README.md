@@ -52,6 +52,9 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0027_match_request_admin_both_sides.sql` | 신청 읽기·수정을 **양쪽** 담당 주선자에게                                       |
 | `0028_admin_creates_request_on_approval.sql` | 담당 주선자가 회원을 대신해 신청을 만든다 (승인 경로)                       |
 | `0029_intent_notification_payload.sql` | 요청 알림 payload 키를 아웃박스가 읽는 이름으로                                 |
+| `0030_hide_declined_intent_targets.sql` | 보류된 「마음 보내기」의 상대를 그 회원 목록에서 뺀다 (한 방향)               |
+| `0031_intent_declined_notification.sql` | 보류를 그 회원의 담당 주선자에게 알린다 (누른 사람 제외)                     |
+| `0032_match_rejected_notification.sql` | 거절을 **신청자 쪽** 담당 주선자에게 알린다 (누른 사람 제외)                    |
 
 ## 테이블
 

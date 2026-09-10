@@ -165,6 +165,36 @@ export const messages = {
       "확인해야 상대에게 전달됩니다.",
     ].join("\n"),
 
+  /**
+   * 요청이 보류됐다 (0031). 보류한 사람이 그 회원의 담당자가 아닐 수 있어서,
+   * **회원에게 말해줄 사람**이 알아야 한다. 그래서 다음 할 일을 문장으로 적는다.
+   */
+  intentDeclined: (
+    kind: MatchIntentKind | null,
+    fromCode: number | null,
+    toCode: number | null,
+  ) =>
+    [
+      `요청이 보류됐습니다 — ${kind ? MATCH_INTENT_KIND_LABELS[kind] : "요청"}.`,
+      "",
+      pairLine(fromCode, toCode, "→"),
+      "",
+      "상대에게 전달되지 않았습니다. 회원에게 알려주세요.",
+    ].join("\n"),
+
+  /**
+   * 신청이 거절됐다 (0032). 거절당한 쪽에는 화면 알림이 뜨지 않으므로
+   * **그 회원의 주선자**가 알고 전해야 한다.
+   */
+  matchRejected: (requesterCode: number | null, targetCode: number | null) =>
+    [
+      "신청이 거절됐습니다.",
+      "",
+      pairLine(requesterCode, targetCode, "→"),
+      "",
+      "회원에게 알려주세요. 두 분은 서로 목록에서 빠집니다.",
+    ].join("\n"),
+
   requestsButton: "신청 목록 열기",
 } as const;
 
