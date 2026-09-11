@@ -5,6 +5,7 @@
  * 직접 PUT 한 뒤 `POST /api/imports/:id/assets` 로 확정한다.
  */
 import { createImportSessionSchema } from "@bolsaram/schemas";
+import { assertGroupAdmin } from "@/server/auth/group-invite";
 import { writeAudit } from "@/server/audit";
 import { asAdmin } from "@/server/http/context";
 import { fail, ok, readJson, route } from "@/server/http/respond";
@@ -29,10 +30,12 @@ export const POST = route(async (request: Request) => {
     }
   }
 
-  // 모임이 없어도 Import 할 수 있다 — 그 결과는 전체공개 프로필이 된다.
+  // 어느 방에 넣을지는 **올리는 쪽이 말한다**(`groupId`). null 이면 전체공개다 —
+  // 모임이 없는 주선자도 그렇게 올린다. 세션의 방은 검토 화면에서 바꿀 수 있다.
   return asAdmin(async (sql, viewer) => {
+    if (input.groupId) await assertGroupAdmin(viewer.userId, input.groupId);
     const session = await createSession(sql, {
-      groupId: viewer.groupId,
+      groupId: input.groupId,
       createdBy: viewer.userId,
       source: input.source,
       ...(input.rawText ? { rawText: input.rawText } : {}),
@@ -62,7 +65,7 @@ export const POST = route(async (request: Request) => {
       action: "import.create",
       entityType: "import_session",
       entityId: session.id,
-      metadata: { source: input.source, assetCount: slots.length },
+      metadata: { source: input.source, assetCount: slots.length, groupId: session.groupId },
     });
 
     return ok({ id: session.id, status: session.status, assets: slots }, { status: 201 });

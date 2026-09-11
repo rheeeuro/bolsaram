@@ -22,6 +22,7 @@ import {
   classifyTelegramMessage,
   mergeRawText,
   nextTelegramState,
+  parseRoomChoice,
   shouldAnnounceMedia,
   type TelegramIntent,
 } from "@bolsaram/domain";
@@ -40,6 +41,7 @@ import {
   touchTelegramConnection,
   type TelegramIdentity,
 } from "../auth/telegram";
+import { readMyGroups, setActiveGroup } from "../auth/group-invite";
 import { env } from "../env";
 import * as imports from "../repo/imports";
 import * as conversations from "../repo/telegram";
@@ -237,6 +239,37 @@ async function handleCommand(
       }
       await sendMessage(identity.telegramChatId, messages.analyzing);
       triggerAnalyze(ctx, identity, sessionId);
+      return;
+    }
+
+    /**
+     * 담을 모임 확인·변경.
+     *
+     * 봇은 눌러서 고르는 버튼(callback)을 다루지 않으므로 번호로 고른다.
+     * 1번은 언제나 전체공개다 — 소속 없는 방도 하나의 방으로 센다.
+     *
+     * 바꾸는 값은 `users.active_group_id` 이고 웹에서 보고 있는 방과 같은 값이다.
+     * 그래서 봇에서 옮기면 웹 화면도 함께 옮겨 간다(0036).
+     */
+    case "/room": {
+      // owner 커넥션이다 — 모임 소속은 신원에 가까워 인증 레이어만 다룬다.
+      const groups = await readMyGroups(identity.userId);
+      const rooms = [{ id: null, name: null }, ...groups.map((g) => ({ id: g.groupId, name: g.name }))];
+      const activeIndex = rooms.findIndex((r) => r.id === identity.groupId);
+      const choice = parseRoomChoice(intent.argument, rooms.length);
+
+      if (choice.kind === "outOfRange") {
+        await sendMessage(identity.telegramChatId, messages.roomOutOfRange);
+        return;
+      }
+      if (choice.kind === "list") {
+        await sendMessage(identity.telegramChatId, messages.roomList(rooms, activeIndex));
+        return;
+      }
+
+      const picked = rooms[choice.index]!;
+      await setActiveGroup(identity.userId, picked.id);
+      await sendMessage(identity.telegramChatId, messages.roomChanged(picked.name));
       return;
     }
 

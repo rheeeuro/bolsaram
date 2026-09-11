@@ -177,7 +177,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 회원(프로필 필요) | 숨긴 사람 목록·토글                  |
 | `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
-| `/api/imports`                            | GET / POST          | 주선자            | 가져오기 목록 / 세션 생성 + 업로드 슬롯 |
+| `/api/imports`                            | GET / POST          | 주선자            | 가져오기 목록(현재 방) / 세션 생성 + 업로드 슬롯 (`groupId` 필수) |
 | `/api/imports/[id]`                       | GET / DELETE        | 주선자            | 원본·추출 결과 / 세션 삭제           |
 | `/api/imports/[id]/assets`                | POST / DELETE       | 주선자            | 업로드 확정·슬롯 추가 / 제거         |
 | `/api/imports/[id]/text`                  | PATCH               | 주선자            | 원문 저장                            |

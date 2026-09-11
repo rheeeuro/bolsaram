@@ -44,6 +44,7 @@ export const messages = {
     "",
     "/new 새 프로필 등록 시작",
     "/status 지금까지 받은 것",
+    "/room 담을 모임 확인·변경",
     "/analyze 사진 설명만으로 분석",
     "/cancel 현재 등록 취소",
   ].join("\n"),
@@ -127,6 +128,34 @@ export const messages = {
     lines.push("등록할 모임은 검토 화면에서 바꿀 수 있습니다.");
     return lines.join("\n");
   },
+
+  /**
+   * `/room` 목록. 번호를 붙여 보여주고 `/room <번호>` 로 고르게 한다 —
+   * 봇은 눌러서 고르는 버튼(callback)을 다루지 않으므로 번호가 유일한 방법이다.
+   * 1번은 항상 전체공개다.
+   */
+  roomList: (rooms: { name: string | null }[], activeIndex: number) =>
+    [
+      "담을 모임을 고릅니다.",
+      "",
+      ...rooms.map(
+        (room, index) =>
+          `${index + 1}. ${roomName(room.name)}${index === activeIndex ? "  ← 지금" : ""}`,
+      ),
+      "",
+      "/room <번호> 로 바꿉니다. 볼사람 화면에서 보는 모임도 함께 바뀝니다.",
+    ].join("\n"),
+
+  /** 이미 받아 둔 사진은 옮겨 가지 않는다는 것을 분명히 한다. */
+  roomChanged: (groupName: string | null) =>
+    [
+      `담을 곳을 ${roomName(groupName)} 으로 바꿨습니다.`,
+      "",
+      "지금부터 보내는 것이 이 모임으로 들어갑니다.",
+      "진행 중이던 등록은 그대로입니다 — 옮기려면 검토 화면에서 바꾸세요.",
+    ].join("\n"),
+
+  roomOutOfRange: "그런 번호는 없습니다. /room 으로 목록을 확인해 주세요.",
 
   analyzeFailed: "분석에 실패했습니다. 볼사람에서 다시 시도해 주세요.",
 

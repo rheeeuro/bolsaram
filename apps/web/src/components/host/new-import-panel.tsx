@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { Field, Textarea } from "@/components/ui/field";
+import { GroupPicker, type GroupChoice } from "@/components/host/group-picker";
 import { apiPost, uploadFile } from "@/lib/api-client";
 
 type Slot = { assetId: string; order: number; uploadUrl: string };
@@ -16,9 +17,19 @@ type Created = { id: string; assets: Slot[] };
  * fallback 네 갈래를 한 화면에 둔다(모바일 가이드 「Fallback UX」).
  * 사진만 / 글만 / 둘 다 / 아무것도 없음 — 어떤 조합이든 진행할 수 있고,
  * 무엇이 빠졌는지 즉시 알려준다.
+ *
+ * **어느 방에 넣을지를 여기서 정한다.** 지금 보고 있는 방이 골라진 채로 시작하지만
+ * 보내기 전에 눈에 보이고, 서버도 이 값을 반드시 받는다 — 조용히 정해지지 않는다.
  */
-export function NewImportPanel() {
+export function NewImportPanel({
+  groups,
+  activeGroupId,
+}: {
+  groups: GroupChoice[];
+  activeGroupId: string | null;
+}) {
   const router = useRouter();
+  const [groupId, setGroupId] = useState<string | null>(activeGroupId);
   const [files, setFiles] = useState<File[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,6 +46,7 @@ export function NewImportPanel() {
       setProgress("세션 만드는 중…");
       const created = await apiPost<Created>("/api/imports", {
         source: hasImages ? "MANUAL_UPLOAD" : "TEXT",
+        groupId,
         ...(hasText ? { rawText: text } : {}),
         assets: files.map((file, index) => ({
           filename: file.name,
@@ -82,6 +94,17 @@ export function NewImportPanel() {
 
   return (
     <Panel title="새로 가져오기">
+      <Field label="등록할 모임" hint="여기 고른 방에 프로필이 만들어집니다">
+        <GroupPicker
+          groups={groups}
+          value={groupId}
+          disabled={busy}
+          onChange={setGroupId}
+        />
+      </Field>
+
+      <div className="mt-4" />
+
       <Field label="사진" hint="카카오톡에서 받은 프로필 사진 (여러 장 선택 가능)">
         <input
           type="file"

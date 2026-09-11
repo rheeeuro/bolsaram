@@ -18,6 +18,7 @@ import {
   isTelegramSessionOpen,
   isTelegramSessionStale,
   mergeRawText,
+  parseRoomChoice,
   nextTelegramState,
   shouldAnnounceMedia,
 } from "@bolsaram/domain";
@@ -279,5 +280,33 @@ describe("한도와 만료", () => {
     const outside = new Date(now.getTime() - (TELEGRAM_SESSION_TTL_HOURS + 1) * 3_600_000);
     expect(isTelegramSessionStale(justInside, now)).toBe(false);
     expect(isTelegramSessionStale(outside, now)).toBe(true);
+  });
+});
+
+describe("parseRoomChoice", () => {
+  it("인자가 없으면 목록을 보여준다", () => {
+    expect(parseRoomChoice(null, 3)).toEqual({ kind: "list" });
+  });
+
+  it("번호는 1부터 세고 배열 자리로 바꾼다", () => {
+    expect(parseRoomChoice("1", 3)).toEqual({ kind: "pick", index: 0 });
+    expect(parseRoomChoice("3", 3)).toEqual({ kind: "pick", index: 2 });
+  });
+
+  it("앞뒤 공백은 무시한다", () => {
+    expect(parseRoomChoice(" 2 ", 3)).toEqual({ kind: "pick", index: 1 });
+  });
+
+  it("범위를 벗어나면 고르지 않는다", () => {
+    expect(parseRoomChoice("0", 3)).toEqual({ kind: "outOfRange" });
+    expect(parseRoomChoice("4", 3)).toEqual({ kind: "outOfRange" });
+  });
+
+  it("숫자가 아니면 고르지 않는다", () => {
+    // 방 이름을 그대로 적는 경우가 있다. 이름으로는 고르지 않는다 — 같은 이름이
+    // 여러 개일 수 있고, 오타를 조용히 다른 방으로 해석하면 안 된다.
+    expect(parseRoomChoice("강남", 3)).toEqual({ kind: "outOfRange" });
+    expect(parseRoomChoice("2번", 3)).toEqual({ kind: "outOfRange" });
+    expect(parseRoomChoice("", 3)).toEqual({ kind: "outOfRange" });
   });
 });

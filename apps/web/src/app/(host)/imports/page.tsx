@@ -32,7 +32,7 @@ export default async function ImportInboxPage() {
 
       <div className="grid gap-5 lg:grid-cols-[380px_1fr]">
         <div className="flex flex-col gap-5">
-          <NewImportPanel />
+          <NewImportPanel groups={viewer.groups} activeGroupId={viewer.groupId} />
           <TelegramLinkPanel
             enabled={isTelegramEnabled()}
             connected={connection != null}

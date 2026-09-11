@@ -25,6 +25,8 @@ export const TELEGRAM_COMMANDS = [
   "/cancel",
   "/status",
   "/analyze",
+  /** 담을 모임 확인·변경. 인자 없으면 목록, `/room 2` 면 2번으로 옮긴다. */
+  "/room",
   "/help",
 ] as const;
 export type TelegramCommand = (typeof TELEGRAM_COMMANDS)[number];
@@ -246,4 +248,26 @@ export function assertAssetCapacity(currentCount: number): void {
       { limit: TELEGRAM_MAX_ASSETS_PER_SESSION },
     );
   }
+}
+
+/**
+ * `/room` 의 인자를 해석한다.
+ *
+ * 봇은 URL 버튼만 보낼 수 있고 눌러서 고르는 버튼(callback)은 다루지 않는다.
+ * 그래서 방을 **번호로** 고른다 — 목록을 1번부터 붙여 보여주고 `/room 2` 로 옮긴다.
+ * 1번은 항상 전체공개다(소속 없는 방도 하나의 방으로 센다).
+ *
+ * 숫자가 아니거나 범위를 벗어나면 고르지 않는다 — 조용히 엉뚱한 방으로 옮기는 것보다
+ * 목록을 다시 보여주는 편이 낫다.
+ */
+export function parseRoomChoice(
+  argument: string | null,
+  roomCount: number,
+): { kind: "list" } | { kind: "pick"; index: number } | { kind: "outOfRange" } {
+  if (argument == null) return { kind: "list" };
+  if (!/^[0-9]{1,3}$/.test(argument.trim())) return { kind: "outOfRange" };
+  const picked = Number(argument.trim());
+  if (picked < 1 || picked > roomCount) return { kind: "outOfRange" };
+  // 화면에는 1번부터 보여주고 배열은 0부터 센다.
+  return { kind: "pick", index: picked - 1 };
 }

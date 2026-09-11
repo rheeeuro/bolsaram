@@ -27,6 +27,14 @@ export type IncomingSharePayload = z.infer<typeof incomingSharePayloadSchema>;
 
 export const createImportSessionSchema = z.object({
   source: z.enum(IMPORT_SOURCES).default("MANUAL_UPLOAD"),
+  /**
+   * 어느 모임에 등록할지. **키를 생략할 수 없다** — `null` 이면 전체공개다.
+   *
+   * 예전에는 보내지 않으면 서버가 「지금 보고 있는 방」으로 조용히 정했다. 방이
+   * 여러 개가 된 뒤로는 그 기본값이 자주 틀렸고, 틀린 것을 검토 화면에 가서야
+   * 알게 됐다. 그래서 올리는 쪽이 항상 말하게 한다.
+   */
+  groupId: z.uuid().nullable(),
   rawText: z.string().max(20_000).optional(),
   /** 클라이언트가 올릴 파일 목록을 미리 알려주면 signed upload 슬롯을 함께 발급한다. */
   assets: z
