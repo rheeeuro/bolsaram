@@ -22,6 +22,9 @@ Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에
 > 주선자 가입이 열려 있으므로 `ADMIN` 이라는 사실만으로 권한을 주지 않는다 —
 > **읽기와 쓰기를 다르게 준다.** 전체공개 프로필은 누구나 보지만 고치는 것은 등록한
 > 주선자만이다. 모임 소속을 바꾸는 것(`group_admins`)은 인증 레이어만 할 수 있다.
+> **이름과 연락처도 주선자라는 사실만으로 열지 않는다** — 담당이 아닌 프로필은
+> 회원과 같은 기준을 쓰고(`disclosureFor` 의 `canEdit`), 자기 회원과 연결된 뒤에
+> 열린다. 그전에 필요하면 대행으로 회원 화면에서 보고 감사에 남긴다.
 >
 > **불변식 6: 보고 있는 모임은 화면 필터이지 권한이 아니다.**
 > 한 주선자가 여러 모임에 속한다. `viewer.groupId`(= `users.active_group_id`)는 그중
@@ -142,7 +145,7 @@ server/
 │   ├── outbox.ts             미발송 알림 선점·기록 (owner)
 │   └── dispatch.ts           발송 루프 + 기동 시 주기 스윕
 ├── services/import-service.ts  분석 실행 + idempotent commit
-├── views/profile-view.ts     공개 단계 적용 + signed URL 부착
+├── views/profile-view.ts     공개 단계 판정·적용 + signed URL 부착
 └── http/
     ├── respond.ts            DomainError → HTTP status, 입력 검증
     └── context.ts            asUser / asAdmin / asMember (세션 + RLS 묶음)

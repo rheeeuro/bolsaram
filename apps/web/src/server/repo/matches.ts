@@ -6,6 +6,7 @@
 import "server-only";
 import type { Sql } from "@bolsaram/db";
 import {
+  CANNOT_REQUEST_MESSAGE,
   DomainError,
   assertCanCreateRequest,
   resolveTransition,
@@ -81,15 +82,22 @@ export async function findActiveBetween(
 }
 
 /**
- * 어느 방향이든 거절된 이력이 있는가 (마이그레이션 0023).
+ * 어느 방향이든 거절된 이력이 있는가 (마이그레이션 0023·0038).
  *
  * 판정을 DEFINER 함수에 맡긴다 — 정책상 당사자에게는 두 방향이 다 보이지만, 신청
  * 차단이 호출자에게 보이는 행에 좌우되면 안 된다.
+ *
+ * 두 프로필을 모두 인자로 넘긴다. 주선자가 회원의 요청을 승인하는 경로에는 세션
+ * 프로필이 없어(NULL) 한쪽을 세션에서 가져오면 어떤 관계도 찾지 못한다.
  */
-export async function isRejectedBetween(sql: Sql, otherProfileId: string): Promise<boolean> {
+export async function isRejectedBetween(
+  sql: Sql,
+  profileId: string,
+  otherProfileId: string,
+): Promise<boolean> {
   const result = await sql.query<{ rejected: boolean }>(
-    `SELECT app_is_rejected_between($1) AS rejected`,
-    [otherProfileId],
+    `SELECT app_is_rejected_between($1, $2) AS rejected`,
+    [profileId, otherProfileId],
   );
   return result.rows[0]?.rejected ?? false;
 }
@@ -108,8 +116,8 @@ export async function assertRequestable(
 ): Promise<void> {
   const existing = await findActiveBetween(sql, requesterProfileId, targetProfileId);
   const [rejected, hidden] = await Promise.all([
-    isRejectedBetween(sql, targetProfileId),
-    isHiddenBetween(sql, targetProfileId),
+    isRejectedBetween(sql, requesterProfileId, targetProfileId),
+    isHiddenBetween(sql, requesterProfileId, targetProfileId),
   ]);
 
   // 도메인 규칙 먼저. DB 의 부분 유니크 인덱스와 삽입 트리거가 최종 방어선이다.
@@ -137,16 +145,22 @@ export async function createMatchRequest(
     return toRecord(result.rows[0]!);
   } catch (error) {
     // 23505 = unique_violation. 동시 요청 두 개가 검사를 함께 통과한 경우다.
-    if (isUniqueViolation(error)) {
+    if (hasPgCode(error, "23505")) {
       throw new DomainError("CONFLICT", "이미 진행 중인 신청이 있습니다.");
+    }
+    // 23514 = check_violation. 거절·숨김 관계를 막는 트리거다. 위 검사와 이 삽입
+    // 사이에 관계가 바뀌면 여기까지 온다 — 주선자 확인을 기다리는 동안 상대가
+    // 숨기거나 다른 건이 거절되는 경우다. 사람이 읽을 수 있게 번역한다.
+    if (hasPgCode(error, "23514")) {
+      throw new DomainError("CONFLICT", CANNOT_REQUEST_MESSAGE);
     }
     throw error;
   }
 }
 
-function isUniqueViolation(error: unknown): boolean {
+function hasPgCode(error: unknown, code: string): boolean {
   return (
-    typeof error === "object" && error !== null && (error as { code?: string }).code === "23505"
+    typeof error === "object" && error !== null && (error as { code?: string }).code === code
   );
 }
 
@@ -279,6 +293,24 @@ export async function listForAdmin(
     values,
   );
   return result.rows.map(toRecord);
+}
+
+/**
+ * **주선자 화면용.** 자기가 맡은 회원이 낀 연결에서 상대 쪽 프로필 id 집합.
+ *
+ * 담당이 아닌 프로필의 이름·연락처를 언제 여는지를 정한다 — 자기 회원과 연결된
+ * 뒤에야 연다. RLS 가 이미 자기가 낀 신청만 보여주므로(0027) 여기서 다시 거르지
+ * 않는다. CLOSED 를 포함하는 이유는 회원 경로와 같다(0022).
+ */
+export async function introducedWithManaged(sql: Sql): Promise<Set<string>> {
+  const result = await sql.query<{ other: string }>(
+    `SELECT CASE WHEN app_can_edit_profile(requester_profile_id)
+                 THEN target_profile_id ELSE requester_profile_id END AS other
+       FROM match_requests
+      WHERE status IN ('INTRODUCED','CLOSED')
+      LIMIT 2000`,
+  );
+  return new Set(result.rows.map((r) => r.other));
 }
 
 /**

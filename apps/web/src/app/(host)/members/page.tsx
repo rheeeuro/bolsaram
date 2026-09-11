@@ -28,6 +28,9 @@ export default async function HostMembersPage() {
     const result = await sql.query<MemberRow>(
       // 지금 보고 있는 채널의 회원만 본다. 볼 수 있는 범위는 RLS 가 이미 정했고
       // 여기서 좁히는 것은 「지금 이 모임」이라는 화면의 약속이다.
+      //
+      // 담당분만 남긴다. 이 화면은 초대를 발급하고 연결 현황을 보는 곳인데 그 동작은
+      // 모두 편집 권한을 요구하고(`invites_admin`), 이름·전화번호를 함께 싣는다.
       `
       SELECT u.id AS user_id, u.phone, u.last_login_at,
              p.id AS profile_id, p.public_code, p.real_name,
@@ -40,6 +43,7 @@ export default async function HostMembersPage() {
            ORDER BY created_at DESC LIMIT 1
         ) i ON true
        WHERE p.group_id IS NOT DISTINCT FROM $1
+         AND app_can_edit_profile(p.id)
        ORDER BY (p.user_id IS NOT NULL), p.created_at DESC
        LIMIT 300
     `,

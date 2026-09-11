@@ -6,8 +6,9 @@ import { adminProfileQuerySchema, PROFILE_STATUSES } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge } from "@/components/ui/badge";
 import { Count, PageHeader, Panel } from "@/components/host/surface";
-import { findAdminProfiles } from "@/server/repo/profiles";
-import { toDetailView } from "@/server/views/profile-view";
+import { introducedWithManaged } from "@/server/repo/matches";
+import { canEditProfiles, findAdminProfiles } from "@/server/repo/profiles";
+import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 import { label } from "@/lib/labels";
 import { HostProfileFilters } from "@/components/host/profile-filters";
 
@@ -26,12 +27,31 @@ export default async function HostProfilesPage({
 
   const page = await withRls(rlsContextOf(viewer), async (sql) => {
     const result = await findAdminProfiles(sql, query, { groupId: viewer.groupId });
+    // 전체공개 풀에는 남이 등록한 프로필도 함께 있다. 담당이 아니면 이름·연락처를
+    // 가린다 — 판정은 회원 경로와 같은 함수가 한다.
+    const editable = await canEditProfiles(
+      sql,
+      result.items.map((p) => p.id),
+    );
+    const introducedWith = await introducedWithManaged(sql);
     return {
       total: result.total,
       nextCursor: result.nextCursor,
       items: result.items.map((profile) => ({
-        view: toDetailView(profile, "ADMIN"),
+        view: toDetailView(
+          profile,
+          disclosureFor({
+            profile,
+            viewerRole: "ADMIN",
+            viewerUserId: viewer.userId,
+            introducedWith,
+            canEdit: editable.has(profile.id),
+          }),
+        ),
         claimed: profile.userId != null,
+        // 운영 상태는 개인정보가 아니라 담당이 아니어도 보인다. 공개 단계가 낮아지면
+        // view 에서 빠지므로 레코드에서 직접 싣는다.
+        status: profile.status,
         // 상태와 노출은 직교한다 — 「공개」인데 안 보이는 조합이 있으므로
         // 두 값을 따로 읽게 두지 않고 결론을 낸다.
         visible: isDiscoverable({ status: profile.status, visibility: profile.visibility }),
@@ -69,7 +89,7 @@ export default async function HostProfilesPage({
         </Panel>
       ) : (
         <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-          {page.items.map(({ view, claimed, visible }) => (
+          {page.items.map(({ view, claimed, visible, status }) => (
             <li key={view.id}>
               <Link href={`/profiles/${view.id}`} className="group block">
                 <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
@@ -90,7 +110,7 @@ export default async function HostProfilesPage({
                   )}
 
                   <span className="absolute left-2.5 top-2.5 rounded-[var(--radius-pill)] bg-white/90 px-2.5 py-1 text-[11.5px] font-medium text-[var(--color-ink-800)] backdrop-blur">
-                    {label.profileStatus(view.status)}
+                    {label.profileStatus(status)}
                   </span>
                   {!claimed ? (
                     <span className="absolute right-2.5 top-2.5 rounded-[var(--radius-pill)] bg-[var(--color-burgundy-800)]/85 px-2.5 py-1 text-[11.5px] text-white">

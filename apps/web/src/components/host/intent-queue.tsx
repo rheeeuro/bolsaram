@@ -64,6 +64,7 @@ export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
     >
       <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
         회원이 누른 것은 아직 상대에게 가지 않았습니다. 확인하면 그때 전달됩니다.
+        보고 있는 모임과 상관없이 맡은 분들의 요청을 모두 보여줍니다.
       </p>
 
       {error ? (

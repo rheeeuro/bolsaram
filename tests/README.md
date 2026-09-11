@@ -31,7 +31,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 21   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
-| `rls.test.ts`                  | RLS 정책 강제·거절·숨김 관계                   | 필요 | 30   |
+| `rls.test.ts`                  | RLS 정책 강제·거절·숨김·담당이 갈리는 신청     | 필요 | 43   |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
@@ -73,6 +73,7 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `rls.test.ts` 「거절 이력이 있으면 …막힌다」               | 거절 후 재신청 차단 (양방향)        |
 | `rls.test.ts` 「숨긴 사실은 숨긴 사람만 읽는다」           | 숨기기가 상대·주선자에게 통보되지 않음 |
 | `rls.test.ts` 「활성 신청이 있는 상대는 숨길 수 없다」     | 되돌릴 수 없는 「숨김 + 연결」 방지  |
+| `rls.test.ts` 「상대의 수락을 기록할 수 없다」             | 연결 동의를 남의 담당이 대신 내지 못함 |
 | `match-transitions.test.ts` 「거절·숨김·둘 다에 같은 문구」 | 막힌 이유가 숨김을 드러내지 않음    |
 | `visibility.test.ts` 「INTRODUCED 에서만 이름·연락처」     | 연결 전 개인정보 비공개             |
 | `import-normalization.test.ts` 「확인이 남으면 공개 불가」 | AI 자동 게시 차단                   |

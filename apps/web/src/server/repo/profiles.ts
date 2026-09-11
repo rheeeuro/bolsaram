@@ -258,6 +258,22 @@ const UPDATABLE_COLUMNS: Record<keyof ProfileUpdate, string> = {
  * 반드시 `withRls(ctx, ...)` 안에서 호출한다. owner 커넥션에서는 세션 컨텍스트가
  * 없어 의미 없는 답이 나온다.
  */
+/**
+ * 여러 프로필을 한 번에 물어 고칠 수 있는 것만 돌려준다.
+ *
+ * 목록 화면이 프로필마다 판정 함수를 부르면 행 수만큼 쿼리가 늘어난다. 주선자
+ * 화면은 이 집합으로 공개 단계를 가르므로(담당이면 전부, 아니면 회원과 같은 단계)
+ * 한 번에 읽는 경로가 필요하다.
+ */
+export async function canEditProfiles(sql: Sql, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const result = await sql.query<{ id: string }>(
+    `SELECT id FROM profiles WHERE id = ANY($1) AND app_can_edit_profile(id)`,
+    [ids],
+  );
+  return new Set(result.rows.map((r) => r.id));
+}
+
 export async function assertCanEditProfile(sql: Sql, profileId: string): Promise<void> {
   const result = await sql.query<{ allowed: boolean }>(
     `SELECT app_can_edit_profile($1) AS allowed`,

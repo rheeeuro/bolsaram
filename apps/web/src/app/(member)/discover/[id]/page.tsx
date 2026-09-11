@@ -10,6 +10,7 @@ import {
   introducedPartnerIds,
   isRejectedBetween,
 } from "@/server/repo/matches";
+import { listPendingIntentsForProfile } from "@/server/repo/match-intents";
 import { findProfileById } from "@/server/repo/profiles";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 import { ProfileDetail } from "@/components/member/profile-detail";
@@ -74,11 +75,14 @@ export default async function ProfileDetailPage({
     // 직접 URL 로는 여기까지 올 수 있으므로 버튼 상태를 서버에서 정한다.
     const relation = viewer.profileId
       ? {
-          rejected: await isRejectedBetween(sql, profile.id),
-          hiddenBetween: await isHiddenBetween(sql, profile.id),
+          rejected: await isRejectedBetween(sql, viewer.profileId, profile.id),
+          hiddenBetween: await isHiddenBetween(sql, viewer.profileId, profile.id),
+          pendingSend: (await listPendingIntentsForProfile(sql, viewer.profileId)).some(
+            (intent) => intent.kind === "SEND" && intent.targetProfileId === profile.id,
+          ),
           iHid: await didHide(sql, viewer.profileId, profile.id),
         }
-      : { rejected: false, hiddenBetween: false, iHid: false };
+      : { rejected: false, hiddenBetween: false, iHid: false, pendingSend: false };
 
     return {
       view: toDetailView(profile, level, { isFavorited: favorited }),

@@ -122,10 +122,12 @@ export async function readSession(): Promise<SessionUser | null> {
       // 주선자의 활성 채널은 **지금도 그 모임에 속해 있을 때만** 살린다 — 나간 모임을
       // 가리키고 있으면 전체공개(null)로 떨어진다. 소속 판정은 group_admins 가 하고
       // active_group_id 는 그중 어디를 보고 있는지만 말한다(0036).
-      // 대행(ap)은 주선자에게만 붙는다. 본인 계정이 연결된 프로필도 대상이다(0035) —
-      // 연결은 초대를 한 번 열었다는 뜻일 뿐 직접 쓰고 있다는 뜻이 아니다.
-      // 최종 판정은 RLS 의 app_current_profile_id() 가 하고 여기서는 같은 조건을
-      // 애플리케이션 레이어에 한 번 더 둔다(권한 검사는 두 곳에 중복으로).
+      // 대행(ap)은 주선자에게만, 그리고 **지금도 고칠 수 있는 프로필일 때만** 붙는다.
+      // 본인 계정이 연결된 프로필도 대상이다(0035) — 연결은 초대를 한 번 열었다는
+      // 뜻일 뿐 직접 쓰고 있다는 뜻이 아니다. 대행을 시작한 뒤 모임에서 나가는 것처럼
+      // 권한이 사라질 수 있으므로 세션을 읽을 때마다 다시 본다. 조건은
+      // `app_can_edit_profile` 과 같고, owner 커넥션이라 RLS 컨텍스트가 없어 여기서는
+      // 그 함수 대신 같은 판정을 직접 쓴다. 최종 판정은 RLS 가 한 번 더 한다.
       `SELECT u.id AS user_id, u.role, u.display_name, p.id AS profile_id,
               ap.id AS acting_profile_id,
               CASE WHEN u.role = 'ADMIN' THEN (
@@ -145,6 +147,12 @@ export async function readSession(): Promise<SessionUser | null> {
          LEFT JOIN profiles p ON p.user_id = u.id
          LEFT JOIN profiles ap ON ap.id = s.acting_profile_id
                               AND u.role = 'ADMIN'
+                              AND (
+                                EXISTS (SELECT 1 FROM group_admins ga
+                                         WHERE ga.user_id = u.id
+                                           AND ga.group_id = ap.group_id)
+                                OR (ap.group_id IS NULL AND ap.created_by = u.id)
+                              )
         WHERE s.id = $1
           AND s.revoked_at IS NULL
           AND s.expires_at > now()`,

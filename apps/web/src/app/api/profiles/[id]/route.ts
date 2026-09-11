@@ -5,8 +5,8 @@ import { writeAudit } from "@/server/audit";
 import { asAdmin, asUser } from "@/server/http/context";
 import { ok, readJson, route } from "@/server/http/respond";
 import { isFavorited } from "@/server/repo/favorites";
-import { introducedPartnerIds } from "@/server/repo/matches";
-import { findProfileById, updateProfile } from "@/server/repo/profiles";
+import { introducedPartnerIds, introducedWithManaged } from "@/server/repo/matches";
+import { canEditProfiles, findProfileById, updateProfile } from "@/server/repo/profiles";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 
 export const dynamic = "force-dynamic";
@@ -27,14 +27,21 @@ export const GET = route(async (_request: Request, { params }: Params) => {
       throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     }
 
-    const introducedWith = viewer.profileId
-      ? await introducedPartnerIds(sql, viewer.profileId)
-      : new Set<string>();
+    // 주선자는 자기 회원이 낀 연결을, 회원은 자기 연결을 본다.
+    const introducedWith =
+      viewer.role === "ADMIN"
+        ? await introducedWithManaged(sql)
+        : viewer.profileId
+          ? await introducedPartnerIds(sql, viewer.profileId)
+          : new Set<string>();
+    const editable =
+      viewer.role === "ADMIN" ? await canEditProfiles(sql, [profile.id]) : new Set<string>();
     const level = disclosureFor({
       profile,
       viewerRole: viewer.role,
       viewerUserId: viewer.userId,
       introducedWith,
+      canEdit: editable.has(profile.id),
     });
     const favorited = await isFavorited(sql, viewer.userId, profile.id);
     return ok(toDetailView(profile, level, { isFavorited: favorited }));

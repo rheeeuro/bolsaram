@@ -20,7 +20,13 @@ type Existing = { status: string; isRequester: boolean } | null;
  * `hiddenBetween` 은 방향을 담지 않는다 — 상대가 나를 숨겼다는 사실을 화면에 흘리지
  * 않기 위해서다. 내가 숨겼는지는 `iHid` 로만 알 수 있고 그때만 해제 버튼이 뜬다.
  */
-type Relation = { rejected: boolean; hiddenBetween: boolean; iHid: boolean };
+type Relation = {
+  rejected: boolean;
+  hiddenBetween: boolean;
+  iHid: boolean;
+  /** 이 사람에게 보낸 마음이 아직 주선자 확인을 기다리는 중인가 (0026). */
+  pendingSend: boolean;
+};
 
 export function ProfileDetail({
   profile,
@@ -286,6 +292,15 @@ function RequestAction({
     return (
       <Button variant="secondary" size="lg" className="flex-[1.4]" disabled>
         프로필 연결 후 가능
+      </Button>
+    );
+  }
+  // 이미 낸 요청이 확인을 기다리는 중이면 다시 누를 것이 없다. 누르면 DB 의 부분
+  // 유니크 인덱스가 막아 오류 문구만 보게 된다.
+  if (relation.pendingSend) {
+    return (
+      <Button variant="secondary" size="lg" className="flex-[1.4]" disabled>
+        주선자 확인 중
       </Button>
     );
   }

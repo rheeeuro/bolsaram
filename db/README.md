@@ -60,6 +60,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0035_acting_allows_claimed_profile.sql` | 본인 계정이 연결된 프로필도 대행 대상 — `app_current_profile_id()` 에서 연결 조건 제거 |
 | `0036_multi_group_admins.sql`      | 주선자 다중 소속 + 보고 있는 모임(`users.active_group_id`)                              |
 | `0037_group_invite_consume_pair.sql` | `group_invite_codes_consume_pair` 완화 — 코드를 쓴 주선자를 삭제할 수 있게             |
+| `0038_admin_transition_scope.sql`  | 신청 전이를 담당별로 — 수락·거절은 받은 쪽, 취소는 신청자 쪽. 거절·숨김 판정 2인자 형태 |
 
 ## 테이블
 
@@ -124,6 +125,9 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 방향을 구분하지 않는다 — 한쪽만 막으면 탐색 목록에서 서로 빠지는 것과 어긋난다.
 `app_discover_excluded_profile_ids()` 가 같은 관계를 목록 쿼리에 알려주고,
 `app_is_rejected_between()` · `app_is_hidden_between()` 이 화면의 버튼 상태를 정한다.
+두 함수는 형태가 둘이다 — 한 인자 형태는 세션 프로필과 상대를, 두 인자 형태는 두 사람을
+직접 본다. 주선자가 승인하며 신청을 만드는 경로에는 세션 프로필이 없으므로 두 인자
+형태를 쓴다.
 숨김 판정 함수들이 `SECURITY DEFINER` 인 이유는 **누가 숨겼는지는 정책으로 가려 두고**
 판정만 내보내기 위해서다.
 
@@ -162,6 +166,8 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 | `app_can_edit_import(uuid)`            | 위와 같은 판정을 Import 세션에                      |
 | `app_current_member_group()`           | 현재 회원이 속한 풀 (전체공개 회원은 NULL)          |
 | `app_profile_admins(uuid)`             | 그 프로필의 담당 주선자 집합 (알림 수신자)          |
+| `app_is_rejected_between(uuid[, uuid])` | 어느 방향이든 거절 이력이 있는가                   |
+| `app_is_hidden_between(uuid[, uuid])`  | 어느 방향이든 숨긴 관계인가                         |
 
 - 익명(둘 다 NULL)은 어떤 프로필도 읽지 못한다.
 - 모임에 속하지 않은 주선자는 전체공개 프로필만 보고, 고치는 것은 자기가 등록한 것뿐이다.
@@ -172,6 +178,10 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
   남의 프로필을 가져갈 수 있다(0013 에서 제거).
 - 회원은 공개 프로필과 자기 프로필만 읽고, 프로필을 만들거나 남의 것을 고칠 수 없다.
 - 신청은 **자기 명의로만** 만들 수 있다(`requester_profile_id = app_current_profile_id()`).
+  담당 주선자가 회원의 요청을 승인하며 만드는 경로는 예외이고, 그때도 풀 경계는 지킨다.
+- **신청을 옮기는 것은 그 답을 낸 사람의 담당 주선자다.** 읽기는 양쪽 담당이 함께 하지만
+  수락·거절은 받은 쪽 담당, 취소는 신청자 쪽 담당만 기록한다 — 수락은 연락처 상호 공개라
+  그 동의가 상대의 것이어야 한다. 종료는 목록 정리라 양쪽 누구나 한다.
 - Import·초대는 관리자 전용이다.
 - 텔레그램 봇 대화·계정 연결도 관리자 전용이다. webhook 은 **RLS 를 우회하지 않는다** —
   신원 확인만 owner 커넥션으로 하고, 그 뒤 모든 접근은 연결된 주선자 명의로 정책을 통과한다.
@@ -181,7 +191,7 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
   트리거(owner 소유 SECURITY DEFINER), 보냈다고 표시하는 것은 디스패처(owner)뿐이다 —
   정책과 권한 회수로 두 겹을 걸었다.
 
-`tests/rls.test.ts` 22개, `tests/group-isolation.test.ts` 11개,
+`tests/rls.test.ts` 43개, `tests/group-isolation.test.ts` 11개,
 `tests/notifications.test.ts` 11개, `tests/telegram-import.test.ts` 의 「권한 경계」가
 실제 DB 에 붙어 검증한다.
 

@@ -91,7 +91,7 @@ afterAll(async () => {
   await withOwner(async (sql) => {
     await sql.query(`DELETE FROM profiles WHERE real_name = $1`, [`${TAG}-이름`]);
     await sql.query(
-      `DELETE FROM users WHERE display_name IN ('admin','admin2','m1','m2','m3','m4') AND (email LIKE $1 OR phone LIKE $2)`,
+      `DELETE FROM users WHERE display_name IN ('admin','admin2','admin3','admin4','m1','m2','m3','m4','m5','m6') AND (email LIKE $1 OR phone LIKE $2)`,
       [`${TAG}-%`, `${phonePrefix()}%`],
     );
     await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
@@ -560,5 +560,143 @@ describe("거절·숨김 관계", () => {
         ),
       ),
     ).rejects.toThrow(/숨긴 관계/);
+  });
+});
+
+/**
+ * 전체공개 풀(group_id IS NULL)에서는 한 신청의 두 사람을 서로 다른 주선자가 등록할 수
+ * 있다. 그때 **누구의 답인지가 누가 옮길 수 있는지를 정한다**(0038) — 수락은 연락처
+ * 상호 공개이므로 그 동의는 받은 쪽이 낸 것이어야 한다.
+ */
+describe("담당이 갈리는 신청 (전체공개 풀)", () => {
+  let adminX: RlsContext;
+  let adminY: RlsContext;
+  let pubA: string;
+  let pubB: string;
+
+  beforeAll(async () => {
+    await withOwner(async (sql) => {
+      const admin = async (key: string) => {
+        const r = await sql.query<{ id: string }>(
+          `INSERT INTO users (role, email, password_hash, display_name)
+           VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+          [`${TAG}-${key}@test.local`, key],
+        );
+        return r.rows[0]!.id;
+      };
+      const x = await admin("admin3");
+      const y = await admin("admin4");
+      adminX = { userId: x, role: "ADMIN" };
+      adminY = { userId: y, role: "ADMIN" };
+
+      // 모임에 넣지 않는다 — 소속이 없으면 전체공개이고, 고치는 것은 등록한 사람뿐이다.
+      const publicProfile = async (createdBy: string, gender: string) => {
+        const r = await sql.query<{ id: string }>(
+          `INSERT INTO profiles (group_id, user_id, created_by, gender, birth_year,
+                                 residence_region, status, visibility, real_name)
+           VALUES (NULL, NULL, $1, $2, 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3) RETURNING id`,
+          [createdBy, gender, `${TAG}-이름`],
+        );
+        return r.rows[0]!.id;
+      };
+      pubA = await publicProfile(x, "FEMALE");
+      pubB = await publicProfile(y, "MALE");
+    });
+  });
+
+  /** A → B 신청을 새로 만든다. 케이스끼리 상태를 물려받지 않게 매번 새로 만든다. */
+  async function newRequest(): Promise<string> {
+    return withOwner(async (sql) => {
+      await sql.query(
+        `DELETE FROM match_requests
+          WHERE requester_profile_id = $1 AND target_profile_id = $2`,
+        [pubA, pubB],
+      );
+      const r = await sql.query<{ id: string }>(
+        `INSERT INTO match_requests (requester_profile_id, target_profile_id)
+         VALUES ($1, $2) RETURNING id`,
+        [pubA, pubB],
+      );
+      return r.rows[0]!.id;
+    });
+  }
+
+  /**
+   * 상태를 옮겨 보고 결과를 말한다.
+   *
+   * 정책은 두 가지로 막는다 — USING 에 걸리면 행이 보이지 않아 0행이 갱신되고,
+   * WITH CHECK 에 걸리면 예외가 난다. 호출부에서는 둘 다 「막혔다」이므로 여기서
+   * 하나로 접는다.
+   */
+  async function move(
+    ctx: RlsContext,
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<"moved" | "blocked"> {
+    try {
+      const result = await withRls(ctx, (sql) =>
+        sql.query(`UPDATE match_requests SET status = $3 WHERE id = $1 AND status = $2`, [
+          id,
+          from,
+          to,
+        ]),
+      );
+      return result.rowCount === 1 ? "moved" : "blocked";
+    } catch {
+      return "blocked";
+    }
+  }
+
+  it("신청자 쪽 담당 주선자는 상대의 수락을 기록할 수 없다", async () => {
+    // 수락은 연락처 상호 공개다. X 는 B 와 아무 관계가 없다.
+    expect(await move(adminX, await newRequest(), "REQUESTED", "INTRODUCED")).toBe("blocked");
+  });
+
+  it("신청자 쪽 담당 주선자는 상대의 거절도 기록할 수 없다", async () => {
+    expect(await move(adminX, await newRequest(), "REQUESTED", "REJECTED")).toBe("blocked");
+  });
+
+  it("받는 쪽 담당 주선자는 수락을 기록한다", async () => {
+    expect(await move(adminY, await newRequest(), "REQUESTED", "INTRODUCED")).toBe("moved");
+  });
+
+  it("받는 쪽 담당 주선자는 신청자의 취소를 기록할 수 없다", async () => {
+    expect(await move(adminY, await newRequest(), "REQUESTED", "CANCELED")).toBe("blocked");
+  });
+
+  it("신청자 쪽 담당 주선자는 취소를 기록한다", async () => {
+    expect(await move(adminX, await newRequest(), "REQUESTED", "CANCELED")).toBe("moved");
+  });
+
+  it("종료는 양쪽 담당 누구나 한다 — 목록 정리는 운영 행위다", async () => {
+    const id = await newRequest();
+    expect(await move(adminY, id, "REQUESTED", "INTRODUCED")).toBe("moved");
+    expect(await move(adminX, id, "INTRODUCED", "CLOSED")).toBe("moved");
+  });
+
+  it("담당이 아닌 전체공개 프로필은 고치지 못한다", async () => {
+    const result = await withRls(adminX, (sql) =>
+      sql.query(`UPDATE profiles SET bio = 'hacked' WHERE id = $1`, [pubB]),
+    );
+    expect(result.rowCount).toBe(0);
+  });
+
+  it("주선자 세션에서도 거절·숨김 관계를 찾는다", async () => {
+    // 한 인자 형태는 세션 프로필(NULL)을 기준으로 삼아 아무것도 찾지 못한다. 주선자가
+    // 회원의 요청을 승인하며 신청을 만드는 경로는 두 인자 형태를 써야 한다(0038).
+    const id = await newRequest();
+    await withOwner((sql) =>
+      sql.query(`UPDATE match_requests SET status = 'REJECTED' WHERE id = $1`, [id]),
+    );
+    const result = await withRls(adminX, (sql) =>
+      sql.query<{ one: boolean; two: boolean }>(
+        `SELECT app_is_rejected_between($2) AS one,
+                app_is_rejected_between($1, $2) AS two`,
+        [pubA, pubB],
+      ),
+    );
+    expect(result.rows[0]?.one).toBe(false);
+    expect(result.rows[0]?.two).toBe(true);
   });
 });

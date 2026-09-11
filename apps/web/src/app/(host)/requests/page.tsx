@@ -2,8 +2,8 @@
 import { withRls } from "@bolsaram/db";
 import { MATCH_REQUEST_STATUSES, type MatchRequestStatus } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
-import { listForAdmin } from "@/server/repo/matches";
-import { findProfilesByIds, type ProfileRecord } from "@/server/repo/profiles";
+import { introducedWithManaged, listForAdmin } from "@/server/repo/matches";
+import { canEditProfiles, findProfilesByIds, type ProfileRecord } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
 import { listPendingIntents } from "@/server/repo/match-intents";
 import { HostRequestList } from "@/components/host/request-list";
@@ -29,7 +29,7 @@ export default async function HostRequestsPage({
       ...(filter ? { status: filter } : {}),
     });
     // 회원이 낸 요청은 아직 신청이 아니다 — 승인해야 상대에게 간다(0026).
-    const pending = await listPendingIntents(sql, { groupId: viewer.groupId });
+    const pending = await listPendingIntents(sql);
 
     const byRequestId = new Map(requests.map((r) => [r.id, r]));
     const ids = new Set([
@@ -46,6 +46,23 @@ export default async function HostRequestsPage({
     ]);
     const profiles = await findProfilesByIds(sql, [...ids]);
     const byId = new Map(profiles.map((p) => [p.id, p]));
+
+    // 이름은 담당 회원과, 그 회원과 연결된 상대에게만 보인다. 전체공개 풀에서는
+    // 신청의 반대편이 남의 회원일 수 있다.
+    const editable = await canEditProfiles(sql, [...ids]);
+    const introduced = await introducedWithManaged(sql);
+    const describe = (profile: ProfileRecord | undefined) => {
+      if (!profile) return null;
+      const card = toCardView(profile);
+      const named = editable.has(profile.id) || introduced.has(profile.id);
+      return {
+        id: profile.id,
+        code: card.code,
+        name: named ? profile.realName : null,
+        imageUrl: card.primaryImage?.url ?? null,
+        birthYear: card.birthYear,
+      };
+    };
 
     return {
       items: requests.map((request) => ({
@@ -91,17 +108,4 @@ export default async function HostRequestsPage({
       <HostRequestList items={items} activeStatus={status ?? ""} />
     </>
   );
-}
-
-/** 목록에 사람이 보이게 사진과 공개 번호를 함께 싣는다. 이름은 주선자만 본다. */
-function describe(profile: ProfileRecord | undefined) {
-  if (!profile) return null;
-  const card = toCardView(profile);
-  return {
-    id: profile.id,
-    code: card.code,
-    name: profile.realName,
-    imageUrl: card.primaryImage?.url ?? null,
-    birthYear: card.birthYear,
-  };
 }

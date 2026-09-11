@@ -103,32 +103,37 @@ export async function findIntentById(
   return row ? toRecord(row) : null;
 }
 
-/** 주선자 큐. RLS 가 이미 담당분만 남기므로 여기서 다시 거르지 않는다. */
-export async function listPendingIntents(
-  sql: Sql,
-  /** 지금 보고 있는 채널. 요청을 낸 회원이 그 풀에 있는 것만 본다. */
-  scope: { groupId: string | null },
-): Promise<MatchIntentRecord[]> {
+/**
+ * 주선자 큐. RLS 가 이미 담당분만 남기므로 여기서 다시 거르지 않는다.
+ *
+ * **보고 있는 채널로 좁히지 않는다.** 이것은 조회 목록이 아니라 처리해야 끝나는
+ * 일감이고, 회원에게는 알림 채널이 없어 주선자가 확인할 때까지 아무 일도 일어나지
+ * 않는다. 채널로 거르면 여러 모임에 속한 주선자가 다른 채널을 보는 동안 요청이
+ * 큐에서 사라진 채 잠든다.
+ */
+export async function listPendingIntents(sql: Sql): Promise<MatchIntentRecord[]> {
   const result = await sql.query<Row>(
     `SELECT ${COLUMNS} FROM match_intents
       WHERE status = 'PENDING'
-        AND EXISTS (SELECT 1 FROM profiles p
-                     WHERE p.id = profile_id
-                       AND p.group_id IS NOT DISTINCT FROM $1)
-      ORDER BY created_at ASC`,
-    [scope.groupId],
+      ORDER BY created_at ASC
+      LIMIT 200`,
   );
   return result.rows.map(toRecord);
 }
 
-/** 회원이 자기 화면에서 「확인 중」을 보기 위한 목록. */
-export async function listIntentsForProfile(
+/**
+ * 회원이 자기 화면에서 「확인 중」을 보기 위한 목록.
+ *
+ * 아직 확인되지 않은 것만 준다. 회원에게 보여야 하는 것은 「지금 기다리는 중」이라는
+ * 사실이고, 확인이 끝난 요청은 신청 쪽에 결과로 남는다.
+ */
+export async function listPendingIntentsForProfile(
   sql: Sql,
   profileId: string,
 ): Promise<MatchIntentRecord[]> {
   const result = await sql.query<Row>(
     `SELECT ${COLUMNS} FROM match_intents
-      WHERE profile_id = $1
+      WHERE profile_id = $1 AND status = 'PENDING'
       ORDER BY created_at DESC
       LIMIT 100`,
     [profileId],

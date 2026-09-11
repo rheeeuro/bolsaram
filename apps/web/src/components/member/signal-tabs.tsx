@@ -22,6 +22,18 @@ export type SignalItem = {
   requestedAt: string;
   isRequester: boolean;
   profile: ProfileCardView | null;
+  /**
+   * 주선자 확인을 기다리는 중이면 무엇을 기다리는지(0026).
+   * 값이 있으면 결과가 아직 없으므로 상태 대신 이것을 보여주고 버튼을 내린다.
+   */
+  pendingKind?: "SEND" | "ACCEPT" | "REJECT" | "CANCEL" | null;
+};
+
+const PENDING_COPY: Record<string, string> = {
+  SEND: "주선자 확인 중",
+  ACCEPT: "수락 — 주선자 확인 중",
+  REJECT: "거절 — 주선자 확인 중",
+  CANCEL: "취소 — 주선자 확인 중",
 };
 
 const TABS = [
@@ -137,7 +149,11 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
             ) : (
               <span className="display text-[15px] text-[var(--color-ink-900)]">비공개</span>
             )}
-            <Badge tone={toneForStatus(item.status)}>{label.matchStatus(item.status)}</Badge>
+            {item.pendingKind ? (
+              <Badge tone="neutral">{PENDING_COPY[item.pendingKind]}</Badge>
+            ) : (
+              <Badge tone={toneForStatus(item.status)}>{label.matchStatus(item.status)}</Badge>
+            )}
           </div>
 
           {item.profile ? (
@@ -164,7 +180,13 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
             </p>
           ) : null}
 
-          {direction === "incoming" && item.status === "REQUESTED" ? (
+          {item.pendingKind ? (
+            <p className="mt-2.5 text-[12.5px] text-[var(--color-ink-600)]">
+              주선자가 확인하면 다음으로 넘어갑니다. 확인 전까지 상대는 알지 못합니다.
+            </p>
+          ) : null}
+
+          {direction === "incoming" && item.status === "REQUESTED" && !item.pendingKind ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button disabled={busy} onClick={() => void act("accept")}>
                 수락하기
@@ -181,7 +203,7 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
             </div>
           ) : null}
 
-          {direction === "outgoing" && item.status === "REQUESTED" ? (
+          {direction === "outgoing" && item.status === "REQUESTED" && !item.pendingKind ? (
             <div className="mt-3">
               <ConfirmButton
                 label="신청 취소"

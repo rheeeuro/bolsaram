@@ -11,9 +11,10 @@
  * 판정은 도메인 레이어가 한다(`resolveTransition`). 이 라우트는 새 규칙을 만들지
  * 않고, 상태 기계가 이미 `admin` 에게 허용해 둔 전이만 노출한다.
  *
- * RLS 는 **신청자 쪽 담당 주선자**에게만 UPDATE 를 준다(`match_requests_admin_update`).
- * 전체공개 풀에서 두 사람의 등록 주선자가 다르면 상대 쪽 주선자에게는 이 신청이
- * 보이지 않아 404 가 된다 — 조용히 실패하지 않는다.
+ * **누구의 답인지가 누가 옮길 수 있는지를 정한다**(0038). 수락·거절은 받은 쪽 담당
+ * 주선자만, 취소는 신청자 쪽 담당만 기록한다 — 수락은 연락처 상호 공개이고 그
+ * 동의는 상대가 낸 것이어야 한다. 종료는 목록 정리이므로 양쪽 담당 누구나 한다.
+ * RLS 가 같은 경계를 한 번 더 본다(`match_requests_admin_update`).
  */
 import { DomainError, type MatchAction } from "@bolsaram/domain";
 import { rejectMatchRequestSchema } from "@bolsaram/schemas";
@@ -22,6 +23,7 @@ import { asAdmin } from "@/server/http/context";
 import { scheduleDispatch } from "@/server/notify/dispatch";
 import { ok, route } from "@/server/http/respond";
 import { findById, transition } from "@/server/repo/matches";
+import { assertCanEditProfile } from "@/server/repo/profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,15 @@ export const POST = route(async (request: Request, { params }: Params) => {
   return asAdmin(async (sql, viewer) => {
     const record = await findById(sql, id);
     if (!record) throw new DomainError("NOT_FOUND", "신청을 찾을 수 없습니다.");
+
+    // 답을 낸 사람의 담당인지 먼저 본다. RLS 도 같은 판정을 하지만 거기서 막히면
+    // 0행 갱신으로 떨어져 「그 사이 상태가 바뀌었습니다」라는 엉뚱한 안내가 나간다.
+    if (action !== "close") {
+      await assertCanEditProfile(
+        sql,
+        action === "cancel" ? record.requesterProfileId : record.targetProfileId,
+      );
+    }
 
     const updated = await transition(sql, {
       id,

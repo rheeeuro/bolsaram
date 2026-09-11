@@ -36,14 +36,18 @@ export async function removeHide(
 /**
  * 어느 방향이든 숨긴 관계인가. 신청 가능 여부와 상세 화면의 버튼 상태에 쓴다.
  * 방향을 돌려주지 않는 것이 의도다 — 누가 숨겼는지 알려주면 숨기기가 통보가 된다.
+ *
+ * 두 프로필을 모두 인자로 넘긴다. 주선자가 회원의 요청을 승인하는 경로에는 세션
+ * 프로필이 없어(NULL) 한쪽을 세션에서 가져오면 어떤 관계도 찾지 못한다(0038).
  */
 export async function isHiddenBetween(
   sql: Sql,
+  profileId: string,
   otherProfileId: string,
 ): Promise<boolean> {
   const result = await sql.query<{ hidden: boolean }>(
-    `SELECT app_is_hidden_between($1) AS hidden`,
-    [otherProfileId],
+    `SELECT app_is_hidden_between($1, $2) AS hidden`,
+    [profileId, otherProfileId],
   );
   return result.rows[0]?.hidden ?? false;
 }
