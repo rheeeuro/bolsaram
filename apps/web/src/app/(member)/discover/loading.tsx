@@ -6,7 +6,7 @@
  */
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { MemberHeader, MemberSubBar } from "@/components/member/member-header";
-import { CardGridSkeleton } from "@/components/member/card-grid-skeleton";
+import { CardRowsSkeleton } from "@/components/member/card-grid-skeleton";
 import { LoadingLabel, Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
@@ -21,7 +21,8 @@ export default function Loading() {
         </MemberSubBar>
         <LoadingLabel />
         <div className="pt-3">
-          <CardGridSkeleton />
+          {/* 기본 보기가 한 줄 목록이라 그쪽에 맞춘다. */}
+          <CardRowsSkeleton />
         </div>
       </main>
     </>
