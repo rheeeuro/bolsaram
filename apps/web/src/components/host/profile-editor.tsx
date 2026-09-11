@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DRINKING_LABELS,
   DRINKING_LEVELS,
@@ -23,6 +23,7 @@ import {
 } from "@bolsaram/schemas";
 import { isDiscoverable } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
+import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { ProfilePhotos } from "@/components/host/profile-photos";
@@ -34,23 +35,9 @@ import type { ProfileDetailView } from "@/server/views/profile-view";
 
 type Draft = Record<string, string>;
 
-/**
- * 프로필 상세 편집.
- *
- * 회원이 보게 될 사람을 먼저 크게 보여주고(사진·공개 번호·요약), 그 아래에서 고친다.
- * 공개 여부와 초대는 오른쪽에 모아 둔다 — 주선자가 가장 자주 누르는 두 가지다.
- */
-export function HostProfileEditor({
-  profile,
-  claimed,
-  invite,
-}: {
-  profile: ProfileDetailView;
-  claimed: boolean;
-  invite: { expiresAt: string; claimed: boolean } | null;
-}) {
-  const router = useRouter();
-  const [draft, setDraft] = useState<Draft>(() => ({
+/** 프로필 레코드 → 폼 초기값. 저장 기준점과 편집값 둘 다 여기서 시작한다. */
+function initialDraft(profile: ProfileDetailView): Draft {
+  return {
     gender: profile.gender,
     birthYear: String(profile.birthYear),
     height: profile.height == null ? "" : String(profile.height),
@@ -69,7 +56,29 @@ export function HostProfileEditor({
     idealTypeText: profile.idealTypeText ?? "",
     realName: profile.realName ?? "",
     contactNote: profile.contactNote ?? "",
-  }));
+  };
+}
+
+/**
+ * 프로필 상세 편집.
+ *
+ * 회원이 보게 될 사람을 먼저 크게 보여주고(사진·공개 번호·요약), 그 아래에서 고친다.
+ * 공개 여부와 초대는 오른쪽에 모아 둔다 — 주선자가 가장 자주 누르는 두 가지다.
+ */
+export function HostProfileEditor({
+  profile,
+  claimed,
+  invite,
+}: {
+  profile: ProfileDetailView;
+  claimed: boolean;
+  invite: { expiresAt: string; claimed: boolean } | null;
+}) {
+  const router = useRouter();
+  // 저장 기준점. 저장에 성공하면 여기를 지금 값으로 옮긴다 — 그래야 「고친 것이 있는지」를
+  // 서버가 돌려준 값이 아니라 화면에서 바로 판정할 수 있다.
+  const [saved, setSaved] = useState<Draft>(() => initialDraft(profile));
+  const [draft, setDraft] = useState<Draft>(() => initialDraft(profile));
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -115,6 +124,7 @@ export function HostProfileEditor({
       setError(result.message);
       return;
     }
+    setSaved(draft);
     setMessage("저장했습니다.");
     router.refresh();
   }
@@ -133,6 +143,18 @@ export function HostProfileEditor({
     }
     router.refresh();
   }
+
+  // 고친 것이 하나라도 있는가. 저장 버튼을 잠그고 이탈 경고를 걸 기준이다.
+  const dirty = Object.keys(draft).some((key) => draft[key] !== saved[key]);
+
+  // 새로고침·탭 닫기는 막아준다. 앱 안에서의 이동(상단 메뉴)은 App Router 에
+  // 가로챌 자리가 없어서 막지 못한다 — 그래서 저장 바를 화면에 붙여 둔다.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   // 상태와 노출은 직교한다 — 「공개」인데 노출이 「비공개」면 아무도 못 본다.
   // 두 드롭다운을 나란히 두기만 하면 그 조합을 사람이 머릿속에서 계산해야 한다.
@@ -364,10 +386,24 @@ export function HostProfileEditor({
             </div>
           </Panel>
 
-          <div className="flex items-center gap-3">
-            <Button size="lg" disabled={busy} onClick={() => void save()}>
+          {/* 패널이 아홉 개라 맨 아래 버튼 하나로는 고친 것을 두고 화면을 떠나기 쉽다.
+              아래에 붙여 두고, 고친 것이 있을 때만 눈에 띄게 한다. */}
+          <div
+            className={cn(
+              "sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 rounded-t-[12px] px-1 py-3",
+              dirty
+                ? "border-t border-[var(--color-rose-200)] bg-[var(--color-ivory-50)]/95 backdrop-blur"
+                : "",
+            )}
+          >
+            <Button size="lg" disabled={busy || !dirty} onClick={() => void save()}>
               {busy ? "저장 중…" : "저장"}
             </Button>
+            {dirty && !busy ? (
+              <span className="text-[13px] text-[var(--color-burgundy-700)]">
+                저장하지 않은 변경이 있습니다.
+              </span>
+            ) : null}
             {/* 저장 결과는 화면을 보지 않는 사용자에게도 전달돼야 한다. */}
             <span role="status" className="text-[13px] text-[var(--color-success)]">
               {message}

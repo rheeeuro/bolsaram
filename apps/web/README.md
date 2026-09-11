@@ -65,7 +65,7 @@ apps/web/src/
 │   │   └── group/            속한 모임들 · 주선자 구성원 · 초대 코드 · 나가기
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·auth-shell·markdown·brand-logo)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·skeleton·auth-shell·markdown·brand-logo)
 │   ├── member/               회원 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
@@ -77,6 +77,11 @@ apps/web/src/
 │   └── cn.ts                 Tailwind 클래스 병합
 └── server/                   서버 전용 (아래 참고)
 ```
+
+모든 페이지가 `force-dynamic` 이고 요청마다 DB 를 읽는다. 그래서 회원 화면 다섯 곳과
+주선자 영역에 `loading.tsx` 를 둔다 — 상단 바는 바로 뜨고 본문만 스켈레톤이 된다.
+스켈레톤은 `aria-hidden` 이라 `LoadingLabel` 을 같이 놓아야 화면을 보지 않는 사용자에게도
+「불러오는 중」이 전달된다.
 
 정적 파일은 `apps/web/public/` 에 있다. 리포 루트 `assets/` 의 브랜드 에셋을 그대로
 복사한 것이고, 파일명을 바꾸지 않아 원본과 1:1 로 대응한다.

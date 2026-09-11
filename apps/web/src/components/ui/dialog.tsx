@@ -162,7 +162,7 @@ export function DialogClose({ onClose }: { onClose: () => void }) {
       type="button"
       onClick={onClose}
       aria-label="닫기"
-      className="-mr-1 grid h-9 w-9 place-items-center rounded-full text-[var(--color-ink-600)] transition-colors hover:bg-[var(--surface-muted)]"
+      className="-mr-2 grid h-11 w-11 place-items-center rounded-full text-[var(--color-ink-600)] transition-colors hover:bg-[var(--surface-muted)]"
     >
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
         <path

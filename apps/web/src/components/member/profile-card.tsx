@@ -72,6 +72,8 @@ function FavoriteButton({ profileId, initial }: { profileId: string; initial: bo
       <span role="status" className="sr-only">
         {failed ? "관심을 저장하지 못했습니다." : ""}
       </span>
+      {/* 보이는 원은 32px 그대로 두고 누를 수 있는 범위만 44px 로 넓힌다 —
+          사진 위에 더 큰 흰 원을 얹으면 카드가 무거워진다. */}
       <button
         type="button"
         aria-label={favorited ? "관심 해제" : "관심 저장"}
@@ -92,21 +94,25 @@ function FavoriteButton({ profileId, initial }: { profileId: string; initial: bo
             }
           });
         }}
-        className={cn(
-          "absolute right-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-full",
-          "bg-white/85 backdrop-blur transition-transform duration-[var(--duration-quick)]",
-          "active:scale-90",
-        )}
+        className="absolute right-1 top-1 grid h-11 w-11 place-items-center"
       >
-        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <path
-            d="M10 16s-6-3.7-6-7.6A3.4 3.4 0 0 1 10 6.3a3.4 3.4 0 0 1 6 2.1C16 12.3 10 16 10 16Z"
-            stroke={favorited ? "var(--color-rose-500)" : "var(--color-ink-600)"}
-            strokeWidth="1.4"
-            strokeLinejoin="round"
-            fill={favorited ? "var(--color-rose-500)" : "none"}
-          />
-        </svg>
+        <span
+          className={cn(
+            "grid h-8 w-8 place-items-center rounded-full bg-white/85 backdrop-blur",
+            "transition-transform duration-[var(--duration-quick)]",
+            "active:scale-90",
+          )}
+        >
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden>
+            <path
+              d="M10 16s-6-3.7-6-7.6A3.4 3.4 0 0 1 10 6.3a3.4 3.4 0 0 1 6 2.1C16 12.3 10 16 10 16Z"
+              stroke={favorited ? "var(--color-rose-500)" : "var(--color-ink-600)"}
+              strokeWidth="1.4"
+              strokeLinejoin="round"
+              fill={favorited ? "var(--color-rose-500)" : "none"}
+            />
+          </svg>
+        </span>
       </button>
     </>
   );

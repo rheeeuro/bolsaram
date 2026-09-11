@@ -42,8 +42,10 @@ export function ConfirmButton({
       <span className="text-[12px] leading-snug text-[var(--color-burgundy-800)]">
         {message}
       </span>
+      {/* 확인 단계는 실제로 일이 벌어지는 클릭이다. 먼저 누른 버튼보다 작아지지 않게
+          같은 size 를 그대로 넘긴다. */}
       <Button
-        size="sm"
+        size={size}
         variant={variant === "danger" ? "danger" : "primary"}
         disabled={disabled}
         onClick={() => {
@@ -53,7 +55,7 @@ export function ConfirmButton({
       >
         {confirmLabel}
       </Button>
-      <Button size="sm" variant="ghost" disabled={disabled} onClick={() => setAsking(false)}>
+      <Button size={size} variant="ghost" disabled={disabled} onClick={() => setAsking(false)}>
         그만두기
       </Button>
     </span>

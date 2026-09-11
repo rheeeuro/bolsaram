@@ -7,6 +7,8 @@ import { Empty } from "@/components/ui/empty";
 import { ProfileCard } from "@/components/member/profile-card";
 import { FilterSheet } from "@/components/member/filter-sheet";
 import { MemberSubBar } from "@/components/member/member-header";
+import { CardGridSkeleton } from "@/components/member/card-grid-skeleton";
+import { LoadingLabel } from "@/components/ui/skeleton";
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -105,7 +107,10 @@ export function DiscoverClient() {
       </MemberSubBar>
 
       {loading ? (
-        <CardSkeletonGrid />
+        <div className="pt-3">
+          <LoadingLabel />
+          <CardGridSkeleton />
+        </div>
       ) : error ? (
         <Empty
           title="목록을 불러오지 못했어요"
@@ -195,19 +200,5 @@ function GenderTab({
     >
       {label}
     </button>
-  );
-}
-
-function CardSkeletonGrid() {
-  return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-6 pt-3 sm:grid-cols-3 lg:grid-cols-4">
-      {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className="animate-pulse">
-          <div className="aspect-3/4 rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]" />
-          <div className="mt-2.5 h-3.5 w-10 rounded bg-[var(--color-ivory-200)]" />
-          <div className="mt-1.5 h-3 w-24 rounded bg-[var(--color-ivory-200)]" />
-        </div>
-      ))}
-    </div>
   );
 }

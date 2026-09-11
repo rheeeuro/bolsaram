@@ -30,7 +30,7 @@ export function MemberHeader({
           <Link
             href={back.href}
             aria-label={back.label}
-            className="-ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-full"
+            className="-ml-2.5 grid h-11 w-11 shrink-0 place-items-center rounded-full"
           >
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
               <path

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Empty } from "@/components/ui/empty";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
@@ -164,31 +165,33 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
           ) : null}
 
           {direction === "incoming" && item.status === "REQUESTED" ? (
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" disabled={busy} onClick={() => void act("accept")}>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button disabled={busy} onClick={() => void act("accept")}>
                 수락하기
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
+              {/* 거절은 되돌릴 수 없다 — 주선자 화면과 같은 제자리 확인을 거친다. */}
+              <ConfirmButton
+                label="정중히 거절"
+                confirmLabel="거절하기"
+                message="상대에게는 알리지 않습니다. 되돌릴 수 없어요."
                 disabled={busy}
-                onClick={() => void act("reject")}
-              >
-                정중히 거절
-              </Button>
+                size="md"
+                onConfirm={() => void act("reject")}
+              />
             </div>
           ) : null}
 
           {direction === "outgoing" && item.status === "REQUESTED" ? (
             <div className="mt-3">
-              <Button
-                variant="ghost"
-                size="sm"
+              <ConfirmButton
+                label="신청 취소"
+                confirmLabel="취소하기"
+                message="보낸 마음을 거둡니다. 되돌릴 수 없어요."
                 disabled={busy}
-                onClick={() => void act("cancel")}
-              >
-                신청 취소
-              </Button>
+                variant="ghost"
+                size="md"
+                onConfirm={() => void act("cancel")}
+              />
             </div>
           ) : null}
 

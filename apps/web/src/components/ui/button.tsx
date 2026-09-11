@@ -26,17 +26,33 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
 };
 
+/**
+ * 버튼 생김새만. `button` 이 아닌 것(전체 화면 상태의 `Link`)에 같은 모습을 입힐 때 쓴다 —
+ * 스타일을 옮겨 적으면 버튼 색을 바꿀 때 그쪽만 남는다.
+ */
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  className,
+}: {
+  variant?: Variant;
+  size?: Size;
+  className?: string;
+} = {}) {
+  return cn(
+    "inline-flex items-center justify-center gap-1.5 font-medium",
+    "transition-colors duration-[var(--duration-quick)]",
+    "disabled:cursor-not-allowed disabled:opacity-60",
+    VARIANTS[variant],
+    SIZES[size],
+    className,
+  );
+}
+
 export function Button({ variant = "primary", size = "md", className, ...props }: ButtonProps) {
   return (
     <button
-      className={cn(
-        "inline-flex items-center justify-center gap-1.5 font-medium",
-        "transition-colors duration-[var(--duration-quick)]",
-        "disabled:cursor-not-allowed disabled:opacity-60",
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      )}
+      className={buttonClasses({ variant, size, ...(className ? { className } : {}) })}
       {...props}
     />
   );
