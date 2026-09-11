@@ -22,7 +22,9 @@ export function ProfileCard({
   const href = from ? `/discover/${profile.id}?from=${from}` : `/discover/${profile.id}`;
   return (
     <article className="group relative">
-      <Link href={href} className="block">
+      {/* 사진은 장식이라 접근명이 없다. 같은 곳으로 가는 링크가 아래에 하나 더 있으므로
+          이쪽은 접근성 트리에서 감춘다 — 그러지 않으면 이름 없는 링크가 하나 더 읽힌다. */}
+      <Link href={href} aria-hidden tabIndex={-1} className="block">
         <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
           {profile.primaryImage ? (
             // signed URL 은 매 요청마다 새로 발급된다. next/image 최적화를 쓰면
@@ -61,40 +63,51 @@ export function ProfileCard({
 
 function FavoriteButton({ profileId, initial }: { profileId: string; initial: boolean }) {
   const [favorited, setFavorited] = useState(initial);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   return (
-    <button
-      type="button"
-      aria-label={favorited ? "관심 해제" : "관심 저장"}
-      aria-pressed={favorited}
-      disabled={pending}
-      onClick={() => {
-        // 낙관적으로 먼저 반영하고, 실패하면 되돌린다.
-        const next = !favorited;
-        setFavorited(next);
-        startTransition(async () => {
-          const result = next
-            ? await apiPost("/api/favorites", { profileId })
-            : await apiDelete("/api/favorites", { profileId });
-          if (!result.ok) setFavorited(!next);
-        });
-      }}
-      className={cn(
-        "absolute right-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-full",
-        "bg-white/85 backdrop-blur transition-transform duration-[var(--duration-quick)]",
-        "active:scale-90",
-      )}
-    >
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden>
-        <path
-          d="M10 16s-6-3.7-6-7.6A3.4 3.4 0 0 1 10 6.3a3.4 3.4 0 0 1 6 2.1C16 12.3 10 16 10 16Z"
-          stroke={favorited ? "var(--color-rose-500)" : "var(--color-ink-600)"}
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-          fill={favorited ? "var(--color-rose-500)" : "none"}
-        />
-      </svg>
-    </button>
+    <>
+      {/* 실패하면 하트가 되돌아가는 것으로 보이지만, 화면을 보지 않으면 알 수 없다. */}
+      <span role="status" className="sr-only">
+        {failed ? "관심을 저장하지 못했습니다." : ""}
+      </span>
+      <button
+        type="button"
+        aria-label={favorited ? "관심 해제" : "관심 저장"}
+        aria-pressed={favorited}
+        disabled={pending}
+        onClick={() => {
+          // 낙관적으로 먼저 반영하고, 실패하면 되돌린다.
+          const next = !favorited;
+          setFavorited(next);
+          setFailed(false);
+          startTransition(async () => {
+            const result = next
+              ? await apiPost("/api/favorites", { profileId })
+              : await apiDelete("/api/favorites", { profileId });
+            if (!result.ok) {
+              setFavorited(!next);
+              setFailed(true);
+            }
+          });
+        }}
+        className={cn(
+          "absolute right-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-full",
+          "bg-white/85 backdrop-blur transition-transform duration-[var(--duration-quick)]",
+          "active:scale-90",
+        )}
+      >
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden>
+          <path
+            d="M10 16s-6-3.7-6-7.6A3.4 3.4 0 0 1 10 6.3a3.4 3.4 0 0 1 6 2.1C16 12.3 10 16 10 16Z"
+            stroke={favorited ? "var(--color-rose-500)" : "var(--color-ink-600)"}
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+            fill={favorited ? "var(--color-rose-500)" : "none"}
+          />
+        </svg>
+      </button>
+    </>
   );
 }

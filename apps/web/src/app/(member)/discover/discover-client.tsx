@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { ProfileCard } from "@/components/member/profile-card";
 import { FilterSheet } from "@/components/member/filter-sheet";
+import { MemberSubBar } from "@/components/member/member-header";
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -63,7 +64,7 @@ export function DiscoverClient() {
 
   return (
     <main className="mx-auto max-w-3xl px-4">
-      <div className="sticky top-[57px] z-10 -mx-4 flex items-center gap-2 bg-[var(--surface-page)]/95 px-4 py-3 backdrop-blur">
+      <MemberSubBar>
         <div className="flex gap-1.5">
           <GenderTab label="전체" active={gender === null} onClick={() => setGender(null)} />
           {GENDERS.map((value) => (
@@ -101,7 +102,7 @@ export function DiscoverClient() {
             </span>
           ) : null}
         </button>
-      </div>
+      </MemberSubBar>
 
       {loading ? (
         <CardSkeletonGrid />
@@ -129,7 +130,9 @@ export function DiscoverClient() {
         />
       ) : (
         <>
-          <p className="pb-3 text-[12px] text-[var(--color-ink-600)]">{total}명</p>
+          <p role="status" className="pb-3 text-[12px] text-[var(--color-ink-600)]">
+            {total}명
+          </p>
           <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
             {items.map((profile) => (
               <ProfileCard key={profile.id} profile={profile} />

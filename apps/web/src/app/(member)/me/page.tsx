@@ -8,6 +8,7 @@ import { findProfileById } from "@/server/repo/profiles";
 import { toDetailView } from "@/server/views/profile-view";
 import { label } from "@/lib/labels";
 import { LogoutButton } from "@/components/member/logout-button";
+import { MemberHeader } from "@/components/member/member-header";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +24,16 @@ export default async function MePage() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-[var(--surface-border)] bg-[var(--surface-page)]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5">
-          <h1 className="display text-[22px] text-[var(--color-ink-900)]">내 프로필</h1>
-          {viewer.role === "ADMIN" ? (
+      <MemberHeader
+        title="내 프로필"
+        action={
+          viewer.role === "ADMIN" ? (
             <Link href="/home" className="text-[13px] text-[var(--color-rose-600)] underline">
               주선자 화면
             </Link>
-          ) : null}
-        </div>
-      </header>
+          ) : null
+        }
+      />
 
       <main className="mx-auto max-w-2xl px-5 pb-8">
         {!profile ? (

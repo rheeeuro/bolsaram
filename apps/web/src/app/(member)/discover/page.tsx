@@ -1,5 +1,6 @@
 import { requireUserPage } from "@/server/auth/guard";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { MemberHeader } from "@/components/member/member-header";
 import { DiscoverClient } from "./discover-client";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,7 @@ export default async function DiscoverPage() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-[var(--surface-border)] bg-[var(--surface-page)]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5">
-          <h1>
-            <BrandLogo variant="wordmark" height={21} eager />
-          </h1>
-        </div>
-      </header>
+      <MemberHeader title={<BrandLogo variant="wordmark" height={21} eager />} />
       <DiscoverClient />
     </>
   );

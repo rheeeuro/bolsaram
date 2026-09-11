@@ -6,6 +6,7 @@ import { listSignals, type SignalDirection } from "@/server/repo/matches";
 import { findProfilesByIds } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
 import { SignalTabs } from "@/components/member/signal-tabs";
+import { MemberHeader } from "@/components/member/member-header";
 
 export const dynamic = "force-dynamic";
 
@@ -70,11 +71,7 @@ export default async function SignalsPage({
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-[var(--surface-border)] bg-[var(--surface-page)]/95 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-3.5">
-          <h1 className="display text-[22px] text-[var(--color-ink-900)]">시그널</h1>
-        </div>
-      </header>
+      <MemberHeader title="시그널" />
       <main className="mx-auto max-w-3xl px-4">{children}</main>
     </>
   );

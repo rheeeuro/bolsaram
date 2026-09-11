@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { apiDelete, apiPost } from "@/lib/api-client";
 
 /**
@@ -53,7 +54,9 @@ export function HideAction({
           숨긴 분입니다. 서로 탐색 목록에 보이지 않고 마음도 보낼 수 없습니다.
         </p>
         {error ? (
-          <p className="mt-2 text-[13px] text-[var(--color-danger)]">{error}</p>
+          <p role="alert" className="mt-2 text-[13px] text-[var(--color-danger)]">
+            {error}
+          </p>
         ) : null}
         <button
           type="button"
@@ -79,43 +82,39 @@ export function HideAction({
         </button>
       </div>
 
-      {confirming ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
-          <button
-            type="button"
-            aria-label="닫기"
+      <Dialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        label={`${code}을 숨기시겠어요?`}
+      >
+        <h2 className="display text-[18px] leading-snug text-[var(--color-ink-900)]">
+          {code}을 숨기시겠어요?
+        </h2>
+        <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--color-ink-600)]">
+          탐색 목록에서 서로 보이지 않고, 서로 마음을 보낼 수 없게 됩니다. 상대에게는 알리지
+          않습니다. 내 프로필 화면에서 언제든 해제할 수 있습니다.
+        </p>
+
+        {error ? (
+          <p role="alert" className="mt-3 text-[13px] text-[var(--color-danger)]">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex flex-col gap-2">
+          <Button size="lg" disabled={busy} onClick={() => send(true)}>
+            {busy ? "숨기는 중…" : "숨기기"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="lg"
+            disabled={busy}
             onClick={() => setConfirming(false)}
-            className="animate-fade absolute inset-0 bg-[var(--color-ink-900)]/45"
-          />
-          <div className="animate-rise relative w-full max-w-sm rounded-[var(--radius-sheet)] bg-white p-6 shadow-[var(--shadow-lift)]">
-            <h2 className="display text-[18px] leading-snug text-[var(--color-ink-900)]">
-              {code}을 숨기시겠어요?
-            </h2>
-            <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--color-ink-600)]">
-              탐색 목록에서 서로 보이지 않고, 서로 마음을 보낼 수 없게 됩니다. 상대에게는
-              알리지 않습니다. 내 프로필 화면에서 언제든 해제할 수 있습니다.
-            </p>
-
-            {error ? (
-              <p className="mt-3 text-[13px] text-[var(--color-danger)]">{error}</p>
-            ) : null}
-
-            <div className="mt-5 flex flex-col gap-2">
-              <Button size="lg" disabled={busy} onClick={() => send(true)}>
-                {busy ? "숨기는 중…" : "숨기기"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                disabled={busy}
-                onClick={() => setConfirming(false)}
-              >
-                취소
-              </Button>
-            </div>
-          </div>
+          >
+            취소
+          </Button>
         </div>
-      ) : null}
+      </Dialog>
     </>
   );
 }

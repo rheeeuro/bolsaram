@@ -15,6 +15,7 @@ import {
 } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { Dialog, DialogClose } from "@/components/ui/dialog";
 import { apiGet } from "@/lib/api-client";
 import {
   AGE_RANGE,
@@ -69,8 +70,6 @@ export function FilterSheet({
     };
   }, [open, query]);
 
-  if (!open) return null;
-
   const toggle = (key: keyof Filters, value: string) => {
     setDraft((prev) => {
       const list = prev[key] as string[];
@@ -82,115 +81,92 @@ export function FilterSheet({
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center">
-      <button
-        type="button"
-        aria-label="닫기"
-        onClick={onClose}
-        className="animate-fade absolute inset-0 bg-[var(--color-ink-900)]/35"
-      />
+    <Dialog open={open} onClose={onClose} label="조건 설정" variant="sheet">
+      <header className="flex items-center justify-between border-b border-[var(--surface-border)] px-5 py-4">
+        <h2 className="text-[16px] font-medium">조건 설정</h2>
+        <DialogClose onClose={onClose} />
+      </header>
 
-      <div className="animate-sheet relative flex max-h-[85dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-sheet)] bg-white shadow-[var(--shadow-sheet)]">
-        <header className="flex items-center justify-between border-b border-[var(--surface-border)] px-5 py-4">
-          <h2 className="text-[16px] font-medium">조건 설정</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="p-1 text-[var(--color-ink-600)]"
-          >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
-              <path
-                d="m5 5 10 10M15 5 5 15"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </header>
+      <div className="no-scrollbar flex-1 overflow-y-auto px-5 py-5">
+        <RangeGroup
+          title="나이"
+          unit="세"
+          min={AGE_RANGE.min}
+          max={AGE_RANGE.max}
+          valueMin={draft.ageMin}
+          valueMax={draft.ageMax}
+          onChange={(lo, hi) => setDraft((p) => ({ ...p, ageMin: lo, ageMax: hi }))}
+        />
+        <RangeGroup
+          title="키"
+          unit="cm"
+          min={HEIGHT_RANGE.min}
+          max={HEIGHT_RANGE.max}
+          valueMin={draft.heightMin}
+          valueMax={draft.heightMax}
+          onChange={(lo, hi) => setDraft((p) => ({ ...p, heightMin: lo, heightMax: hi }))}
+          note="키가 적혀 있지 않은 분은 키 조건을 걸면 나오지 않습니다."
+        />
 
-        <div className="no-scrollbar flex-1 overflow-y-auto px-5 py-5">
-          <RangeGroup
-            title="나이"
-            unit="세"
-            min={AGE_RANGE.min}
-            max={AGE_RANGE.max}
-            valueMin={draft.ageMin}
-            valueMax={draft.ageMax}
-            onChange={(lo, hi) => setDraft((p) => ({ ...p, ageMin: lo, ageMax: hi }))}
-          />
-          <RangeGroup
-            title="키"
-            unit="cm"
-            min={HEIGHT_RANGE.min}
-            max={HEIGHT_RANGE.max}
-            valueMin={draft.heightMin}
-            valueMax={draft.heightMax}
-            onChange={(lo, hi) => setDraft((p) => ({ ...p, heightMin: lo, heightMax: hi }))}
-            note="키가 적혀 있지 않은 분은 키 조건을 걸면 나오지 않습니다."
-          />
-
-          <ChipGroup
-            title="지역"
-            values={REGIONS}
-            labels={REGION_LABELS}
-            selected={draft.regions}
-            onToggle={(v) => toggle("regions", v)}
-            onClear={() => setDraft((p) => ({ ...p, regions: [] }))}
-          />
-          <ChipGroup
-            title="직업군"
-            values={JOB_CATEGORIES}
-            labels={JOB_CATEGORY_LABELS}
-            selected={draft.jobCategories}
-            onToggle={(v) => toggle("jobCategories", v)}
-            onClear={() => setDraft((p) => ({ ...p, jobCategories: [] }))}
-          />
-          <ChipGroup
-            title="종교"
-            values={RELIGIONS}
-            labels={RELIGION_LABELS}
-            selected={draft.religions}
-            onToggle={(v) => toggle("religions", v)}
-            onClear={() => setDraft((p) => ({ ...p, religions: [] }))}
-          />
-          <ChipGroup
-            title="흡연"
-            values={SMOKING_LEVELS}
-            labels={SMOKING_LABELS}
-            selected={draft.smoking}
-            onToggle={(v) => toggle("smoking", v)}
-            onClear={() => setDraft((p) => ({ ...p, smoking: [] }))}
-          />
-          <ChipGroup
-            title="음주"
-            values={DRINKING_LEVELS}
-            labels={DRINKING_LABELS}
-            selected={draft.drinking}
-            onToggle={(v) => toggle("drinking", v)}
-            onClear={() => setDraft((p) => ({ ...p, drinking: [] }))}
-          />
-        </div>
-
-        <footer
-          className="flex gap-2 border-t border-[var(--surface-border)] px-5 py-4"
-          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
-        >
-          <Button
-            variant="secondary"
-            size="lg"
-            className="flex-1"
-            onClick={() => setDraft(DEFAULT_FILTERS)}
-          >
-            초기화
-          </Button>
-          <Button size="lg" className="flex-[2]" onClick={() => onApply(draft)}>
-            {count == null ? "결과 보기" : `${count}명 보기`}
-          </Button>
-        </footer>
+        <ChipGroup
+          title="지역"
+          values={REGIONS}
+          labels={REGION_LABELS}
+          selected={draft.regions}
+          onToggle={(v) => toggle("regions", v)}
+          onClear={() => setDraft((p) => ({ ...p, regions: [] }))}
+        />
+        <ChipGroup
+          title="직업군"
+          values={JOB_CATEGORIES}
+          labels={JOB_CATEGORY_LABELS}
+          selected={draft.jobCategories}
+          onToggle={(v) => toggle("jobCategories", v)}
+          onClear={() => setDraft((p) => ({ ...p, jobCategories: [] }))}
+        />
+        <ChipGroup
+          title="종교"
+          values={RELIGIONS}
+          labels={RELIGION_LABELS}
+          selected={draft.religions}
+          onToggle={(v) => toggle("religions", v)}
+          onClear={() => setDraft((p) => ({ ...p, religions: [] }))}
+        />
+        <ChipGroup
+          title="흡연"
+          values={SMOKING_LEVELS}
+          labels={SMOKING_LABELS}
+          selected={draft.smoking}
+          onToggle={(v) => toggle("smoking", v)}
+          onClear={() => setDraft((p) => ({ ...p, smoking: [] }))}
+        />
+        <ChipGroup
+          title="음주"
+          values={DRINKING_LEVELS}
+          labels={DRINKING_LABELS}
+          selected={draft.drinking}
+          onToggle={(v) => toggle("drinking", v)}
+          onClear={() => setDraft((p) => ({ ...p, drinking: [] }))}
+        />
       </div>
-    </div>
+
+      <footer
+        className="flex gap-2 border-t border-[var(--surface-border)] px-5 py-4"
+        style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+      >
+        <Button
+          variant="secondary"
+          size="lg"
+          className="flex-1"
+          onClick={() => setDraft(DEFAULT_FILTERS)}
+        >
+          초기화
+        </Button>
+        <Button size="lg" className="flex-[2]" onClick={() => onApply(draft)}>
+          {count == null ? "결과 보기" : `${count}명 보기`}
+        </Button>
+      </footer>
+    </Dialog>
   );
 }
 

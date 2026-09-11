@@ -4,6 +4,7 @@ import { withRls } from "@bolsaram/db";
 import { requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { Empty } from "@/components/ui/empty";
 import { ProfileCard } from "@/components/member/profile-card";
+import { MemberHeader } from "@/components/member/member-header";
 import { favoriteProfileIds } from "@/server/repo/favorites";
 import { findProfilesByIds } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
@@ -26,11 +27,7 @@ export default async function FavoritesPage() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-[var(--surface-border)] bg-[var(--surface-page)]/95 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-3.5">
-          <h1 className="display text-[22px] text-[var(--color-ink-900)]">관심</h1>
-        </div>
-      </header>
+      <MemberHeader title="관심" />
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
         {items.length === 0 ? (

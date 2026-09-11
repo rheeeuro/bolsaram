@@ -80,6 +80,10 @@
 
 /* 회원 화면 기본 표면. */
 .member-surface {
+  /* 상단 바 높이. 그 아래 붙는 sticky 하위 바(성별 탭·시그널 탭)가 이 값을 읽는다 —
+     숫자를 각자 들고 있으면 헤더를 손볼 때마다 틈이 벌어지거나 겹친다. */
+  --member-header-h: 56px;
+
   --surface-page: var(--color-ivory-50);
   --surface-card: #ffffff;
   --surface-muted: var(--color-ivory-100);

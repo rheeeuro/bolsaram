@@ -7,11 +7,11 @@
  * 해제는 여기서 바로 하지 않고 상세 화면에서 한다. 목록에서 한 번의 탭으로 풀리면
  * 실수로 다시 보이게 되고, 해제 문구를 두 곳에 적어야 한다.
  */
-import Link from "next/link";
 import { withRls } from "@bolsaram/db";
 import { requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { Empty } from "@/components/ui/empty";
 import { ProfileCard } from "@/components/member/profile-card";
+import { MemberHeader } from "@/components/member/member-header";
 import { hiddenProfileIds } from "@/server/repo/hides";
 import { findProfilesByIds } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
@@ -36,26 +36,7 @@ export default async function HiddenPage() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-[var(--surface-border)] bg-[var(--surface-page)]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3.5">
-          <Link
-            href="/me"
-            aria-label="뒤로"
-            className="grid h-8 w-8 place-items-center rounded-full"
-          >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
-              <path
-                d="M12 4 6 10l6 6"
-                stroke="var(--color-ink-900)"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Link>
-          <h1 className="display text-[22px] text-[var(--color-ink-900)]">숨긴 사람</h1>
-        </div>
-      </header>
+      <MemberHeader title="숨긴 사람" back={{ href: "/me", label: "뒤로" }} />
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
         {items.length === 0 ? (

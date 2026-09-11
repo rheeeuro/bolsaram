@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 
 /**
  * 감정 구간 연출 (UI 컨셉 06). 유일하게 긴 모션(--duration-emotive)을 쓴다.
@@ -41,23 +41,15 @@ export function MatchMoment({
   variant?: MomentVariant;
   onClose: () => void;
 }) {
-  // ESC 로도 닫을 수 있게 한다.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   const copy = COPY[variant];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center px-8 text-center"
+    <Dialog
+      open={open}
+      onClose={onClose}
+      label={`${copy.headline[0]} ${copy.headline[1]}`}
+      variant="full"
+      backdrop={false}
       style={{
         background:
           "radial-gradient(90% 60% at 50% 40%, var(--color-burgundy-800) 0%, var(--color-ink-900) 100%)",
@@ -101,6 +93,6 @@ export function MatchMoment({
       >
         확인했어요
       </Button>
-    </div>
+    </Dialog>
   );
 }

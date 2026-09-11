@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { ProfilePhotos } from "@/components/host/profile-photos";
 import { CopyField } from "@/components/ui/copy-field";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FormError, Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch, apiPost } from "@/lib/api-client";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
@@ -76,7 +76,12 @@ export function HostProfileEditor({
   // 발급 직후 한 번만 보여줄 값. 링크와 입장코드는 같은 토큰이다.
   const [issued, setIssued] = useState<{ url: string; code: string } | null>(null);
 
-  const set = (key: string) => (value: string) => setDraft((p) => ({ ...p, [key]: value }));
+  // 고치기 시작하면 지난 결과 문구를 지운다 — 다음 편집 중에 「저장했습니다」가
+  // 남아 있으면 방금 저장된 것으로 읽힌다.
+  const set = (key: string) => (value: string) => {
+    setMessage(null);
+    setDraft((p) => ({ ...p, [key]: value }));
+  };
 
   async function save() {
     setBusy(true);
@@ -133,8 +138,9 @@ export function HostProfileEditor({
   // 두 드롭다운을 나란히 두기만 하면 그 조합을 사람이 머릿속에서 계산해야 한다.
   const visible = isDiscoverable({
     status: (profile.status ?? "INACTIVE") as Parameters<typeof isDiscoverable>[0]["status"],
-    visibility: (profile.visibility ??
-      "PRIVATE") as Parameters<typeof isDiscoverable>[0]["visibility"],
+    visibility: (profile.visibility ?? "PRIVATE") as Parameters<
+      typeof isDiscoverable
+    >[0]["visibility"],
   });
 
   const summary = [
@@ -153,11 +159,7 @@ export function HostProfileEditor({
         <div className="h-32 w-24 shrink-0 overflow-hidden rounded-[12px] bg-[var(--color-ivory-200)]">
           {profile.images[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={profile.images[0].url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <img src={profile.images[0].url} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="grid h-full place-items-center text-[11.5px] text-[var(--color-ink-700)]">
               사진 없음
@@ -187,7 +189,11 @@ export function HostProfileEditor({
         </div>
 
         {profile.status !== "ACTIVE" ? (
-          <Button size="lg" disabled={busy} onClick={() => void changeStatus("ACTIVE", "LISTED")}>
+          <Button
+            size="lg"
+            disabled={busy}
+            onClick={() => void changeStatus("ACTIVE", "LISTED")}
+          >
             지금 공개하기
           </Button>
         ) : null}
@@ -362,12 +368,11 @@ export function HostProfileEditor({
             <Button size="lg" disabled={busy} onClick={() => void save()}>
               {busy ? "저장 중…" : "저장"}
             </Button>
-            {message ? (
-              <span className="text-[13px] text-[var(--color-success)]">{message}</span>
-            ) : null}
-            {error ? (
-              <span className="text-[13px] text-[var(--color-danger)]">{error}</span>
-            ) : null}
+            {/* 저장 결과는 화면을 보지 않는 사용자에게도 전달돼야 한다. */}
+            <span role="status" className="text-[13px] text-[var(--color-success)]">
+              {message}
+            </span>
+            <FormError>{error}</FormError>
           </div>
         </div>
 
@@ -429,8 +434,8 @@ export function HostProfileEditor({
 
           <Panel title="대신 둘러보기">
             <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-              휴대폰 쓰기를 꺼리는 분은 주선자가 자기 폰으로 대신 봅니다. 초대는
-              소진되지 않고 주선자 로그인도 그대로 유지됩니다.
+              휴대폰 쓰기를 꺼리는 분은 주선자가 자기 폰으로 대신 봅니다. 초대는 소진되지 않고
+              주선자 로그인도 그대로 유지됩니다.
             </p>
             <Button
               variant="secondary"
@@ -455,13 +460,13 @@ export function HostProfileEditor({
               이 분으로 둘러보기
             </Button>
             <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-              대행 중에는 화면 아래에 띠가 뜨고, 거기서 언제든 주선자로 돌아옵니다.
-              끝내지 않으면 로그아웃할 때까지 이어집니다.
+              대행 중에는 화면 아래에 띠가 뜨고, 거기서 언제든 주선자로 돌아옵니다. 끝내지
+              않으면 로그아웃할 때까지 이어집니다.
             </p>
             {claimed ? (
               <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                본인 계정이 연결된 분입니다. 본인도 같은 화면을 직접 볼 수 있으니,
-                대신 누르기 전에 확인해 주세요.
+                본인 계정이 연결된 분입니다. 본인도 같은 화면을 직접 볼 수 있으니, 대신 누르기
+                전에 확인해 주세요.
               </p>
             ) : null}
           </Panel>
@@ -550,4 +555,3 @@ function reasonHidden(
   }
   return `노출이 「${label.visibility(visibility) ?? visibility}」입니다`;
 }
-

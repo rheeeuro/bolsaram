@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
@@ -10,6 +10,7 @@ import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
 import { MatchMoment, type MomentVariant } from "@/components/member/match-moment";
+import { MemberSubBar } from "@/components/member/member-header";
 import type { ProfileCardView } from "@/server/views/profile-view";
 
 export type SignalItem = {
@@ -46,7 +47,7 @@ const EMPTY_COPY: Record<string, { title: string; description: string }> = {
 export function SignalTabs({ direction, items }: { direction: string; items: SignalItem[] }) {
   return (
     <>
-      <div className="sticky top-[57px] z-10 -mx-4 flex gap-1.5 bg-[var(--surface-page)]/95 px-4 py-3 backdrop-blur">
+      <MemberSubBar className="gap-1.5">
         {TABS.map((tab) => (
           <Link
             key={tab.key}
@@ -61,7 +62,7 @@ export function SignalTabs({ direction, items }: { direction: string; items: Sig
             {tab.label}
           </Link>
         ))}
-      </div>
+      </MemberSubBar>
 
       {items.length === 0 ? (
         <Empty {...(EMPTY_COPY[direction] ?? EMPTY_COPY.incoming!)} />
@@ -78,6 +79,11 @@ export function SignalTabs({ direction, items }: { direction: string; items: Sig
 
 function SignalRow({ item, direction }: { item: SignalItem; direction: string }) {
   const router = useRouter();
+  // RLS 로 걸러졌거나 지워진 프로필은 갈 곳이 없다. 예전에는 `#` 을 넣어
+  // 아무 데도 가지 않는 링크가 포커스를 받았다.
+  const href = item.profile
+    ? `/discover/${item.profile.id}?from=signals&tab=${direction}`
+    : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [moment, setMoment] = useState<MomentVariant | null>(null);
@@ -107,14 +113,7 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
   return (
     <li className="rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-white p-3.5">
       <div className="flex gap-3">
-        <Link
-          href={
-            item.profile
-              ? `/discover/${item.profile.id}?from=signals&tab=${direction}`
-              : "#"
-          }
-          className="h-18 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--color-ivory-200)]"
-        >
+        <Thumb href={href}>
           {item.profile?.primaryImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -123,13 +122,20 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
               className="h-full w-full object-cover"
             />
           ) : null}
-        </Link>
+        </Thumb>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="display text-[15px] text-[var(--color-ink-900)]">
-              {item.profile?.code ?? "비공개"}
-            </span>
+            {href ? (
+              <Link
+                href={href}
+                className="display text-[15px] text-[var(--color-ink-900)] underline-offset-4 hover:underline"
+              >
+                {item.profile?.code}
+              </Link>
+            ) : (
+              <span className="display text-[15px] text-[var(--color-ink-900)]">비공개</span>
+            )}
             <Badge tone={toneForStatus(item.status)}>{label.matchStatus(item.status)}</Badge>
           </div>
 
@@ -152,7 +158,9 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
           ) : null}
 
           {error ? (
-            <p className="mt-2 text-[12px] text-[var(--color-danger)]">{error}</p>
+            <p role="alert" className="mt-2 text-[12px] text-[var(--color-danger)]">
+              {error}
+            </p>
           ) : null}
 
           {direction === "incoming" && item.status === "REQUESTED" ? (
@@ -201,5 +209,20 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
         }}
       />
     </li>
+  );
+}
+
+/**
+ * 썸네일. 사진은 장식이라 접근명이 없으므로, 링크로 둘 때는 접근성 트리에서 감춘다 —
+ * 옆의 공개 번호 링크가 같은 곳으로 가는 이름 있는 경로다.
+ */
+function Thumb({ href, children }: { href: string | null; children: ReactNode }) {
+  const box = "h-18 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--color-ivory-200)]";
+  return href ? (
+    <Link href={href} aria-hidden tabIndex={-1} className={box}>
+      {children}
+    </Link>
+  ) : (
+    <div className={box}>{children}</div>
   );
 }

@@ -65,7 +65,7 @@ apps/web/src/
 │   │   └── group/            속한 모임들 · 주선자 구성원 · 초대 코드 · 나가기
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·auth-shell·markdown·brand-logo)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·auth-shell·markdown·brand-logo)
 │   ├── member/               회원 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
