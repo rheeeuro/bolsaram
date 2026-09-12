@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 
 /**
@@ -18,7 +19,15 @@ import { cn } from "@/lib/cn";
  * 배경막은 클릭만 받는 장식이라 버튼이 아니라 `div` 다 — 화면 전체를 덮는 버튼을
  * 탭 순서에 넣으면 키보드 사용자가 먼저 「닫기」를 밟고 지나간다. 닫는 길은
  * ESC 와 각 화면이 놓은 취소 버튼이다.
+ *
+ * 그리는 자리는 부르는 곳이 아니라 **표면 루트**(`.host-surface` / `.member-surface`)다.
+ * `backdrop-filter` 가 걸린 조상(예: sticky 헤더) 안에서 `position: fixed` 는 뷰포트가
+ * 아니라 그 조상을 기준으로 잡혀 화면 밖으로 밀려난다. 표면 루트로 올리면 그 영향을
+ * 받지 않으면서 `--surface-*` 변수는 그대로 물려받는다.
  */
+
+/** 덮개를 붙일 자리. 둘 다 없으면 body 로 떨어진다. */
+const SURFACE_ROOT = ".host-surface, .member-surface";
 
 type Variant = "center" | "sheet" | "full";
 
@@ -62,6 +71,16 @@ export function Dialog({
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const [mount, setMount] = useState<HTMLElement | null>(null);
+
+  // 부르는 자리에 남겨 둔 표식에서 표면 루트를 찾는다. 마운트 뒤에야 DOM 이 있으므로
+  // 첫 렌더에는 아무것도 그리지 않는다 — 덮개는 늘 사용자가 눌러야 열린다.
+  useEffect(() => {
+    const surface = anchorRef.current?.closest<HTMLElement>(SURFACE_ROOT);
+    setMount(surface ?? document.body);
+  }, []);
+
   // 부르는 쪽이 인라인 화살표를 넘기므로 의존성에 그대로 넣으면 렌더마다 효과가
   // 다시 돈다 — 포커스를 계속 뺏기고 스크롤 락이 풀렸다 걸린다.
   const closeRef = useRef(onClose);
@@ -127,11 +146,13 @@ export function Dialog({
       // 닫은 뒤에는 열었던 자리로 돌아간다. 그 자리가 사라졌으면 아무것도 하지 않는다.
       if (previous?.isConnected) previous.focus();
     };
-  }, [open]);
+    // `mount` 는 첫 렌더 뒤에야 정해진다. 열린 채로 마운트되는 덮개는 그때 비로소
+    // 패널이 생기므로, 여기 넣지 않으면 포커스 트랩과 스크롤 락이 걸리지 않는다.
+  }, [open, mount]);
 
-  if (!open) return null;
+  if (!open || !mount) return <span ref={anchorRef} hidden />;
 
-  return (
+  return createPortal(
     <div className={cn("fixed inset-0", WRAP[variant])} style={style}>
       {backdrop ? (
         <div
@@ -151,7 +172,8 @@ export function Dialog({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    mount,
   );
 }
 
