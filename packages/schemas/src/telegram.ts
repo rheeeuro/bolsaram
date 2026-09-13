@@ -98,3 +98,14 @@ export type TelegramFile = z.infer<typeof telegramFileResponseSchema>["result"];
 
 /** 연결 코드 발급 요청. 만료는 서버가 정한다. */
 export const issueTelegramLinkCodeSchema = z.object({});
+
+/**
+ * 봇으로 보낸 프로필을 담을 모임. `null` 이면 전체공개다.
+ *
+ * 웹에서 보고 있는 채널과 별개의 값이다 — 카카오톡에서 넘길 때는 웹을 보고 있지
+ * 않으므로 담을 곳이 화면을 따라 움직이면 안 된다. 서버는 여기 들어온 모임에
+ * 실제로 속해 있는지 다시 확인한다.
+ */
+export const telegramUploadGroupSchema = z.object({
+  groupId: z.uuid().nullable(),
+});

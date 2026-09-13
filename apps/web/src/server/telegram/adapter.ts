@@ -41,7 +41,7 @@ import {
   touchTelegramConnection,
   type TelegramIdentity,
 } from "../auth/telegram";
-import { readMyGroups, setActiveGroup } from "../auth/group-invite";
+import { assertGroupAdmin, readMyGroups } from "../auth/group-invite";
 import { env } from "../env";
 import * as imports from "../repo/imports";
 import * as conversations from "../repo/telegram";
@@ -248,8 +248,9 @@ async function handleCommand(
      * 봇은 눌러서 고르는 버튼(callback)을 다루지 않으므로 번호로 고른다.
      * 1번은 언제나 전체공개다 — 소속 없는 방도 하나의 방으로 센다.
      *
-     * 바꾸는 값은 `users.active_group_id` 이고 웹에서 보고 있는 방과 같은 값이다.
-     * 그래서 봇에서 옮기면 웹 화면도 함께 옮겨 간다(0036).
+     * 바꾸는 값은 연결 설정의 `upload_group_id` 다. 웹의 「텔레그램 연결」 패널이
+     * 같은 값을 고치므로 양쪽이 언제나 같은 방을 가리킨다. 웹에서 보고 있는
+     * 채널과는 별개다 — 다른 모임을 들여다봐도 담기는 곳은 움직이지 않는다(0039).
      */
     case "/room": {
       // owner 커넥션이다 — 모임 소속은 신원에 가까워 인증 레이어만 다룬다.
@@ -268,7 +269,12 @@ async function handleCommand(
       }
 
       const picked = rooms[choice.index]!;
-      await setActiveGroup(identity.userId, picked.id);
+      // 소속 확인은 정책(WITH CHECK)과 여기 둘 다에서 한다. 목록에서 골랐더라도
+      // 그 사이 모임에서 나갔을 수 있다.
+      if (picked.id) await assertGroupAdmin(identity.userId, picked.id);
+      await withRls(ctx, (sql) =>
+        conversations.setUploadGroupForUser(sql, identity.userId, picked.id),
+      );
       await sendMessage(identity.telegramChatId, messages.roomChanged(picked.name));
       return;
     }

@@ -8,6 +8,7 @@
  *   * 연결 코드는 한 번만 쓰이고 만료된다.
  *   * 사진 여러 장이 하나의 ImportSession 에 순서대로 묶인다.
  *   * 모임 없는 주선자도 봇으로 Import 를 만든다(그 결과는 전체공개).
+ *   * 봇이 담는 모임은 연결 설정에 붙어 있고 웹 채널을 따라 움직이지 않는다.
  *   * 봇 전용 테이블에 런타임 롤이 접근하지 못한다.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -26,6 +27,7 @@ import {
   findActiveConversation,
   findConnectionForUser,
   findConversationByImportSession,
+  setUploadGroupForUser,
   updateConversation,
 } from "../apps/web/src/server/repo/telegram";
 import {
@@ -260,6 +262,69 @@ describe("계정 연결", () => {
         telegramChatId: TG_ADMIN,
       }),
     ).rejects.toThrow(/다른 주선자/);
+  });
+});
+
+describe("담을 모임", () => {
+  /**
+   * 담기는 곳은 `telegram_connections.upload_group_id` 다(0039). 웹에서 보고 있는
+   * 채널(`users.active_group_id`)과 별개라는 것이 이 블록이 지키는 성질이다 —
+   * 카카오톡에서 넘길 때는 웹 화면을 보고 있지 않다.
+   */
+  it("웹에서 보는 채널을 바꿔도 담을 곳은 움직이지 않는다", async () => {
+    await withRls(admin, (sql) => setUploadGroupForUser(sql, adminId, groupId));
+    await withOwner((sql) =>
+      sql.query(`UPDATE users SET active_group_id = NULL WHERE id = $1`, [adminId]),
+    );
+    expect(await findTelegramIdentity(TG_ADMIN)).toMatchObject({ groupId });
+  });
+
+  it("바꾸면 다음 사진부터 그 모임으로 들어간다", async () => {
+    await withRls(admin, (sql) => setUploadGroupForUser(sql, adminId, null));
+    expect(await findTelegramIdentity(TG_ADMIN)).toMatchObject({ groupId: null });
+
+    await withRls(admin, (sql) => setUploadGroupForUser(sql, adminId, groupId));
+    expect(await findTelegramIdentity(TG_ADMIN)).toMatchObject({ groupId });
+  });
+
+  it("속하지 않은 모임은 정책이 막는다", async () => {
+    const foreign = await withOwner(async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `INSERT INTO groups (name) VALUES ($1) RETURNING id`,
+        [`${TAG}-foreign`],
+      );
+      return r.rows[0]!.id;
+    });
+    await expect(
+      withRls(admin, (sql) => setUploadGroupForUser(sql, adminId, foreign)),
+    ).rejects.toThrow(/row-level security/i);
+    // 실패했으면 이전 값이 그대로여야 한다 — 조용히 전체공개로 떨어지면 안 된다.
+    expect(await findTelegramIdentity(TG_ADMIN)).toMatchObject({ groupId });
+  });
+
+  it("모임에서 나가면 전체공개로 떨어진다", async () => {
+    await withOwner((sql) =>
+      sql.query(`DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2`, [
+        groupId,
+        adminId,
+      ]),
+    );
+    const connection = await withOwner(async (sql) => {
+      const r = await sql.query<{ upload_group_id: string | null }>(
+        `SELECT upload_group_id FROM telegram_connections WHERE user_id = $1`,
+        [adminId],
+      );
+      return r.rows[0];
+    });
+    expect(connection?.upload_group_id).toBeNull();
+
+    // 뒤 테스트는 이 주선자가 모임에 속해 있다고 본다. 되돌려 놓는다.
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, true)`,
+        [groupId, adminId],
+      ),
+    );
   });
 });
 

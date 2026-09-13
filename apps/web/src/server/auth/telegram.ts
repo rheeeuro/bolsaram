@@ -74,7 +74,7 @@ export type TelegramIdentity = {
   telegramUserId: number;
   telegramChatId: number;
   /**
-   * 이 주선자가 Import 를 넣을 모임 — 웹에서 보고 있는 채널과 같은 값이다.
+   * 이 주선자가 Import 를 넣을 모임 — 연결 설정의 `upload_group_id` 다(0039).
    * null 이면 전체공개로 들어간다(웹 업로드와 같다).
    */
   groupId: string | null;
@@ -123,23 +123,37 @@ export async function consumeTelegramLinkCode(input: {
       throw new DomainError("CONFLICT", "이 텔레그램 계정은 다른 주선자에게 연결되어 있습니다.");
     }
 
-    await sql.query(
-      `INSERT INTO telegram_connections (user_id, telegram_user_id, telegram_chat_id)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id) DO UPDATE
-         SET telegram_user_id = EXCLUDED.telegram_user_id,
-             telegram_chat_id = EXCLUDED.telegram_chat_id,
-             linked_at = now()`,
-      [row.user_id, input.telegramUserId, input.telegramChatId],
-    );
-
-    // 연결 시점에 보고 있는 채널. 소속이 아닌 값이면 전체공개로 떨어뜨린다 —
-    // 소속 판정은 group_admins 가 하고 active_group_id 는 그중 어디인지만 말한다(0036).
+    // 담을 곳의 첫 값은 연결 시점에 보고 있는 채널로 둔다 — 방금 그 방에서 코드를
+    // 받아 온 참이다. 이후로는 연결 설정(또는 봇의 `/room`)이 따로 정한다(0039).
+    // 소속이 아닌 값이면 전체공개로 떨어뜨린다 — 소속 판정은 group_admins 가 하고
+    // active_group_id 는 그중 어디를 보고 있는지만 말한다(0036).
     const group = await sql.query<{ group_id: string; name: string }>(
       `SELECT ga.group_id, g.name FROM group_admins ga
          JOIN users u ON u.id = ga.user_id AND u.active_group_id = ga.group_id
          JOIN groups g ON g.id = ga.group_id
         WHERE ga.user_id = $1`,
+      [row.user_id],
+    );
+    const uploadGroupId = group.rows[0]?.group_id ?? null;
+
+    // 다시 연결하는 경우 담을 곳은 건드리지 않는다 — 봇에서 정해 둔 방이 연결을
+    // 새로 맺었다는 이유로 조용히 바뀌면 안 된다.
+    await sql.query(
+      `INSERT INTO telegram_connections
+         (user_id, telegram_user_id, telegram_chat_id, upload_group_id)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) DO UPDATE
+         SET telegram_user_id = EXCLUDED.telegram_user_id,
+             telegram_chat_id = EXCLUDED.telegram_chat_id,
+             linked_at = now()`,
+      [row.user_id, input.telegramUserId, input.telegramChatId, uploadGroupId],
+    );
+
+    const linked = await sql.query<{ group_id: string | null; name: string | null }>(
+      `SELECT c.upload_group_id AS group_id, g.name
+         FROM telegram_connections c
+         LEFT JOIN groups g ON g.id = c.upload_group_id
+        WHERE c.user_id = $1`,
       [row.user_id],
     );
 
@@ -148,8 +162,8 @@ export async function consumeTelegramLinkCode(input: {
       role: row.role,
       telegramUserId: input.telegramUserId,
       telegramChatId: input.telegramChatId,
-      groupId: group.rows[0]?.group_id ?? null,
-      groupName: group.rows[0]?.name ?? null,
+      groupId: linked.rows[0]?.group_id ?? null,
+      groupName: linked.rows[0]?.name ?? null,
     };
   });
 }
@@ -169,14 +183,15 @@ export async function findTelegramIdentity(
       group_id: string | null;
       group_name: string | null;
     }>(
-      // 봇은 웹에서 보고 있는 채널과 같은 모임에 넣는다. 매 요청에 다시 읽으므로
-      // 웹에서 채널을 바꾸면 다음 사진부터 그 모임으로 들어간다.
+      // 담을 곳은 연결 설정에 붙어 있다(0039) — 웹에서 다른 채널을 보고 있어도
+      // 움직이지 않는다. 매 요청에 다시 읽으므로 설정을 바꾸면 다음 사진부터 그
+      // 모임으로 들어가고, 그 사이 모임에서 나갔으면 전체공개로 떨어진다.
       `SELECT c.user_id, u.role, c.telegram_chat_id,
               g.id AS group_id, g.name AS group_name
          FROM telegram_connections c
          JOIN users u ON u.id = c.user_id
          LEFT JOIN group_admins ga ON ga.user_id = c.user_id
-                                  AND ga.group_id = u.active_group_id
+                                  AND ga.group_id = c.upload_group_id
          LEFT JOIN groups g ON g.id = ga.group_id
         WHERE c.telegram_user_id = $1`,
       [telegramUserId],

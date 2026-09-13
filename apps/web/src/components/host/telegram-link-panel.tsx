@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { CopyField } from "@/components/ui/copy-field";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { apiDelete, apiPost } from "@/lib/api-client";
+import { Field } from "@/components/ui/field";
+import { GroupPicker, PUBLIC_GROUP_LABEL, type GroupChoice } from "@/components/host/group-picker";
+import { apiDelete, apiPatch, apiPost } from "@/lib/api-client";
 
 type Issued = { code: string; expiresAt: string; deepLink: string | null };
 
@@ -14,20 +16,46 @@ type Issued = { code: string; expiresAt: string; deepLink: string | null };
  *
  * 봇은 검색으로 누구나 찾을 수 있으므로 연결된 주선자만 Import 할 수 있다.
  * 발급된 코드는 **이 화면에서 한 번만** 보인다 — 서버는 해시만 저장한다.
+ *
+ * **담을 모임도 여기서 정한다.** 웹에서 보고 있는 채널과 별개의 값이라(0039),
+ * 다른 모임을 들여다보는 동안 봇으로 사진을 보내도 담기는 곳이 움직이지 않는다.
+ * 봇의 `/room` 이 같은 값을 바꾸므로 양쪽이 언제나 같은 방을 가리킨다.
  */
 export function TelegramLinkPanel({
   enabled,
   connected,
   lastSeenAt,
+  groups,
+  uploadGroupId,
 }: {
   enabled: boolean;
   connected: boolean;
   lastSeenAt: string | null;
+  groups: GroupChoice[];
+  uploadGroupId: string | null;
 }) {
   const [issued, setIssued] = useState<Issued | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [linked, setLinked] = useState(connected);
+  const [uploadGroup, setUploadGroup] = useState<string | null>(uploadGroupId);
+
+  const uploadGroupName = groups.find((g) => g.id === uploadGroup)?.name ?? PUBLIC_GROUP_LABEL;
+
+  async function changeUploadGroup(groupId: string | null) {
+    const previous = uploadGroup;
+    // 먼저 고른 대로 보여주고, 실패하면 되돌린다 — 알약 하나 누르는 데
+    // 대기 표시가 끼면 고르는 흐름이 끊긴다.
+    setUploadGroup(groupId);
+    setBusy(true);
+    setError(null);
+    const result = await apiPatch("/api/admin/telegram", { groupId });
+    if (!result.ok) {
+      setUploadGroup(previous);
+      setError(result.message);
+    }
+    setBusy(false);
+  }
 
   async function issue() {
     setBusy(true);
@@ -77,6 +105,25 @@ export function TelegramLinkPanel({
             봇에게 프로필 사진을 보내고 이어서 프로필 글을 보내면 여기 Inbox 에 올라옵니다.
             글을 받는 즉시 분석하고, 등록은 검토 후에만 이루어집니다.
           </p>
+
+          <div className="pt-1">
+            <Field
+              label="업로드할 모임"
+              hint={`봇으로 보낸 프로필은 ${uploadGroupName}에 담깁니다`}
+            >
+              <GroupPicker
+                groups={groups}
+                value={uploadGroup}
+                disabled={busy}
+                onChange={(groupId) => void changeUploadGroup(groupId)}
+              />
+            </Field>
+            <p className="mt-1.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+              화면 위쪽에서 보고 있는 모임을 바꿔도 여기는 그대로입니다. 봇 대화창에서{" "}
+              <code>/room</code> 으로도 바꿀 수 있습니다.
+            </p>
+          </div>
+
           <ConfirmButton
             variant="ghost"
             label="연결 해제"

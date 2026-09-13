@@ -141,12 +141,14 @@ export async function expireStaleConversations(sql: Sql): Promise<number> {
 
 // ── 계정 연결 (관리자 화면용) ─────────────────────────────────
 // webhook 의 신원 확인은 auth/telegram.ts 가 owner 커넥션으로 한다.
-// 여기 있는 것은 주선자가 자기 연결 상태를 보고 끊는 경로뿐이다.
+// 여기 있는 것은 주선자가 자기 연결 상태를 보고, 담을 모임을 바꾸고, 끊는 경로다.
 
 export type TelegramConnectionRecord = {
   telegramUserId: number;
   linkedAt: Date;
   lastSeenAt: Date | null;
+  /** 봇으로 보낸 프로필을 담을 모임. null 이면 전체공개다(0039). */
+  uploadGroupId: string | null;
 };
 
 export async function findConnectionForUser(
@@ -157,8 +159,9 @@ export async function findConnectionForUser(
     telegram_user_id: number;
     linked_at: Date;
     last_seen_at: Date | null;
+    upload_group_id: string | null;
   }>(
-    `SELECT telegram_user_id, linked_at, last_seen_at
+    `SELECT telegram_user_id, linked_at, last_seen_at, upload_group_id
        FROM telegram_connections WHERE user_id = $1`,
     [userId],
   );
@@ -168,8 +171,28 @@ export async function findConnectionForUser(
         telegramUserId: Number(row.telegram_user_id),
         linkedAt: row.linked_at,
         lastSeenAt: row.last_seen_at,
+        uploadGroupId: row.upload_group_id,
       }
     : null;
+}
+
+/**
+ * 봇이 담을 모임을 바꾼다. 웹 설정 화면과 봇의 `/room` 이 같은 함수를 쓴다.
+ *
+ * 소속 확인은 여기서 하지 않는다 — 정책(`telegram_connections_own` 의 WITH CHECK)이
+ * 속하지 않은 모임을 거부하고, 호출부도 소속을 한 번 더 확인한다. 연결이 없으면
+ * 바꿀 것도 없으므로 false 를 돌려준다.
+ */
+export async function setUploadGroupForUser(
+  sql: Sql,
+  userId: string,
+  groupId: string | null,
+): Promise<boolean> {
+  const result = await sql.query(
+    `UPDATE telegram_connections SET upload_group_id = $2 WHERE user_id = $1`,
+    [userId, groupId],
+  );
+  return (result.rowCount ?? 0) > 0;
 }
 
 /** 연결 해제. 진행 중이던 대화도 함께 닫는다 — 끊었는데 대화가 살아 있으면 안 된다. */

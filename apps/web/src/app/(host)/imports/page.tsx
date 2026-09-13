@@ -37,6 +37,8 @@ export default async function ImportInboxPage() {
             enabled={isTelegramEnabled()}
             connected={connection != null}
             lastSeenAt={connection?.lastSeenAt?.toISOString() ?? null}
+            groups={viewer.groups}
+            uploadGroupId={connection?.uploadGroupId ?? null}
           />
         </div>
 

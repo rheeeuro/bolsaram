@@ -61,6 +61,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0036_multi_group_admins.sql`      | 주선자 다중 소속 + 보고 있는 모임(`users.active_group_id`)                              |
 | `0037_group_invite_consume_pair.sql` | `group_invite_codes_consume_pair` 완화 — 코드를 쓴 주선자를 삭제할 수 있게             |
 | `0038_admin_transition_scope.sql`  | 신청 전이를 담당별로 — 수락·거절은 받은 쪽, 취소는 신청자 쪽. 거절·숨김 판정 2인자 형태 |
+| `0039_telegram_upload_group.sql`   | 봇이 담을 모임을 연결 설정에 둔다(`telegram_connections.upload_group_id`)               |
 
 ## 테이블
 
@@ -79,7 +80,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
 | `notifications`                                | 알림 아웃박스. 트리거가 만들고 디스패처가 보낸다   | 받는 사람이 **읽기만**              |
-| `telegram_connections`                         | 텔레그램 계정 ↔ 주선자 연결                        | 관리자만                            |
+| `telegram_connections`                         | 텔레그램 계정 ↔ 주선자 연결. `upload_group_id` 는 봇이 담을 모임 | 본인 것만            |
 | `telegram_import_sessions`                     | 봇 대화 상태 (ImportSession 과 1:1)                | 관리자만                            |
 | `sessions`                                     | 세션                                               | **권한 없음** (owner 커넥션 전용)   |
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
@@ -109,6 +110,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_link_codes_one_open` (부분 유니크)        | 주선자당 살아 있는 연결 코드 두 개            |
 | `telegram_webhook_events.update_id` PK              | 같은 webhook update 두 번 처리                |
 | `telegram_connections` 양방향 UNIQUE                | 계정 하나에 텔레그램 두 개 / 그 반대          |
+| `telegram_connections_own` 의 WITH CHECK            | 속하지 않은 모임을 봇 업로드 대상으로 두기    |
 | `group_admins_one_owner` (부분 유니크)              | 모임당 OWNER 두 명                            |
 | `users.active_group_id` 의 컬럼 UPDATE 권한 회수    | 런타임 롤이 보고 있는 모임을 바꾸는 것        |
 | `notifications_dedupe_idx` (부분 유니크)            | 같은 사건으로 같은 사람에게 두 번 알림        |
@@ -137,6 +139,8 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 
 `group_admins_clear_active_group` 트리거가 모임에서 나간 주선자의 `users.active_group_id`
 를 비운다. 소속이 끊겼는데 그 모임을 보고 있는 상태를 남기지 않는다.
+`group_admins_clear_telegram_upload_group` 이 `telegram_connections.upload_group_id` 에
+같은 일을 한다 — 나간 모임으로 봇 업로드가 계속 향하지 않게 한다.
 
 ## RLS 요약
 
@@ -157,6 +161,9 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 통과시킨다. `users.active_group_id` 는 그중 지금 화면이 보여줄 하나를 가리킬 뿐이며
 **정책은 이 값을 보지 않는다.** 그래서 그 값이 무엇이든 볼 수 있는 범위는 달라지지 않고,
 런타임 롤은 컬럼 UPDATE 권한이 없어 바꾸지도 못한다.
+
+`telegram_connections.upload_group_id` 도 권한이 아니라 목적지다. 다만 이 값은 런타임 롤이
+직접 바꾸므로 정책의 WITH CHECK 가 속한 모임인지 확인한다.
 
 | 함수                                   | 판정                                                |
 | -------------------------------------- | --------------------------------------------------- |

@@ -198,7 +198,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/active`                | PUT                 | 주선자            | 보고 있는 모임 전환 (`null` = 전체공개) |
 | `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
 | `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급           |
-| `/api/admin/telegram`                     | GET / POST / DELETE | 주선자            | 봇 연결 상태 / 연결 코드 발급 / 해제 |
+| `/api/admin/telegram`                     | GET / POST / PATCH / DELETE | 주선자    | 봇 연결 상태 / 연결 코드 발급 / 담을 모임 변경 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |
 | `/api/uploads`                            | PUT                 | 주선자            | signed 토큰으로 직접 업로드          |
@@ -247,6 +247,10 @@ webhook
 
 owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세션 쿠키가 없어 RLS 컨텍스트를
 만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 주선자 요청과 완전히 같다.
+
+**담기는 모임은 연결 설정에 붙어 있다**(`telegram_connections.upload_group_id`). 화면 위쪽에서
+보고 있는 채널과 별개의 값이며, 「가져오기」의 텔레그램 연결 패널과 봇의 `/room` 이 같은 값을
+바꾼다. 카카오톡에서 넘길 때는 웹을 보고 있지 않으므로 담을 곳이 화면을 따라 움직이지 않는다.
 
 ### 알림
 
