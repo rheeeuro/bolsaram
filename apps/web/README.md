@@ -143,6 +143,8 @@ server/
 │   ├── client.ts             Bot API 호출·파일 다운로드·webhook 서명 확인
 │   ├── adapter.ts            Update → 신원 확인 → 의도 판정 → ImportSession
 │   └── messages.ts           봇 응답 문구
+├── chat/
+│   └── broadcast.ts          채팅 변화 구독 (LISTEN 커넥션 하나 → 열린 SSE 연결들)
 ├── notify/                   알림 아웃박스 → 텔레그램 발송
 │   ├── outbox.ts             미발송 알림 선점·기록 (owner)
 │   └── dispatch.ts           발송 루프 + 기동 시 주기 스윕
@@ -203,7 +205,8 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/[id]/messages`         | GET / POST          | 그 모임 주선자    | 채팅 읽기(`before`·`after`) / 쓰기   |
 | `/api/admin/groups/[id]/messages/[messageId]` | DELETE          | 쓴 사람           | 내 메시지 지우기 (본문만 사라진다)   |
 | `/api/admin/groups/[id]/chat`             | GET / PATCH         | 그 모임 주선자    | 읽은 위치·텔레그램 알림 설정         |
-| `/api/admin/chat`                         | GET                 | 주선자            | 모임별 안 읽은 채팅 수 (상단 배지)   |
+| `/api/admin/chat`                         | GET                 | 주선자            | 모임별 안 읽은 채팅 수 (첫 값·재동기화) |
+| `/api/admin/chat/stream`                  | GET (SSE)           | 주선자            | 속한 모든 방의 새 글·지움을 밀어준다 |
 | `/api/admin/telegram`                     | GET / POST / PATCH / DELETE | 주선자    | 봇 연결 상태 / 연결 코드 발급 / 담을 모임 변경 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |

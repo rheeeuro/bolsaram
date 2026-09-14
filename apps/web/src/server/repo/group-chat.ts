@@ -13,6 +13,8 @@ import { DomainError } from "@bolsaram/domain";
 
 export type GroupMessageRecord = {
   id: string;
+  /** 어느 방의 글인가. 스트림은 여러 방의 사건을 한 줄로 보내므로 필요하다. */
+  groupId: string;
   authorUserId: string | null;
   /** 작성자 이름. 계정이 지워졌으면 null 이다. */
   authorName: string | null;
@@ -23,6 +25,7 @@ export type GroupMessageRecord = {
 
 type Row = {
   id: string;
+  group_id: string;
   author_user_id: string | null;
   author_name: string | null;
   body: string;
@@ -30,7 +33,7 @@ type Row = {
   deleted_at: Date | null;
 };
 
-const SELECT_MESSAGE = `SELECT m.id, m.author_user_id, u.display_name AS author_name,
+const SELECT_MESSAGE = `SELECT m.id, m.group_id, m.author_user_id, u.display_name AS author_name,
                                m.body, m.created_at, m.deleted_at
                           FROM group_messages m
                           LEFT JOIN users u ON u.id = m.author_user_id`;
@@ -38,6 +41,7 @@ const SELECT_MESSAGE = `SELECT m.id, m.author_user_id, u.display_name AS author_
 function toRecord(row: Row): GroupMessageRecord {
   return {
     id: row.id,
+    groupId: row.group_id,
     authorUserId: row.author_user_id,
     authorName: row.author_name,
     // 지운 메시지의 본문은 DB 에도 없다. 화면에서 자리만 남긴다.
@@ -51,24 +55,15 @@ function toRecord(row: Row): GroupMessageRecord {
  * 방의 메시지. 항상 오래된 것부터 돌려준다 — 화면이 그 순서로 쌓는다.
  *
  *   before  위로 거슬러 올라갈 때. 그 시각 **직전** 것들을 가져와 뒤집는다.
- *   after   열어 둔 화면의 폴링. 그 시각 **이후** 것들.
  *   (없음)  최근 한 페이지.
+ *
+ * 앞으로 오는 것은 여기서 묻지 않는다 — 스트림이 밀어준다(`listMessagesSince`).
  */
 export async function listMessages(
   sql: Sql,
   groupId: string,
-  query: { before?: string; after?: string; limit: number },
+  query: { before?: string; limit: number },
 ): Promise<GroupMessageRecord[]> {
-  if (query.after) {
-    const result = await sql.query<Row>(
-      `${SELECT_MESSAGE}
-        WHERE m.group_id = $1 AND m.created_at > $2
-        ORDER BY m.created_at LIMIT $3`,
-      [groupId, query.after, query.limit],
-    );
-    return result.rows.map(toRecord);
-  }
-
   const result = await sql.query<Row>(
     `${SELECT_MESSAGE}
       WHERE m.group_id = $1 AND ($2::timestamptz IS NULL OR m.created_at < $2)
@@ -113,6 +108,39 @@ export async function deleteMessage(sql: Sql, groupId: string, messageId: string
   if ((result.rowCount ?? 0) === 0) {
     throw new DomainError("NOT_FOUND", "이미 지웠거나 내가 쓴 메시지가 아닙니다.");
   }
+}
+
+/**
+ * 메시지 하나. 볼 수 없으면 `null` 이다 — RLS 가 판정한다.
+ *
+ * 스트림이 쓴다. DB 가 알린 사건에는 권한이 없으므로(0043) **보내기 직전에 이 조회로
+ * 판정을 받는다.** 속하지 않은 방의 사건은 여기서 조용히 빈 결과가 된다.
+ */
+export async function readMessage(
+  sql: Sql,
+  messageId: string,
+): Promise<GroupMessageRecord | null> {
+  const result = await sql.query<Row>(`${SELECT_MESSAGE} WHERE m.id = $1`, [messageId]);
+  const row = result.rows[0];
+  return row ? toRecord(row) : null;
+}
+
+/**
+ * 내가 볼 수 있는 **모든 방**에서 그 시각 이후의 글. 스트림이 끊겼다 붙을 때 놓친
+ * 구간을 메운다(`Last-Event-ID`).
+ *
+ * 모임을 지정하지 않는다 — 어느 방이 보이는지는 RLS 가 `group_admins` 로 정한다.
+ */
+export async function listMessagesSince(
+  sql: Sql,
+  since: string,
+  limit: number,
+): Promise<GroupMessageRecord[]> {
+  const result = await sql.query<Row>(
+    `${SELECT_MESSAGE} WHERE m.created_at > $1 ORDER BY m.created_at LIMIT $2`,
+    [since, limit],
+  );
+  return result.rows.map(toRecord);
 }
 
 export type GroupChatPrefsRecord = {

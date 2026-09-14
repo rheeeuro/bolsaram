@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { BRAND } from "@bolsaram/ui-tokens";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GroupSwitcher, type GroupChoice } from "@/components/host/group-switcher";
+import { useChatStream } from "@/components/host/chat-stream";
 
 /**
  * 주선자 네비게이션.
@@ -21,6 +21,7 @@ import { GroupSwitcher, type GroupChoice } from "@/components/host/group-switche
  *
  * 「채팅」 옆 숫자는 **보고 있는 모임**의 안 읽은 글이다. 다른 모임에 안 읽은 것이
  * 있으면 전환기에 점이 붙는다 — 방을 옮기지 않아도 알아채라는 뜻이다.
+ * 두 값 모두 SSE 연결에서 온다.
  */
 
 type NavLink = { href: string; label: string; exact?: boolean };
@@ -35,59 +36,19 @@ const LINKS: NavLink[] = [
   { href: "/group", label: "모임" },
 ];
 
-/** 배지 갱신 간격. 방 안에서는 채팅 화면이 초 단위로 따라가므로 여기는 느긋해도 된다. */
-const UNREAD_POLL_MS = 20_000;
-
-export type UnreadMap = Record<string, number>;
-
-/**
- * 안 읽은 개수를 주기적으로 다시 읽는다. 화면이 덮여 있으면 묻지 않는다.
- * 첫 값은 서버 렌더에서 온 것이라 화면이 뜨자마자 배지가 맞다.
- */
-function useUnread(initial: UnreadMap): UnreadMap {
-  const [unread, setUnread] = useState(initial);
-
-  useEffect(() => {
-    let stopped = false;
-
-    async function poll() {
-      if (document.hidden) return;
-      const result = await apiGet<{ groups: { groupId: string; unread: number }[] }>(
-        "/api/admin/chat",
-      );
-      if (stopped || !result.ok) return;
-      setUnread(Object.fromEntries(result.data.groups.map((g) => [g.groupId, g.unread])));
-    }
-
-    const timer = setInterval(() => void poll(), UNREAD_POLL_MS);
-    const onVisible = () => {
-      if (!document.hidden) void poll();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
-
-  return unread;
-}
-
 export function HostNav({
   displayName,
   groups,
   activeGroupId,
-  initialUnread,
 }: {
   displayName: string | null;
   groups: GroupChoice[];
   activeGroupId: string | null;
-  initialUnread: UnreadMap;
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const unread = useUnread(initialUnread);
+  // 배지는 SSE 가 밀어주는 값이다(`ChatStreamProvider`). 여기서 따로 묻지 않는다.
+  const { unread } = useChatStream();
   const hereUnread = activeGroupId ? (unread[activeGroupId] ?? 0) : 0;
   const elsewhereUnread = Object.entries(unread).some(
     ([groupId, count]) => groupId !== activeGroupId && count > 0,

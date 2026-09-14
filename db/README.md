@@ -65,6 +65,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0040_group_chat.sql`              | 모임 채팅방(주선자 전용): `group_messages` · `group_chat_prefs` + 새 글 알림             |
 | `0041_group_message_author_cleared.sql` | 계정 삭제 시 메시지의 작성자만 비우도록 가드 트리거 완화                            |
 | `0042_group_chat_millisecond_cursors.sql` | 채팅 시각을 `timestamptz(3)` 로 — 화면이 들고 있는 ISO 커서와 정밀도를 맞춘다     |
+| `0043_group_chat_notify.sql`       | 채팅 변화를 `pg_notify` 로 알린다 — 화면에 밀어주는 SSE 의 뿌리                          |
 
 ## 테이블
 
@@ -143,6 +144,11 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 `profile_hides_block_active_request` 트리거가 그 반대 방향을 막는다 — 활성 신청이 있는
 상대는 숨기지 못한다. 두 트리거가 함께 있어야 「숨김 + 활성 신청」이 어느 순서로도
 만들어지지 않는다. 그 조합은 회원이 스스로 되돌릴 수 없는 상태다.
+
+`group_messages_broadcast_created` · `group_messages_broadcast_deleted` 트리거가 채널
+`bolsaram_group_chat` 으로 `pg_notify` 한다. **payload 에 본문이 없다** — 이 채널은
+권한 판정을 거치지 않고 모든 방의 사건이 지나가므로, 「어느 방에서 무엇이 바뀌었다」만
+싣고 내용은 구독자가 자기 RLS 컨텍스트로 다시 읽는다.
 
 `group_messages_notify` 트리거가 새 글을 알림을 켜 둔 같은 방 주선자에게 넣는다. 쓴 사람은
 빠지고, payload 에는 모임 이름만 싣는다 — 본문은 볼사람에서 읽는다.

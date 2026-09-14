@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GROUP_MESSAGE_MAX_LENGTH } from "@bolsaram/schemas";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { useChatStream, type ChatMessage } from "@/components/host/chat-stream";
 import { Button } from "@/components/ui/button";
 import { FormError, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
@@ -13,23 +14,12 @@ import { cn } from "@/lib/cn";
  * 주선자끼리 쓰는 운영 채널이라 메신저처럼 꾸미지 않는다 — 같은 warm ivory 표면에
  * 말풍선 대신 줄을 쌓는다. 내가 쓴 것만 색을 달리해 눈으로 구분한다.
  *
- * 실시간은 폴링이다. 방 하나에 주선자 몇 명이고 대화가 빽빽하지 않으므로 소켓을
- * 새로 들이지 않는다 — 화면이 보이는 동안에만 묻고(`visibilitychange`), 마지막으로
- * 받은 시각 이후만 가져온다.
+ * 새 글은 **서버가 밀어준다**(`ChatStreamProvider` 의 SSE 연결). 이 화면은 그 연결에
+ * 얹혀 자기 방의 것만 골라 쓰고, 열려 있는 동안 「이 방을 보고 있다」고 알려 둔다 —
+ * 그래야 보고 있는 방의 글이 안 읽음으로 세어지지 않는다.
  */
 
-export type ChatMessage = {
-  id: string;
-  authorUserId: string | null;
-  authorName: string | null;
-  body: string;
-  /** 서버에서 ISO 문자열로 내려온다 — 폴링 커서로 그대로 쓴다. */
-  createdAt: string;
-  deleted: boolean;
-};
-
-/** 폴링 간격. 운영 대화라 초 단위로 다툴 일이 없다. */
-const POLL_MS = 5_000;
+export type { ChatMessage };
 
 export function GroupChat({
   groupId,
@@ -50,6 +40,8 @@ export function GroupChat({
   const [olderDone, setOlderDone] = useState(initialMessages.length === 0);
   const [loadingOlder, setLoadingOlder] = useState(false);
 
+  const { subscribe, setViewing, markRead } = useChatStream();
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   /** 이미 읽음으로 찍은 시각. 같은 값을 두 번 보내지 않는다. */
@@ -57,17 +49,10 @@ export function GroupChat({
 
   const latestAt = messages.length > 0 ? messages[messages.length - 1]!.createdAt : null;
 
-  /** 여기까지 읽었다고 알린다 — 상단 배지가 이 값으로 줄어든다. */
-  const markRead = useCallback(
-    (at: string | null) => {
-      if (!at || markedRef.current === at) return;
-      markedRef.current = at;
-      void apiPatch(`/api/admin/groups/${groupId}/chat`, { readUpTo: at });
-    },
-    [groupId],
-  );
-
-  /** 새 메시지만 덧붙인다. 폴링과 전송이 겹쳐도 id 로 접힌다. */
+  /**
+   * 새 메시지만 덧붙인다. 보낸 직후의 응답과 곧이어 오는 스트림 이벤트가 같은 글을
+   * 가리키므로 id 로 접는다 — 보낸 사람에게는 응답이 먼저 닿아 바로 보인다.
+   */
   const append = useCallback((incoming: ChatMessage[]) => {
     if (incoming.length === 0) return;
     setMessages((prev) => {
@@ -77,38 +62,38 @@ export function GroupChat({
     });
   }, []);
 
-  // 화면이 보이는 동안만 폴링한다. 탭을 덮어 둔 창이 계속 묻지 않게 한다.
+  // 이 방을 보고 있다고 알린다. 나가면 해제한다.
   useEffect(() => {
-    let stopped = false;
+    setViewing(groupId);
+    return () => setViewing(null);
+  }, [groupId, setViewing]);
 
-    async function poll() {
-      if (stopped || document.hidden) return;
-      const cursor = markedRef.current ?? latestAt;
-      const query = cursor ? `?after=${encodeURIComponent(cursor)}` : "";
-      const result = await apiGet<{ messages: ChatMessage[] }>(
-        `/api/admin/groups/${groupId}/messages${query}`,
-      );
-      if (stopped || !result.ok) return;
-      append(result.data.messages);
-    }
-
-    const timer = setInterval(() => void poll(), POLL_MS);
-    const onVisible = () => {
-      if (!document.hidden) void poll();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [groupId, latestAt, append]);
+  // 서버가 밀어주는 글을 받는다. 다른 방의 것은 상단 배지가 쓰고 여기서는 버린다.
+  useEffect(
+    () =>
+      subscribe((event) => {
+        if (event.message.groupId !== groupId) return;
+        if (event.kind === "deleted") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === event.message.id ? { ...m, body: "", deleted: true } : m,
+            ),
+          );
+          return;
+        }
+        append([event.message]);
+      }),
+    [groupId, subscribe, append],
+  );
 
   // 새 메시지가 쌓이면 바닥으로 따라가고 읽음을 찍는다.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
-    markRead(latestAt);
-  }, [latestAt, markRead]);
+    if (latestAt && markedRef.current !== latestAt) {
+      markedRef.current = latestAt;
+      markRead(groupId, latestAt);
+    }
+  }, [groupId, latestAt, markRead]);
 
   async function loadOlder() {
     const oldest = messages[0]?.createdAt;

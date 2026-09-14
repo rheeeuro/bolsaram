@@ -10,9 +10,11 @@
  *   * 알림은 켜 둔 사람에게만 가고, 쓴 사람에게는 가지 않는다.
  *   * 아직 보내지 않은 알림이 있으면 새 글이 와도 하나로 접힌다.
  *   * 계정이 지워져도 대화는 남는다(0041).
+ *   * 새 글과 지움이 `LISTEN/NOTIFY` 로 알려지고, 그 payload 에 본문이 없다(0043).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { closePools, withOwner, withRls, type RlsContext, type Sql } from "@bolsaram/db";
+import { closePools, listen, withOwner, withRls, type RlsContext, type Sql } from "@bolsaram/db";
+import { groupChatNotifySchema } from "@bolsaram/schemas";
 import {
   createMessage,
   deleteMessage,
@@ -256,6 +258,65 @@ describe("안 읽은 개수", () => {
     );
     const after = await withRls(party.peer, (sql) => unreadByGroup(sql, party.peerId));
     expect(after.find((g) => g.groupId === party.groupId)?.unread).toBe(0);
+  });
+});
+
+/**
+ * 실시간 전달의 뿌리 (0043). 이것이 조용히 깨지면 화면이 영영 갱신되지 않는다 —
+ * 폴링을 걷어냈기 때문에 대신 메워 줄 것이 없다.
+ */
+describe("LISTEN/NOTIFY", () => {
+  /** 조건이 참이 될 때까지 짧게 기다린다. NOTIFY 는 커밋 뒤에 도착한다. */
+  async function waitFor(check: () => boolean, timeoutMs = 3_000): Promise<void> {
+    const until = Date.now() + timeoutMs;
+    while (!check()) {
+      if (Date.now() > until) throw new Error("이벤트를 기다리다 시간이 지났습니다.");
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
+  it("새 글과 지움을 알리고, payload 에 본문이 없다", async () => {
+    const payloads: string[] = [];
+    const listener = listen("bolsaram_group_chat", (payload) => payloads.push(payload));
+    try {
+      await listener.ready;
+
+      const secret = `${TAG}-본문은 실리지 않는다`;
+      const written = await withRls(A.owner, (sql) =>
+        createMessage(sql, A.groupId, A.ownerId, secret),
+      );
+      await waitFor(() => payloads.length >= 1);
+
+      const created = groupChatNotifySchema.parse(JSON.parse(payloads[0]!));
+      expect(created.kind).toBe("created");
+      expect(created.groupId).toBe(A.groupId);
+      expect(created.messageId).toBe(written.id);
+      // 이 채널은 권한 판정을 거치지 않는다 — 본문이 흐르면 그 자체로 경계를 넘는다.
+      expect(payloads[0]).not.toContain(secret);
+
+      await withRls(A.owner, (sql) => deleteMessage(sql, A.groupId, written.id));
+      await waitFor(() => payloads.length >= 2);
+      expect(groupChatNotifySchema.parse(JSON.parse(payloads[1]!)).kind).toBe("deleted");
+    } finally {
+      await listener.close();
+    }
+  });
+
+  it("계정 삭제로 작성자만 비워지는 것은 알리지 않는다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `b${Date.now() % 100000}`));
+    await seedMessage(party.groupId, party.peerId, `${TAG}-떠나는 사람`);
+
+    const payloads: string[] = [];
+    const listener = listen("bolsaram_group_chat", (payload) => payloads.push(payload));
+    try {
+      await listener.ready;
+      await withOwner((sql) => sql.query(`DELETE FROM users WHERE id = $1`, [party.peerId]));
+      // 알릴 것이 없는 UPDATE 다. 잠깐 기다려도 아무것도 오지 않아야 한다.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(payloads).toHaveLength(0);
+    } finally {
+      await listener.close();
+    }
   });
 });
 

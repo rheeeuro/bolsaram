@@ -1,8 +1,10 @@
 /**
  * 모임 채팅방의 메시지.
  *
- *   GET   최근 한 페이지 · `before` 로 거슬러 올라가기 · `after` 로 폴링
+ *   GET   최근 한 페이지 · `before` 로 거슬러 올라가기
  *   POST  새 메시지
+ *
+ * 새 글을 받는 것은 스트림(`/api/admin/chat/stream`)이다. 여기로 묻지 않는다.
  *
  * 이 방은 주선자 전용이다. `requireGroupAdmin` 으로 소속을 확인하고, 그와 별개로
  * RLS 가 같은 판정을 다시 한다(`app_is_group_admin`).

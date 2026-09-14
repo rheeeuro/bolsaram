@@ -23,9 +23,10 @@ Postgres 커넥션 풀, RLS 요청 컨텍스트, 마이그레이션·시드·정
 ```
 packages/db/src/
 ├── client.ts       커넥션 풀 2개 + withRls / withOwner / withOwnerTx
+├── listen.ts       LISTEN 전용 커넥션 (앱 롤, 끊기면 스스로 다시 붙는다)
 ├── env.ts          DATABASE_URL · APP_DATABASE_URL 로딩
 ├── cleanup.ts      만료 데이터 정리 로직 (테스트가 이 모듈을 쓴다)
-├── index.ts        client · env 재수출
+├── index.ts        client · env · listen 재수출
 └── cli/
     ├── migrate.ts  번호순 SQL 적용 + 체크섬 검사
     ├── reset.ts    public 스키마 초기화 (로컬 전용)
@@ -36,6 +37,16 @@ packages/db/src/
 ```
 
 ---
+
+## `listen` 이 풀을 쓰지 않는 이유
+
+`LISTEN` 은 **세션에 붙는** 구독이라 커넥션을 풀에 반납하면 사라진다. 그래서 채널 하나에
+커넥션 하나를 붙잡고 산다(프로세스당 하나). 앱 롤로 붙는다 — 이 커넥션은 데이터를 읽지
+않고 채널만 듣는다.
+
+여기로 오는 payload 는 **권한 판정을 거치지 않는다.** 모든 방의 사건이 그대로 지나가므로
+받는 쪽이 자기 RLS 컨텍스트로 다시 읽어야 한다. `ready` 는 첫 구독이 실제로 걸린 시점이고,
+끊기면 지수 백오프로 다시 붙는다.
 
 ## 롤 두 개
 

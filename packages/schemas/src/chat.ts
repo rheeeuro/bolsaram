@@ -22,21 +22,33 @@ export type GroupMessageCreate = z.infer<typeof groupMessageCreateSchema>;
  *
  *   (없음)   최근 한 페이지
  *   before   그 시각보다 이전 — 위로 거슬러 올라간다
- *   after    그 시각보다 이후 — 열어 둔 화면의 폴링
  *
- * 커서를 id 가 아니라 시각으로 두는 이유는 폴링이 「마지막으로 본 시각 이후」를
- * 그대로 묻기 때문이다.
+ * 앞으로 오는 것은 묻지 않는다. 새 글은 스트림이 밀어준다(0043).
+ * 커서가 id 가 아니라 시각인 것은 화면이 시각으로 정렬하기 때문이다.
  */
-export const groupMessageQuerySchema = z
-  .object({
-    before: z.iso.datetime().optional(),
-    after: z.iso.datetime().optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(GROUP_MESSAGE_PAGE_SIZE),
-  })
-  .refine((v) => !(v.before && v.after), {
-    message: "before 와 after 는 함께 쓸 수 없습니다.",
-  });
+export const groupMessageQuerySchema = z.object({
+  before: z.iso.datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(GROUP_MESSAGE_PAGE_SIZE),
+});
 export type GroupMessageQuery = z.infer<typeof groupMessageQuerySchema>;
+
+/**
+ * DB 가 `pg_notify` 로 알리는 채팅 변화 (마이그레이션 0043).
+ *
+ * 이 채널은 **권한 판정을 거치지 않는다** — 듣는 커넥션 하나가 모든 방의 사건을
+ * 받는다. 그래서 본문이 실리지 않고 「어느 방에서 무엇이 바뀌었다」만 온다.
+ * 받는 쪽이 자기 컨텍스트로 다시 읽어야 내용을 알 수 있다.
+ *
+ * DB 가 만든 값이지만 밖에서 들어오는 payload 와 같은 규칙으로 검증한다.
+ */
+export const groupChatNotifySchema = z.object({
+  kind: z.enum(["created", "deleted"]),
+  groupId: z.uuid(),
+  messageId: z.uuid(),
+  /** 놓친 구간을 되짚는 커서. 저장 정밀도와 같은 밀리초다(0042). */
+  at: z.iso.datetime(),
+});
+export type GroupChatNotify = z.infer<typeof groupChatNotifySchema>;
 
 /**
  * 내 방 상태. 보낸 필드만 바꾼다.

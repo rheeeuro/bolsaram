@@ -9,24 +9,32 @@ import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { unreadByGroup } from "@/server/repo/group-chat";
 import { HostNav } from "@/components/host/host-nav";
+import { ChatStreamProvider } from "@/components/host/chat-stream";
 
 export const dynamic = "force-dynamic";
 
 export default async function HostLayout({ children }: { children: React.ReactNode }) {
   const viewer = await requireAdminPage();
 
-  // 채팅 배지의 첫 값. 이후에는 네비가 스스로 주기적으로 갱신한다.
+  // 채팅 배지의 첫 값. 이후에는 SSE 가 밀어준다. 센 시각을 함께 넘겨 화면이 뜨고
+  // 연결되기까지의 틈을 스트림이 메우게 한다.
+  const countedAt = new Date().toISOString();
   const unread = await withRls(rlsContextOf(viewer), (sql) => unreadByGroup(sql, viewer.userId));
 
   return (
     <div className="host-surface min-h-dvh bg-[var(--surface-page)] text-[var(--surface-text)]">
-      <HostNav
-        displayName={viewer.displayName}
-        groups={viewer.groups}
-        activeGroupId={viewer.groupId}
+      <ChatStreamProvider
         initialUnread={Object.fromEntries(unread.map((g) => [g.groupId, g.unread]))}
-      />
-      <div className="mx-auto max-w-6xl px-5 pb-16 pt-7">{children}</div>
+        since={countedAt}
+        viewerId={viewer.userId}
+      >
+        <HostNav
+          displayName={viewer.displayName}
+          groups={viewer.groups}
+          activeGroupId={viewer.groupId}
+        />
+        <div className="mx-auto max-w-6xl px-5 pb-16 pt-7">{children}</div>
+      </ChatStreamProvider>
     </div>
   );
 }
