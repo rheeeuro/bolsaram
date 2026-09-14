@@ -66,6 +66,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0041_group_message_author_cleared.sql` | 계정 삭제 시 메시지의 작성자만 비우도록 가드 트리거 완화                            |
 | `0042_group_chat_millisecond_cursors.sql` | 채팅 시각을 `timestamptz(3)` 로 — 화면이 들고 있는 ISO 커서와 정밀도를 맞춘다     |
 | `0043_group_chat_notify.sql`       | 채팅 변화를 `pg_notify` 로 알린다 — 화면에 밀어주는 SSE 의 뿌리                          |
+| `0044_group_chat_system_messages.sql` | 방에 남는 사건 — 주선자 입·퇴장, 회원 등록, 신청·연결. 사람은 만들지도 지우지도 못한다 |
+| `0045_group_chat_visible_from_join.sql` | 채팅은 **들어온 시점부터** 보인다. 합류 전 대화는 정책이 막는다                     |
 
 ## 테이블
 
@@ -73,7 +75,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | ---------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
 | `groups`                                       | 모임. 이름·설명. 가입과 별개로 만든다              | 소속 주선자 + 소속 회원             |
 | `group_admins`                                 | 모임 ↔ 주선자 (**다대다**, 모임마다 OWNER 한 명)   | 같은 모임 주선자만 조회             |
-| `group_messages`                               | 모임 채팅방의 글. 고칠 수 없고 지우기만 된다       | 같은 모임 주선자 (쓰기는 본인 명의)  |
+| `group_messages`                               | 모임 채팅방의 글과 사건(`system_kind`). 고칠 수 없고 사람의 글만 지워진다 | 같은 모임 주선자 중 **들어온 뒤의 것만** (쓰기는 본인 명의·사람의 글만) |
 | `group_chat_prefs`                             | 주선자별 방 상태 — 읽은 위치·텔레그램 알림 여부    | 본인 것만                           |
 | `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임 | 본인 + 같은 모임 관계자             |
 | `profiles`                                     | 프로필. `public_code` 가 화면의 `#17`, `is_seed` 는 합성 표식 | 공개분 + 본인 + 관리자   |
@@ -121,7 +123,10 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `users.active_group_id` 의 컬럼 UPDATE 권한 회수    | 런타임 롤이 보고 있는 모임을 바꾸는 것        |
 | `notifications_dedupe_idx` (부분 유니크)            | 같은 사건으로 같은 사람에게 두 번 알림        |
 | `notifications_group_pending_idx` (부분 유니크)     | 방 하나에 아직 안 보낸 채팅 알림 두 개 — 줄마다 울리는 것 |
-| `group_messages_update_guard` 트리거                | 남긴 글을 고치는 것 (지우기와 계정 삭제만 통과) |
+| `group_messages_update_guard` 트리거                | 남긴 글을 고치는 것 (지우기와 계정 삭제만 통과), 시스템 메시지를 지우는 것 |
+| `group_messages_write` 의 `system_kind IS NULL`     | 사람이 사건 기록을 손으로 지어내는 것          |
+| `group_messages_read` 의 `app_group_chat_visible_from()` | 합류 전 대화를 뒤늦게 읽는 것 (목록·스트림·배지 모두) |
+| `group_messages_body_sane` (CHECK)                  | 본문 있는 시스템 메시지 · 본문 없는 사람의 글  |
 | `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을
@@ -150,7 +155,24 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 권한 판정을 거치지 않고 모든 방의 사건이 지나가므로, 「어느 방에서 무엇이 바뀌었다」만
 싣고 내용은 구독자가 자기 RLS 컨텍스트로 다시 읽는다.
 
-`group_messages_notify` 트리거가 새 글을 알림을 켜 둔 같은 방 주선자에게 넣는다. 쓴 사람은
+`app_group_chat_visible_from(group)` 이 그 방에서 볼 수 있는 가장 이른 시각을 준다 —
+`group_admins.added_at` 을 밀리초로 내린 값이다(0045). 정밀도를 맞추지 않으면 자기 입장
+기록이 자기 기준보다 이르다고 판정되어 빠진다(`group_messages.created_at` 은 밀리초,
+`added_at` 은 마이크로초다). 목록·스트림·안 읽은 수가 모두 이 테이블을 읽으므로
+애플리케이션이 아니라 **정책 한 곳**에서 자른다.
+
+`group_admins_announce_joined` · `group_admins_announce_left` ·
+`profiles_announce_registered` · `match_requests_announce_created` ·
+`match_requests_announce_introduced` 트리거가 모임의 사건을 그 방의 시스템 메시지로
+남긴다(0044). 전부 `app_post_group_system_message()` 를 지나며, 방이 없는 경우
+(전체공개 · 삭제 중인 모임)는 조용히 넘어간다. **문장이 아니라 사실을 저장한다** —
+본문은 비우고 종류와 `payload`(공개 번호 · 주선자 이름)만 남겨 화면이 문장을 만든다.
+작성자 자리에는 그 사건을 일으킨 **주선자**만 들어간다(`app_group_chat_actor()`) —
+회원이 낸 신청은 비어 있다. 주선자 방에 회원 계정을 작성자로 박으면 이름 조인으로
+회원 이름이 새어 나간다.
+
+`group_messages_notify` 트리거가 새 글을 알림을 켜 둔 같은 방 주선자에게 넣는다.
+**시스템 메시지는 빼고** 보낸다(0044) — 신청·연결은 0017 계열이 이미 알린다. 쓴 사람은
 빠지고, payload 에는 모임 이름만 싣는다 — 본문은 볼사람에서 읽는다.
 
 `group_messages_update_guard` 트리거가 이 방의 글을 **지우는 것 외의 수정**에서 지킨다.

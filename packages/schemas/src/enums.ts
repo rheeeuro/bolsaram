@@ -303,3 +303,19 @@ export const MATCH_INTENT_STATUS_LABELS: Record<MatchIntentStatus, string> = {
   APPROVED: "전달됨",
   DECLINED: "반려됨",
 };
+
+/**
+ * 모임 채팅방의 시스템 메시지 (마이그레이션 0044).
+ *
+ * 사람이 만들 수 없다 — DB 트리거만 남긴다. 본문 대신 종류와 payload 를 저장하고
+ * 화면이 문장을 만든다. 회원은 언제나 공개 번호로만 등장한다.
+ */
+export const GROUP_MESSAGE_SYSTEM_KINDS = [
+  "ADMIN_JOINED",
+  "ADMIN_LEFT",
+  "PROFILE_REGISTERED",
+  "MATCH_REQUESTED",
+  /** 이 제품에서 「수락」은 곧 연결이다(0021 이후 ACCEPTED 는 쓰지 않는다). */
+  "MATCH_INTRODUCED",
+] as const;
+export type GroupMessageSystemKind = (typeof GROUP_MESSAGE_SYSTEM_KINDS)[number];

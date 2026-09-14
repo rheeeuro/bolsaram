@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { GroupMessagePayload, GroupMessageSystemKind } from "@bolsaram/schemas";
 import { apiGet, apiPatch } from "@/lib/api-client";
 
 /**
@@ -35,6 +36,9 @@ export type ChatMessage = {
   /** 서버에서 ISO 문자열로 내려온다 — 재연결 커서로 그대로 쓴다. */
   createdAt: string;
   deleted: boolean;
+  /** 사람이 쓴 글이면 null. 값이 있으면 DB 가 남긴 사건이다(0044). */
+  systemKind: GroupMessageSystemKind | null;
+  payload: GroupMessagePayload;
 };
 
 export type ChatEvent = { kind: "message" | "deleted"; message: ChatMessage };

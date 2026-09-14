@@ -11,6 +11,8 @@
  *   * 아직 보내지 않은 알림이 있으면 새 글이 와도 하나로 접힌다.
  *   * 계정이 지워져도 대화는 남는다(0041).
  *   * 새 글과 지움이 `LISTEN/NOTIFY` 로 알려지고, 그 payload 에 본문이 없다(0043).
+ *   * 모임의 사건이 시스템 메시지로 남고, 사람은 그것을 만들지도 지우지도 못한다(0044).
+ *   * 나중에 합류한 주선자에게는 **들어오기 전 대화가 보이지 않는다**(0045).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, listen, withOwner, withRls, type RlsContext, type Sql } from "@bolsaram/db";
@@ -19,6 +21,7 @@ import {
   createMessage,
   deleteMessage,
   listMessages,
+  readMessage,
   unreadByGroup,
   updatePrefs,
 } from "../apps/web/src/server/repo/group-chat";
@@ -240,24 +243,29 @@ describe("안 읽은 개수", () => {
     expect(after.find((g) => g.groupId === party.groupId)?.unread).toBe(0);
   });
 
+  /** 방을 만들면 시스템 메시지(입장·회원 등록)가 먼저 쌓인다 — 늘어난 만큼을 본다. */
+  async function unreadOf(ctx: RlsContext, userId: string, groupId: string): Promise<number> {
+    const rows = await withRls(ctx, (sql) => unreadByGroup(sql, userId));
+    return rows.find((g) => g.groupId === groupId)?.unread ?? 0;
+  }
+
   it("내가 쓴 것과 읽은 것은 세지 않는다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `u${Date.now() % 100000}`));
+    const base = await unreadOf(party.peer, party.peerId, party.groupId);
 
     await seedMessage(party.groupId, party.ownerId, `${TAG}-1`);
     await seedMessage(party.groupId, party.ownerId, `${TAG}-2`);
+    expect(await unreadOf(party.peer, party.peerId, party.groupId)).toBe(base + 2);
 
-    const before = await withRls(party.peer, (sql) => unreadByGroup(sql, party.peerId));
-    expect(before.find((g) => g.groupId === party.groupId)?.unread).toBe(2);
-
-    // 쓴 사람에게는 처음부터 안 읽은 것이 없다.
-    const author = await withRls(party.owner, (sql) => unreadByGroup(sql, party.ownerId));
-    expect(author.find((g) => g.groupId === party.groupId)?.unread).toBe(0);
+    // 쓴 사람에게는 자기 글이 세어지지 않는다.
+    const authorBefore = await unreadOf(party.owner, party.ownerId, party.groupId);
+    await seedMessage(party.groupId, party.ownerId, `${TAG}-3`);
+    expect(await unreadOf(party.owner, party.ownerId, party.groupId)).toBe(authorBefore);
 
     await withRls(party.peer, (sql) =>
       updatePrefs(sql, party.groupId, party.peerId, { readUpTo: new Date().toISOString() }),
     );
-    const after = await withRls(party.peer, (sql) => unreadByGroup(sql, party.peerId));
-    expect(after.find((g) => g.groupId === party.groupId)?.unread).toBe(0);
+    expect(await unreadOf(party.peer, party.peerId, party.groupId)).toBe(0);
   });
 });
 
@@ -265,6 +273,236 @@ describe("안 읽은 개수", () => {
  * 실시간 전달의 뿌리 (0043). 이것이 조용히 깨지면 화면이 영영 갱신되지 않는다 —
  * 폴링을 걷어냈기 때문에 대신 메워 줄 것이 없다.
  */
+describe("들어온 시점부터 보인다", () => {
+  /** 먼저 있던 주선자 하나로 방을 만들고, 말이 오간 뒤에 새 주선자를 들인다. */
+  async function roomWithHistory(key: string) {
+    const party = await withOwner((sql) => makeParty(sql, key));
+    const before = await withRls(party.owner, (sql) =>
+      createMessage(sql, party.groupId, party.ownerId, `${TAG}-오기 전에 오간 말`),
+    );
+
+    const latecomerId = await withOwner(async (sql) => {
+      const u = await sql.query<{ id: string }>(
+        `INSERT INTO users (role, email, password_hash, display_name)
+         VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+        [`${TAG}-${key}-late@test.local`, `${TAG}-${key}-late`],
+      );
+      const id = u.rows[0]!.id;
+      await sql.query(
+        `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, false)`,
+        [party.groupId, id],
+      );
+      return id;
+    });
+
+    return {
+      ...party,
+      before,
+      latecomerId,
+      latecomer: { userId: latecomerId, role: "ADMIN" } as RlsContext,
+    };
+  }
+
+  it("합류 전 대화는 보이지 않는다", async () => {
+    const room = await roomWithHistory(`l${Date.now() % 100000}`);
+
+    const seen = await withRls(room.latecomer, (sql) =>
+      listMessages(sql, room.groupId, { limit: 100 }),
+    );
+    expect(seen.map((m) => m.id)).not.toContain(room.before.id);
+    // 먼저 있던 사람에게는 그대로 보인다.
+    const owner = await withRls(room.owner, (sql) =>
+      listMessages(sql, room.groupId, { limit: 100 }),
+    );
+    expect(owner.map((m) => m.id)).toContain(room.before.id);
+  });
+
+  it("자기 입장 기록이 첫 줄이다", async () => {
+    const room = await roomWithHistory(`f${Date.now() % 100000}`);
+
+    const seen = await withRls(room.latecomer, (sql) =>
+      listMessages(sql, room.groupId, { limit: 100 }),
+    );
+    expect(seen.length).toBeGreaterThan(0);
+    // 정밀도가 어긋나면 자기 입장 기록이 자기 기준보다 이르다고 판정되어 빠진다(0045).
+    expect(seen[0]!.systemKind).toBe("ADMIN_JOINED");
+    expect(seen[0]!.payload.actorName).toContain("-late");
+  });
+
+  it("합류 뒤의 말은 보인다", async () => {
+    const room = await roomWithHistory(`a${Date.now() % 100000}`);
+    const after = await withRls(room.owner, (sql) =>
+      createMessage(sql, room.groupId, room.ownerId, `${TAG}-온 뒤에 오간 말`),
+    );
+
+    const seen = await withRls(room.latecomer, (sql) =>
+      listMessages(sql, room.groupId, { limit: 100 }),
+    );
+    expect(seen.map((m) => m.id)).toContain(after.id);
+  });
+
+  it("합류 전 것은 안 읽은 수에도 들어가지 않는다", async () => {
+    const room = await roomWithHistory(`u${Date.now() % 100000}`);
+
+    const rows = await withRls(room.latecomer, (sql) => unreadByGroup(sql, room.latecomerId));
+    const unread = rows.find((g) => g.groupId === room.groupId)?.unread ?? 0;
+    const visible = await withRls(room.latecomer, (sql) =>
+      listMessages(sql, room.groupId, { limit: 100 }),
+    );
+    // 볼 수 있는 것만 센다 — 목록과 배지가 같은 기준을 쓴다.
+    expect(unread).toBe(visible.filter((m) => m.authorUserId !== room.latecomerId).length);
+  });
+
+  it("스트림도 같은 기준으로 막힌다", async () => {
+    const room = await roomWithHistory(`s${Date.now() % 100000}`);
+
+    // 스트림은 사건을 받고 이 조회로 판정을 받는다. 합류 전 글은 여기서 사라진다.
+    const hidden = await withRls(room.latecomer, (sql) => readMessage(sql, room.before.id));
+    expect(hidden).toBeNull();
+  });
+});
+
+describe("시스템 메시지", () => {
+  /** 그 방의 시스템 메시지만. 사람의 글은 빼고 본다. */
+  async function systemMessages(ctx: RlsContext, groupId: string) {
+    const all = await withRls(ctx, (sql) => listMessages(sql, groupId, { limit: 100 }));
+    return all.filter((m) => m.systemKind !== null);
+  }
+
+  it("주선자가 들어오고 나간 것이 남는다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `j${Date.now() % 100000}`));
+
+    const joined = (await systemMessages(party.owner, party.groupId)).filter(
+      (m) => m.systemKind === "ADMIN_JOINED",
+    );
+    // 개설자와 동료 둘 다 들어온 기록이 있다.
+    expect(joined).toHaveLength(2);
+    // 누가 들어왔는지 이름이 남는다. 픽스처의 주선자 이름은 `${TAG}-…-owner|peer` 다.
+    expect(joined.every((m) => m.payload.actorName?.includes(TAG))).toBe(true);
+    // 문장은 화면이 만든다 — DB 에는 본문이 없다.
+    expect(joined.every((m) => m.body === "")).toBe(true);
+
+    await withOwner((sql) =>
+      sql.query(`DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2`, [
+        party.groupId,
+        party.peerId,
+      ]),
+    );
+
+    const left = (await systemMessages(party.owner, party.groupId)).filter(
+      (m) => m.systemKind === "ADMIN_LEFT",
+    );
+    expect(left).toHaveLength(1);
+    // 나간 사람은 더 이상 같은 모임이 아니라 이름을 조회할 수 없다 — 그래서 적어 둔다.
+    expect(left[0]!.payload.actorName).toContain(TAG);
+  });
+
+  it("회원 등록은 공개 번호로만 남는다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `r${Date.now() % 100000}`));
+
+    const registered = (await systemMessages(party.owner, party.groupId)).filter(
+      (m) => m.systemKind === "PROFILE_REGISTERED",
+    );
+    expect(registered).toHaveLength(1);
+    expect(registered[0]!.payload.profileCode).toBeGreaterThan(0);
+
+    // 방에 회원 이름이 적히지 않는다. 픽스처의 이름은 `${TAG}-…-이름` 이다.
+    expect(JSON.stringify(registered[0]!.payload)).not.toContain("-이름");
+  });
+
+  it("신청과 연결이 남는다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `x${Date.now() % 100000}`));
+    const pair = await withOwner(async (sql) => {
+      const make = async (key: string) => {
+        const u = await sql.query<{ id: string }>(
+          `INSERT INTO users (role, phone, display_name) VALUES ('MEMBER', $1, $2) RETURNING id`,
+          [`0109${String(Date.now()).slice(-6)}${key}`, `${TAG}-${key}`],
+        );
+        const p = await sql.query<{ id: string }>(
+          `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
+                                 status, visibility, real_name, created_by)
+           VALUES ($1, $2, 'MALE', 1990, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4) RETURNING id`,
+          [party.groupId, u.rows[0]!.id, `${TAG}-${key}-이름`, party.ownerId],
+        );
+        return p.rows[0]!.id;
+      };
+      return { a: await make("s1"), b: await make("s2") };
+    });
+
+    const requestId = await withOwner(async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `INSERT INTO match_requests (requester_profile_id, target_profile_id)
+         VALUES ($1, $2) RETURNING id`,
+        [pair.a, pair.b],
+      );
+      return r.rows[0]!.id;
+    });
+
+    const requested = (await systemMessages(party.owner, party.groupId)).filter(
+      (m) => m.systemKind === "MATCH_REQUESTED",
+    );
+    expect(requested).toHaveLength(1);
+    expect(requested[0]!.payload.requesterCode).toBeGreaterThan(0);
+    expect(requested[0]!.payload.targetCode).toBeGreaterThan(0);
+
+    await withOwner((sql) =>
+      sql.query(`UPDATE match_requests SET status = 'INTRODUCED' WHERE id = $1`, [requestId]),
+    );
+
+    const introduced = (await systemMessages(party.owner, party.groupId)).filter(
+      (m) => m.systemKind === "MATCH_INTRODUCED",
+    );
+    expect(introduced).toHaveLength(1);
+  });
+
+  it("사람이 시스템 메시지를 만들지 못한다", async () => {
+    await expect(
+      withRls(A.owner, (sql) =>
+        sql.query(
+          `INSERT INTO group_messages (group_id, author_user_id, body, system_kind)
+           VALUES ($1, $2, '', 'ADMIN_JOINED')`,
+          [A.groupId, A.ownerId],
+        ),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("시스템 메시지는 지우지 못한다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `d${Date.now() % 100000}`));
+    const system = (await systemMessages(party.owner, party.groupId))[0]!;
+
+    await expect(
+      withRls(party.owner, (sql) => deleteMessage(sql, party.groupId, system.id)),
+    ).rejects.toThrow();
+  });
+
+  it("시스템 메시지는 텔레그램 알림을 만들지 않는다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `t${Date.now() % 100000}`));
+    await withRls(party.peer, (sql) =>
+      updatePrefs(sql, party.groupId, party.peerId, { telegramNotify: true }),
+    );
+
+    // 알림을 켠 뒤에 일어난 사건이다. 신청·연결은 0017 계열이 이미 알린다.
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region, real_name, created_by)
+         VALUES ($1, 'FEMALE', 1995, 'SEOUL', $2, $3)`,
+        [party.groupId, `${TAG}-알림확인-이름`, party.ownerId],
+      ),
+    );
+
+    const count = await withOwner(async (sql) => {
+      const r = await sql.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM notifications
+          WHERE group_id = $1 AND kind = 'GROUP_MESSAGE'`,
+        [party.groupId],
+      );
+      return r.rows[0]!.n;
+    });
+    expect(count).toBe(0);
+  });
+});
+
 describe("LISTEN/NOTIFY", () => {
   /** 조건이 참이 될 때까지 짧게 기다린다. NOTIFY 는 커밋 뒤에 도착한다. */
   async function waitFor(check: () => boolean, timeoutMs = 3_000): Promise<void> {
@@ -285,18 +523,22 @@ describe("LISTEN/NOTIFY", () => {
       const written = await withRls(A.owner, (sql) =>
         createMessage(sql, A.groupId, A.ownerId, secret),
       );
-      await waitFor(() => payloads.length >= 1);
 
-      const created = groupChatNotifySchema.parse(JSON.parse(payloads[0]!));
+      const mine = () =>
+        payloads
+          .map((raw) => groupChatNotifySchema.parse(JSON.parse(raw)))
+          .filter((event) => event.messageId === written.id);
+
+      await waitFor(() => mine().length >= 1);
+      const created = mine()[0]!;
       expect(created.kind).toBe("created");
       expect(created.groupId).toBe(A.groupId);
-      expect(created.messageId).toBe(written.id);
       // 이 채널은 권한 판정을 거치지 않는다 — 본문이 흐르면 그 자체로 경계를 넘는다.
-      expect(payloads[0]).not.toContain(secret);
+      expect(payloads.join("")).not.toContain(secret);
 
       await withRls(A.owner, (sql) => deleteMessage(sql, A.groupId, written.id));
-      await waitFor(() => payloads.length >= 2);
-      expect(groupChatNotifySchema.parse(JSON.parse(payloads[1]!)).kind).toBe("deleted");
+      await waitFor(() => mine().length >= 2);
+      expect(mine()[1]!.kind).toBe("deleted");
     } finally {
       await listener.close();
     }
@@ -304,16 +546,20 @@ describe("LISTEN/NOTIFY", () => {
 
   it("계정 삭제로 작성자만 비워지는 것은 알리지 않는다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `b${Date.now() % 100000}`));
-    await seedMessage(party.groupId, party.peerId, `${TAG}-떠나는 사람`);
+    const messageId = await seedMessage(party.groupId, party.peerId, `${TAG}-떠나는 사람`);
 
     const payloads: string[] = [];
     const listener = listen("bolsaram_group_chat", (payload) => payloads.push(payload));
     try {
       await listener.ready;
       await withOwner((sql) => sql.query(`DELETE FROM users WHERE id = $1`, [party.peerId]));
-      // 알릴 것이 없는 UPDATE 다. 잠깐 기다려도 아무것도 오지 않아야 한다.
+      // 나가는 것은 방에 남지만(ADMIN_LEFT), 남의 글에 작성자만 비우는 UPDATE 는
+      // 화면에 알릴 것이 없다.
       await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(payloads).toHaveLength(0);
+      const about = payloads
+        .map((raw) => groupChatNotifySchema.parse(JSON.parse(raw)))
+        .filter((event) => event.messageId === messageId);
+      expect(about).toHaveLength(0);
     } finally {
       await listener.close();
     }

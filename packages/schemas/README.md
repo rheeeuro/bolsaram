@@ -27,7 +27,7 @@ packages/schemas/src/
 ├── import.ts       Import 세션·에셋·원문·검토·commit
 ├── auth.ts         전화번호 정규화, 주선자 로그인, 초대 링크·모임 코드
 ├── telegram.ts     텔레그램 Bot API payload · 파일/사진 상한
-├── chat.ts         모임 채팅 — 메시지 본문 길이·목록 커서·방 설정·DB 이벤트 payload
+├── chat.ts         모임 채팅 — 메시지 본문 길이·목록 커서·방 설정·DB 이벤트·시스템 메시지 payload
 └── index.ts        위 전부 재수출
 ```
 

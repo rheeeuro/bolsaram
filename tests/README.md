@@ -41,7 +41,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
-| `group-chat.test.ts`           | 모임 채팅 경계·수정 불가·지우기·알림 접힘·NOTIFY | 필요 | 19  |
+| `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 30 |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 리다이렉트 검증       | –    | 9    |
 | `seed-admin-password.test.ts`   | 시드 관리자 비밀번호 판정·고정값 금지          | –    | 8    |
@@ -104,6 +104,10 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `group-chat.test.ts` 「본문을 수정하지 못한다」            | 남긴 기록이 근거로 남음             |
 | `group-chat.test.ts` 「계정이 지워져도 대화는 남고」       | 가드가 계정 삭제를 막지 않음 (0041) |
 | `group-chat.test.ts` 「payload 에 본문이 없다」            | 권한 없는 채널로 내용이 새지 않음 (0043) |
+| `group-chat.test.ts` 「사람이 시스템 메시지를 만들지」     | 사건 기록을 손으로 지어내지 못함 (0044) |
+| `group-chat.test.ts` 「회원 등록은 공개 번호로만」         | 방에 회원 이름이 적히지 않음 (0044) |
+| `group-chat.test.ts` 「합류 전 대화는 보이지 않는다」      | 초대가 과거 전부를 열지 않음 (0045) |
+| `group-chat.test.ts` 「자기 입장 기록이 첫 줄이다」        | 정밀도 차이로 첫 줄이 빠지지 않음 (0045) |
 | `docs-guide.test.ts`                                       | 사용자 문서와 구현의 정합성         |
 | `docs-readme.test.ts`                                      | 디렉터리 문서와 코드 구조의 정합성  |
 

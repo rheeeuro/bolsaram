@@ -2,6 +2,7 @@
  * 열거형 → 한글 라벨 조회. UI 는 이 함수만 쓰고 enums 를 직접 인덱싱하지 않는다.
  * 알 수 없는 값이 와도 화면이 깨지지 않게 원문을 그대로 돌려준다.
  */
+import type { GroupMessagePayload, GroupMessageSystemKind } from "@bolsaram/schemas";
 import {
   DRINKING_LABELS,
   GENDER_LABELS,
@@ -56,3 +57,30 @@ export const FIELD_LABELS: Record<string, string> = {
   realName: "이름",
   contactNote: "연락 방법",
 };
+
+/**
+ * 모임 채팅방의 시스템 메시지 문장 (마이그레이션 0044).
+ *
+ * DB 에는 종류와 값만 있고 문장은 여기서 만든다. 회원은 **공개 번호로만** 부른다 —
+ * 방에 이름을 적지 않기로 한 규칙이 시스템 메시지에도 그대로 적용된다.
+ */
+export function groupSystemMessageText(
+  kind: GroupMessageSystemKind,
+  payload: GroupMessagePayload,
+): string {
+  const who = payload.actorName?.trim() ? payload.actorName.trim() : "주선자";
+  const code = (value: number | null | undefined) => (value == null ? "?번" : `${value}번`);
+
+  switch (kind) {
+    case "ADMIN_JOINED":
+      return `${who} 님이 모임에 들어왔습니다.`;
+    case "ADMIN_LEFT":
+      return `${who} 님이 모임에서 나갔습니다.`;
+    case "PROFILE_REGISTERED":
+      return `${code(payload.profileCode)} 회원이 등록됐습니다. (${who})`;
+    case "MATCH_REQUESTED":
+      return `${code(payload.requesterCode)} → ${code(payload.targetCode)} 소개를 신청했습니다.`;
+    case "MATCH_INTRODUCED":
+      return `${code(payload.requesterCode)} ↔ ${code(payload.targetCode)} 연결됐습니다.`;
+  }
+}

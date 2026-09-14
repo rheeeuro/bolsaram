@@ -61,21 +61,31 @@ export const GET = route(async (request: Request) => {
         send(`${id ? `id: ${id}\n` : ""}event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
       }
 
+      /**
+       * 사건마다 DB 를 한 번 읽고 보낸다. 그 읽기가 비동기라 **그냥 띄우면 도착 순서가
+       * 뒤집힌다** — 한 트랜잭션에서 여러 사건이 나올 때 실제로 어긋났다. 앞의 처리가
+       * 끝난 뒤에 다음을 처리하도록 이어 붙인다.
+       */
+      let queue: Promise<void> = Promise.resolve();
+
       const unsubscribe = subscribeGroupChat((event) => {
-        void (async () => {
-          // 볼 수 있는 글인지는 여기서 판정된다. 못 보면 null 이고 아무것도 나가지 않는다.
-          const message = await withRls(rlsContextOf(viewer), (sql) =>
-            readMessage(sql, event.messageId),
-          ).catch((error: unknown) => {
+        queue = queue
+          .then(async () => {
+            if (closed) return;
+            // 볼 수 있는 글인지는 여기서 판정된다. 못 보면 null 이고 아무것도 나가지 않는다.
+            const message = await withRls(rlsContextOf(viewer), (sql) =>
+              readMessage(sql, event.messageId),
+            );
+            if (!message) return;
+            sendEvent(event.kind === "deleted" ? "deleted" : "message", event.at, message);
+          })
+          .catch((error: unknown) => {
+            // 한 건이 실패해도 연결은 유지한다. 다음 사건은 그대로 간다.
             console.error(
-              "채팅 이벤트를 읽지 못했습니다:",
+              "채팅 이벤트를 보내지 못했습니다:",
               error instanceof Error ? error.message : error,
             );
-            return null;
           });
-          if (!message) return;
-          sendEvent(event.kind === "deleted" ? "deleted" : "message", event.at, message);
-        })();
       });
 
       const keepalive = setInterval(() => send(`: ping\n\n`), KEEPALIVE_MS);

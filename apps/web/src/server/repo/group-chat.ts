@@ -10,6 +10,11 @@
 import "server-only";
 import type { Sql } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
+import {
+  groupMessagePayloadSchema,
+  type GroupMessagePayload,
+  type GroupMessageSystemKind,
+} from "@bolsaram/schemas";
 
 export type GroupMessageRecord = {
   id: string;
@@ -21,6 +26,10 @@ export type GroupMessageRecord = {
   body: string;
   createdAt: Date;
   deleted: boolean;
+  /** 사람이 쓴 글이면 null. 값이 있으면 DB 가 남긴 사건이다(0044). */
+  systemKind: GroupMessageSystemKind | null;
+  /** 시스템 메시지가 싣는 것. 사람의 글에서는 비어 있다. */
+  payload: GroupMessagePayload;
 };
 
 type Row = {
@@ -31,10 +40,12 @@ type Row = {
   body: string;
   created_at: Date;
   deleted_at: Date | null;
+  system_kind: GroupMessageSystemKind | null;
+  payload: unknown;
 };
 
 const SELECT_MESSAGE = `SELECT m.id, m.group_id, m.author_user_id, u.display_name AS author_name,
-                               m.body, m.created_at, m.deleted_at
+                               m.body, m.created_at, m.deleted_at, m.system_kind, m.payload
                           FROM group_messages m
                           LEFT JOIN users u ON u.id = m.author_user_id`;
 
@@ -48,6 +59,10 @@ function toRecord(row: Row): GroupMessageRecord {
     body: row.deleted_at ? "" : row.body,
     createdAt: row.created_at,
     deleted: row.deleted_at !== null,
+    systemKind: row.system_kind,
+    // DB 가 만든 값이지만 화면으로 나가기 전에 형태를 확인한다. 모양이 어긋나면
+    // 문장을 만들지 못할 뿐 목록 전체가 깨지지는 않게 빈 값으로 떨어뜨린다.
+    payload: groupMessagePayloadSchema.safeParse(row.payload).data ?? {},
   };
 }
 

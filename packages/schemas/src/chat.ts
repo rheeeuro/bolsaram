@@ -5,6 +5,7 @@
  * 프로필·연락처가 등장하지 않는다 — 본문 텍스트 하나뿐이다.
  */
 import { z } from "zod";
+import { GROUP_MESSAGE_SYSTEM_KINDS } from "./enums";
 
 /** DB CHECK(`group_messages_body_sane`)와 같은 값. 한쪽만 바꾸면 저장에서 터진다. */
 export const GROUP_MESSAGE_MAX_LENGTH = 2000;
@@ -31,6 +32,23 @@ export const groupMessageQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(GROUP_MESSAGE_PAGE_SIZE),
 });
 export type GroupMessageQuery = z.infer<typeof groupMessageQuerySchema>;
+
+/**
+ * 시스템 메시지가 싣는 것 (마이그레이션 0044).
+ *
+ * 전부 선택이다 — 종류마다 채우는 것이 다르다. 회원은 공개 번호로만 등장하고
+ * 이름이 들어가는 자리는 **주선자 이름 하나뿐**이다(`actorName`).
+ * 나간 주선자는 나중에 `users` 에서 읽을 수 없어서 그때 값을 적어 둔다.
+ */
+export const groupMessagePayloadSchema = z.object({
+  actorName: z.string().nullish(),
+  profileCode: z.number().int().nullish(),
+  requesterCode: z.number().int().nullish(),
+  targetCode: z.number().int().nullish(),
+});
+export type GroupMessagePayload = z.infer<typeof groupMessagePayloadSchema>;
+
+export const groupMessageSystemKindSchema = z.enum(GROUP_MESSAGE_SYSTEM_KINDS);
 
 /**
  * DB 가 `pg_notify` 로 알리는 채팅 변화 (마이그레이션 0043).

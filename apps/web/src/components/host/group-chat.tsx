@@ -7,6 +7,7 @@ import { useChatStream, type ChatMessage } from "@/components/host/chat-stream";
 import { Button } from "@/components/ui/button";
 import { FormError, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
+import { groupSystemMessageText } from "@/lib/labels";
 
 /**
  * 모임 채팅방 (마이그레이션 0040).
@@ -17,6 +18,12 @@ import { cn } from "@/lib/cn";
  * 새 글은 **서버가 밀어준다**(`ChatStreamProvider` 의 SSE 연결). 이 화면은 그 연결에
  * 얹혀 자기 방의 것만 골라 쓰고, 열려 있는 동안 「이 방을 보고 있다」고 알려 둔다 —
  * 그래야 보고 있는 방의 글이 안 읽음으로 세어지지 않는다.
+ *
+ * 모임에서 일어난 일(입장·퇴장·회원 등록·신청·연결)도 같은 줄기에 섞여 내려온다.
+ * 그것은 말이 아니라 사건이므로 가운데 한 줄로 조용히 흐르게 둔다.
+ *
+ * 보이는 범위는 **들어온 시점부터**다(0045). 화면이 자르는 것이 아니라 정책이 막으므로
+ * 여기서는 따로 다루지 않는다 — 새로 합류한 사람에게는 자기 입장 기록이 첫 줄이 된다.
  */
 
 export type { ChatMessage };
@@ -58,7 +65,9 @@ export function GroupChat({
     setMessages((prev) => {
       const seen = new Set(prev.map((m) => m.id));
       const added = incoming.filter((m) => !seen.has(m.id));
-      return added.length > 0 ? [...prev, ...added] : prev;
+      if (added.length === 0) return prev;
+      // 보낸 직후의 응답과 밀려오는 사건이 뒤섞일 수 있으므로 시각으로 정렬해 둔다.
+      return [...prev, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     });
   }, []);
 
@@ -187,7 +196,7 @@ export function GroupChat({
           <>
             {olderDone ? (
               <p className="pb-3 text-center text-[12px] text-[var(--surface-text-muted)]">
-                대화의 시작입니다
+                더 이전 대화는 없습니다
               </p>
             ) : (
               <button
@@ -199,16 +208,20 @@ export function GroupChat({
                 {loadingOlder ? "불러오는 중…" : "이전 대화 보기"}
               </button>
             )}
-            {messages.map((message, index) => (
-              <MessageRow
-                key={message.id}
-                message={message}
-                mine={message.authorUserId === viewerId}
-                /** 같은 사람이 이어 쓰면 이름을 반복하지 않는다. */
-                grouped={isGrouped(messages[index - 1], message)}
-                onDelete={() => void remove(message.id)}
-              />
-            ))}
+            {messages.map((message, index) =>
+              message.systemKind ? (
+                <SystemRow key={message.id} message={{ ...message, systemKind: message.systemKind }} />
+              ) : (
+                <MessageRow
+                  key={message.id}
+                  message={message}
+                  mine={message.authorUserId === viewerId}
+                  /** 같은 사람이 이어 쓰면 이름을 반복하지 않는다. */
+                  grouped={isGrouped(messages[index - 1], message)}
+                  onDelete={() => void remove(message.id)}
+                />
+              ),
+            )}
           </>
         )}
         <div ref={bottomRef} />
@@ -240,9 +253,35 @@ export function GroupChat({
   );
 }
 
+/**
+ * 모임에서 일어난 일. 말풍선도 이름도 없이 가운데 한 줄로 흐른다 — 읽히되 대화를
+ * 끊지 않는 자리다. 지울 수 없으므로 지우기 버튼도 없다.
+ */
+function SystemRow({
+  message,
+}: {
+  message: ChatMessage & { systemKind: NonNullable<ChatMessage["systemKind"]> };
+}) {
+  return (
+    <div className="flex items-center gap-2.5 px-1 py-2">
+      <span aria-hidden className="h-px flex-1 bg-[var(--surface-border)]" />
+      <span className="text-center text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+        {groupSystemMessageText(message.systemKind, message.payload)}
+        <time dateTime={message.createdAt} className="ml-1.5 text-[11px] opacity-80">
+          {formatTime(message.createdAt)}
+        </time>
+      </span>
+      <span aria-hidden className="h-px flex-1 bg-[var(--surface-border)]" />
+    </div>
+  );
+}
+
 /** 같은 사람이 5분 안에 이어 쓴 줄인가. 이름과 시각을 반복하지 않기 위한 판정이다. */
 function isGrouped(previous: ChatMessage | undefined, current: ChatMessage): boolean {
-  if (!previous || previous.authorUserId !== current.authorUserId) return false;
+  // 사건이 끼면 흐름이 끊긴 것이다 — 다음 줄은 이름을 다시 보여준다.
+  if (!previous || previous.systemKind || previous.authorUserId !== current.authorUserId) {
+    return false;
+  }
   const gap = new Date(current.createdAt).getTime() - new Date(previous.createdAt).getTime();
   return gap < 5 * 60_000;
 }
