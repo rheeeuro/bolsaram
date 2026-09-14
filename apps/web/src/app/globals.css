@@ -54,7 +54,8 @@
     input,
     textarea,
     select {
-      font-size: 16px;
+      /* 유틸리티의 작은 글자 클래스보다 우선해 iOS 자동 확대를 막는다. */
+      font-size: 16px !important;
     }
   }
 }

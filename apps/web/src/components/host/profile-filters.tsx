@@ -18,6 +18,8 @@ export function HostProfileFilters({ statuses }: { statuses: string[] }) {
 
   function apply(next: Record<string, string>) {
     const search = new URLSearchParams(params.toString());
+    // 조건이 달라지면 현재 커서는 더 이상 같은 목록을 가리키지 않는다.
+    search.delete("cursor");
     for (const [key, value] of Object.entries(next)) {
       if (value.length === 0) search.delete(key);
       else search.set(key, value);

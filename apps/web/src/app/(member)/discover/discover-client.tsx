@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { GENDERS, GENDER_LABELS } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
@@ -38,12 +38,16 @@ export function DiscoverClient() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 조건이 바뀐 뒤 늦게 도착한 이전 응답이 새 목록을 덮지 못하게 한다.
+  const loadGeneration = useRef(0);
 
   const load = useCallback(
     async (nextCursor: string | null, replace: boolean) => {
+      const generation = replace ? ++loadGeneration.current : loadGeneration.current;
       const params = filtersToParams(filters, gender);
       if (nextCursor) params.set("cursor", nextCursor);
       const result = await apiGet<Page>(`/api/profiles?${params.toString()}`);
+      if (generation !== loadGeneration.current) return;
       if (!result.ok) {
         setError(result.message);
         return;

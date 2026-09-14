@@ -147,13 +147,38 @@ export function HostProfileEditor({
   // 고친 것이 하나라도 있는가. 저장 버튼을 잠그고 이탈 경고를 걸 기준이다.
   const dirty = Object.keys(draft).some((key) => draft[key] !== saved[key]);
 
-  // 새로고침·탭 닫기는 막아준다. 앱 안에서의 이동(상단 메뉴)은 App Router 에
-  // 가로챌 자리가 없어서 막지 못한다 — 그래서 저장 바를 화면에 붙여 둔다.
+  // 새로고침·탭 닫기뿐 아니라 앱 안의 링크 이동도 확인한다. Next App Router에는
+  // 전역 이동 차단 API가 없어서 같은 출처 링크 클릭을 캡처 단계에서 잡는다.
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    const guardLink = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const element = event.target instanceof Element ? event.target : null;
+      const link = element?.closest<HTMLAnchorElement>("a[href]");
+      if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
+      const destination = new URL(link.href, window.location.href);
+      if (destination.origin !== window.location.origin) return;
+      if (destination.href === window.location.href) return;
+      if (window.confirm("저장하지 않은 변경이 있습니다. 이 화면을 나갈까요?")) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
     window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
+    document.addEventListener("click", guardLink, true);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      document.removeEventListener("click", guardLink, true);
+    };
   }, [dirty]);
 
   // 상태와 노출은 직교한다 — 「공개」인데 노출이 「비공개」면 아무도 못 본다.

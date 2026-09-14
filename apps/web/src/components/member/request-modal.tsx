@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/field";
@@ -27,10 +27,21 @@ export function RequestModal({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (open) return;
+    setMessage("");
+    setError(null);
+  }, [open]);
+
+  const close = () => {
+    // 전송 중에는 배경 클릭이나 Esc로 닫혀 결과를 놓치지 않게 한다.
+    if (!busy) onClose();
+  };
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={close}
       label={`${code}에게 마음을 보내시겠어요?`}
       className="text-center"
     >
@@ -94,7 +105,7 @@ export function RequestModal({
         >
           {busy ? "보내는 중…" : "주선자에게 보내기"}
         </Button>
-        <Button variant="ghost" size="lg" onClick={onClose} disabled={busy}>
+        <Button variant="ghost" size="lg" onClick={close} disabled={busy}>
           아직 고민할게요
         </Button>
       </div>
