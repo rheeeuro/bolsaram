@@ -62,6 +62,9 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0037_group_invite_consume_pair.sql` | `group_invite_codes_consume_pair` 완화 — 코드를 쓴 주선자를 삭제할 수 있게             |
 | `0038_admin_transition_scope.sql`  | 신청 전이를 담당별로 — 수락·거절은 받은 쪽, 취소는 신청자 쪽. 거절·숨김 판정 2인자 형태 |
 | `0039_telegram_upload_group.sql`   | 봇이 담을 모임을 연결 설정에 둔다(`telegram_connections.upload_group_id`)               |
+| `0040_group_chat.sql`              | 모임 채팅방(주선자 전용): `group_messages` · `group_chat_prefs` + 새 글 알림             |
+| `0041_group_message_author_cleared.sql` | 계정 삭제 시 메시지의 작성자만 비우도록 가드 트리거 완화                            |
+| `0042_group_chat_millisecond_cursors.sql` | 채팅 시각을 `timestamptz(3)` 로 — 화면이 들고 있는 ISO 커서와 정밀도를 맞춘다     |
 
 ## 테이블
 
@@ -69,6 +72,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | ---------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
 | `groups`                                       | 모임. 이름·설명. 가입과 별개로 만든다              | 소속 주선자 + 소속 회원             |
 | `group_admins`                                 | 모임 ↔ 주선자 (**다대다**, 모임마다 OWNER 한 명)   | 같은 모임 주선자만 조회             |
+| `group_messages`                               | 모임 채팅방의 글. 고칠 수 없고 지우기만 된다       | 같은 모임 주선자 (쓰기는 본인 명의)  |
+| `group_chat_prefs`                             | 주선자별 방 상태 — 읽은 위치·텔레그램 알림 여부    | 본인 것만                           |
 | `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임 | 본인 + 같은 모임 관계자             |
 | `profiles`                                     | 프로필. `public_code` 가 화면의 `#17`, `is_seed` 는 합성 표식 | 공개분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
@@ -114,6 +119,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `group_admins_one_owner` (부분 유니크)              | 모임당 OWNER 두 명                            |
 | `users.active_group_id` 의 컬럼 UPDATE 권한 회수    | 런타임 롤이 보고 있는 모임을 바꾸는 것        |
 | `notifications_dedupe_idx` (부분 유니크)            | 같은 사건으로 같은 사람에게 두 번 알림        |
+| `notifications_group_pending_idx` (부분 유니크)     | 방 하나에 아직 안 보낸 채팅 알림 두 개 — 줄마다 울리는 것 |
+| `group_messages_update_guard` 트리거                | 남긴 글을 고치는 것 (지우기와 계정 삭제만 통과) |
 | `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을
@@ -136,6 +143,13 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 `profile_hides_block_active_request` 트리거가 그 반대 방향을 막는다 — 활성 신청이 있는
 상대는 숨기지 못한다. 두 트리거가 함께 있어야 「숨김 + 활성 신청」이 어느 순서로도
 만들어지지 않는다. 그 조합은 회원이 스스로 되돌릴 수 없는 상태다.
+
+`group_messages_notify` 트리거가 새 글을 알림을 켜 둔 같은 방 주선자에게 넣는다. 쓴 사람은
+빠지고, payload 에는 모임 이름만 싣는다 — 본문은 볼사람에서 읽는다.
+
+`group_messages_update_guard` 트리거가 이 방의 글을 **지우는 것 외의 수정**에서 지킨다.
+지울 때 본문을 빈 문자열로 만들어 DB 에도 남기지 않는다. 계정 삭제로 작성자만 비워지는
+UPDATE 는 통과시킨다(0041) — 그 경로까지 막으면 주선자 계정을 지울 수 없다.
 
 `group_admins_clear_active_group` 트리거가 모임에서 나간 주선자의 `users.active_group_id`
 를 비운다. 소속이 끊겼는데 그 모임을 보고 있는 상태를 남기지 않는다.

@@ -31,6 +31,8 @@ export type Group = {
   isOwner: boolean;
   memberCount: number;
   admins: Admin[];
+  /** 이 방의 새 채팅을 텔레그램으로도 받는 중인가. 사람마다 따로다. */
+  chatNotify: boolean;
 };
 
 /** 보고 있는 모임을 바꾼다. 세 곳(전체공개 칸·각 카드·상단 전환기)이 같은 일을 한다. */
@@ -190,6 +192,7 @@ function GroupCard({
       {open ? (
         <div id={panelId} className="mt-4 grid gap-5 border-t border-[var(--surface-border)] pt-4">
           <GroupProfileForm group={group} />
+          <ChatNotify group={group} />
           <GroupAdmins group={group} />
           <LeaveGroup group={group} />
         </div>
@@ -253,6 +256,54 @@ function GroupProfileForm({ group }: { group: Group }) {
           <span className="text-[12.5px] text-[var(--surface-text-muted)]">{message}</span>
         ) : null}
       </div>
+      <FormError>{error}</FormError>
+    </section>
+  );
+}
+
+/**
+ * 이 방의 채팅 알림. 기본은 화면 배지뿐이고, 켜면 텔레그램으로도 온다.
+ *
+ * 모임 단위이면서 사람 단위다 — 같은 방이라도 켠 사람에게만 나간다. 보내는 것은
+ * 「새 글이 있다」 한 줄이고 내용은 싣지 않는다.
+ */
+function ChatNotify({ group }: { group: Group }) {
+  const router = useRouter();
+  const [on, setOn] = useState(group.chatNotify);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <section>
+      <h3 className="mb-2 text-[13px] font-medium text-[var(--surface-text)]">채팅 알림</h3>
+      <label className="flex cursor-pointer items-start gap-2.5">
+        <input
+          type="checkbox"
+          checked={on}
+          className="mt-0.5 h-3.5 w-3.5 accent-[var(--color-rose-600)]"
+          onChange={() =>
+            void (async () => {
+              const next = !on;
+              setOn(next);
+              setError(null);
+              const result = await apiPatch(`/api/admin/groups/${group.groupId}/chat`, {
+                telegramNotify: next,
+              });
+              if (result.ok) router.refresh();
+              else {
+                setOn(!next);
+                setError(result.message);
+              }
+            })()
+          }
+        />
+        <span className="text-[12.5px] leading-relaxed text-[var(--surface-text)]">
+          이 모임의 새 채팅을 텔레그램으로도 받기
+          <span className="mt-1 block text-[11.5px] text-[var(--surface-text-muted)]">
+            내용은 보내지 않고 새 글이 있다는 것만 알립니다. 봇을 연결해야 도착합니다 —
+            가져오기 화면의 「텔레그램 연결」에서 연결합니다.
+          </span>
+        </span>
+      </label>
       <FormError>{error}</FormError>
     </section>
   );

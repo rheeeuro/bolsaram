@@ -65,6 +65,7 @@ apps/web/src/
 │   │   ├── profiles/         카드 목록 + 상세 편집·게시·초대
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
+│   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용)
 │   │   └── group/            속한 모임들 · 주선자 구성원 · 초대 코드 · 나가기
 │   └── api/                  Route Handler (아래 표)
 ├── components/
@@ -136,6 +137,7 @@ server/
 │   ├── favorites.ts          관심 토글·목록
 │   ├── hides.ts              숨기기 토글·목록 + 양방향 판정
 │   ├── imports.ts            세션·에셋·추출·검토
+│   ├── group-chat.ts         모임 채팅 — 메시지 목록·작성·지우기, 읽은 위치·안 읽은 수
 │   └── telegram.ts           봇 대화 상태 + 계정 연결 조회/해제
 ├── telegram/                 텔레그램 Import 채널 (Bot API 를 아는 유일한 곳)
 │   ├── client.ts             Bot API 호출·파일 다운로드·webhook 서명 확인
@@ -198,6 +200,10 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/active`                | PUT                 | 주선자            | 보고 있는 모임 전환 (`null` = 전체공개) |
 | `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
 | `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급           |
+| `/api/admin/groups/[id]/messages`         | GET / POST          | 그 모임 주선자    | 채팅 읽기(`before`·`after`) / 쓰기   |
+| `/api/admin/groups/[id]/messages/[messageId]` | DELETE          | 쓴 사람           | 내 메시지 지우기 (본문만 사라진다)   |
+| `/api/admin/groups/[id]/chat`             | GET / PATCH         | 그 모임 주선자    | 읽은 위치·텔레그램 알림 설정         |
+| `/api/admin/chat`                         | GET                 | 주선자            | 모임별 안 읽은 채팅 수 (상단 배지)   |
 | `/api/admin/telegram`                     | GET / POST / PATCH / DELETE | 주선자    | 봇 연결 상태 / 연결 코드 발급 / 담을 모임 변경 / 해제 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |

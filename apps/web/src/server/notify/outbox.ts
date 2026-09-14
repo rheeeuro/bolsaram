@@ -26,12 +26,15 @@ export type ClaimedNotification = {
     | "MATCH_REJECTED"
     | "MATCH_CANCELED"
     | "MEMBER_INTENT"
-    | "INTENT_DECLINED";
+    | "INTENT_DECLINED"
+    | "GROUP_MESSAGE";
   chatId: number;
   requesterCode: number | null;
   targetCode: number | null;
   /** 요청 알림(MEMBER_INTENT · INTENT_DECLINED)일 때만 채워진다 — 무슨 요청인지. */
   intentKind: MatchIntentKind | null;
+  /** 모임 채팅 알림(GROUP_MESSAGE)일 때만 채워진다 — 어느 방인지. */
+  groupName: string | null;
 };
 
 type ClaimRow = {
@@ -41,6 +44,7 @@ type ClaimRow = {
   requester_code: number | null;
   target_code: number | null;
   intent_kind: MatchIntentKind | null;
+  group_name: string | null;
 };
 
 /**
@@ -73,7 +77,8 @@ export async function claimPending(): Promise<ClaimedNotification[]> {
                     WHERE tc.user_id = n.recipient_user_id) AS telegram_chat_id,
                   (n.payload->>'requesterCode')::int AS requester_code,
                   (n.payload->>'targetCode')::int AS target_code,
-                  n.payload->>'intentKind' AS intent_kind`,
+                  n.payload->>'intentKind' AS intent_kind,
+                  n.payload->>'groupName' AS group_name`,
       [NOTIFICATION_MAX_ATTEMPTS, NOTIFICATION_RETRY_WINDOW_DAYS, BATCH],
     );
     return result.rows.map((row) => ({
@@ -83,6 +88,7 @@ export async function claimPending(): Promise<ClaimedNotification[]> {
       requesterCode: row.requester_code,
       targetCode: row.target_code,
       intentKind: row.intent_kind,
+      groupName: row.group_name,
     }));
   });
 }

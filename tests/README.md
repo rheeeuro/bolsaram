@@ -41,6 +41,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
+| `group-chat.test.ts`           | 모임 채팅 경계·수정 불가·지우기·알림 접힘      | 필요 | 16   |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 리다이렉트 검증       | –    | 9    |
 | `seed-admin-password.test.ts`   | 시드 관리자 비밀번호 판정·고정값 금지          | –    | 8    |
@@ -99,6 +100,9 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `member-magic-link.test.ts` 「링크를 쓴 회원을 삭제」      | 탈퇴 처리가 제약에 막히지 않음 (0016)|
 | `notifications.test.ts` 「남의 모임 주선자에게는」         | 알림이 담당자 밖으로 새지 않음      |
 | `notifications.test.ts` 「런타임 롤은 …만들지 못한다」     | 남의 봇으로 임의 발송 차단          |
+| `group-chat.test.ts` 「다른 모임 주선자는 읽지 못한다」    | 운영 대화가 모임 밖으로 새지 않음   |
+| `group-chat.test.ts` 「본문을 수정하지 못한다」            | 남긴 기록이 근거로 남음             |
+| `group-chat.test.ts` 「계정이 지워져도 대화는 남고」       | 가드가 계정 삭제를 막지 않음 (0041) |
 | `docs-guide.test.ts`                                       | 사용자 문서와 구현의 정합성         |
 | `docs-readme.test.ts`                                      | 디렉터리 문서와 코드 구조의 정합성  |
 

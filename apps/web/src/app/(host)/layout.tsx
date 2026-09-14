@@ -5,7 +5,9 @@
  * 회원 화면과 같은 warm ivory 팔레트를 쓰고, 밀도만 한 단 높인다(설계문서 §13에서
  * 벗어난 결정은 `docs/implementation-plan.md` 참고).
  */
-import { requireAdminPage } from "@/server/auth/guard";
+import { withRls } from "@bolsaram/db";
+import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
+import { unreadByGroup } from "@/server/repo/group-chat";
 import { HostNav } from "@/components/host/host-nav";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +15,16 @@ export const dynamic = "force-dynamic";
 export default async function HostLayout({ children }: { children: React.ReactNode }) {
   const viewer = await requireAdminPage();
 
+  // 채팅 배지의 첫 값. 이후에는 네비가 스스로 주기적으로 갱신한다.
+  const unread = await withRls(rlsContextOf(viewer), (sql) => unreadByGroup(sql, viewer.userId));
+
   return (
     <div className="host-surface min-h-dvh bg-[var(--surface-page)] text-[var(--surface-text)]">
       <HostNav
         displayName={viewer.displayName}
         groups={viewer.groups}
         activeGroupId={viewer.groupId}
+        initialUnread={Object.fromEntries(unread.map((g) => [g.groupId, g.unread]))}
       />
       <div className="mx-auto max-w-6xl px-5 pb-16 pt-7">{children}</div>
     </div>

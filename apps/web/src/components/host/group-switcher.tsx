@@ -46,9 +46,15 @@ function useNarrowViewport() {
 export function GroupSwitcher({
   groups,
   activeGroupId,
+  unread,
+  elsewhereUnread,
 }: {
   groups: GroupChoice[];
   activeGroupId: string | null;
+  /** 모임별 안 읽은 채팅 수. 목록에서 어느 방이 밀렸는지 보여준다. */
+  unread: Record<string, number>;
+  /** 지금 보고 있지 않은 방에 안 읽은 글이 있는가. 버튼에 점으로 붙는다. */
+  elsewhereUnread: boolean;
 }) {
   const router = useRouter();
   const narrow = useNarrowViewport();
@@ -101,6 +107,7 @@ export function GroupSwitcher({
           label={group.name}
           active={group.id === activeGroupId}
           narrow={narrow}
+          unread={unread[group.id] ?? 0}
           onSelect={() => void switchTo(group.id)}
         />
       ))}
@@ -131,6 +138,14 @@ export function GroupSwitcher({
           )}
         />
         <span className="truncate">{activeName}</span>
+        {elsewhereUnread ? (
+          <span
+            className="size-1.5 shrink-0 rounded-full bg-[var(--color-rose-600)]"
+            title="다른 모임에 안 읽은 채팅이 있습니다"
+          >
+            <span className="sr-only">다른 모임에 안 읽은 채팅이 있습니다</span>
+          </span>
+        ) : null}
         <Chevron />
       </button>
 
@@ -221,6 +236,7 @@ function ChannelItem({
   hint,
   active,
   narrow,
+  unread = 0,
   onSelect,
 }: {
   label: string;
@@ -228,6 +244,8 @@ function ChannelItem({
   active: boolean;
   /** sheet 에서는 손가락으로 누르므로 줄을 키우고 글씨를 올린다. */
   narrow: boolean;
+  /** 그 방의 안 읽은 채팅. 전체공개는 방이 없어 항상 0 이다. */
+  unread?: number;
   onSelect: () => void;
 }) {
   return (
@@ -248,6 +266,17 @@ function ChannelItem({
           {active ? "●" : ""}
         </span>
         <span className="min-w-0 flex-1 truncate">{label}</span>
+        {unread > 0 ? (
+          <span
+            className={cn(
+              "shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-rose-600)] text-white",
+              narrow ? "px-1.5 py-px text-[12px]" : "px-1.5 py-px text-[11px]",
+            )}
+          >
+            {unread > 99 ? "99+" : unread}
+            <span className="sr-only">개 안 읽음</span>
+          </span>
+        ) : null}
         {hint ? (
           <span
             className={cn(

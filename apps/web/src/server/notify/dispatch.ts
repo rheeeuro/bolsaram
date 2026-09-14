@@ -33,7 +33,16 @@ function textFor(item: ClaimedNotification): string {
       return messages.memberIntent(item.intentKind, item.requesterCode, item.targetCode);
     case "INTENT_DECLINED":
       return messages.intentDeclined(item.intentKind, item.requesterCode, item.targetCode);
+    case "GROUP_MESSAGE":
+      return messages.groupMessage(item.groupName);
   }
+}
+
+/** 알림마다 「다음에 할 일」이 다른 화면에 있다. 채팅만 방으로 보낸다. */
+function linkFor(item: ClaimedNotification): { text: string; path: string } {
+  return item.kind === "GROUP_MESSAGE"
+    ? { text: messages.chatButton, path: "/chat" }
+    : { text: messages.requestsButton, path: "/requests" };
 }
 
 /**
@@ -46,13 +55,14 @@ export async function dispatchPending(): Promise<{ sent: number; failed: number 
   let sent = 0;
   let failed = 0;
   const items = await claimPending();
-  const requestsUrl = `${env().APP_ORIGIN}/requests`;
+  const origin = env().APP_ORIGIN;
 
   for (const item of items) {
     try {
+      const link = linkFor(item);
       await sendMessage(item.chatId, textFor(item), {
-        buttonText: messages.requestsButton,
-        buttonUrl: requestsUrl,
+        buttonText: link.text,
+        buttonUrl: `${origin}${link.path}`,
       });
       await markSent(item.id);
       sent += 1;

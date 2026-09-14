@@ -146,6 +146,8 @@ export type GroupSummary = {
   /** 이 모임에 등록된 회원 수. 목록에서 어느 방이 활발한지 가늠하는 데 쓴다. */
   memberCount: number;
   admins: { userId: string; displayName: string | null; isOwner: boolean }[];
+  /** 이 방의 새 채팅을 텔레그램으로도 받을 것인가(0040). 사람마다 따로 켠다. */
+  chatNotify: boolean;
 };
 
 /**
@@ -162,10 +164,15 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       description: string | null;
       is_owner: boolean;
       member_count: number;
+      chat_notify: boolean;
     }>(
       `SELECT g.id AS group_id, g.name, g.description, ga.is_owner,
-              (SELECT count(*)::int FROM profiles p WHERE p.group_id = g.id) AS member_count
-         FROM group_admins ga JOIN groups g ON g.id = ga.group_id
+              (SELECT count(*)::int FROM profiles p WHERE p.group_id = g.id) AS member_count,
+              COALESCE(pref.telegram_notify, false) AS chat_notify
+         FROM group_admins ga
+         JOIN groups g ON g.id = ga.group_id
+         LEFT JOIN group_chat_prefs pref
+           ON pref.group_id = g.id AND pref.user_id = ga.user_id
         WHERE ga.user_id = $1 ORDER BY ga.added_at`,
       [userId],
     );
@@ -189,6 +196,7 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       description: group.description,
       isOwner: group.is_owner,
       memberCount: group.member_count,
+      chatNotify: group.chat_notify,
       admins: admins.rows
         .filter((a) => a.group_id === group.group_id)
         .map((a) => ({
