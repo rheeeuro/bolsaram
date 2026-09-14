@@ -37,11 +37,13 @@ export type GroupMessageQuery = z.infer<typeof groupMessageQuerySchema>;
  * 시스템 메시지가 싣는 것 (마이그레이션 0044).
  *
  * 전부 선택이다 — 종류마다 채우는 것이 다르다. 회원은 공개 번호로만 등장하고
- * 이름이 들어가는 자리는 **주선자 이름 하나뿐**이다(`actorName`).
+ * 이름이 들어가는 자리는 **주선자뿐**이다 — `actorName` 이 그 일을 한 사람이고,
+ * 내보내기에서만 대상이 따로 있어 `targetName` 이 붙는다.
  * 나간 주선자는 나중에 `users` 에서 읽을 수 없어서 그때 값을 적어 둔다.
  */
 export const groupMessagePayloadSchema = z.object({
   actorName: z.string().nullish(),
+  targetName: z.string().nullish(),
   profileCode: z.number().int().nullish(),
   requesterCode: z.number().int().nullish(),
   targetCode: z.number().int().nullish(),

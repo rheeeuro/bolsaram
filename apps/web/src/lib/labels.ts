@@ -76,6 +76,12 @@ export function groupSystemMessageText(
       return `${who} 님이 모임에 들어왔습니다.`;
     case "ADMIN_LEFT":
       return `${who} 님이 모임에서 나갔습니다.`;
+    case "ADMIN_REMOVED": {
+      const target = payload.targetName?.trim() ? payload.targetName.trim() : "주선자";
+      return `${who} 님이 ${target} 님을 모임에서 내보냈습니다.`;
+    }
+    case "OWNER_TRANSFERRED":
+      return `${who} 님이 모임장이 됐습니다.`;
     case "PROFILE_REGISTERED":
       return `${code(payload.profileCode)} 회원이 등록됐습니다. (${who})`;
     case "MATCH_REQUESTED":

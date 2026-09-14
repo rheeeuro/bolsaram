@@ -31,7 +31,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 21   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
-| `rls.test.ts`                  | RLS 정책 강제·거절·숨김·담당이 갈리는 신청     | 필요 | 43   |
+| `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·거절·숨김·담당이 갈리는 신청 | 필요 | 47 |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
@@ -39,7 +39,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `admin-login.test.ts`          | 관리자 비밀번호 시도 제한·창 만료·권한 경계    | 필요 | 7    |
 | `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
-| `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기         | 필요 | 23   |
+| `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기·모임장 위임/내보내기 | 필요 | 39 |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
 | `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 30 |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |

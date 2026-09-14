@@ -66,6 +66,17 @@ export const groupJoinSchema = z.object({
   code: z.string().trim().min(8).max(200),
 });
 
+/**
+ * 모임의 주선자 한 명을 다룬다. 대상은 경로에 있고 본문은 무엇을 할지만 담는다.
+ *
+ * 지금은 모임장 넘기기 하나뿐이라 값이 고정이다 — 모임장을 **스스로 내려놓는** 경로는
+ * 두지 않는다. 모임마다 모임장이 꼭 한 명 있어야 해서(`group_admins_one_owner`)
+ * 넘길 사람을 반드시 골라야 한다.
+ */
+export const groupAdminUpdateSchema = z.object({
+  isOwner: z.literal(true),
+});
+
 export const requestOtpSchema = z.object({
   phone: phoneSchema,
 });

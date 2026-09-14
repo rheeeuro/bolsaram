@@ -7,7 +7,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { DomainError } from "@bolsaram/domain";
 import type { RlsContext } from "@bolsaram/db";
-import { assertGroupAdmin } from "./group-invite";
+import { assertGroupAdmin, assertGroupOwner } from "./group-invite";
 import { readSession, type SessionUser } from "./session";
 
 export type Viewer = SessionUser;
@@ -36,6 +36,19 @@ export async function requireAdmin(): Promise<Viewer> {
 export async function requireGroupAdmin(groupId: string): Promise<Viewer> {
   const user = await requireAdmin();
   await assertGroupAdmin(user.userId, groupId);
+  return user;
+}
+
+/**
+ * 그 모임의 **모임장**만 통과. 다른 주선자의 소속을 건드리는 동작에만 쓴다
+ * (모임장 넘기기·내보내기).
+ *
+ * 소속을 바꾸는 경로는 RLS 가 아예 열려 있지 않으므로(`group_admins` 는 SELECT 정책
+ * 하나뿐) 여기가 유일한 판정이다.
+ */
+export async function requireGroupOwner(groupId: string): Promise<Viewer> {
+  const user = await requireAdmin();
+  await assertGroupOwner(user.userId, groupId);
   return user;
 }
 

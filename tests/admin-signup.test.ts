@@ -17,7 +17,9 @@ import {
   issueGroupInvite,
   leaveGroup,
   readMyGroups,
+  removeGroupAdmin,
   setActiveGroup,
+  transferGroupOwnership,
   updateGroup,
 } from "../apps/web/src/server/auth/group-invite";
 import { loginAdmin } from "../apps/web/src/server/auth/login";
@@ -57,6 +59,30 @@ async function newAdmin(label: string): Promise<RlsContext & { userId: string }>
     displayName: `${TAG}-${label}`,
   });
   return { userId: created.userId, role: "ADMIN" };
+}
+
+/** 방에 남은 사건 종류를 순서대로. 나간 것과 내보내진 것을 구분해 본다(0046). */
+async function readSystemKinds(groupId: string): Promise<string[]> {
+  return withOwner(async (sql) => {
+    const r = await sql.query<{ system_kind: string }>(
+      `SELECT system_kind FROM group_messages
+        WHERE group_id = $1 AND system_kind IS NOT NULL ORDER BY created_at`,
+      [groupId],
+    );
+    return r.rows.map((row) => row.system_kind);
+  });
+}
+
+/** 모임에 동료 주선자 한 명을 붙인다. 초대 코드를 거쳐야 소속이 생긴다. */
+async function addColleague(
+  owner: { userId: string },
+  groupId: string,
+  label: string,
+): Promise<RlsContext & { userId: string }> {
+  const issued = await issueGroupInvite({ groupId, createdBy: owner.userId });
+  const invited = await newAdmin(label);
+  await consumeGroupInvite({ code: issued.code, userId: invited.userId });
+  return invited;
 }
 
 /** 프로필을 만든다. groupId 가 null 이면 전체공개다. */
@@ -514,6 +540,158 @@ describe("모임 나가기", () => {
     });
     await leaveGroup(admin.userId, groupId);
     expect(await readActiveGroupId(admin.userId)).toBeNull();
+  });
+});
+
+describe("모임장", () => {
+  it("모임장을 넘기면 둘의 표시가 맞바뀐다", async () => {
+    const owner = await newAdmin("넘기는모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-위임모임`,
+    });
+    const colleague = await addColleague(owner, groupId, "받는동료");
+
+    await transferGroupOwnership({
+      actorId: owner.userId,
+      groupId,
+      targetUserId: colleague.userId,
+    });
+
+    expect(await readGroup(owner.userId, groupId)).toMatchObject({ isOwner: false });
+    expect(await readGroup(colleague.userId, groupId)).toMatchObject({ isOwner: true });
+    // 소속은 그대로다 — 넘긴 사람도 계속 그 모임 주선자다.
+    expect((await readGroup(owner.userId, groupId))?.admins).toHaveLength(2);
+  });
+
+  it("모임장이 아니면 넘길 수 없다", async () => {
+    const owner = await newAdmin("안넘기는모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-위임차단모임`,
+    });
+    const colleague = await addColleague(owner, groupId, "권한없는동료");
+
+    // 보통 주선자가 모임장을 자기에게 끌어올 수 없다.
+    await expect(
+      transferGroupOwnership({
+        actorId: colleague.userId,
+        groupId,
+        targetUserId: colleague.userId,
+      }),
+    ).rejects.toThrow(/이미 모임장입니다/);
+    await expect(
+      transferGroupOwnership({
+        actorId: colleague.userId,
+        groupId,
+        targetUserId: owner.userId,
+      }),
+    ).rejects.toThrow(/모임장만/);
+    expect(await readGroup(owner.userId, groupId)).toMatchObject({ isOwner: true });
+  });
+
+  it("속하지 않은 사람에게는 넘길 수 없다", async () => {
+    const owner = await newAdmin("혼자모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-외부위임모임`,
+    });
+    const stranger = await newAdmin("무소속대상");
+
+    await expect(
+      transferGroupOwnership({ actorId: owner.userId, groupId, targetUserId: stranger.userId }),
+    ).rejects.toThrow(/주선자가 아닙니다/);
+    expect(await readGroup(owner.userId, groupId)).toMatchObject({ isOwner: true });
+  });
+
+  it("내보낸 주선자는 그 모임 회원을 더 이상 보지 못한다", async () => {
+    const owner = await newAdmin("내보내는모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-추방모임`,
+    });
+    const colleague = await addColleague(owner, groupId, "나갈동료");
+    const hidden = await seedProfile({
+      groupId,
+      createdBy: owner.userId,
+      name: "추방뒤안보임",
+    });
+
+    // 내보내기 전에는 보인다.
+    const before = await withRls(colleague, async (sql) => {
+      const r = await sql.query(`SELECT id FROM profiles WHERE id = $1`, [hidden]);
+      return r.rowCount ?? 0;
+    });
+    expect(before).toBe(1);
+
+    await removeGroupAdmin({ actorId: owner.userId, groupId, targetUserId: colleague.userId });
+
+    const after = await withRls(colleague, async (sql) => {
+      const r = await sql.query(`SELECT id FROM profiles WHERE id = $1`, [hidden]);
+      return r.rowCount ?? 0;
+    });
+    expect(after).toBe(0);
+    expect(await readGroup(colleague.userId, groupId)).toBeNull();
+    // 보고 있던 채널도 정리된다(0036 트리거).
+    expect(await readActiveGroupId(colleague.userId)).toBeNull();
+  });
+
+  it("모임장이 아니면 내보낼 수 없다", async () => {
+    const owner = await newAdmin("표적모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-추방차단모임`,
+    });
+    const colleague = await addColleague(owner, groupId, "시도하는동료");
+
+    // 보통 주선자가 모임장을 밀어낼 수 없다.
+    await expect(
+      removeGroupAdmin({ actorId: colleague.userId, groupId, targetUserId: owner.userId }),
+    ).rejects.toThrow(/모임장만/);
+    expect((await readGroup(owner.userId, groupId))?.admins).toHaveLength(2);
+  });
+
+  it("자기 자신은 내보낼 수 없다", async () => {
+    const owner = await newAdmin("자기추방");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-자기추방모임`,
+    });
+
+    // 모임장이 빠지는 것은 나가기다 — 승계·빈 모임 정리가 함께 일어나야 한다.
+    await expect(
+      removeGroupAdmin({ actorId: owner.userId, groupId, targetUserId: owner.userId }),
+    ).rejects.toThrow(/모임 나가기로/);
+    expect(await readGroup(owner.userId, groupId)).not.toBeNull();
+  });
+
+  it("방에는 나간 것과 내보낸 것이 구분돼 남는다", async () => {
+    const owner = await newAdmin("기록모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-기록모임`,
+    });
+    const leaves = await addColleague(owner, groupId, "스스로나갈동료");
+    const removed = await addColleague(owner, groupId, "내보내질동료");
+
+    await leaveGroup(leaves.userId, groupId);
+    await removeGroupAdmin({ actorId: owner.userId, groupId, targetUserId: removed.userId });
+    await transferGroupOwnership({
+      actorId: owner.userId,
+      groupId,
+      targetUserId: (await addColleague(owner, groupId, "넘겨받을동료")).userId,
+    });
+
+    expect(await readSystemKinds(groupId)).toEqual([
+      // 모임을 만든 사람도 들어온 기록이 하나 남는다.
+      "ADMIN_JOINED",
+      "ADMIN_JOINED",
+      "ADMIN_JOINED",
+      "ADMIN_LEFT",
+      "ADMIN_REMOVED",
+      "ADMIN_JOINED",
+      "OWNER_TRANSFERRED",
+    ]);
   });
 });
 

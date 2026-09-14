@@ -70,6 +70,7 @@ beforeAll(async () => {
     const u4 = await user("MEMBER", "m4");
 
     return {
+      groupId,
       adminId,
       admin: { userId: adminId, role: "ADMIN" as const },
       strangerAdmin: { userId: strangerAdminId, role: "ADMIN" as const },
@@ -272,6 +273,53 @@ describe("관리자 전용 테이블", () => {
 
   it("회원은 감사 로그를 읽지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) => sql.query(`SELECT id FROM audit_logs`));
+    expect(result.rowCount).toBe(0);
+  });
+});
+
+describe("모임 소속(group_admins)", () => {
+  it("주선자는 자기 모임의 주선자 목록만 읽는다", async () => {
+    const mine = await withRls(fx.admin, (sql) =>
+      sql.query(`SELECT user_id FROM group_admins WHERE group_id = $1`, [fx.groupId]),
+    );
+    expect(mine.rowCount).toBe(1);
+
+    // 속하지 않은 주선자에게는 그 모임이 통째로 없는 것과 같다.
+    const theirs = await withRls(fx.strangerAdmin, (sql) =>
+      sql.query(`SELECT user_id FROM group_admins WHERE group_id = $1`, [fx.groupId]),
+    );
+    expect(theirs.rowCount).toBe(0);
+  });
+
+  it("런타임 롤은 모임장을 스스로 옮길 수 없다", async () => {
+    // 위임은 인증 레이어(owner 커넥션)만 한다. 정책이 없으므로 0건이 지나간다.
+    const moved = await withRls(fx.admin, (sql) =>
+      sql.query(`UPDATE group_admins SET is_owner = true WHERE group_id = $1`, [fx.groupId]),
+    );
+    expect(moved.rowCount).toBe(0);
+  });
+
+  it("런타임 롤은 주선자를 넣거나 뺄 수 없다", async () => {
+    // INSERT 는 WITH CHECK 가 없어 곧장 거부된다 — 조용히 넘어가지 않는다.
+    await expect(
+      withRls(fx.admin, (sql) =>
+        sql.query(
+          `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, false)`,
+          [fx.groupId, fx.strangerAdmin.userId],
+        ),
+      ),
+    ).rejects.toThrow(/row-level security/i);
+
+    const removed = await withRls(fx.strangerAdmin, (sql) =>
+      sql.query(`DELETE FROM group_admins WHERE group_id = $1`, [fx.groupId]),
+    );
+    expect(removed.rowCount).toBe(0);
+  });
+
+  it("회원은 주선자 목록을 읽지 못한다", async () => {
+    const result = await withRls(fx.member1, (sql) =>
+      sql.query(`SELECT user_id FROM group_admins`),
+    );
     expect(result.rowCount).toBe(0);
   });
 });

@@ -68,6 +68,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0043_group_chat_notify.sql`       | 채팅 변화를 `pg_notify` 로 알린다 — 화면에 밀어주는 SSE 의 뿌리                          |
 | `0044_group_chat_system_messages.sql` | 방에 남는 사건 — 주선자 입·퇴장, 회원 등록, 신청·연결. 사람은 만들지도 지우지도 못한다 |
 | `0045_group_chat_visible_from_join.sql` | 채팅은 **들어온 시점부터** 보인다. 합류 전 대화는 정책이 막는다                     |
+| `0046_group_owner_actions.sql`     | 모임장이 한 일을 방에 구분해 남긴다 — 내보내기·모임장 넘기기                            |
 
 ## 테이블
 
@@ -162,9 +163,11 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 애플리케이션이 아니라 **정책 한 곳**에서 자른다.
 
 `group_admins_announce_joined` · `group_admins_announce_left` ·
-`profiles_announce_registered` · `match_requests_announce_created` ·
-`match_requests_announce_introduced` 트리거가 모임의 사건을 그 방의 시스템 메시지로
-남긴다(0044). 전부 `app_post_group_system_message()` 를 지나며, 방이 없는 경우
+`group_admins_announce_owner` · `profiles_announce_registered` ·
+`match_requests_announce_created` · `match_requests_announce_introduced` 트리거가 모임의
+사건을 그 방의 시스템 메시지로 남긴다(0044·0046). 퇴장 트리거는 DELETE 한 줄만 보므로
+자진 탈퇴와 내보내기를 스스로 가르지 못한다 — 내보내는 경로가 트랜잭션 지역 GUC
+`app.group_admin_removed_by` 에 실행한 사람을 적고 트리거가 그 값으로 종류를 정한다. 전부 `app_post_group_system_message()` 를 지나며, 방이 없는 경우
 (전체공개 · 삭제 중인 모임)는 조용히 넘어간다. **문장이 아니라 사실을 저장한다** —
 본문은 비우고 종류와 `payload`(공개 번호 · 주선자 이름)만 남겨 화면이 문장을 만든다.
 작성자 자리에는 그 사건을 일으킨 **주선자**만 들어간다(`app_group_chat_actor()`) —
@@ -203,6 +206,11 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 통과시킨다. `users.active_group_id` 는 그중 지금 화면이 보여줄 하나를 가리킬 뿐이며
 **정책은 이 값을 보지 않는다.** 그래서 그 값이 무엇이든 볼 수 있는 범위는 달라지지 않고,
 런타임 롤은 컬럼 UPDATE 권한이 없어 바꾸지도 못한다.
+
+`group_admins` 에는 **SELECT 정책 하나뿐**이다. 소속을 만들고 없애고 `is_owner` 를 옮기는
+것은 전부 인증 레이어(owner 커넥션)의 몫이다 — 가입·초대 코드 소비·나가기, 그리고
+모임장의 넘기기·내보내기. 런타임 롤로는 INSERT 가 거부되고 UPDATE·DELETE 는 0건이
+지나간다. 모임장만 할 수 있다는 판정도 애플리케이션 레이어에만 있다.
 
 `telegram_connections.upload_group_id` 도 권한이 아니라 목적지다. 다만 이 값은 런타임 롤이
 직접 바꾸므로 정책의 WITH CHECK 가 속한 모임인지 확인한다.

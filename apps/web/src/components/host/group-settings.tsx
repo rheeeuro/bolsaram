@@ -21,6 +21,10 @@ import { cn } from "@/lib/cn";
  * 그래서 카드는 접힌 채로 시작한다. 이름·설명 수정, 동료 초대 코드, 나가기는 전부
  * 「설정」 안에 있다 — 모임이 서너 개만 돼도 폼이 화면을 가득 채우기 때문이다.
  * 만들기와 참여도 늘 펼쳐 두지 않고 버튼 → 창으로 옮겼다.
+ *
+ * 모임장에게만 보이는 것이 하나 있다 — 주선자 목록의 「모임장 넘기기」·「내보내기」다.
+ * 다른 사람의 소속을 건드리는 유일한 자리라 다른 주선자에게는 버튼 자체를 그리지 않고,
+ * 서버도 같은 판정을 다시 한다.
  */
 
 type Admin = { userId: string; displayName: string | null; isOwner: boolean };
@@ -56,9 +60,12 @@ function useSwitchGroup() {
 export function GroupSettings({
   groups,
   activeGroupId,
+  viewerUserId,
 }: {
   groups: Group[];
   activeGroupId: string | null;
+  /** 보고 있는 사람. 주선자 목록에서 자기 자신에게는 조작 버튼을 그리지 않는다. */
+  viewerUserId: string;
 }) {
   const [dialog, setDialog] = useState<"create" | "join" | null>(null);
   const { switchTo, busy, error } = useSwitchGroup();
@@ -94,6 +101,7 @@ export function GroupSettings({
         <GroupCard
           key={group.groupId}
           group={group}
+          viewerUserId={viewerUserId}
           active={group.groupId === activeGroupId}
           switchBusy={busy}
           onSwitch={() => void switchTo(group.groupId)}
@@ -155,11 +163,13 @@ function ChannelCard({
 /** 모임 하나 — 접으면 요약, 펼치면 정보 수정 · 동료 초대 · 나가기. */
 function GroupCard({
   group,
+  viewerUserId,
   active,
   switchBusy,
   onSwitch,
 }: {
   group: Group;
+  viewerUserId: string;
   active: boolean;
   switchBusy: boolean;
   onSwitch: () => void;
@@ -193,7 +203,7 @@ function GroupCard({
         <div id={panelId} className="mt-4 grid gap-5 border-t border-[var(--surface-border)] pt-4">
           <GroupProfileForm group={group} />
           <ChatNotify group={group} />
-          <GroupAdmins group={group} />
+          <GroupAdmins group={group} viewerUserId={viewerUserId} />
           <LeaveGroup group={group} />
         </div>
       ) : null}
@@ -309,8 +319,14 @@ function ChatNotify({ group }: { group: Group }) {
   );
 }
 
-/** 동료 주선자 목록과 초대 코드 발급. 코드는 발급 직후 한 번만 보인다. */
-function GroupAdmins({ group }: { group: Group }) {
+/**
+ * 동료 주선자 목록과 초대 코드 발급. 코드는 발급 직후 한 번만 보인다.
+ *
+ * 모임장에게는 각 줄에 「모임장 넘기기」·「내보내기」가 붙는다. 초대 코드가 잘못
+ * 전달됐을 때 되돌릴 수 있는 유일한 자리라 목록 안에 둔다 — 누구를 빼는지 이름을
+ * 보면서 누르게 한다.
+ */
+function GroupAdmins({ group, viewerUserId }: { group: Group; viewerUserId: string }) {
   const [issued, setIssued] = useState<{ code: string; expiresAt: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -318,17 +334,14 @@ function GroupAdmins({ group }: { group: Group }) {
   return (
     <section>
       <h3 className="mb-2 text-[13px] font-medium text-[var(--surface-text)]">주선자</h3>
-      <ul className="mb-3 flex flex-wrap gap-1.5">
+      <ul className="mb-3 grid gap-1.5">
         {group.admins.map((admin) => (
-          <li
+          <AdminRow
             key={admin.userId}
-            className="rounded-[var(--radius-pill)] border border-[var(--surface-border)] px-2.5 py-1 text-[12.5px]"
-          >
-            {admin.displayName ?? "이름 없음"}
-            {admin.isOwner ? (
-              <span className="ml-1.5 text-[11.5px] text-[var(--surface-text-muted)]">개설자</span>
-            ) : null}
-          </li>
+            group={group}
+            admin={admin}
+            isMe={admin.userId === viewerUserId}
+          />
         ))}
       </ul>
 
@@ -363,6 +376,76 @@ function GroupAdmins({ group }: { group: Group }) {
       )}
       <FormError>{error}</FormError>
     </section>
+  );
+}
+
+/**
+ * 주선자 한 줄. 모임장이 남을 볼 때만 조작 버튼이 붙는다.
+ *
+ * 자기 자신에게는 아무것도 그리지 않는다 — 모임장이 빠지는 것은 「모임 나가기」이고,
+ * 그쪽은 남은 주선자에게 모임장을 넘기는 일까지 함께 한다.
+ */
+function AdminRow({ group, admin, isMe }: { group: Group; admin: Admin; isMe: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const name = admin.displayName ?? "이름 없음";
+  const canManage = group.isOwner && !isMe;
+
+  async function send(run: () => Promise<{ ok: boolean; message?: string }>) {
+    setBusy(true);
+    setError(null);
+    const result = await run();
+    setBusy(false);
+    if (result.ok) router.refresh();
+    else setError(result.message ?? "요청을 처리하지 못했습니다.");
+  }
+
+  return (
+    <li className="rounded-[10px] border border-[var(--surface-border)] px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[12.5px] text-[var(--surface-text)]">
+          {name}
+          {admin.isOwner ? (
+            <span className="ml-1.5 text-[11.5px] text-[var(--surface-text-muted)]">모임장</span>
+          ) : null}
+          {isMe ? (
+            <span className="ml-1.5 text-[11.5px] text-[var(--surface-text-muted)]">나</span>
+          ) : null}
+        </span>
+
+        {canManage ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <ConfirmButton
+              label="모임장 넘기기"
+              confirmLabel="넘기기"
+              message={`${name} 님이 모임장이 되고 나는 보통 주선자가 됩니다. 되돌리려면 그분이 다시 넘겨야 합니다.`}
+              disabled={busy}
+              onConfirm={() =>
+                void send(() =>
+                  apiPatch(`/api/admin/groups/${group.groupId}/admins/${admin.userId}`, {
+                    isOwner: true,
+                  }),
+                )
+              }
+            />
+            <ConfirmButton
+              variant="danger"
+              label="내보내기"
+              confirmLabel="내보내기"
+              message={`${name} 님은 이 모임의 회원을 더 이상 볼 수 없습니다. 다시 들어오려면 초대 코드가 필요합니다.`}
+              disabled={busy}
+              onConfirm={() =>
+                void send(() =>
+                  apiDelete(`/api/admin/groups/${group.groupId}/admins/${admin.userId}`),
+                )
+              }
+            />
+          </span>
+        ) : null}
+      </div>
+      <FormError>{error}</FormError>
+    </li>
   );
 }
 

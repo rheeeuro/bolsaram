@@ -20,11 +20,15 @@ export default async function HostGroupPage() {
         title="모임"
         description={
           groups.length > 0
-            ? "지금 고를 수 있는 방입니다. 모임에 등록한 회원은 같은 모임 주선자만 봅니다 — 카드의 「설정」에서 이름·동료 초대·나가기를 다룹니다."
+            ? "지금 고를 수 있는 방입니다. 모임에 등록한 회원은 같은 모임 주선자만 봅니다 — 카드의 「설정」에서 이름·동료 초대·나가기를 다룹니다. 모임장은 여기서 주선자를 내보내거나 모임장을 넘깁니다."
             : "아직 모임이 없습니다. 모임 없이도 전체공개 프로필은 다룰 수 있습니다."
         }
       />
-      <GroupSettings groups={groups} activeGroupId={viewer.groupId} />
+      <GroupSettings
+        groups={groups}
+        activeGroupId={viewer.groupId}
+        viewerUserId={viewer.userId}
+      />
     </>
   );
 }

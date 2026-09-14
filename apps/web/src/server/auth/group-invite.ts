@@ -211,8 +211,8 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
 /**
  * 모임 이름·설명을 고친다. 보낸 필드만 바꾼다.
  *
- * 같은 모임의 주선자면 누구나 고칠 수 있다 — 한 팀으로 일하는 사이라 개설자만으로
- * 좁히면 개설자가 없을 때 아무도 못 고친다. RLS(`groups_owner_update`)도 같은 판정이다.
+ * 같은 모임의 주선자면 누구나 고칠 수 있다 — 한 팀으로 일하는 사이라 모임장만으로
+ * 좁히면 모임장이 없을 때 아무도 못 고친다. RLS(`groups_owner_update`)도 같은 판정이다.
  */
 export async function updateGroup(input: {
   groupId: string;
@@ -236,6 +236,97 @@ export async function updateGroup(input: {
 }
 
 /**
+ * 이 사용자가 그 모임의 **모임장**인지 확인한다. 아니면 던진다.
+ *
+ * 소속(`assertGroupAdmin`)보다 한 칸 좁다. 다른 주선자의 소속을 건드리는 동작에만
+ * 쓴다 — 이름·설명 수정과 초대 코드 발급은 지금까지대로 소속 주선자 누구나 한다.
+ */
+export async function assertGroupOwner(userId: string, groupId: string): Promise<void> {
+  const result = await withOwner((sql) =>
+    sql.query(
+      `SELECT 1 FROM group_admins WHERE user_id = $1 AND group_id = $2 AND is_owner`,
+      [userId, groupId],
+    ),
+  );
+  if ((result.rowCount ?? 0) === 0) {
+    throw new DomainError("FORBIDDEN", "모임장만 할 수 있습니다.");
+  }
+}
+
+/**
+ * 모임장을 다른 주선자에게 넘긴다.
+ *
+ * 넘기고 나면 자기는 보통 주선자가 된다 — 되돌리려면 새 모임장이 다시 넘겨야 한다.
+ * 한 트랜잭션 안에서 **해제한 뒤 부여한다**: `group_admins_one_owner` 가 모임당
+ * 모임장 하나만 허용하는 부분 유니크 인덱스라 순서를 바꾸면 충돌한다.
+ */
+export async function transferGroupOwnership(input: {
+  actorId: string;
+  groupId: string;
+  targetUserId: string;
+}): Promise<void> {
+  if (input.actorId === input.targetUserId) {
+    throw new DomainError("CONFLICT", "이미 모임장입니다.");
+  }
+  await assertGroupOwner(input.actorId, input.groupId);
+
+  await withOwnerTx(async (sql) => {
+    const target = await sql.query(
+      `SELECT 1 FROM group_admins WHERE group_id = $1 AND user_id = $2`,
+      [input.groupId, input.targetUserId],
+    );
+    if ((target.rowCount ?? 0) === 0) {
+      throw new DomainError("NOT_FOUND", "이 모임의 주선자가 아닙니다.");
+    }
+
+    await sql.query(
+      `UPDATE group_admins SET is_owner = false WHERE group_id = $1 AND user_id = $2`,
+      [input.groupId, input.actorId],
+    );
+    await sql.query(
+      `UPDATE group_admins SET is_owner = true WHERE group_id = $1 AND user_id = $2`,
+      [input.groupId, input.targetUserId],
+    );
+  });
+}
+
+/**
+ * 다른 주선자를 모임에서 내보낸다. 모임장만 할 수 있다.
+ *
+ * 나가는 것(`leaveGroup`)과 결과는 같지만 **부르는 사람이 다르다.** 초대 코드가 잘못
+ * 전달됐을 때 되돌릴 수 있는 유일한 경로다 — 소속이 사라지면 RLS 가 그 모임의 회원을
+ * 전부 가린다.
+ *
+ * 자기 자신은 이 경로로 뺄 수 없다. 모임장이 빠지는 것은 나가기이고, 그쪽은 남은
+ * 주선자에게 모임장을 넘기거나 빈 모임을 지우는 일까지 함께 한다.
+ *
+ * 내보내진 사람의 활성 채널·봇 업로드 대상은 트리거가 정리한다(0036·0039).
+ * 방에는 「내보냈습니다」 한 줄이 남는다(0046) — 트리거가 아래 GUC 로 자진 탈퇴와
+ * 가른다.
+ */
+export async function removeGroupAdmin(input: {
+  actorId: string;
+  groupId: string;
+  targetUserId: string;
+}): Promise<void> {
+  if (input.actorId === input.targetUserId) {
+    throw new DomainError("CONFLICT", "자기 자신은 모임 나가기로 빠집니다.");
+  }
+  await assertGroupOwner(input.actorId, input.groupId);
+
+  await withOwnerTx(async (sql) => {
+    await sql.query(`SELECT set_config('app.group_admin_removed_by', $1, true)`, [input.actorId]);
+    const removed = await sql.query(
+      `DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2`,
+      [input.groupId, input.targetUserId],
+    );
+    if (removed.rowCount === 0) {
+      throw new DomainError("NOT_FOUND", "이 모임의 주선자가 아닙니다.");
+    }
+  });
+}
+
+/**
  * 모임 하나에서 나간다.
  *
  * 막는 경우가 하나 있다 — **마지막 주선자인데 모임에 회원이나 Import 가 남아 있으면**
@@ -243,8 +334,8 @@ export async function updateGroup(input: {
  * 방법도 없다. 먼저 회원을 전체공개로 옮기거나 동료를 초대하라고 알려준다.
  *
  * 비어 있는 모임이면 나가면서 모임까지 지운다 — 주인 없는 빈 모임을 남기지 않는다.
- * 개설자가 나가고 다른 주선자가 남으면 가장 먼저 들어온 사람에게 개설자를 넘긴다
- * (`group_admins_one_owner` 때문에 개설자 없는 모임을 만들 수 없다).
+ * 모임장이 나가고 다른 주선자가 남으면 가장 먼저 들어온 사람에게 모임장을 넘긴다
+ * (`group_admins_one_owner` 때문에 모임장 없는 모임을 만들 수 없다).
  *
  * 나간 모임을 보고 있었다면 활성 채널은 남아 있는 다른 모임으로 옮기고, 없으면
  * 전체공개가 된다.

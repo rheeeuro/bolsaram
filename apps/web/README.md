@@ -118,9 +118,9 @@ server/
 │   ├── login.ts              주선자 비밀번호 (15분 5회 시도 제한)
 │   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
-│   ├── group-invite.ts       모임 소속·초대 코드·보고 있는 모임 전환
+│   ├── group-invite.ts       모임 소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
-│   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireMemberProfile
+│   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 회원 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)
 ├── storage/local.ts          private 저장소 + signed download/upload URL
@@ -202,6 +202,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/active`                | PUT                 | 주선자            | 보고 있는 모임 전환 (`null` = 전체공개) |
 | `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
 | `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급           |
+| `/api/admin/groups/[id]/admins/[userId]`  | PATCH / DELETE      | **모임장**        | 모임장 넘기기 / 주선자 내보내기      |
 | `/api/admin/groups/[id]/messages`         | GET / POST          | 그 모임 주선자    | 채팅 읽기(`before`·`after`) / 쓰기   |
 | `/api/admin/groups/[id]/messages/[messageId]` | DELETE          | 쓴 사람           | 내 메시지 지우기 (본문만 사라진다)   |
 | `/api/admin/groups/[id]/chat`             | GET / PATCH         | 그 모임 주선자    | 읽은 위치·텔레그램 알림 설정         |

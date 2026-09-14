@@ -313,6 +313,10 @@ export const MATCH_INTENT_STATUS_LABELS: Record<MatchIntentStatus, string> = {
 export const GROUP_MESSAGE_SYSTEM_KINDS = [
   "ADMIN_JOINED",
   "ADMIN_LEFT",
+  /** 모임장이 내보냈다. 자진 탈퇴(`ADMIN_LEFT`)와 구분해 남긴다. */
+  "ADMIN_REMOVED",
+  /** 모임장이 바뀌었다. `actorName` 이 새 모임장이다. */
+  "OWNER_TRANSFERRED",
   "PROFILE_REGISTERED",
   "MATCH_REQUESTED",
   /** 이 제품에서 「수락」은 곧 연결이다(0021 이후 ACCEPTED 는 쓰지 않는다). */
