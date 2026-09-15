@@ -34,7 +34,9 @@ export const GET = route(async (request: Request) => {
   if (size == null) return fail("NOT_FOUND", "파일을 찾을 수 없습니다.", 404);
 
   const contentType = contentTypeFor(key);
-  const stream = Readable.toWeb(openObject(key) as Readable) as WebReadableStream<Uint8Array>;
+  const stream = Readable.toWeb(
+    (await openObject(key)) as Readable,
+  ) as WebReadableStream<Uint8Array>;
   return new NextResponse(stream as unknown as ReadableStream, {
     headers: {
       "content-type": contentType,

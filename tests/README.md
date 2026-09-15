@@ -33,6 +33,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
 | `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·거절·숨김·담당이 갈리는 신청 | 필요 | 47 |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
+| `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 4 |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기·권한 경계 | 필요 | 29 |

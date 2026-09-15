@@ -1,7 +1,5 @@
 /**
- * 로컬 private 스토리지.
- * Supabase Storage 대체물이며 계약을 맞춰둔다 — 나중에 객체 스토리지로 갈아끼울 때
- * `putObject / readObject / signDownloadUrl / signUploadToken` 만 바꾸면 된다.
+ * 로컬 및 Cloudflare R2 private 스토리지. 저장 키로 읽기·삭제 대상을 구분한다.
  *
  * 규칙(설계문서 §12):
  *   * 저장 경로는 웹 루트 밖이다. 정적 서빙되지 않는다.
@@ -9,6 +7,13 @@
  *   * 저장 키는 예측 불가능한 난수를 포함한다.
  */
 import "server-only";
+import {
+  isR2Key,
+  putR2Object,
+  r2ObjectSize,
+  openR2Object,
+  deleteR2Object,
+} from "@bolsaram/db/r2";
 import { createReadStream } from "node:fs";
 import { mkdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -51,7 +56,7 @@ export function buildStorageKey(
   mimeType: string,
 ): string {
   const ext = extensionFor(mimeType);
-  return `${namespace}/${ownerId}/${b64url(randomBytes(12))}${ext}`;
+  return `${namespace}/${ownerId}/${env().STORAGE_PROVIDER === "r2" ? "r2/" : ""}${b64url(randomBytes(12))}${ext}`;
 }
 
 function extensionFor(mimeType: string): string {
@@ -82,6 +87,7 @@ function resolveSafe(key: string): string {
 }
 
 export async function putObject(key: string, data: Buffer): Promise<void> {
+  if (isR2Key(key)) return putR2Object(key, data);
   const full = resolveSafe(key);
   await mkdir(path.dirname(full), { recursive: true });
   // 부분 쓰기가 유효한 파일로 보이지 않도록 임시 파일에 쓰고 원자적으로 옮긴다.
@@ -91,19 +97,23 @@ export async function putObject(key: string, data: Buffer): Promise<void> {
 }
 
 export async function objectSize(key: string): Promise<number | null> {
+  if (isR2Key(key)) return r2ObjectSize(key);
   try {
     const info = await stat(resolveSafe(key));
     return info.size;
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     return null;
   }
 }
 
-export function openObject(key: string): NodeJS.ReadableStream {
+export async function openObject(key: string): Promise<NodeJS.ReadableStream> {
+  if (isR2Key(key)) return openR2Object(key);
   return createReadStream(resolveSafe(key));
 }
 
 export async function deleteObject(key: string): Promise<void> {
+  if (isR2Key(key)) return deleteR2Object(key);
   try {
     await unlink(resolveSafe(key));
   } catch (error) {

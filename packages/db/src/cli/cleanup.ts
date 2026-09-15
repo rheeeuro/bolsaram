@@ -2,6 +2,7 @@
  * 만료 데이터 정리 실행기. PM2 cron(bolsaram-cleanup)이 매일 04:10 에 돌린다.
  * 로직은 ../cleanup.ts 에 있다 — 테스트가 같은 코드를 쓰도록 분리했다.
  */
+import { validateStorageConfig } from "../r2.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { closePools, withOwner } from "../client.js";
@@ -12,6 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 
 async function main(): Promise<void> {
   loadDotEnv();
+  validateStorageConfig(process.env);
   const storageRoot = path.resolve(ROOT, process.env.STORAGE_ROOT ?? "var/storage");
   const startedAt = Date.now();
 

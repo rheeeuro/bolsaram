@@ -32,7 +32,7 @@ API 경로 `/api/admin/*` 은 그대로 둡니다(설계문서 §13에서 벗어
 | API      | Next.js Route Handler (별도 백엔드 프로세스 없음)                               |
 | DB       | PostgreSQL 17 (로컬 컨테이너), 순수 SQL 마이그레이션 + RLS                      |
 | 인증     | 자체 세션(서명 쿠키 + `sessions`). 주선자 이메일/비밀번호, **회원은 초대 링크** |
-| 스토리지 | 로컬 private 디렉터리 + HMAC signed URL                                         |
+| 스토리지 | 로컬 또는 Cloudflare R2 private 저장소 + HMAC signed URL                                         |
 | AI       | provider 추상화. 기본 `mock`, `AI_PROVIDER=openai` 로 전환                      |
 | Import   | 텔레그램 Bot API webhook (1차) + 주선자 웹 업로드. `TELEGRAM_ENABLED` 게이트     |
 

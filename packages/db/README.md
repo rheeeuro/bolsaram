@@ -25,6 +25,7 @@ packages/db/src/
 ├── client.ts       커넥션 풀 2개 + withRls / withOwner / withOwnerTx
 ├── listen.ts       LISTEN 전용 커넥션 (앱 롤, 끊기면 스스로 다시 붙는다)
 ├── env.ts          DATABASE_URL · APP_DATABASE_URL 로딩
+├── r2.ts           웹·정리 CLI 공용 R2 객체 접근 및 설정 검증
 ├── cleanup.ts      만료 데이터 정리 로직 (테스트가 이 모듈을 쓴다)
 ├── index.ts        client · env · listen 재수출
 └── cli/
@@ -32,7 +33,8 @@ packages/db/src/
     ├── reset.ts    public 스키마 초기화 (로컬 전용)
     ├── seed.ts     합성 시드 데이터
     ├── seed-admin-password.ts  시드 관리자 비밀번호 판정 (고정값 없음)
-    ├── cleanup.ts  정리 실행기 (PM2 cron 이 호출)
+    ├── r2.ts           웹·정리 CLI 공용 R2 객체 접근 및 설정 검증
+├── cleanup.ts  정리 실행기 (PM2 cron 이 호출)
     └── dotenv.ts   최소 .env 로더 (CLI 전용)
 ```
 

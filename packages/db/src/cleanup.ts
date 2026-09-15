@@ -1,3 +1,4 @@
+import { isR2Key, deleteR2Object } from "./r2.js";
 /**
  * 만료 데이터 정리 로직 (설계문서 §12 「Import 원본 보관/삭제 정책」, rate limit).
  * 실행기는 cli/cleanup.ts — 여기는 테스트할 수 있도록 순수 로직만 둔다.
@@ -209,6 +210,11 @@ export async function purgeAbandonedImports(
   let files = 0;
   for (const key of new Set(keys)) {
     if (referenced.has(key)) continue;
+    if (isR2Key(key)) {
+      await deleteR2Object(key);
+      files += 1;
+      continue;
+    }
     const full = path.resolve(storageRoot, key);
     // 경로 탈출 방지 — DB 값이라도 그대로 믿지 않는다.
     if (full !== storageRoot && !full.startsWith(storageRoot + path.sep)) {

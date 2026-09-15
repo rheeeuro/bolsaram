@@ -123,7 +123,7 @@ server/
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 회원 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)
-├── storage/local.ts          private 저장소 + signed download/upload URL
+├── storage/local.ts          로컬/R2 private 저장소 + signed download/upload URL
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
 │   ├── mock.ts               규칙 기반 추출기 (기본, API 키 불필요)
@@ -300,3 +300,7 @@ pnpm deploy:web                # 빌드 + PM2 재시작
   (`tests/docs-guide.test.ts` 가 어긋남을 잡는다).
 - 화면 작업은 모바일 390px 를 먼저 만족시킨다.
 - 검증: `pnpm verify`, 그리고 `run-web` 스킬로 권한 경계를 실제 호출해 확인.
+
+## Cloudflare R2
+
+설정 및 전환 방법은 [R2 운영 안내](../../docs/r2-storage.md)를 참고합니다.

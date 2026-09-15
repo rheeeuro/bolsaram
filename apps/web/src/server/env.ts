@@ -3,6 +3,7 @@
  * 클라이언트 번들에 새어 나가면 안 되므로 이 파일은 server-only 로 표시한다.
  */
 import "server-only";
+import { validateStorageConfig } from "@bolsaram/db/r2";
 import { z } from "zod";
 
 const envSchema = z.object({
@@ -14,6 +15,7 @@ const envSchema = z.object({
   STORAGE_SECRET: z.string().min(32, "STORAGE_SECRET 은 32자 이상이어야 합니다."),
   INVITE_TOKEN_PEPPER: z.string().min(32, "INVITE_TOKEN_PEPPER 는 32자 이상이어야 합니다."),
 
+  STORAGE_PROVIDER: z.enum(["local", "r2"]).default("local"),
   STORAGE_ROOT: z.string().min(1).default("./var/storage"),
   STORAGE_SIGNED_URL_TTL: z.coerce.number().int().min(30).max(3600).default(300),
 
@@ -67,6 +69,7 @@ let cached: Env | null = null;
 
 export function env(): Env {
   if (cached) return cached;
+  validateStorageConfig(process.env);
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     const lines = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`);
