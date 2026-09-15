@@ -19,7 +19,9 @@ export default async function HostLayout({ children }: { children: React.ReactNo
   // 채팅 배지의 첫 값. 이후에는 SSE 가 밀어준다. 센 시각을 함께 넘겨 화면이 뜨고
   // 연결되기까지의 틈을 스트림이 메우게 한다.
   const countedAt = new Date().toISOString();
-  const unread = await withRls(rlsContextOf(viewer), (sql) => unreadByGroup(sql, viewer.userId));
+  const unread = await withRls(rlsContextOf(viewer), (sql) =>
+    unreadByGroup(sql, viewer.userId),
+  );
 
   return (
     <div className="host-surface min-h-dvh bg-[var(--surface-page)] text-[var(--surface-text)]">
@@ -33,7 +35,9 @@ export default async function HostLayout({ children }: { children: React.ReactNo
           groups={viewer.groups}
           activeGroupId={viewer.groupId}
         />
-        <div className="mx-auto max-w-6xl px-5 pb-16 pt-7">{children}</div>
+        <div className="lg:pl-64">
+          <main className="mx-auto max-w-6xl px-5 pb-16 pt-7">{children}</main>
+        </div>
       </ChatStreamProvider>
     </div>
   );

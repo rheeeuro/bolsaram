@@ -2,27 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BRAND } from "@bolsaram/ui-tokens";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GroupSwitcher, type GroupChoice } from "@/components/host/group-switcher";
 import { useChatStream } from "@/components/host/chat-stream";
 
-/**
- * 주선자 네비게이션.
- *
- * 볼사람에 별도의 관리자 제품이 있는 게 아니라 이 화면들이 곧 볼사람이다.
- * 그래서 로고를 그대로 쓰고 「Admin」 같은 꼬리표를 붙이지 않는다.
- * 메뉴는 알약 형태로 가로 스크롤한다 — 주선자도 대부분 폰에서 일한다.
- *
- * 로고 옆의 전환기가 지금 보고 있는 모임을 말한다. 아래 메뉴는 전부 그 모임 안의
- * 화면이다 — 모임을 바꾸면 같은 메뉴가 다른 모임의 내용을 보여준다.
- *
- * 「채팅」 옆 숫자는 **보고 있는 모임**의 안 읽은 글이다. 다른 모임에 안 읽은 것이
- * 있으면 전환기에 점이 붙는다 — 방을 옮기지 않아도 알아채라는 뜻이다.
- * 두 값 모두 SSE 연결에서 온다.
- */
+/** 모임 목록과 선택한 모임의 화면을 계층으로 보여주는 내비게이션. */
 
 type NavLink = { href: string; label: string; exact?: boolean };
 
@@ -50,31 +36,20 @@ export function HostNav({
   // 배지는 SSE 가 밀어주는 값이다(`ChatStreamProvider`). 여기서 따로 묻지 않는다.
   const { unread } = useChatStream();
   const hereUnread = activeGroupId ? (unread[activeGroupId] ?? 0) : 0;
-  const elsewhereUnread = Object.entries(unread).some(
-    ([groupId, count]) => groupId !== activeGroupId && count > 0,
-  );
+  const activeName = groups.find((group) => group.id === activeGroupId)?.name ?? "전체공개";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--surface-border)] bg-[var(--color-ivory-50)]/92 backdrop-blur">
-      <div className="mx-auto max-w-6xl px-5">
-        <div className="flex items-center justify-between gap-4 pt-4">
+    <header className="sticky top-0 z-30 lg:fixed lg:bottom-0 lg:left-0 lg:w-64 lg:overflow-y-auto lg:border-r border-b border-[var(--surface-border)] bg-[var(--color-ivory-50)]/92 backdrop-blur">
+      <div className="px-4 lg:flex lg:min-h-full lg:flex-col">
+        <div className="flex items-center justify-between gap-3 py-4 lg:flex-wrap">
           <div className="flex min-w-0 items-center gap-3">
             <Link href="/home" className="flex shrink-0 items-baseline">
               <BrandLogo variant="wordmark" height={22} eager />
-              <span className="ml-2.5 hidden text-[12px] text-[var(--color-ink-500)] lg:inline">
-                {BRAND.tagline}
-              </span>
             </Link>
-            <GroupSwitcher
-              groups={groups}
-              activeGroupId={activeGroupId}
-              unread={unread}
-              elsewhereUnread={elsewhereUnread}
-            />
           </div>
 
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="hidden text-[12.5px] text-[var(--surface-text-muted)] sm:inline">
+          <div className="flex min-w-0 items-center gap-3 lg:w-full lg:justify-between">
+            <span className="hidden truncate text-[12.5px] text-[var(--surface-text-muted)] sm:inline">
               {displayName ?? "주선자"} 님
             </span>
             <button
@@ -92,24 +67,37 @@ export function HostNav({
           </div>
         </div>
 
-        <nav className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto py-3">
+        <GroupSwitcher groups={groups} activeGroupId={activeGroupId} unread={unread} />
+        <div className="mt-2 border-t border-[var(--surface-border)] px-2 pt-3 lg:mt-4 lg:pt-5">
+          <p className="truncate text-[15px] font-semibold" title={activeName}>
+            {activeName}
+          </p>
+          <p className="mt-1 hidden text-[11px] text-[var(--surface-text-muted)] lg:block">
+            {activeGroupId ? "우리 모임의 공간" : "전체공개 프로필을 함께 살펴보세요"}
+          </p>
+        </div>
+        <nav
+          aria-label="모임 안의 화면"
+          className="flex gap-1 overflow-x-auto py-3 lg:flex-col lg:overflow-visible"
+        >
           {LINKS.map((link) => {
-            const active = link.exact
-              ? pathname === link.href
-              : pathname.startsWith(link.href);
+            const active = link.exact ? pathname === link.href : pathname.startsWith(link.href);
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "shrink-0 rounded-[var(--radius-pill)] px-3.5 py-1.5 text-[13.5px]",
+                  "flex min-h-11 shrink-0 items-center rounded-lg px-3.5 py-2 text-[13.5px]",
                   "transition-colors duration-[var(--duration-quick)]",
                   active
                     ? "bg-[var(--color-rose-600)] text-white"
                     : "text-[var(--color-ink-600)] hover:bg-[var(--color-ivory-200)]",
                 )}
               >
+                <span aria-hidden className="mr-2 text-base opacity-60">
+                  {link.href === "/group" ? "⚙" : "#"}
+                </span>
                 {link.label}
                 {link.href === "/chat" && hereUnread > 0 ? (
                   <span
