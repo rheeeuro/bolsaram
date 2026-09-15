@@ -148,14 +148,14 @@ pnpm db:backup:verify   # 최근 백업을 임시 DB 로 되살려 확인
 ```bash
 pnpm verify        # typecheck + lint + test (311개)
 pnpm agents:check  # 에이전트 설정 드리프트 검사
-pnpm agents:test   # 셸 가드 판정 케이스 25개
+pnpm agents:test   # 셸 가드·자동 배포 회귀 테스트
 ```
 
 DB 통합 테스트가 포함되어 있어 `pnpm db:up`이 필요합니다.
 
 ## 에이전트 하네스
 
-Claude Code와 Codex가 같은 규칙으로 움직이도록 `.agent-config/`를 단일 원본으로 두고
+Claude Code와 Codex가 같은 규칙으로 움직이도록 [`.agent-config/`](.agent-config/README.md)를 단일 원본으로 두고
 `sync.py`가 에이전트별 설정을 생성합니다. 생성 파일을 직접 고치면 다음 동기화에 덮어써지므로
 훅이 편집을 막습니다.
 

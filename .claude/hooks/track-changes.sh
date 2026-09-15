@@ -2,23 +2,18 @@
 # PostToolUse: 편집된 파일을 누적 기록하고(턴 종료 시 deploy-on-stop 이 소비),
 # 파일이 속한 축에 맞는 프로젝트 규칙을 에이전트 컨텍스트에 주입한다.
 # - 누적 기록: .claude/.pending-changes (gitignore)
-# - exit 0 고정. 검증 책임은 quality-gate.sh 가 따로 담당하고 여긴 기록/상기 전용.
+# - 변경 경로 입력이 잘못되면 exit 2. 코드 검증은 quality-gate.sh가 담당한다.
 set -uo pipefail
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-PENDING="$ROOT/.claude/.pending-changes"
+PENDING="${AGENT_PENDING_CHANGES:-$ROOT/.claude/.pending-changes}"
 
-FILE=$(python3 -c '
-import json,sys
-try:
-    d=json.load(sys.stdin)
-    print(d.get("tool_input",{}).get("file_path",""))
-except Exception:
-    print("")
-' 2>/dev/null || echo "")
-
-[ -z "$FILE" ] && exit 0
-echo "$FILE" >> "$PENDING"
+CHANGED=$(python3 "$ROOT/.agent-config/hook-files.py" "$ROOT") || exit 2
+[ -z "$CHANGED" ] && exit 0
+mkdir -p "$(dirname "$PENDING")"
+# 각 파일을 누적하고, 문맥 안내는 첫 파일을 기준으로 한 번만 출력한다.
+printf '%s\n' "$CHANGED" >> "$PENDING"
+FILE="${CHANGED%%$'\n'*}"
 
 # 어떤 축을 건드렸는지 판정한다. 여러 축에 걸리면 모두 알린다.
 KINDS=""

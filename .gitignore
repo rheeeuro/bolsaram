@@ -23,6 +23,9 @@ var/
 # 에이전트 훅 상태 파일 (턴 단위 임시)
 .claude/.pending-changes
 .claude/.turn-start
+.claude/.deploy-state.json
+.claude/.deploy-state.json.next.*
+.claude/.deploy.lock
 .claude/settings.local.json
 
 # 비밀 파일 가드 일시 해제 마커. 사용자가 명시적으로 요청할 때만 만들고 곧바로 지운다.

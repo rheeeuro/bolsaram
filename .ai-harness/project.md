@@ -89,7 +89,7 @@ pnpm ai:check          # OpenAI 키·모델 사용 가능 여부
 
 pnpm agents:sync       # 하네스 원본 → 에이전트별 설정 생성
 pnpm agents:check      # 생성 파일 드리프트 검사
-pnpm agents:test       # 셸 가드 판정 케이스 25개
+pnpm agents:test       # 셸 가드 25개 + 자동 배포 회귀 테스트
 ```
 
 회원 계정은 **초대 링크를 소비할 때만** 만들어집니다(`consumeInvite`).
@@ -138,6 +138,9 @@ pnpm agents:test       # 셸 가드 판정 케이스 25개
   manifest.json     훅 on/off · 권한 · Codex 규칙
   sync.py           생성기 (--check 로 드리프트 검사)
   guard-cases.py    셸 가드 판정 케이스
+  deploy-cases.py   임시 프로젝트에서 배포 훅 회귀 검증
+  deploy-state.py   배포 입력 메타데이터 비교 (비밀 내용은 읽지 않음)
+  hook-files.py     Claude·Codex 편집 입력의 파일 경로 추출
   skills/           check · run-web · db-query · new-migration
   agents/           verify-agent · ui-agent
 ```
@@ -150,8 +153,27 @@ pnpm agents:test       # 셸 가드 판정 케이스 25개
 | PreToolUse       | guard-sensitive.sh | 민감 파일 편집·열람 차단 (셸 우회 포함)     |
 | PostToolUse      | quality-gate.sh    | 해당 패키지 타입체크, 마이그레이션 RLS 검사 |
 | PostToolUse      | track-changes.sh   | 변경 기록 + 건드린 축의 규칙 주입 + 이력 주석 경고 |
-| UserPromptSubmit | mark-turn-start.sh | 턴 시작 시각 기록                           |
+| UserPromptSubmit | mark-turn-start.sh | 턴 시작·최초 배포 비교 기준 기록            |
 | Stop             | deploy-on-stop.sh  | 빌드 + PM2 재시작, 미적용 마이그레이션 안내 |
+
+### 자동 배포 (Claude·Codex 공통)
+
+- `.agent-config/sync.py`가 양쪽의 `UserPromptSubmit`·`PostToolUse`·`Stop`을 같은
+  공용 스크립트에 연결한다. 생성 설정을 직접 편집하지 않는다.
+- `.claude/.deploy-state.json`의 파일 메타데이터와 현재 상태를 비교한다. 최초 턴에
+  기준을 만들고, 성공한 반영만 기준을 갱신한다. 셸 편집·삭제와 턴 사이의 변경도 감지한다.
+- 웹 소스·정적 파일·워크스페이스 런타임 패키지·의존성 설정·루트 `.env`/`.env.local`
+  변경은 빌드 후 `bolsaram-web`을 재시작한다. 환경변수 변경 시 상시 `bolsaram-health`도
+  재시작한다. `.env` 내용은 비교 과정에서 읽거나 기록하지 않는다.
+- 빌드·재시작·로컬 `/api/health` 확인이 실패하면 변경을 보존하고 다음 Stop에서
+  재시도한다. 첫 실패는 `decision: block`으로 수정을 이어가고, 재진입 실패는 경고한다.
+- Claude와 Codex의 동시 빌드는 공용 파일 잠금으로 막는다. 다른 배포가 진행 중이면
+  이번 호출은 건너뛰고 다음 Stop에서 변경을 다시 확인한다.
+- PM2 미설치·중지된 웹 앱은 자동으로 켜지 않고 대기 상태를 보존한다.
+  cron 작업은 다음 실행에 반영되며, DB 마이그레이션은 자동 적용하지 않는다.
+- 하네스를 바꾸면 `pnpm agents:sync`, `pnpm agents:check`, `pnpm agents:test`,
+  `pnpm verify`를 실행한다. 현재 세션이 새 훅 설정을 아직 읽지 않았다면 검증된 공용
+  Stop 스크립트를 직접 실행해 반영하고 실제 응답을 확인한다.
 
 가드가 막는 대상: 생성된 에이전트 설정, 비밀 파일, private 스토리지, **DB 백업**, 운영 로그,
 **이미 적용된 마이그레이션**. 개인정보 디렉터리(`var/storage` · `var/backup` · `var/log`)는

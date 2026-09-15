@@ -75,11 +75,17 @@
           },
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/track-changes.sh"
-          },
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.agent-config/sync.py\" --quiet"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.agent-config/sync.py\" --quiet"
+            "command": "/usr/bin/env bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/track-changes.sh\"",
+            "timeout": 30
           }
         ]
       }
@@ -89,7 +95,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/mark-turn-start.sh"
+            "command": "/usr/bin/env bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/mark-turn-start.sh\"",
+            "timeout": 30
           }
         ]
       }
@@ -99,7 +106,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/deploy-on-stop.sh"
+            "command": "/usr/bin/env bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/deploy-on-stop.sh\"",
+            "timeout": 600
           }
         ]
       }

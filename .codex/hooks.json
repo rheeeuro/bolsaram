@@ -44,6 +44,28 @@
             "statusMessage": "Claude/Codex 설정 동기화"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/env bash \"$(git rev-parse --show-toplevel)/.claude/hooks/track-changes.sh\"",
+            "timeout": 30,
+            "statusMessage": "배포할 변경 파일 기록"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/env bash \"$(git rev-parse --show-toplevel)/.claude/hooks/mark-turn-start.sh\"",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "Stop": [
@@ -52,8 +74,7 @@
           {
             "type": "command",
             "command": "/usr/bin/env bash \"$(git rev-parse --show-toplevel)/.claude/hooks/deploy-on-stop.sh\"",
-            "timeout": 600,
-            "statusMessage": "변경된 서비스 빌드 및 반영"
+            "timeout": 600
           }
         ]
       }
