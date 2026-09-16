@@ -8,7 +8,13 @@ import { BrandLogo } from "@/components/ui/brand-logo";
 import { GroupSwitcher, type GroupChoice } from "@/components/host/group-switcher";
 import { useChatStream } from "@/components/host/chat-stream";
 
-/** 모임 목록과 선택한 모임의 화면을 계층으로 보여주는 내비게이션. */
+/**
+ * 모임 목록과 선택한 모임의 화면을 계층으로 보여주는 내비게이션.
+ *
+ * 아래 목록에는 **보고 있는 모임에 속한 화면만** 둔다. 모임 자체를 다루는 `/group`
+ * 은 계정 단위라 위쪽 모임 목록 옆의 「관리」로 간다 — 같은 줄에 섞으면 모임을
+ * 바꿔도 안 바뀌는 화면이 하나 껴 있게 된다.
+ */
 
 type NavLink = { href: string; label: string; exact?: boolean };
 
@@ -19,7 +25,6 @@ const LINKS: NavLink[] = [
   { href: "/imports", label: "가져오기" },
   { href: "/members", label: "회원" },
   { href: "/chat", label: "채팅" },
-  { href: "/group", label: "모임" },
 ];
 
 export function HostNav({
@@ -96,7 +101,7 @@ export function HostNav({
                 )}
               >
                 <span aria-hidden className="mr-2 text-base opacity-60">
-                  {link.href === "/group" ? "⚙" : "#"}
+                  #
                 </span>
                 {link.label}
                 {link.href === "/chat" && hereUnread > 0 ? (

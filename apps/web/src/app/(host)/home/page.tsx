@@ -30,6 +30,8 @@ type RecentRow = {
 
 export default async function HostHomePage() {
   const viewer = await requireAdminPage();
+  const activeName =
+    viewer.groups.find((group) => group.id === viewer.groupId)?.name ?? "전체공개";
 
   const { kpi, recent } = await withRls(rlsContextOf(viewer), async (sql) => {
     // 홈은 단일 왕복으로 끝낸다. 카운트가 늘어나면 뷰로 뺀다.
@@ -99,12 +101,15 @@ export default async function HostHomePage() {
   return (
     <>
       <section className="animate-fade mb-8">
-        <p className="kicker mb-3">Today</p>
+        {/* 아래 숫자는 전부 보고 있는 채널 안의 것이다. 어디를 세고 있는지 먼저 말한다. */}
+        <p className="mb-3 text-[11.5px] tracking-[0.08em] text-[var(--surface-text-muted)]">
+          {activeName}
+        </p>
         <h1 className="display text-[30px] leading-snug text-[var(--color-ink-900)]">
           {greeting(kpi)}
         </h1>
         <p className="mt-2.5 text-[13.5px] leading-relaxed text-[var(--surface-text-muted)]">
-          좋은 사람을, 좋은 방식으로. 오늘 주선자가 볼 것만 모았습니다.
+          좋은 사람을, 좋은 방식으로. {activeName}에서 오늘 볼 것만 모았습니다.
         </p>
       </section>
 

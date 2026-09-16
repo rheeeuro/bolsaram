@@ -8,7 +8,12 @@ import { cn } from "@/lib/cn";
 
 export type GroupChoice = { id: string; name: string };
 
-/** 항상 보이는 모임 목록. 전환 완료까지 중복 요청을 막는다. */
+/**
+ * 항상 보이는 모임 목록. 전환 완료까지 중복 요청을 막는다.
+ *
+ * 모임 자체를 다루는 `/group` 진입점이 여기 붙는 이유는 그것이 계정 단위이기
+ * 때문이다 — 아래 화면 목록은 고른 모임 안에서만 뜻이 있다.
+ */
 export function GroupSwitcher({
   groups,
   activeGroupId,
@@ -42,9 +47,17 @@ export function GroupSwitcher({
       aria-busy={busy || pending}
       className="min-h-0 lg:flex lg:flex-col"
     >
-      <p className="mb-2 px-2 text-[11px] font-medium tracking-wider text-[var(--surface-text-muted)]">
-        내 모임
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-2 px-2">
+        <p className="text-[11px] font-medium tracking-wider text-[var(--surface-text-muted)]">
+          내 모임
+        </p>
+        <Link
+          href="/group"
+          className="shrink-0 text-[11px] text-[var(--surface-text-muted)] transition-colors hover:text-[var(--color-rose-600)]"
+        >
+          관리
+        </Link>
+      </div>
       <div className="flex gap-2 overflow-x-auto pb-2 lg:max-h-[32dvh] lg:flex-col lg:overflow-y-auto">
         {[{ id: null, name: "전체공개" }, ...groups].map((group) => {
           const active = group.id === activeGroupId;
@@ -99,7 +112,7 @@ export function GroupSwitcher({
           <span aria-hidden className="text-xl">
             ＋
           </span>{" "}
-          모임 만들기 · 참여
+          모임 만들기 · 참여하기
         </Link>
       </div>
       {(busy || pending) && (
