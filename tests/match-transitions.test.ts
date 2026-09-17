@@ -113,6 +113,41 @@ describe("assertCanCreateRequest", () => {
     ).not.toThrow();
   });
 
+  it("같은 성별에게는 신청할 수 없다", () => {
+    const error = catchError(() =>
+      assertCanCreateRequest({
+        requesterProfileId: "a",
+        targetProfileId: "b",
+        requesterGender: "FEMALE",
+        targetGender: "FEMALE",
+      }),
+    );
+    expect((error as DomainError).code).toBe("FORBIDDEN");
+  });
+
+  it("이성이면 통과한다", () => {
+    expect(() =>
+      assertCanCreateRequest({
+        requesterProfileId: "a",
+        targetProfileId: "b",
+        requesterGender: "FEMALE",
+        targetGender: "MALE",
+      }),
+    ).not.toThrow();
+  });
+
+  it("성별을 모르면 성별로 막지 않는다 — 다른 판정이 이미 걸러낸 경우다", () => {
+    // 상대가 RLS 로 보이지 않으면 null 이 온다. 그때 막는 이유는 성별이 아니다.
+    expect(() =>
+      assertCanCreateRequest({
+        requesterProfileId: "a",
+        targetProfileId: "b",
+        requesterGender: "FEMALE",
+        targetGender: null,
+      }),
+    ).not.toThrow();
+  });
+
   it("거절된 관계에는 다시 신청할 수 없다", () => {
     const error = catchError(() =>
       assertCanCreateRequest({

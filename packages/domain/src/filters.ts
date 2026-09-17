@@ -2,13 +2,20 @@
  * Discover 필터를 SQL 조각으로 바꾼다.
  * 필터 의미를 한 곳에 모아 테스트 가능하게 하고, 값은 항상 파라미터로만 넘긴다.
  */
-import type { DiscoverQuery } from "@bolsaram/schemas";
+import type { DiscoverQuery, Gender } from "@bolsaram/schemas";
+import { oppositeGender } from "./visibility";
 
 export type SqlFragment = { text: string; values: unknown[] };
 
 export type FilterContext = {
   /** 나 자신은 리스트에서 제외한다. */
   viewerProfileId: string | null;
+  /**
+   * 보는 사람의 성별. 목록은 **이성만** 보여주므로 이 값이 곧 필터다.
+   * 회원이 고를 수 있는 값이 아니다 — 프로필에 적힌 성별을 그대로 쓴다.
+   * null 이면(프로필이 없는 주선자) 좁히지 않는다.
+   */
+  viewerGender: Gender | null;
   /** 기준 연도. 나이 → 출생연도 변환에 쓴다. */
   currentYear: number;
 };
@@ -51,7 +58,11 @@ export function buildDiscoverWhere(
     // 서브쿼리로 직접 훑으면 그 방향이 빠진다.
     clauses.push(`p.id NOT IN (SELECT app_discover_excluded_profile_ids())`);
   }
-  if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
+  // 이성만 본다. 화면에 성별 선택이 없고 주소로 넣을 수도 없다 — 볼 수 있는 성별은
+  // 보는 사람의 프로필이 정한다(`isOppositeGender`).
+  if (ctx.viewerGender) {
+    clauses.push(`p.gender = ${push(oppositeGender(ctx.viewerGender))}`);
+  }
 
   const years = birthYearRange(query, ctx.currentYear);
   if (years.min != null) clauses.push(`p.birth_year >= ${push(years.min)}`);

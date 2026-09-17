@@ -413,7 +413,7 @@ describe("시스템 메시지", () => {
   it("신청과 연결이 남는다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `x${Date.now() % 100000}`));
     const pair = await withOwner(async (sql) => {
-      const make = async (key: string) => {
+      const make = async (key: string, gender: "MALE" | "FEMALE") => {
         const u = await sql.query<{ id: string }>(
           `INSERT INTO users (role, phone, display_name) VALUES ('MEMBER', $1, $2) RETURNING id`,
           [`0109${String(Date.now()).slice(-6)}${key}`, `${TAG}-${key}`],
@@ -421,12 +421,13 @@ describe("시스템 메시지", () => {
         const p = await sql.query<{ id: string }>(
           `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
                                  status, visibility, real_name, created_by)
-           VALUES ($1, $2, 'MALE', 1990, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4) RETURNING id`,
-          [party.groupId, u.rows[0]!.id, `${TAG}-${key}-이름`, party.ownerId],
+           VALUES ($1, $2, $3, 1990, 'SEOUL', 'ACTIVE', 'LISTED', $4, $5) RETURNING id`,
+          [party.groupId, u.rows[0]!.id, gender, `${TAG}-${key}-이름`, party.ownerId],
         );
         return p.rows[0]!.id;
       };
-      return { a: await make("s1"), b: await make("s2") };
+      // 신청은 이성 사이에만 성립한다(0048).
+      return { a: await make("s1", "MALE"), b: await make("s2", "FEMALE") };
     });
 
     const requestId = await withOwner(async (sql) => {

@@ -37,13 +37,11 @@ import {
 export function FilterSheet({
   open,
   initial,
-  gender,
   onClose,
   onApply,
 }: {
   open: boolean;
   initial: Filters;
-  gender: string | null;
   onClose: () => void;
   onApply: (filters: Filters) => void;
 }) {
@@ -55,7 +53,7 @@ export function FilterSheet({
     if (open) setDraft(initial);
   }, [open, initial]);
 
-  const query = useMemo(() => filtersToParams(draft, gender).toString(), [draft, gender]);
+  const query = useMemo(() => filtersToParams(draft).toString(), [draft]);
 
   // 결과 개수 미리보기. 입력이 멈춘 뒤에만 요청한다.
   useEffect(() => {

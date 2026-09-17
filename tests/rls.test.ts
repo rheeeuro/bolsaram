@@ -6,6 +6,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ANONYMOUS, closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
+import { discoverQuerySchema } from "@bolsaram/schemas";
+import { findDiscoverProfiles } from "../apps/web/src/server/repo/profiles";
 
 type Fixture = {
   adminId: string;
@@ -40,11 +42,20 @@ beforeAll(async () => {
       return result.rows[0]!.id;
     };
 
-    const profile = async (userId: string | null, status: string, visibility: string) => {
+    /**
+     * 성별을 받는다. 신청은 **이성 사이에서만** 성립하므로(0048) 신청을 주고받는
+     * 픽스처를 같은 성별로 두면 관계 테스트가 전부 성별에서 먼저 막힌다.
+     */
+    const profile = async (
+      userId: string | null,
+      status: string,
+      visibility: string,
+      gender: "MALE" | "FEMALE",
+    ) => {
       const result = await sql.query<{ id: string }>(
         `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status, visibility, real_name)
-         VALUES ($1,$2,'FEMALE',1993,'SEOUL',$3,$4,$5) RETURNING id`,
-        [groupId, userId, status, visibility, `${TAG}-이름`],
+         VALUES ($1,$2,$3,1993,'SEOUL',$4,$5,$6) RETURNING id`,
+        [groupId, userId, gender, status, visibility, `${TAG}-이름`],
       );
       return result.rows[0]!.id;
     };
@@ -77,12 +88,14 @@ beforeAll(async () => {
       member1: { userId: u1, role: "MEMBER" as const },
       member2: { userId: u2, role: "MEMBER" as const },
       outsider: { userId: u3, role: "MEMBER" as const },
-      p1: await profile(u1, "ACTIVE", "LISTED"),
-      p2: await profile(u2, "ACTIVE", "LISTED"),
-      pOutsider: await profile(u3, "ACTIVE", "LISTED"),
-      pHidden: await profile(null, "INACTIVE", "PRIVATE"),
+      // p1·p4 가 여성, p2·pOutsider 가 남성이다. 신청이 오가는 쌍(p1↔p2 · p1↔pOutsider ·
+      // p4↔pOutsider)이 모두 이성이 되도록 짝지었다.
+      p1: await profile(u1, "ACTIVE", "LISTED", "FEMALE"),
+      p2: await profile(u2, "ACTIVE", "LISTED", "MALE"),
+      pOutsider: await profile(u3, "ACTIVE", "LISTED", "MALE"),
+      pHidden: await profile(null, "INACTIVE", "PRIVATE", "FEMALE"),
       member4: { userId: u4, role: "MEMBER" as const },
-      p4: await profile(u4, "ACTIVE", "LISTED"),
+      p4: await profile(u4, "ACTIVE", "LISTED", "FEMALE"),
     };
   });
 });
@@ -104,6 +117,37 @@ describe("profiles 읽기 정책", () => {
   it("익명은 아무 프로필도 보지 못한다", async () => {
     const result = await withRls(ANONYMOUS, (sql) => sql.query(`SELECT id FROM profiles`));
     expect(result.rowCount).toBe(0);
+  });
+
+  it("회원은 같은 성별인 프로필을 보지 못한다", async () => {
+    // p1(여성)에게 p4(여성)는 없는 사람이다. 목록에서 빼는 것과 별개로 정책이 막는다.
+    const result = await withRls(fx.member1, (sql) =>
+      sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.p4]),
+    );
+    expect(result.rowCount).toBe(0);
+  });
+
+  it("회원은 이성 프로필을 본다", async () => {
+    const result = await withRls(fx.member1, (sql) =>
+      sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.p2]),
+    );
+    expect(result.rowCount).toBe(1);
+  });
+
+  it("같은 성별이어도 자기 프로필은 본다", async () => {
+    // 본인 절(user_id = app_current_user_id())이 성별과 무관하게 통과시킨다.
+    const result = await withRls(fx.member1, (sql) =>
+      sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.p1]),
+    );
+    expect(result.rowCount).toBe(1);
+  });
+
+  it("주선자는 성별과 무관하게 본다", async () => {
+    // 주선자는 양쪽을 다 보고 등록한다 — 이성 경계는 회원 화면의 것이다.
+    const result = await withRls(fx.admin, (sql) =>
+      sql.query(`SELECT id FROM profiles WHERE id = ANY($1)`, [[fx.p1, fx.p4]]),
+    );
+    expect(result.rowCount).toBe(2);
   });
 
   it("회원은 비공개(PRIVATE) 프로필을 보지 못한다", async () => {
@@ -196,6 +240,19 @@ describe("match_requests 정책", () => {
         ),
       ),
     ).rejects.toThrow(/match_requests_no_self/);
+  });
+
+  it("같은 성별에게는 신청이 만들어지지 않는다", async () => {
+    // 앱 레이어(assertCanCreateRequest)가 먼저 막지만, 검사를 빠뜨린 경로가 생겨도
+    // DB 가 막아야 한다. owner 로 직접 넣어 트리거만 시험한다.
+    await expect(
+      withOwner((sql) =>
+        sql.query(
+          `INSERT INTO match_requests (requester_profile_id, target_profile_id) VALUES ($1,$2)`,
+          [fx.p1, fx.p4],
+        ),
+      ),
+    ).rejects.toThrow(/같은 성별/);
   });
 
   it("무관한 제3자는 남의 신청을 보지 못한다", async () => {
@@ -377,6 +434,33 @@ describe("주선자 대행", () => {
   it("회원은 대행하지 못한다 — 자기 프로필로 떨어진다", async () => {
     // 대행 값을 직접 넣어도 app_is_admin() 이 막고 COALESCE 가 본인 프로필을 준다.
     expect(await actingAs(fx.member2, fx.p1)).toBe(fx.p2);
+  });
+
+  /**
+   * 대행 중에도 회원 화면은 이성만 보여준다.
+   *
+   * **RLS 만으로는 여기가 막히지 않는다** — 대행 중인 주선자는 회원 절이 아니라
+   * 주선자 절로 프로필을 보기 때문이다(그래서 아래 첫 단언은 「보인다」다).
+   * 목록을 만드는 곳이 대행 프로필의 성별로 좁힌다.
+   */
+  it("대행 중 목록에는 그 회원의 이성만 담긴다", async () => {
+    const acting: RlsContext = { ...fx.admin, actingProfileId: fx.p1 };
+
+    // 정책은 통과시킨다. 대행은 주선자 명의로 도는 요청이다.
+    const visible = await withRls(acting, (sql) =>
+      sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.p4]),
+    );
+    expect(visible.rowCount).toBe(1);
+
+    // 그래도 목록에는 담기지 않는다 — p1(여성) 기준으로 p4(여성)는 이성이 아니다.
+    const page = await withRls(acting, (sql) =>
+      findDiscoverProfiles(sql, discoverQuerySchema.parse({ limit: 60 }), fx.p1),
+    );
+    expect(page.items.map((item) => item.id)).not.toContain(fx.p4);
+    // 담긴 것은 전부 남성이다. 개별 프로필로 확인하지 않는 이유는 앞선 테스트가
+    // 거절·숨김 관계를 남겨 특정 상대가 빠질 수 있기 때문이다.
+    expect(page.items.length).toBeGreaterThan(0);
+    expect(new Set(page.items.map((item) => item.gender))).toEqual(new Set(["MALE"]));
   });
 
   it("대행하지 않는 주선자에게는 회원 프로필이 없다", async () => {

@@ -57,19 +57,26 @@ beforeAll(async () => {
     );
     const memberId = m.rows[0]!.id;
 
-    const insertProfile = async (name: string, days: number, userId: string | null) => {
+    const insertProfile = async (
+      name: string,
+      days: number,
+      userId: string | null,
+      gender: "MALE" | "FEMALE" = "FEMALE",
+    ) => {
       const r = await sql.query<{ id: string }>(
         `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
                                status, visibility, real_name, created_by, created_at)
-         VALUES ($1, $2, 'FEMALE', 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4,
+         VALUES ($1, $2, $6, 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4,
                  now() - make_interval(days => $5))
          RETURNING id`,
-        [gid, userId, name, adminId, days],
+        [gid, userId, name, adminId, days, gender],
       );
       return r.rows[0]!.id;
     };
 
-    const viewer = await insertProfile(`${TAG}-viewer`, 9, memberId);
+    // 보는 사람만 남성이다 — 목록은 이성만 보여주므로(0048) 나머지가 전부 보여야
+    // 정렬을 확인할 수 있다.
+    const viewer = await insertProfile(`${TAG}-viewer`, 9, memberId, "MALE");
 
     for (const f of FIXTURES) {
       const name = `${TAG}-${f.key}`;

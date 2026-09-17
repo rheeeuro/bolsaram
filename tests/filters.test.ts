@@ -19,7 +19,8 @@ import {
   type Filters,
 } from "../apps/web/src/components/member/filter-model";
 
-const CTX = { viewerProfileId: "me", currentYear: 2026 };
+/** 보는 사람은 여성이다 — 목록에는 남성만 나와야 한다(0048). */
+const CTX = { viewerProfileId: "me", viewerGender: "FEMALE" as const, currentYear: 2026 };
 const parse = (raw: Record<string, unknown>) => discoverQuerySchema.parse(raw);
 
 describe("birthYearRange", () => {
@@ -47,7 +48,7 @@ describe("buildDiscoverWhere", () => {
   });
 
   it("프로필이 없는 열람자는 제외 조건을 걸지 않는다", () => {
-    const where = buildDiscoverWhere(parse({}), { ...CTX, viewerProfileId: null });
+    const where = buildDiscoverWhere(parse({}), { ...CTX, viewerProfileId: null, viewerGender: null });
     expect(where.text).not.toContain("p.id <>");
     expect(where.text).not.toContain("app_discover_excluded_profile_ids");
   });
@@ -59,7 +60,7 @@ describe("buildDiscoverWhere", () => {
 
   it("값은 전부 파라미터로 넘어간다 — SQL 에 리터럴이 끼지 않는다", () => {
     const where = buildDiscoverWhere(
-      parse({ q: "'; DROP TABLE profiles; --", gender: "FEMALE" }),
+      parse({ q: "'; DROP TABLE profiles; --" }),
       CTX,
     );
     expect(where.text).not.toContain("DROP TABLE");
@@ -86,7 +87,6 @@ describe("buildDiscoverWhere", () => {
   it("자리표시자 번호가 값 개수와 정확히 일치한다", () => {
     const where = buildDiscoverWhere(
       parse({
-        gender: "MALE",
         ageMin: 28,
         ageMax: 40,
         heightMin: 170,
@@ -107,9 +107,31 @@ describe("buildDiscoverWhere", () => {
   });
 
   it("startIndex 로 자리표시자 번호를 이어붙일 수 있다", () => {
-    const where = buildDiscoverWhere(parse({ gender: "FEMALE" }), CTX, 5);
+    const where = buildDiscoverWhere(parse({}), CTX, 5);
     expect(where.text).toContain("$5");
     expect(where.text).toContain("$6");
+  });
+
+  it("보는 사람의 이성만 남긴다", () => {
+    const where = buildDiscoverWhere(parse({}), CTX);
+    expect(where.text).toContain("p.gender = $");
+    expect(where.values).toContain("MALE");
+  });
+
+  it("성별은 요청으로 바꿀 수 없다 — 주소에 넣어도 무시한다", () => {
+    // 회원이 고르는 값이 아니다. 스키마가 이미 버리고, 필터도 보는 사람만 본다.
+    const where = buildDiscoverWhere(parse({ gender: "FEMALE" }), CTX);
+    expect(where.values).toContain("MALE");
+    expect(where.values).not.toContain("FEMALE");
+  });
+
+  it("프로필이 없는 열람자는 성별로 좁히지 않는다", () => {
+    const where = buildDiscoverWhere(parse({}), {
+      ...CTX,
+      viewerProfileId: null,
+      viewerGender: null,
+    });
+    expect(where.text).not.toContain("p.gender");
   });
 
   it("쉼표 목록을 배열로 파싱한다", () => {
@@ -118,7 +140,7 @@ describe("buildDiscoverWhere", () => {
   });
 
   it("빈 필터는 값 없이 상태 조건만 만든다", () => {
-    const where = buildDiscoverWhere(parse({}), { ...CTX, viewerProfileId: null });
+    const where = buildDiscoverWhere(parse({}), { ...CTX, viewerProfileId: null, viewerGender: null });
     expect(where.values).toEqual([]);
   });
 });
@@ -202,11 +224,12 @@ describe("filtersToParams", () => {
   });
 
   it("보낸 조건이 SQL 절로 그대로 이어진다", () => {
-    const params = filtersToParams(withRange({ ageMin: 30, ageMax: 38 }), null);
+    const params = filtersToParams(withRange({ ageMin: 30, ageMax: 38 }));
     const where = buildDiscoverWhere(parse(Object.fromEntries(params)), CTX);
-    expect(where.text).toContain("p.birth_year >= $2");
-    expect(where.text).toContain("p.birth_year <= $3");
-    expect(where.values).toEqual(["me", 1988, 1996]);
+    // $1 은 자기 자신, $2 는 보는 사람의 이성이다. 화면이 보낸 조건은 그 뒤에 이어진다.
+    expect(where.text).toContain("p.birth_year >= $3");
+    expect(where.text).toContain("p.birth_year <= $4");
+    expect(where.values).toEqual(["me", "MALE", 1988, 1996]);
   });
 
   it("기본값은 슬라이더 양끝과 같다", () => {

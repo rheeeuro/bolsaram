@@ -12,11 +12,13 @@ import {
   buildDiscoverWhere,
   decodeCursor,
   encodeCursor,
+  isOppositeGender,
   type FullProfile,
 } from "@bolsaram/domain";
 import type {
   AdminProfileQuery,
   DiscoverQuery,
+  Gender,
   ProfileStatus,
   ProfileUpdate,
   Visibility,
@@ -138,6 +140,33 @@ async function imagesFor(
   return map;
 }
 
+/**
+ * 프로필의 성별. 볼 수 있는 상대를 정하는 값이라 **항상 DB 에서 읽는다.**
+ * 자기 프로필은 RLS 의 본인 절로, 대행 프로필은 주선자 절로 보인다.
+ */
+async function genderOf(sql: Sql, profileId: string): Promise<Gender | null> {
+  const result = await sql.query<{ gender: Gender }>(
+    `SELECT gender FROM profiles WHERE id = $1`,
+    [profileId],
+  );
+  return result.rows[0]?.gender ?? null;
+}
+
+/**
+ * 회원 화면에서 가려야 하는 상대인가 — 같은 성별이면 가린다.
+ *
+ * 목록에서 빼는 것만으로는 새어 나간다. 주소를 직접 열거나 시그널에서 넘어오는
+ * 경로가 있어서, 상세를 여는 쪽에서도 같은 판정을 한다.
+ */
+export async function isSameGenderForViewer(
+  sql: Sql,
+  viewerProfileId: string,
+  targetGender: string,
+): Promise<boolean> {
+  const mine = await genderOf(sql, viewerProfileId);
+  return mine != null && !isOppositeGender(mine, targetGender as Gender);
+}
+
 export type DiscoverPage = {
   items: ProfileRecord[];
   nextCursor: string | null;
@@ -145,6 +174,13 @@ export type DiscoverPage = {
   total: number;
 };
 
+/**
+ * 회원 탐색 목록.
+ *
+ * **이성만 보여준다.** 보는 사람의 성별은 프로필에서 읽는다 — 요청으로 받으면
+ * 대행 중인 주선자나 조작된 값으로 경계가 흔들린다. 대행 중이면 세션의
+ * `profileId` 가 대행 프로필이므로 그 사람 기준으로 걸린다.
+ */
 export async function findDiscoverProfiles(
   sql: Sql,
   query: DiscoverQuery,
@@ -152,6 +188,7 @@ export async function findDiscoverProfiles(
 ): Promise<DiscoverPage> {
   const where = buildDiscoverWhere(query, {
     viewerProfileId,
+    viewerGender: viewerProfileId ? await genderOf(sql, viewerProfileId) : null,
     currentYear: new Date().getFullYear(),
   });
 

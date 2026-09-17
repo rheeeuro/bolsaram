@@ -12,10 +12,12 @@
  */
 import {
   ACTIVE_MATCH_REQUEST_STATUSES,
+  type Gender,
   type MatchIntentKind,
   type MatchRequestStatus,
 } from "@bolsaram/schemas";
 import { DomainError } from "./errors";
+import { assertOppositeGender } from "./visibility";
 
 export type MatchAction = "accept" | "reject" | "cancel" | "close";
 
@@ -101,9 +103,17 @@ export function assertCanCreateRequest(input: {
   rejectedBetween?: boolean;
   /** 어느 방향이든 숨긴 관계인가. */
   hiddenBetween?: boolean;
+  /** 두 사람의 성별. 이성 사이에만 신청이 성립한다. */
+  requesterGender?: Gender | null;
+  targetGender?: Gender | null;
 }): void {
   if (input.requesterProfileId === input.targetProfileId) {
     throw new DomainError("VALIDATION", "자기 자신에게는 신청할 수 없습니다.");
+  }
+  // 목록·상세에서 이미 걸러지지만 여기서도 본다 — 주소를 아는 상대에게 요청만
+  // 따로 넣는 경로가 있고, 주선자가 승인하는 시점에 다시 이 판정을 지난다.
+  if (input.requesterGender && input.targetGender) {
+    assertOppositeGender(input.requesterGender, input.targetGender);
   }
   if (input.existingActiveStatus) {
     throw new DomainError("CONFLICT", "이미 진행 중인 신청이 있습니다.", {

@@ -64,6 +64,17 @@ export async function requireMemberProfile(): Promise<Viewer & { profileId: stri
   return { ...user, profileId: user.profileId };
 }
 
+/**
+ * 회원 화면으로 보고 있는가 — 회원 본인이거나, 주선자가 대행 중일 때다.
+ *
+ * 회원 화면은 **이성만** 보여준다(`isOppositeGender`). 그 경계가 주선자 화면까지
+ * 번지면 안 되므로, 무엇을 기준으로 가르는지 한 곳에서 정한다. 대행 중이면
+ * 세션의 `profileId` 가 대행 프로필로 바뀌어 있어 그 사람 기준으로 걸린다.
+ */
+export function isMemberView(viewer: Viewer): boolean {
+  return viewer.role === "MEMBER" || viewer.actingProfileId != null;
+}
+
 /** 페이지(서버 컴포넌트)용. 실패 시 예외 대신 리다이렉트한다. */
 export async function requireUserPage(next?: string): Promise<Viewer> {
   const user = await readSession();

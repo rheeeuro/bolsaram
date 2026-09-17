@@ -6,7 +6,8 @@
  *
  * 이 파일은 순수 함수만 둔다. 실제 차단은 SQL(RLS) + API 권한 검사가 함께 담당한다.
  */
-import type { ProfileStatus, Visibility } from "@bolsaram/schemas";
+import type { Gender, ProfileStatus, Visibility } from "@bolsaram/schemas";
+import { DomainError } from "./errors";
 
 export type DisclosureLevel = "LIST" | "DETAIL" | "INTRODUCED" | "OWNER" | "ADMIN";
 
@@ -114,6 +115,33 @@ export function isDiscoverable(profile: {
     (profile.status === "ACTIVE" || profile.status === "MATCHING") &&
     profile.visibility === "LISTED"
   );
+}
+
+/**
+ * 회원이 볼 수 있는 상대인가 — **이성만**이다.
+ *
+ * 볼사람은 이성 소개만 다룬다. 성별이 같으면 목록·상세·신청 어디에서도 만나지 않는다.
+ * 한 곳에서만 걸러도 다른 경로로 새므로(목록에서 빠져도 주소를 직접 열 수 있다)
+ * 판정을 여기 하나로 두고 각 경로가 같은 함수를 부른다.
+ *
+ * 주선자 화면은 이 경계를 쓰지 않는다 — 주선자는 양쪽을 다 보고 등록한다.
+ * 대행 중인 주선자는 **회원 화면을 보는 것**이므로 대행 프로필 기준으로 걸린다.
+ */
+export function isOppositeGender(viewerGender: Gender, targetGender: Gender): boolean {
+  return viewerGender !== targetGender;
+}
+
+/** 이성이 아니면 막는다. 신청 경로처럼 결과를 거부해야 하는 곳에서 쓴다. */
+export function assertOppositeGender(viewerGender: Gender, targetGender: Gender): void {
+  if (!isOppositeGender(viewerGender, targetGender)) {
+    // 왜 막혔는지 굳이 상세히 말하지 않는다 — 화면에 뜨지 않아야 정상인 경로다.
+    throw new DomainError("FORBIDDEN", "이 분에게는 마음을 보낼 수 없습니다.");
+  }
+}
+
+/** 성별이 둘뿐이므로 「이성」은 곧 나머지 하나다. 목록 쿼리가 이 값으로 좁힌다. */
+export function oppositeGender(gender: Gender): Gender {
+  return gender === "MALE" ? "FEMALE" : "MALE";
 }
 
 /** 상세 페이지 직접 접근 허용 여부. UNLISTED 는 링크가 있으면 볼 수 있다. */

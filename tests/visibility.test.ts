@@ -2,9 +2,12 @@
 import { describe, expect, it } from "vitest";
 import {
   ageFromBirthYear,
+  assertOppositeGender,
   formatPublicCode,
   isDetailAccessible,
   isDiscoverable,
+  isOppositeGender,
+  oppositeGender,
   projectProfile,
   type FullProfile,
 } from "@bolsaram/domain";
@@ -116,5 +119,24 @@ describe("표시 헬퍼", () => {
 
   it("만 나이는 기준 연도에서 뺀다", () => {
     expect(ageFromBirthYear(1993, new Date("2026-09-07T00:00:00Z"))).toBe(33);
+  });
+});
+
+describe("이성 경계", () => {
+  it("성별이 다르면 볼 수 있고 같으면 볼 수 없다", () => {
+    expect(isOppositeGender("MALE", "FEMALE")).toBe(true);
+    expect(isOppositeGender("FEMALE", "MALE")).toBe(true);
+    expect(isOppositeGender("MALE", "MALE")).toBe(false);
+    expect(isOppositeGender("FEMALE", "FEMALE")).toBe(false);
+  });
+
+  it("이성은 나머지 하나다 — 목록 쿼리가 이 값으로 좁힌다", () => {
+    expect(oppositeGender("MALE")).toBe("FEMALE");
+    expect(oppositeGender("FEMALE")).toBe("MALE");
+  });
+
+  it("같은 성별에게 보내려 하면 막는다", () => {
+    expect(() => assertOppositeGender("MALE", "MALE")).toThrow();
+    expect(() => assertOppositeGender("MALE", "FEMALE")).not.toThrow();
   });
 });

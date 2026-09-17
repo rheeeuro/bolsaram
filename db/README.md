@@ -70,6 +70,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0045_group_chat_visible_from_join.sql` | 채팅은 **들어온 시점부터** 보인다. 합류 전 대화는 정책이 막는다                     |
 | `0046_group_owner_actions.sql`     | 모임장이 한 일을 방에 구분해 남긴다 — 내보내기·모임장 넘기기                            |
 | `0047_profile_hashtags.sql`        | 프로필 해시태그 — `profiles.hashtags` + 모양 검사 + 태그 검색 인덱스                    |
+| `0048_opposite_gender_only.sql`    | 회원이 보는 사람은 **이성만**. 열람 정책에 성별 조건 + 동성 신청 금지 트리거             |
+| `0049_self_request_keeps_its_own_reason.sql` | 자기 자신에게 낸 신청은 전용 제약이 이유를 말하도록 트리거가 비켜선다        |
 
 ## 테이블
 
@@ -224,6 +226,7 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 | `app_can_edit_profile(uuid)`           | 자기 모임이거나, 전체공개인데 자기가 등록했는가     |
 | `app_can_edit_import(uuid)`            | 위와 같은 판정을 Import 세션에                      |
 | `app_current_member_group()`           | 현재 회원이 속한 풀 (전체공개 회원은 NULL)          |
+| `app_current_member_gender()`          | 현재 회원(대행 중이면 그 프로필)의 성별             |
 | `app_profile_admins(uuid)`             | 그 프로필의 담당 주선자 집합 (알림 수신자)          |
 | `app_is_rejected_between(uuid[, uuid])` | 어느 방향이든 거절 이력이 있는가                   |
 | `app_is_hidden_between(uuid[, uuid])`  | 어느 방향이든 숨긴 관계인가                         |
@@ -232,6 +235,10 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 - 모임에 속하지 않은 주선자는 전체공개 프로필만 보고, 고치는 것은 자기가 등록한 것뿐이다.
 - 회원은 **자기와 같은 풀** 안의 공개 프로필만 보고, 풀을 넘는 소개 신청은 만들 수 없다
   (`IS NOT DISTINCT FROM` 이라 전체공개 회원끼리도 서로 보인다).
+- 회원이 보는 사람은 **이성뿐이다**(`gender <> app_current_member_gender()`). 동성에게는
+  신청도 만들어지지 않는다 — `match_requests_require_opposite_gender` 트리거가 막는다.
+  **대행 중인 주선자는 이 정책으로 걸리지 않는다** — 주선자 절로 먼저 통과하기 때문이며,
+  대행의 경계는 애플리케이션 레이어(`isMemberView`)가 판정한다.
 - **claim 정책은 없다.** 주인 없는 프로필을 자기 것으로 만드는 것은 해시된 초대 토큰을
   검증하는 인증 레이어(owner 커넥션)에서만 일어난다. 정책으로 열어두면 초대 없이도
   남의 프로필을 가져갈 수 있다(0013 에서 제거).

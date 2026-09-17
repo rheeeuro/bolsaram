@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation";
 import { isDetailAccessible } from "@bolsaram/domain";
 import { withRls } from "@bolsaram/db";
-import { requireUserPage, rlsContextOf } from "@/server/auth/guard";
+import { isMemberView, requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { isFavorited } from "@/server/repo/favorites";
 import { didHide, isHiddenBetween } from "@/server/repo/hides";
 import {
@@ -11,7 +11,7 @@ import {
   isRejectedBetween,
 } from "@/server/repo/matches";
 import { listPendingIntentsForProfile } from "@/server/repo/match-intents";
-import { findProfileById } from "@/server/repo/profiles";
+import { findProfileById, isSameGenderForViewer } from "@/server/repo/profiles";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 import { ProfileDetail } from "@/components/member/profile-detail";
 
@@ -53,6 +53,15 @@ export default async function ProfileDetailPage({
       viewer.role !== "ADMIN" &&
       profile.userId !== viewer.userId &&
       !isDetailAccessible(profile)
+    ) {
+      return null;
+    }
+    // 회원 화면은 이성만 본다. 목록에서 빠져도 주소로는 여기까지 올 수 있다.
+    if (
+      isMemberView(viewer) &&
+      viewer.profileId &&
+      profile.userId !== viewer.userId &&
+      (await isSameGenderForViewer(sql, viewer.profileId, profile.gender))
     ) {
       return null;
     }

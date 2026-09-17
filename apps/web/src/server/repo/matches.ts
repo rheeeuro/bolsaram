@@ -13,7 +13,7 @@ import {
   type MatchAction,
   type MatchActor,
 } from "@bolsaram/domain";
-import type { MatchRequestStatus } from "@bolsaram/schemas";
+import type { Gender, MatchRequestStatus } from "@bolsaram/schemas";
 import { isHiddenBetween } from "./hides";
 
 export type MatchRequestRecord = {
@@ -103,7 +103,7 @@ export async function isRejectedBetween(
 }
 
 /**
- * 신청을 만들 수 있는 관계인지 본다(자기 자신 / 활성 중복 / 거절·숨김).
+ * 신청을 만들 수 있는 관계인지 본다(자기 자신 / 활성 중복 / 거절·숨김 / 이성 여부).
  *
  * 신청을 바로 만드는 경로와, 주선자 확인을 기다리는 요청(0026)을 남기는 경로가
  * **같은 판정**을 써야 한다. 회원에게 「확인 중」이라고 해놓고 주선자가 승인할 때
@@ -115,9 +115,10 @@ export async function assertRequestable(
   targetProfileId: string,
 ): Promise<void> {
   const existing = await findActiveBetween(sql, requesterProfileId, targetProfileId);
-  const [rejected, hidden] = await Promise.all([
+  const [rejected, hidden, genders] = await Promise.all([
     isRejectedBetween(sql, requesterProfileId, targetProfileId),
     isHiddenBetween(sql, requesterProfileId, targetProfileId),
+    gendersOf(sql, requesterProfileId, targetProfileId),
   ]);
 
   // 도메인 규칙 먼저. DB 의 부분 유니크 인덱스와 삽입 트리거가 최종 방어선이다.
@@ -127,7 +128,29 @@ export async function assertRequestable(
     existingActiveStatus: existing?.status ?? null,
     rejectedBetween: rejected,
     hiddenBetween: hidden,
+    requesterGender: genders.requester,
+    targetGender: genders.target,
   });
+}
+
+/**
+ * 두 프로필의 성별을 한 번에 읽는다. 이성 판정은 요청이 아니라 **DB 의 값**으로 한다.
+ * 상대가 RLS 로 보이지 않으면 null 이 되고, 그때는 다른 판정이 이미 막고 있다.
+ */
+async function gendersOf(
+  sql: Sql,
+  requesterProfileId: string,
+  targetProfileId: string,
+): Promise<{ requester: Gender | null; target: Gender | null }> {
+  const result = await sql.query<{ id: string; gender: Gender }>(
+    `SELECT id, gender FROM profiles WHERE id = ANY($1)`,
+    [[requesterProfileId, targetProfileId]],
+  );
+  const byId = new Map(result.rows.map((row) => [row.id, row.gender]));
+  return {
+    requester: byId.get(requesterProfileId) ?? null,
+    target: byId.get(targetProfileId) ?? null,
+  };
 }
 
 export async function createMatchRequest(

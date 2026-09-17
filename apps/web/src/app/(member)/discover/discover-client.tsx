@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { GENDERS, GENDER_LABELS, normalizeHashtags } from "@bolsaram/schemas";
+import { normalizeHashtags } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { HashtagChip } from "@/components/ui/marks";
@@ -31,7 +31,6 @@ const VIEW_KEY = "bolsaram.discover.view";
 export function DiscoverClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [gender, setGender] = useState<string | null>(null);
   // 해시태그만 주소에 담는다 — 프로필 상세의 태그를 눌러 들어오는 경로가 있어서다.
   const [filters, setFilters] = useState<Filters>(() => ({
     ...DEFAULT_FILTERS,
@@ -52,7 +51,7 @@ export function DiscoverClient() {
   const load = useCallback(
     async (nextCursor: string | null, replace: boolean) => {
       const generation = replace ? ++loadGeneration.current : loadGeneration.current;
-      const params = filtersToParams(filters, gender);
+      const params = filtersToParams(filters);
       if (nextCursor) params.set("cursor", nextCursor);
       const result = await apiGet<Page>(`/api/profiles?${params.toString()}`);
       if (generation !== loadGeneration.current) return;
@@ -65,7 +64,7 @@ export function DiscoverClient() {
       setCursor(result.data.nextCursor);
       setItems((prev) => (replace ? result.data.items : [...prev, ...result.data.items]));
     },
-    [filters, gender],
+    [filters],
   );
 
   // 저장된 보기 방식은 mount 뒤에 읽는다 — 서버 렌더 결과와 어긋나면 hydration 이 깨진다.
@@ -110,19 +109,8 @@ export function DiscoverClient() {
   return (
     <main className="mx-auto max-w-3xl px-4">
       <MemberSubBar>
-        <div className="flex gap-1.5">
-          <GenderTab label="전체" active={gender === null} onClick={() => setGender(null)} />
-          {GENDERS.map((value) => (
-            <GenderTab
-              key={value}
-              label={GENDER_LABELS[value]}
-              active={gender === value}
-              onClick={() => setGender(value)}
-            />
-          ))}
-        </div>
-
-        <ViewToggle className="ml-auto" value={view} onChange={changeView} />
+        {/* 성별 탭은 두지 않는다 — 보이는 사람은 이성뿐이라 고를 것이 없다. */}
+        <ViewToggle value={view} onChange={changeView} />
 
         <button
           type="button"
@@ -236,7 +224,6 @@ export function DiscoverClient() {
       <FilterSheet
         open={sheetOpen}
         initial={filters}
-        gender={gender}
         onClose={() => setSheetOpen(false)}
         onApply={(next) => {
           setFilters(next);
@@ -247,31 +234,6 @@ export function DiscoverClient() {
   );
 }
 
-function GenderTab({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
-        active
-          ? "bg-[var(--color-ink-900)] text-white"
-          : "bg-white text-[var(--color-ink-600)] border border-[var(--surface-border)]",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
 
 /**
  * 한 줄 목록 ↔ 사진 격자 전환.

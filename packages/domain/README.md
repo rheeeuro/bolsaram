@@ -81,6 +81,11 @@ REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
 `projectProfile()` 은 걸러낸 필드를 null 로 채우지 않고 **키 자체를 없앤다.** 클라이언트가
 "값이 없음"과 "볼 권한 없음"을 구분할 수 있어야 하고, 실수로 직렬화되는 경로를 줄이기 위해서다.
 
+같은 파일이 **이성 경계**도 정한다. 회원 화면에 보이는 사람은 이성뿐이다 —
+`isOppositeGender` 가 판정하고, 목록은 `oppositeGender` 로 좁히며, 신청 경로는
+`assertOppositeGender` 로 거부한다. 주선자 화면은 이 경계를 쓰지 않는다(양쪽을 다 보고
+등록한다). 대행 중인 주선자는 회원 화면을 보는 것이므로 **대행 프로필 기준**으로 걸린다.
+
 ### `import.ts` — 게시 게이트
 
 `assertCommittable(status, fields, { publish })` 가 AI 결과의 자동 게시를 막는다.
@@ -116,6 +121,10 @@ Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가",
 끼워 넣지 않는다. 반환 텍스트는 자리표시자 번호를 `startIndex` 로 이어붙일 수 있다.
 
 나이는 출생연도로 뒤집어 계산한다(`ageMin` 이 클수록 `birthYear` 는 작아진다).
+
+성별은 **요청이 아니라 보는 사람**이 정한다. `FilterContext.viewerGender` 의 이성만 남기고,
+프로필이 없는 열람자(주선자)에게는 성별 절을 만들지 않는다. 회원이 고르는 필터가 아니므로
+`DiscoverQuery` 에는 성별 자리가 없다.
 
 해시태그는 **여러 개를 주면 좁힌다**(`hashtags @> ARRAY[...]`). 저장값과 쿼리값이 모두
 `normalizeHashtags` 를 지나므로 배열 포함 연산으로 바로 맞는다. 자유 검색(`q`)은 앞의 `#` 을

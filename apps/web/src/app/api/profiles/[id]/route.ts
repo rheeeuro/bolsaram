@@ -6,7 +6,13 @@ import { asAdmin, asUser } from "@/server/http/context";
 import { ok, readJson, route } from "@/server/http/respond";
 import { isFavorited } from "@/server/repo/favorites";
 import { introducedPartnerIds, introducedWithManaged } from "@/server/repo/matches";
-import { canEditProfiles, findProfileById, updateProfile } from "@/server/repo/profiles";
+import {
+  canEditProfiles,
+  findProfileById,
+  isSameGenderForViewer,
+  updateProfile,
+} from "@/server/repo/profiles";
+import { isMemberView } from "@/server/auth/guard";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +29,15 @@ export const GET = route(async (_request: Request, { params }: Params) => {
       viewer.role !== "ADMIN" &&
       profile.userId !== viewer.userId &&
       !isDetailAccessible(profile)
+    ) {
+      throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
+    }
+    // 회원 화면은 이성만 본다. 있는지 없는지도 알리지 않으므로 같은 404 다.
+    if (
+      isMemberView(viewer) &&
+      viewer.profileId &&
+      profile.userId !== viewer.userId &&
+      (await isSameGenderForViewer(sql, viewer.profileId, profile.gender))
     ) {
       throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     }

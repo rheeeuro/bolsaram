@@ -46,10 +46,12 @@ const CHIP_KEYS = [
   "tags",
 ] as const;
 
-/** 끝에서 벗어난 경계만 쿼리로 보낸다. 끝에 붙은 쪽은 절을 만들지 않는다. */
-export function filtersToParams(filters: Filters, gender: string | null): URLSearchParams {
+/**
+ * 끝에서 벗어난 경계만 쿼리로 보낸다. 끝에 붙은 쪽은 절을 만들지 않는다.
+ * 성별은 여기 없다 — 회원은 이성만 보고, 그 값은 서버가 프로필에서 읽는다.
+ */
+export function filtersToParams(filters: Filters): URLSearchParams {
   const params = new URLSearchParams();
-  if (gender) params.set("gender", gender);
   if (filters.ageMin > AGE_RANGE.min) params.set("ageMin", String(filters.ageMin));
   if (filters.ageMax < AGE_RANGE.max) params.set("ageMax", String(filters.ageMax));
   if (filters.heightMin > HEIGHT_RANGE.min) {

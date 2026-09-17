@@ -91,7 +91,7 @@ const intParam = (min: number, max: number) =>
 export const DISCOVER_PAGE_SIZE = 24;
 
 export const discoverQuerySchema = z.object({
-  gender: z.enum(GENDERS).optional(),
+  // 성별은 필터가 아니다 — 회원은 이성만 보고, 그 값은 자기 프로필이 정한다.
   ageMin: intParam(18, 99),
   ageMax: intParam(18, 99),
   heightMin: intParam(HEIGHT_MIN, HEIGHT_MAX),
