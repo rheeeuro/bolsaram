@@ -76,7 +76,7 @@ export function ProfilePhotos({
           등록된 사진이 없습니다.
         </p>
       ) : (
-        <ul className="mb-3 grid grid-cols-3 gap-2">
+        <ul className="mb-3 grid grid-cols-2 gap-2">
           {images.map((image) => (
             <li key={image.id}>
               <div className="relative aspect-3/4 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]">
@@ -100,7 +100,7 @@ export function ProfilePhotos({
                       size="sm"
                       variant="danger"
                       disabled={busy != null}
-                      className="h-7 flex-1 px-2 text-[11.5px]"
+                      className="h-7 flex-1 whitespace-nowrap px-2 text-[11.5px]"
                       onClick={() => {
                         setConfirming(null);
                         void act("delete", () =>
@@ -113,7 +113,7 @@ export function ProfilePhotos({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-[11.5px]"
+                      className="h-7 whitespace-nowrap px-2 text-[11.5px]"
                       onClick={() => setConfirming(null)}
                     >
                       취소
@@ -127,7 +127,7 @@ export function ProfilePhotos({
                       size="sm"
                       variant="secondary"
                       disabled={busy != null}
-                      className="h-7 flex-1 px-2 text-[11.5px]"
+                      className="h-7 flex-1 whitespace-nowrap px-2 text-[11.5px]"
                       onClick={() =>
                         void act("primary", () =>
                           apiPatch(`/api/profiles/${profileId}/images/${image.id}`, {
@@ -143,7 +143,7 @@ export function ProfilePhotos({
                     size="sm"
                     variant="ghost"
                     disabled={busy != null}
-                    className="h-7 px-2 text-[11.5px]"
+                    className="h-7 whitespace-nowrap px-2 text-[11.5px]"
                     onClick={() => setConfirming(image.id)}
                   >
                     삭제
