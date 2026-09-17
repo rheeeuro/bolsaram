@@ -351,9 +351,10 @@ export async function findAdminProfiles(
   // 태그는 여러 개를 주면 좁힌다. 회원 탐색과 같은 규칙이다.
   if (query.tags?.length) clauses.push(`p.hashtags @> ${push(query.tags)}`);
   if (query.q) {
-    // `#17` 은 공개 번호, `#여행` 은 해시태그다. 숫자인지로 가른다.
-    const codeMatch = /^#?(\d+)$/.exec(query.q);
-    const needle = query.q.replace(/^#+/u, "").trim();
+    // `17번` 은 공개 번호, `#여행` 은 해시태그다. 숫자인지로 가른다.
+    // 적는 방식을 따지지 않는다 — `17` · `17번` · 예전 표기 `#17` 을 모두 번호로 받는다.
+    const codeMatch = /^[@#]?(\d+)\s*번?$/.exec(query.q);
+    const needle = query.q.replace(/^[@#]+/u, "").trim();
     const term = push(`%${needle.length > 0 ? needle : query.q}%`);
     const codeClause = codeMatch ? ` OR p.public_code = ${push(Number(codeMatch[1]))}` : "";
     clauses.push(

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { MATCH_REQUEST_STATUSES, MATCH_REQUEST_STATUS_LABELS } from "@bolsaram/schemas";
 import { Badge, toneForStatus } from "@/components/ui/badge";
+import { ProfileCode } from "@/components/ui/marks";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -277,7 +278,9 @@ function PartyCard({ party }: { party: Party }) {
         ) : null}
       </div>
       <div className="min-w-0">
-        <p className="display text-[15px] text-[var(--surface-text)]">{party.code}</p>
+        <p className="display text-[15px] text-[var(--surface-text)]">
+          <ProfileCode code={party.code} />
+        </p>
         <p className="truncate text-[12px] text-[var(--surface-text-muted)]">
           {[party.name, `${party.birthYear}년생`].filter(Boolean).join(" · ")}
         </p>

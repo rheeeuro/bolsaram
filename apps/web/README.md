@@ -69,7 +69,7 @@ apps/web/src/
 │   │   └── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·marks)
 │   ├── member/               회원 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/

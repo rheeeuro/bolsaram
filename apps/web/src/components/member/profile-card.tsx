@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { label } from "@/lib/labels";
 import { FavoriteButton } from "@/components/member/favorite-button";
+import { ProfileCode } from "@/components/ui/marks";
 import type { ProfileCardView } from "@/server/views/profile-view";
 
 /** 돌아갈 화면. 상세의 뒤로가기가 이 값을 읽는다. */
@@ -66,7 +67,10 @@ export function ProfileCard({
       />
 
       <Link href={href} className="mt-2.5 block">
-        <p className="display text-[15px] text-[var(--color-ink-900)]">{profile.code}</p>
+        <ProfileCode
+          code={profile.code}
+          className="display text-[15px] text-[var(--color-ink-900)]"
+        />
         <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">{lines.facts}</p>
         <p className="text-[12.5px] text-[var(--color-ink-600)]">{lines.work}</p>
       </Link>

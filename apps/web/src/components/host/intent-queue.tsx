@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MATCH_INTENT_KIND_LABELS, type MatchIntentKind } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
+import { ProfileCode } from "@/components/ui/marks";
 import { Panel, Thumb } from "@/components/host/surface";
 import { apiPost } from "@/lib/api-client";
 
@@ -132,7 +133,7 @@ function Who({ party }: { party: Party }) {
       <Thumb url={party.imageUrl} size="sm" />
       <span className="min-w-0">
         <span className="display block text-[14px] text-[var(--surface-text)]">
-          {party.code}
+          <ProfileCode code={party.code} />
         </span>
         <span className="block truncate text-[11.5px] text-[var(--surface-text-muted)]">
           {[party.name, `${party.birthYear}년생`].filter(Boolean).join(" · ")}

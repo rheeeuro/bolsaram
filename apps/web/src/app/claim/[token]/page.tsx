@@ -57,7 +57,7 @@ export default async function ClaimPage({
       description={
         preview?.alreadyClaimedProfile
           ? "주선자가 보낸 링크로 바로 들어갑니다."
-          : `주선자가 등록한 #${preview?.publicCode ?? ""} 프로필로 시작합니다. 아이디와 비밀번호는 만들지 않습니다.`
+          : `주선자가 등록한 ${preview?.publicCode ?? ""}번 프로필로 시작합니다. 아이디와 비밀번호는 만들지 않습니다.`
       }
     >
       <ClaimForm

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ProfileCode } from "@/components/ui/marks";
 import { CopyField } from "@/components/ui/copy-field";
 import { Thumb } from "@/components/host/surface";
 import { apiPost } from "@/lib/api-client";
@@ -48,7 +49,7 @@ export function InviteRow({
           <Thumb url={imageUrl} size="sm" />
           <span className="min-w-0">
             <span className="display block text-[15px] text-[var(--surface-text)]">
-              #{code}
+              <ProfileCode code={`${code}번`} />
             </span>
             <span className="block truncate text-[12.5px] text-[var(--surface-text-muted)]">
               {name ?? "이름 없음"}

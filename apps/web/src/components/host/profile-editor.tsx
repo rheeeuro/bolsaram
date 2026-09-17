@@ -26,6 +26,7 @@ import {
 } from "@bolsaram/schemas";
 import { isDiscoverable } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
+import { ProfileCode } from "@/components/ui/marks";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
@@ -222,7 +223,7 @@ export function HostProfileEditor({
 
         <div className="min-w-48 flex-1">
           <h1 className="display text-[28px] leading-none text-[var(--color-ink-900)]">
-            {profile.code}
+            <ProfileCode code={profile.code} />
           </h1>
           <p className="mt-2.5 text-[13.5px] text-[var(--surface-text-muted)]">{summary}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">

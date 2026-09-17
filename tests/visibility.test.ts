@@ -110,7 +110,8 @@ describe("노출 규칙", () => {
 
 describe("표시 헬퍼", () => {
   it("익명 코드는 # 를 붙인다", () => {
-    expect(formatPublicCode(17)).toBe("#17");
+    // 기호는 해시태그(`#등산`)의 것이다. 번호는 기호 없이 쓰고 아이콘으로 가른다.
+    expect(formatPublicCode(17)).toBe("17번");
   });
 
   it("만 나이는 기준 연도에서 뺀다", () => {

@@ -5,6 +5,7 @@ import { isDiscoverable } from "@bolsaram/domain";
 import { adminProfileQuerySchema, PROFILE_STATUSES } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge } from "@/components/ui/badge";
+import { ProfileCode } from "@/components/ui/marks";
 import { Count, PageHeader, Panel } from "@/components/host/surface";
 import { introducedWithManaged } from "@/server/repo/matches";
 import { canEditProfiles, findAdminProfiles } from "@/server/repo/profiles";
@@ -121,7 +122,7 @@ export default async function HostProfilesPage({
 
                 <div className="mt-2.5">
                   <p className="display text-[15px] text-[var(--color-ink-900)]">
-                    {view.code}
+                    <ProfileCode code={view.code} />
                     <span className="ml-2 font-sans text-[12px] text-[var(--color-ink-500)]">
                       {label.gender(view.gender)}
                     </span>

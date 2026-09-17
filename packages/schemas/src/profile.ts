@@ -16,7 +16,7 @@ import { HASHTAG_MAX_COUNT, hashtagListSchema, normalizeHashtags } from "./hasht
 
 export const uuidSchema = z.uuid();
 
-/** 사용자에게 노출되는 익명 코드. 예: `#17` 의 `17`. */
+/** 사용자에게 노출되는 익명 코드. 화면에는 `17번` 으로 나온다. */
 export const publicCodeSchema = z.number().int().positive();
 
 const nullableTrimmed = (max: number) =>

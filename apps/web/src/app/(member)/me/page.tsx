@@ -1,10 +1,10 @@
 /** 내 프로필 + 로그아웃. 회원은 열람만 하고 수정은 주선자에게 요청한다. */
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
-import { formatHashtag } from "@bolsaram/schemas";
 import { requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Empty } from "@/components/ui/empty";
+import { HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { findProfileById } from "@/server/repo/profiles";
 import { toDetailView } from "@/server/views/profile-view";
 import { label } from "@/lib/labels";
@@ -57,7 +57,7 @@ export default async function MePage() {
               </div>
               <div>
                 <p className="display text-[24px] text-[var(--color-ink-900)]">
-                  {profile.code}
+                  <ProfileCode code={profile.code} />
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
                   <Badge tone={toneForStatus(profile.status ?? "")}>
@@ -86,7 +86,6 @@ export default async function MePage() {
                   ["흡연", label.smoking(profile.smoking)],
                   ["음주", label.drinking(profile.drinking)],
                   ["취미", profile.hobbies.join(", ") || null],
-                  ["해시태그", profile.hashtags.map(formatHashtag).join(" ") || null],
                 ] as [string, string | null | undefined][]
               )
                 .filter(([, value]) => value != null && value !== "")
@@ -97,6 +96,17 @@ export default async function MePage() {
                   </div>
                 ))}
             </dl>
+
+            {profile.hashtags.length > 0 ? (
+              <section className="mt-8">
+                <h2 className="kicker mb-2">해시태그</h2>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.hashtags.map((tag) => (
+                    <HashtagChip key={tag} tag={tag} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             {profile.bio ? (
               <section className="mt-8">

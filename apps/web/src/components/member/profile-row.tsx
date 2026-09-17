@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FavoriteButton } from "@/components/member/favorite-button";
+import { ProfileCode } from "@/components/ui/marks";
 import { cardLines, profileHref, type CardOrigin } from "@/components/member/profile-card";
 import type { ProfileCardView } from "@/server/views/profile-view";
 
@@ -39,9 +40,10 @@ export function ProfileRow({ profile, from }: { profile: ProfileCardView; from?:
 
         <div className="min-w-0 flex-1">
           <p className="flex items-baseline gap-2">
-            <span className="display text-[15px] text-[var(--color-ink-900)]">
-              {profile.code}
-            </span>
+            <ProfileCode
+              code={profile.code}
+              className="display text-[15px] text-[var(--color-ink-900)]"
+            />
             <span className="truncate text-[12.5px] text-[var(--color-ink-700)]">
               {lines.facts}
             </span>

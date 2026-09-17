@@ -51,7 +51,7 @@ export function HostProfileFilters({ statuses }: { statuses: string[] }) {
         }}
       >
         <Input
-          placeholder="이름 · 회사 · 직업 · #번호 · #해시태그로 찾기"
+          placeholder="이름 · 회사 · 직업 · 번호(17번) · 태그(#등산)"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="h-10 w-full sm:w-72"

@@ -12,12 +12,12 @@ import {
   RELIGION_LABELS,
   SMOKING_LABELS,
   SMOKING_LEVELS,
-  formatHashtag,
   normalizeHashtags,
   parseHashtagInput,
 } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { HashtagChip, TagIcon } from "@/components/ui/marks";
 import { Dialog, DialogClose } from "@/components/ui/dialog";
 import { apiGet } from "@/lib/api-client";
 import {
@@ -204,7 +204,10 @@ function TagGroup({
 
   return (
     <section className="mb-6">
-      <h3 className="mb-2.5 text-[13px] font-medium text-[var(--color-ink-800)]">해시태그</h3>
+      <h3 className="mb-2.5 flex items-center gap-1 text-[13px] font-medium text-[var(--color-ink-800)]">
+        <TagIcon className="text-[var(--color-rose-500)]" />
+        해시태그
+      </h3>
       <input
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -222,15 +225,7 @@ function TagGroup({
       {selected.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {selected.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => onRemove(tag)}
-              aria-label={`${formatHashtag(tag)} 빼기`}
-              className="rounded-full border border-[var(--color-rose-400)] bg-[var(--color-rose-100)] px-3 py-1 text-[13px] text-[var(--color-rose-600)]"
-            >
-              {formatHashtag(tag)} ×
-            </button>
+            <HashtagChip key={tag} tag={tag} onRemove={() => onRemove(tag)} />
           ))}
         </div>
       ) : (

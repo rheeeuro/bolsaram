@@ -2,9 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { GENDERS, GENDER_LABELS, formatHashtag, normalizeHashtags } from "@bolsaram/schemas";
+import { GENDERS, GENDER_LABELS, normalizeHashtags } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
+import { HashtagChip } from "@/components/ui/marks";
 import { ProfileCard } from "@/components/member/profile-card";
 import { ProfileRow } from "@/components/member/profile-row";
 import { FilterSheet } from "@/components/member/filter-sheet";
@@ -153,20 +154,16 @@ export function DiscoverClient() {
       {filters.tags.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5 pb-3 pt-3">
           {filters.tags.map((tag) => (
-            <button
+            <HashtagChip
               key={tag}
-              type="button"
-              aria-label={`${formatHashtag(tag)} 조건 빼기`}
-              onClick={() =>
+              tag={tag}
+              onRemove={() =>
                 setFilters((prev) => ({
                   ...prev,
                   tags: prev.tags.filter((t) => t !== tag),
                 }))
               }
-              className="rounded-full border border-[var(--color-rose-400)] bg-[var(--color-rose-100)] px-3 py-1 text-[13px] text-[var(--color-rose-600)]"
-            >
-              {formatHashtag(tag)} ×
-            </button>
+            />
           ))}
         </div>
       ) : null}

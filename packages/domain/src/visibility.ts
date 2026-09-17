@@ -127,9 +127,16 @@ export function isDetailAccessible(profile: {
   );
 }
 
-/** 익명 코드 표기. 리스트/상세 모두 `#17` 형태로 통일한다. */
+/**
+ * 익명 코드 표기. 리스트/상세 모두 `17번` 형태로 통일한다.
+ *
+ * 기호를 붙이지 않는다 — 화면에서 `#` 은 해시태그의 것이고, 다른 기호를 회원번호에
+ * 주면 둘 다 기호로 시작해 한눈에 갈리지 않는다. 종류는 앞에 붙는 아이콘이 말하고
+ * (`components/ui/marks.tsx`), 아이콘을 쓸 수 없는 문장에서도 「17번 님이」처럼
+ * 그대로 읽힌다. 모임 채팅의 시스템 메시지가 쓰는 어법과 같다.
+ */
 export function formatPublicCode(code: number): string {
-  return `#${code}`;
+  return `${code}번`;
 }
 
 /** 출생연도 → 한국식 나이 계산에 쓰이는 만 나이. */

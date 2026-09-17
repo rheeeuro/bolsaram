@@ -5,6 +5,7 @@
  * 고칠 수 없는 폼을 보여주면 저장을 눌러야 막힌 것을 안다.
  */
 import Link from "next/link";
+import { ProfileCode } from "@/components/ui/marks";
 import { notFound } from "next/navigation";
 import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
@@ -78,7 +79,9 @@ export default async function HostProfileDetail({
           프로필
         </Link>
         <span className="mx-2">·</span>
-        <span className="display text-[13px] text-[var(--surface-text)]">{data.view.code}</span>
+        <span className="display text-[13px] text-[var(--surface-text)]">
+          <ProfileCode code={data.view.code} />
+        </span>
       </nav>
 
       {data.canEdit ? (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Badge, toneForStatus } from "@/components/ui/badge";
+import { ProfileCode } from "@/components/ui/marks";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Empty } from "@/components/ui/empty";
@@ -144,7 +145,7 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
                 href={href}
                 className="display text-[15px] text-[var(--color-ink-900)] underline-offset-4 hover:underline"
               >
-                {item.profile?.code}
+                <ProfileCode code={item.profile?.code ?? ""} />
               </Link>
             ) : (
               <span className="display text-[15px] text-[var(--color-ink-900)]">비공개</span>

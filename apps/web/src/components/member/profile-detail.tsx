@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { formatHashtag } from "@bolsaram/schemas";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { apiDelete, apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
@@ -118,7 +118,7 @@ export function ProfileDetail({
       <div className="mx-auto max-w-2xl px-5">
         <header className="pt-6">
           <h1 className="display text-[30px] leading-none text-[var(--color-ink-900)]">
-            {profile.code}
+            <ProfileCode code={profile.code} />
           </h1>
           {profile.realName ? (
             <p className="mt-2 text-[15px] text-[var(--color-burgundy-700)]">
@@ -157,13 +157,11 @@ export function ProfileDetail({
             {/* 태그를 누르면 같은 태그를 가진 사람만 모아 본다. */}
             <div className="flex flex-wrap gap-1.5">
               {profile.hashtags.map((tag) => (
-                <Link
+                <HashtagChip
                   key={tag}
+                  tag={tag}
                   href={`/discover?tags=${encodeURIComponent(tag)}`}
-                  className="rounded-full border border-[var(--color-rose-300)] bg-[var(--color-rose-100)] px-3 py-1 text-[13px] text-[var(--color-rose-600)] transition-colors hover:border-[var(--color-rose-500)]"
-                >
-                  {formatHashtag(tag)}
-                </Link>
+                />
               ))}
             </div>
           </Section>

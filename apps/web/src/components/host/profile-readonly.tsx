@@ -1,5 +1,5 @@
-import { formatHashtag } from "@bolsaram/schemas";
 import { Badge, toneForStatus } from "@/components/ui/badge";
+import { HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { Panel } from "@/components/host/surface";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
@@ -40,10 +40,6 @@ export function HostProfileReadonly({
     ["흡연", profile.smoking ? label.smoking(profile.smoking) : null],
     ["음주", profile.drinking ? label.drinking(profile.drinking) : null],
     ["취미", profile.hobbies.length > 0 ? profile.hobbies.join(", ") : null],
-    [
-      "해시태그",
-      profile.hashtags.length > 0 ? profile.hashtags.map(formatHashtag).join(" ") : null,
-    ],
   ];
 
   return (
@@ -68,7 +64,7 @@ export function HostProfileReadonly({
 
         <div className="min-w-48 flex-1">
           <h1 className="display text-[28px] leading-none text-[var(--color-ink-900)]">
-            {profile.code}
+            <ProfileCode code={profile.code} />
           </h1>
           <p className="mt-2.5 text-[13.5px] text-[var(--surface-text-muted)]">{summary}</p>
           <div className="mt-3">
@@ -104,6 +100,17 @@ export function HostProfileReadonly({
               </div>
             ))}
         </dl>
+
+        {profile.hashtags.length > 0 ? (
+          <div className="mt-5">
+            <p className="text-[12.5px] text-[var(--surface-text-muted)]">해시태그</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {profile.hashtags.map((tag) => (
+                <HashtagChip key={tag} tag={tag} />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {profile.bio ? (
           <div className="mt-5">

@@ -7,6 +7,7 @@ import { toCardView } from "@/server/views/profile-view";
 import { Blank, Count, PageHeader, Panel, Row, RowList, Thumb } from "@/components/host/surface";
 import { InviteRow } from "@/components/host/invite-row";
 import { Button } from "@/components/ui/button";
+import { ProfileCode } from "@/components/ui/marks";
 import { Input } from "@/components/ui/field";
 
 export const dynamic = "force-dynamic";
@@ -252,7 +253,9 @@ export default async function HostMembersPage({
 function Identity({ code, name }: { code: number; name: string | null }) {
   return (
     <div className="min-w-0">
-      <p className="display text-[15px] text-[var(--surface-text)]">#{code}</p>
+      <p className="display text-[15px] text-[var(--surface-text)]">
+        <ProfileCode code={`${code}번`} />
+      </p>
       <p className="truncate text-[12.5px] text-[var(--surface-text-muted)]">
         {name ?? "이름 없음"}
       </p>

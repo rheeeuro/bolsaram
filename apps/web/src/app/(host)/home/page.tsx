@@ -6,6 +6,7 @@ import { findProfilesByIds } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
 import { Panel, Stat, Thumb } from "@/components/host/surface";
 import { Badge, toneForStatus } from "@/components/ui/badge";
+import { ProfileCode } from "@/components/ui/marks";
 import { label } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
@@ -264,7 +265,9 @@ function Party({
   const body = (
     <>
       <Thumb url={url} size="sm" />
-      <span className="display text-[14px] text-[var(--surface-text)]">{code}</span>
+      <span className="display text-[14px] text-[var(--surface-text)]">
+        <ProfileCode code={code} />
+      </span>
     </>
   );
   return href ? (
