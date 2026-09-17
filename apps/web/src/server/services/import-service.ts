@@ -11,7 +11,11 @@ import {
   normalizeRawText,
   statusAfterExtraction,
 } from "@bolsaram/domain";
-import { normalizeHashtags, type ExtractedFields } from "@bolsaram/schemas";
+import {
+  normalizeHashtags,
+  type ExtractedFields,
+  type ImportStatus,
+} from "@bolsaram/schemas";
 import { extractionProvider } from "../ai/index";
 import { writeAudit } from "../audit";
 import * as imports from "../repo/imports";
@@ -84,6 +88,63 @@ export async function analyzeSession(
 function messageOf(error: unknown): string {
   if (error instanceof DomainError) return error.message;
   return "분석 중 알 수 없는 오류가 발생했습니다.";
+}
+
+/**
+ * 검토로 채운 값을 반영한다.
+ *
+ * 웹 검토 화면과 봇 버튼이 **같은 경로**를 쓴다 — 어느 쪽으로 채우든 AI 결과는
+ * 그대로 두고 수정본만 덧쌓이며, 사람이 고른 값은 신뢰도 1 로 보고 상태를 다시
+ * 판정한다. 트랜잭션은 호출부가 연다(웹은 요청 컨텍스트, 봇은 연결된 주선자 명의).
+ */
+export async function applyExtractionReview(
+  sql: Sql,
+  input: {
+    sessionId: string;
+    fields: Partial<ExtractedFields>;
+    reviewerUserId: string;
+    /** 감사 기록에 남길 경로. 봇으로 고친 것을 나중에 가려낼 수 있어야 한다. */
+    source?: "web" | "telegram";
+  },
+): Promise<{ status: ImportStatus; fields: ExtractedFields }> {
+  const session = await imports.requireSession(sql, input.sessionId);
+  if (session.status === "IMPORTED") {
+    throw new DomainError("CONFLICT", "이미 등록된 세션은 수정할 수 없습니다.");
+  }
+  const extraction = await imports.latestExtraction(sql, input.sessionId);
+  if (!extraction) {
+    throw new DomainError("INVALID_STATE", "먼저 분석을 실행해 주세요.");
+  }
+
+  const merged = { ...(extraction.reviewedFields ?? {}), ...input.fields };
+  await imports.saveReview(sql, {
+    extractionId: extraction.id,
+    reviewedFields: merged,
+    reviewedBy: input.reviewerUserId,
+  });
+
+  // 사람이 채운 값을 반영해 다시 판정한다. 사람이 고친 필드는 신뢰도 1로 본다.
+  const fields = { ...extraction.fields, ...merged };
+  const confidence = { ...extraction.confidence };
+  for (const key of Object.keys(merged) as (keyof typeof merged)[]) {
+    confidence[key] = 1;
+  }
+  const next = statusAfterExtraction(fields, confidence);
+  if (next !== session.status) await imports.setStatus(sql, input.sessionId, next);
+
+  await writeAudit(sql, {
+    actorUserId: input.reviewerUserId,
+    action: "import.review",
+    entityType: "import_session",
+    entityId: input.sessionId,
+    metadata: {
+      fields: Object.keys(input.fields),
+      status: next,
+      ...(input.source ? { source: input.source } : {}),
+    },
+  });
+
+  return { status: next, fields: imports.effectiveFields({ ...extraction, reviewedFields: merged }) };
 }
 
 export type CommitResult = {

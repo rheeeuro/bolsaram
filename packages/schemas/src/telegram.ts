@@ -23,6 +23,12 @@ export const TELEGRAM_MAX_FILE_BYTES = 20 * 1024 * 1024;
 export const TELEGRAM_MAX_ASSETS_PER_SESSION = 20;
 
 /**
+ * 버튼에 실어 보낼 수 있는 값의 상한. Bot API 가 정한 값이며, 초과하면
+ * sendMessage 자체가 거부된다. 그래서 버튼에는 식별자만 싣는다.
+ */
+export const TELEGRAM_CALLBACK_DATA_LIMIT = 64;
+
+/**
  * 텔레그램 사용자/대화 id. 2^53 을 넘지 않으므로 number 로 다룬다
  * (DB 에는 bigint 로 저장한다).
  */
@@ -73,14 +79,41 @@ export const telegramMessageSchema = z.object({
 export type TelegramMessage = z.infer<typeof telegramMessageSchema>;
 
 /**
+ * 버튼(inline keyboard)을 누르면 오는 update. 메시지가 아니라 **누름**이다.
+ *
+ * `data` 는 우리가 버튼에 심어 둔 값이 그대로 돌아오는 것이므로 신뢰하지 않는다 —
+ * Bot API 가 64바이트만 허용하고, 의미 판정은 `parseTelegramCallback` 이 한다.
+ * `message` 는 봇이 보낸 지 오래되면 비어 올 수 있어 optional 이다.
+ */
+export const telegramCallbackQuerySchema = z.object({
+  id: z.string().min(1).max(200),
+  from: z.object({
+    id: telegramIdSchema,
+    is_bot: z.boolean().optional(),
+  }),
+  message: z
+    .object({
+      message_id: z.number().int(),
+      chat: z.object({
+        id: telegramIdSchema,
+        type: z.string().max(40),
+      }),
+    })
+    .optional(),
+  data: z.string().max(TELEGRAM_CALLBACK_DATA_LIMIT).optional(),
+});
+export type TelegramCallbackQuery = z.infer<typeof telegramCallbackQuerySchema>;
+
+/**
  * webhook 본문. `update_id` 는 봇 단위로 유일하고 증가하며 중복 처리 방지에 쓴다.
- * 우리가 쓰지 않는 update 종류(콜백·인라인 등)는 message 가 비어 있는 형태로 들어와
- * 그대로 무시된다.
+ * 우리가 쓰지 않는 update 종류(인라인 질의 등)는 세 필드가 모두 비어 있는 형태로
+ * 들어와 그대로 무시된다.
  */
 export const telegramUpdateSchema = z.object({
   update_id: z.number().int(),
   message: telegramMessageSchema.optional(),
   edited_message: telegramMessageSchema.optional(),
+  callback_query: telegramCallbackQuerySchema.optional(),
 });
 export type TelegramUpdate = z.infer<typeof telegramUpdateSchema>;
 

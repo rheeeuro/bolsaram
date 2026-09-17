@@ -70,7 +70,9 @@ if (mode === "--set") {
   await call("setWebhook", {
     url: `${origin}${WEBHOOK_PATH}`,
     secret_token: secret,
-    allowed_updates: ["message"],
+    // 받겠다고 적은 것만 온다 — 성별 버튼은 callback_query 로 돌아오므로
+    // 이 목록에 없으면 눌러도 webhook 이 아무것도 받지 못한다.
+    allowed_updates: ["message", "callback_query"],
     drop_pending_updates: true,
   });
   console.info("✓ 등록했습니다.\n");

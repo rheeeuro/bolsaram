@@ -15,18 +15,24 @@ import {
   assertAssetCapacity,
   assertTelegramTransition,
   classifyTelegramMessage,
+  encodeGenderCallback,
   isTelegramSessionOpen,
   isTelegramSessionStale,
   mergeRawText,
   parseRoomChoice,
+  parseTelegramCallback,
   nextTelegramState,
   shouldAnnounceMedia,
 } from "@bolsaram/domain";
 import {
+  TELEGRAM_CALLBACK_DATA_LIMIT,
   TELEGRAM_MAX_ASSETS_PER_SESSION,
   telegramUpdateSchema,
   type TelegramMessage,
 } from "@bolsaram/schemas";
+
+/** 버튼 값에 실리는 세션 id. 형태만 맞으면 되는 합성값이다. */
+const SESSION_ID = "3f1c2b8a-9d4e-4f6a-8b1c-2d3e4f5a6b7c";
 
 function message(overrides: Partial<TelegramMessage> = {}): TelegramMessage {
   return {
@@ -160,10 +166,32 @@ describe("webhook payload 검증", () => {
   it("우리가 쓰지 않는 update 는 message 없이 통과한다", () => {
     const parsed = telegramUpdateSchema.safeParse({
       update_id: 8,
-      callback_query: { id: "cb" },
+      inline_query: { id: "iq", query: "누구" },
     });
     expect(parsed.success).toBe(true);
     expect(parsed.success && parsed.data.message).toBeUndefined();
+    expect(parsed.success && parsed.data.callback_query).toBeUndefined();
+  });
+
+  it("버튼 누름은 누가 눌렀는지가 있어야 통과한다", () => {
+    // 누른 사람이 없으면 누구 명의로 고칠지 정할 수 없다.
+    expect(
+      telegramUpdateSchema.safeParse({ update_id: 9, callback_query: { id: "cb" } }).success,
+    ).toBe(false);
+
+    const parsed = telegramUpdateSchema.safeParse({
+      update_id: 10,
+      callback_query: {
+        id: "cb",
+        from: { id: 500, is_bot: false },
+        message: { message_id: 3, chat: { id: 500, type: "private" } },
+        data: encodeGenderCallback(SESSION_ID, "FEMALE"),
+      },
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.callback_query?.data).toBe(
+      encodeGenderCallback(SESSION_ID, "FEMALE"),
+    );
   });
 });
 
@@ -308,5 +336,38 @@ describe("parseRoomChoice", () => {
     expect(parseRoomChoice("강남", 3)).toEqual({ kind: "outOfRange" });
     expect(parseRoomChoice("2번", 3)).toEqual({ kind: "outOfRange" });
     expect(parseRoomChoice("", 3)).toEqual({ kind: "outOfRange" });
+  });
+});
+
+describe("성별 버튼", () => {
+  it("버튼 값은 어떤 세션인지 담고 Bot API 상한 안에 들어간다", () => {
+    const data = encodeGenderCallback(SESSION_ID, "MALE");
+    expect(data.length).toBeLessThanOrEqual(TELEGRAM_CALLBACK_DATA_LIMIT);
+    expect(parseTelegramCallback(data)).toEqual({
+      kind: "gender",
+      sessionId: SESSION_ID,
+      gender: "MALE",
+    });
+  });
+
+  it("남성과 여성은 서로 다른 값으로 돌아온다", () => {
+    expect(parseTelegramCallback(encodeGenderCallback(SESSION_ID, "FEMALE"))).toEqual({
+      kind: "gender",
+      sessionId: SESSION_ID,
+      gender: "FEMALE",
+    });
+  });
+
+  it("형태가 다른 값은 해석하지 않는다", () => {
+    // 텔레그램이 준 값이므로 신뢰하지 않는다. 조금이라도 다르면 아무 일도 없어야 한다.
+    expect(parseTelegramCallback(null)).toBeNull();
+    expect(parseTelegramCallback("")).toBeNull();
+    expect(parseTelegramCallback(`g:${SESSION_ID}`)).toBeNull();
+    expect(parseTelegramCallback(`g:${SESSION_ID}:X`)).toBeNull();
+    expect(parseTelegramCallback(`x:${SESSION_ID}:M`)).toBeNull();
+    // 세션 자리가 UUID 가 아니면 조회조차 하지 않는다.
+    expect(parseTelegramCallback("g:not-a-uuid:M")).toBeNull();
+    expect(parseTelegramCallback(`g:${SESSION_ID}:M:extra`)).toBeNull();
+    expect(parseTelegramCallback(`g:${"a".repeat(TELEGRAM_CALLBACK_DATA_LIMIT)}:M`)).toBeNull();
   });
 });

@@ -9,7 +9,10 @@
  * 여기서 나온 결론만 실행한다.
  */
 import {
+  GENDERS,
+  TELEGRAM_CALLBACK_DATA_LIMIT,
   TELEGRAM_MAX_ASSETS_PER_SESSION,
+  type Gender,
   type TelegramMessage,
   type TelegramSessionState,
 } from "@bolsaram/schemas";
@@ -253,8 +256,9 @@ export function assertAssetCapacity(currentCount: number): void {
 /**
  * `/room` 의 인자를 해석한다.
  *
- * 봇은 URL 버튼만 보낼 수 있고 눌러서 고르는 버튼(callback)은 다루지 않는다.
- * 그래서 방을 **번호로** 고른다 — 목록을 1번부터 붙여 보여주고 `/room 2` 로 옮긴다.
+ * 방은 **번호로** 고른다 — 목록을 1번부터 붙여 보여주고 `/room 2` 로 옮긴다.
+ * 성별처럼 선택지가 둘뿐인 값은 버튼(callback)으로 받지만, 모임은 몇 개가 될지
+ * 모르고 이름이 길어 버튼으로 늘어놓으면 대화창이 가려진다.
  * 1번은 항상 전체공개다(소속 없는 방도 하나의 방으로 센다).
  *
  * 숫자가 아니거나 범위를 벗어나면 고르지 않는다 — 조용히 엉뚱한 방으로 옮기는 것보다
@@ -270,4 +274,52 @@ export function parseRoomChoice(
   if (picked < 1 || picked > roomCount) return { kind: "outOfRange" };
   // 화면에는 1번부터 보여주고 배열은 0부터 센다.
   return { kind: "pick", index: picked - 1 };
+}
+
+// ── 버튼 ──────────────────────────────────────────────────────
+
+/**
+ * 버튼에 심는 값 (Bot API 의 `callback_data`).
+ *
+ * 누름은 **메시지와 달리 대화 맥락이 없다.** 며칠 전 메시지의 버튼도 그대로
+ * 눌리므로, 어떤 세션을 가리키는지 값 안에 적어 두고 그 세션을 직접 찾는다 —
+ * "진행 중인 대화"를 쓰면 다음 등록을 시작한 뒤에 옛 버튼을 누를 때 엉뚱한
+ * 프로필의 성별이 바뀐다.
+ *
+ * 값은 64바이트를 넘을 수 없으므로 식별자만 싣는다(`g:<세션 UUID>:M`, 40바이트).
+ */
+export type TelegramCallbackAction = {
+  kind: "gender";
+  sessionId: string;
+  gender: Gender;
+};
+
+const GENDER_CALLBACK_PREFIX = "g";
+/** 성별 한 글자 ↔ enum. 값을 그대로 실으면 64바이트 안에서 여유가 줄어든다. */
+const GENDER_CALLBACK_CODES: Record<Gender, string> = { MALE: "M", FEMALE: "F" };
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function encodeGenderCallback(sessionId: string, gender: Gender): string {
+  const data = `${GENDER_CALLBACK_PREFIX}:${sessionId}:${GENDER_CALLBACK_CODES[gender]}`;
+  if (data.length > TELEGRAM_CALLBACK_DATA_LIMIT) {
+    throw new DomainError("VALIDATION", "버튼 값이 너무 깁니다.", { length: data.length });
+  }
+  return data;
+}
+
+/**
+ * 돌아온 버튼 값을 해석한다. **텔레그램이 준 값이므로 신뢰하지 않는다** —
+ * 형태가 조금이라도 다르면 null 이고, 어댑터는 아무것도 하지 않는다.
+ * 세션에 손댈 수 있는지는 여기가 아니라 RLS 가 정한다.
+ */
+export function parseTelegramCallback(data: string | null | undefined): TelegramCallbackAction | null {
+  if (!data || data.length > TELEGRAM_CALLBACK_DATA_LIMIT) return null;
+  const parts = data.split(":");
+  if (parts.length !== 3) return null;
+  const [prefix, sessionId, code] = parts as [string, string, string];
+  if (prefix !== GENDER_CALLBACK_PREFIX) return null;
+  if (!UUID_PATTERN.test(sessionId)) return null;
+  const gender = GENDERS.find((value) => GENDER_CALLBACK_CODES[value] === code);
+  if (!gender) return null;
+  return { kind: "gender", sessionId, gender };
 }

@@ -9,6 +9,7 @@
  *   * 사진 여러 장이 하나의 ImportSession 에 순서대로 묶인다.
  *   * 모임 없는 주선자도 봇으로 Import 를 만든다(그 결과는 전체공개).
  *   * 봇이 담는 모임은 연결 설정에 붙어 있고 웹 채널을 따라 움직이지 않는다.
+ *   * 봇 버튼으로 고른 성별이 검토값으로 남고, 남의 세션에는 닿지 않는다.
  *   * 봇 전용 테이블에 런타임 롤이 접근하지 못한다.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -33,8 +34,15 @@ import {
 import {
   appendUploadedAsset,
   createSession,
+  effectiveFields,
+  latestExtraction,
   listAssets,
+  saveExtraction,
+  setStatus,
 } from "../apps/web/src/server/repo/imports";
+import { applyExtractionReview } from "../apps/web/src/server/services/import-service";
+import { encodeGenderCallback, parseTelegramCallback } from "@bolsaram/domain";
+import { emptyExtractedFields } from "@bolsaram/schemas";
 
 const TAG = `tgtest-${Date.now()}`;
 /** 다른 테스트와 겹치지 않도록 높은 대역을 쓴다. */
@@ -530,5 +538,101 @@ describe("권한 경계", () => {
     await expect(
       withRls(admin, (sql) => sql.query(`SELECT 1 FROM telegram_webhook_events`)),
     ).rejects.toThrow(/permission denied/i);
+  });
+});
+
+describe("봇 성별 버튼", () => {
+  /**
+   * 성별은 게시 전에 반드시 채워야 하는데 AI 는 이름·말투로 추측하지 않는다.
+   * 그래서 분석 완료 메시지에 버튼을 붙이고, 누르면 웹 검토 화면과 **같은 경로**로
+   * 검토값을 남긴다. 여기서 지키는 성질은 두 가지다 — 값이 실제로 남는가,
+   * 남의 세션에는 닿지 않는가.
+   */
+  async function analyzedSession(ctx: typeof admin, owner: string, group: string | null) {
+    return withRls(ctx, async (sql) => {
+      const session = await createSession(sql, {
+        groupId: group,
+        createdBy: owner,
+        source: "TELEGRAM",
+      });
+      await setStatus(sql, session.id, "ANALYZING");
+      // 성별만 비운 분석 결과. 나머지 필수 항목은 채워 둔다.
+      await saveExtraction(sql, {
+        sessionId: session.id,
+        fields: { ...emptyExtractedFields(), birthYear: 1995, residenceRegion: "SEOUL" },
+        confidence: { birthYear: 0.9, residenceRegion: 0.9 },
+        notes: [],
+        model: "test",
+        promptVersion: "test",
+        raw: {},
+      });
+      await setStatus(sql, session.id, "REVIEW_REQUIRED");
+      return session.id;
+    });
+  }
+
+  it("버튼을 누르면 성별이 검토값으로 남고 상태가 다시 판정된다", async () => {
+    const sessionId = await analyzedSession(admin, adminId, groupId);
+    const action = parseTelegramCallback(encodeGenderCallback(sessionId, "FEMALE"));
+    expect(action).toEqual({ kind: "gender", sessionId, gender: "FEMALE" });
+
+    const result = await withRls(admin, (sql) =>
+      applyExtractionReview(sql, {
+        sessionId,
+        fields: { gender: "FEMALE" },
+        reviewerUserId: adminId,
+        source: "telegram",
+      }),
+    );
+    // 필수 항목이 다 찼으므로 검토 대기에서 벗어난다.
+    expect(result.status).toBe("READY");
+    expect(result.fields.gender).toBe("FEMALE");
+
+    const stored = await withRls(admin, (sql) => latestExtraction(sql, sessionId));
+    // AI 결과는 그대로 두고 수정본만 덧쌓인다.
+    expect(stored?.fields.gender).toBeNull();
+    expect(effectiveFields(stored).gender).toBe("FEMALE");
+  });
+
+  it("다시 누르면 바꿀 수 있다", async () => {
+    const sessionId = await analyzedSession(admin, adminId, groupId);
+    await withRls(admin, (sql) =>
+      applyExtractionReview(sql, {
+        sessionId,
+        fields: { gender: "MALE" },
+        reviewerUserId: adminId,
+        source: "telegram",
+      }),
+    );
+    const result = await withRls(admin, (sql) =>
+      applyExtractionReview(sql, {
+        sessionId,
+        fields: { gender: "FEMALE" },
+        reviewerUserId: adminId,
+        source: "telegram",
+      }),
+    );
+    expect(result.fields.gender).toBe("FEMALE");
+    // 다른 검토값은 덮어쓰지 않는다.
+    expect(result.fields.birthYear).toBe(1995);
+  });
+
+  it("남의 세션 버튼 값을 흉내 내도 닿지 않는다", async () => {
+    // 버튼 값은 텔레그램을 거쳐 돌아오므로 무엇이든 보낼 수 있다.
+    // 세션에 손댈 수 있는지는 RLS 가 정한다.
+    const sessionId = await analyzedSession(admin, adminId, groupId);
+    await expect(
+      withRls(soloAdmin, (sql) =>
+        applyExtractionReview(sql, {
+          sessionId,
+          fields: { gender: "MALE" },
+          reviewerUserId: soloAdminId,
+          source: "telegram",
+        }),
+      ),
+    ).rejects.toThrow(/찾을 수 없습니다/);
+
+    const stored = await withRls(admin, (sql) => latestExtraction(sql, sessionId));
+    expect(effectiveFields(stored).gender).toBeNull();
   });
 });

@@ -20,15 +20,21 @@ import {
   DomainError,
   assertAssetCapacity,
   classifyTelegramMessage,
+  encodeGenderCallback,
   mergeRawText,
   nextTelegramState,
   parseRoomChoice,
+  parseTelegramCallback,
   shouldAnnounceMedia,
+  type TelegramCallbackAction,
   type TelegramIntent,
 } from "@bolsaram/domain";
 import {
+  GENDERS,
   TELEGRAM_SESSION_STATE_LABELS,
   telegramUpdateSchema,
+  type Gender,
+  type TelegramCallbackQuery,
   type TelegramMessage,
 } from "@bolsaram/schemas";
 import { writeAudit } from "../audit";
@@ -45,9 +51,16 @@ import { assertGroupAdmin, readMyGroups } from "../auth/group-invite";
 import { env } from "../env";
 import * as imports from "../repo/imports";
 import * as conversations from "../repo/telegram";
-import { analyzeSession } from "../services/import-service";
+import { analyzeSession, applyExtractionReview } from "../services/import-service";
 import { buildStorageKey, putObject } from "../storage/local";
-import { downloadFile, getFile, sendMessage } from "./client";
+import {
+  answerCallbackQuery,
+  downloadFile,
+  editMessageReplyMarkup,
+  getFile,
+  sendMessage,
+  type TelegramInlineButton,
+} from "./client";
 import { messages } from "./messages";
 
 /**
@@ -63,16 +76,18 @@ export async function handleTelegramUpdate(raw: unknown): Promise<void> {
   }
   const update = parsed.data;
   const message = update.message ?? update.edited_message;
+  const callback = update.callback_query;
 
   // 재전송이면 아무것도 하지 않는다. 사진이 두 번 저장되는 것을 막는 지점이다.
   const isFirstTime = await claimTelegramUpdate(
     update.update_id,
-    message ? "message" : "other",
+    message ? "message" : callback ? "callback" : "other",
   );
   if (!isFirstTime) return;
 
   try {
     if (message) await route(message);
+    else if (callback) await routeCallback(callback);
     await markTelegramUpdateProcessed(update.update_id);
   } catch (error) {
     // 어디서 실패했는지는 남기고 내용은 남기지 않는다.
@@ -80,12 +95,15 @@ export async function handleTelegramUpdate(raw: unknown): Promise<void> {
       "텔레그램 update 처리 실패",
       error instanceof DomainError ? { code: error.code, message: error.message } : error,
     );
-    if (message) {
-      await sendMessage(
-        message.chat.id,
-        error instanceof DomainError ? error.message : messages.failed,
-      ).catch(() => {
+    const reason = error instanceof DomainError ? error.message : messages.failed;
+    if (callback) {
+      // 실패해도 반드시 답한다 — 답이 없으면 버튼에 로딩 표시가 계속 돈다.
+      await answerCallbackQuery(callback.id, reason).catch(() => {
         // 답장까지 실패하면 더 할 수 있는 게 없다. 위 로그로 충분하다.
+      });
+    } else if (message) {
+      await sendMessage(message.chat.id, reason).catch(() => {
+        // 위와 같다.
       });
     }
   }
@@ -287,6 +305,86 @@ async function handleCommand(
     case "/start":
       return;
   }
+}
+
+// ── 버튼 ──────────────────────────────────────────────────────
+
+/**
+ * 버튼을 누른 것을 처리한다.
+ *
+ * 메시지와 달리 **대화 맥락이 없다.** 어떤 세션인지는 버튼에 심어 둔 값에서 읽고,
+ * 그 세션에 손댈 수 있는지는 연결된 주선자 명의의 RLS 가 정한다 — 남의 버튼 값을
+ * 그대로 흉내 내 보내도 정책을 통과하지 못한다.
+ */
+async function routeCallback(callback: TelegramCallbackQuery): Promise<void> {
+  if (callback.from.is_bot) return;
+
+  const action = parseTelegramCallback(callback.data);
+  console.info(`텔레그램 누름: ${action ? action.kind : "알 수 없음"}`);
+  if (!action) {
+    await answerCallbackQuery(callback.id, messages.buttonExpired);
+    return;
+  }
+
+  const identity = await findTelegramIdentity(callback.from.id);
+  if (!identity) {
+    await answerCallbackQuery(callback.id, messages.notLinkedShort);
+    return;
+  }
+  await touchTelegramConnection(callback.from.id);
+
+  await applyGenderChoice(rlsContextOfTelegram(identity), identity, callback, action);
+}
+
+/**
+ * 고른 성별을 검토값으로 남긴다. 웹 검토 화면과 **같은 서비스**를 통과하므로
+ * 상태 재판정·감사 기록이 한쪽에만 생기는 일이 없다.
+ */
+async function applyGenderChoice(
+  ctx: RlsContext,
+  identity: TelegramIdentity,
+  callback: TelegramCallbackQuery,
+  action: Extract<TelegramCallbackAction, { kind: "gender" }>,
+): Promise<void> {
+  const result = await withRls(ctx, (sql) =>
+    applyExtractionReview(sql, {
+      sessionId: action.sessionId,
+      fields: { gender: action.gender },
+      reviewerUserId: identity.userId,
+      source: "telegram",
+    }),
+  );
+  console.info(`텔레그램 응답: 성별 저장 · 상태 ${result.status}`);
+
+  await answerCallbackQuery(callback.id, messages.genderSaved(action.gender));
+  // 고른 값을 버튼에 표시한다. 오래된 메시지는 텔레그램이 수정을 거부하므로
+  // 여기 실패는 저장을 되돌릴 이유가 되지 않는다 — 값은 이미 남았다.
+  if (callback.message) {
+    await editMessageReplyMarkup(
+      callback.message.chat.id,
+      callback.message.message_id,
+      analyzedKeyboard(action.sessionId, action.gender),
+    ).catch(() => {
+      console.warn("텔레그램 버튼 갱신 실패 (저장은 완료)");
+    });
+  }
+}
+
+/**
+ * 분석 완료 메시지에 붙는 버튼.
+ *
+ * 성별은 게시 전에 반드시 채워야 하는데 AI 는 이름·말투로 추측하지 않으므로
+ * 대부분 비어서 온다. 값이 이미 있어도 버튼을 남겨 둔다 — 잘못 뽑혔을 때
+ * 검토 화면까지 가지 않고 그 자리에서 고칠 수 있어야 한다.
+ */
+function analyzedKeyboard(sessionId: string, gender: Gender | null): TelegramInlineButton[][] {
+  return [
+    GENDERS.map((value) => ({
+      text: messages.genderButton(value, value === gender),
+      data: encodeGenderCallback(sessionId, value),
+    })),
+    [{ text: messages.reviewButton, url: `${env().APP_ORIGIN}/imports/${sessionId}` }],
+  ];
 }
 
 // ── 사진 ──────────────────────────────────────────────────────
@@ -505,10 +603,7 @@ function triggerAnalyze(ctx: RlsContext, identity: TelegramIdentity, sessionId: 
       await sendMessage(
         identity.telegramChatId,
         messages.analyzed(fields, result.status === "REVIEW_REQUIRED", groupName),
-        {
-          buttonText: messages.reviewButton,
-          buttonUrl: `${env().APP_ORIGIN}/imports/${sessionId}`,
-        },
+        { rows: analyzedKeyboard(sessionId, fields.gender) },
       );
     } catch (error) {
       console.error(

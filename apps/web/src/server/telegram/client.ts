@@ -74,20 +74,80 @@ export async function getBotUsername(): Promise<string | null> {
   return payload.result?.username ?? null;
 }
 
-/** 봇이 보내는 메시지. 프로필 원문·사진 URL 을 여기 싣지 않는다. */
+/**
+ * 버튼 한 개. 링크를 여는 버튼이거나, 눌렀다는 사실이 webhook 으로 되돌아오는
+ * 버튼이다. `data` 는 그대로 돌아오므로 식별자만 싣는다(§15 — 개인정보를 싣지 않는다).
+ */
+export type TelegramInlineButton = { text: string; url: string } | { text: string; data: string };
+
+type InlineKeyboardButton = { text: string; url?: string; callback_data?: string };
+
+function toInlineKeyboard(rows: TelegramInlineButton[][]): {
+  inline_keyboard: InlineKeyboardButton[][];
+} {
+  return {
+    inline_keyboard: rows.map((row) =>
+      row.map((button) =>
+        "url" in button
+          ? { text: button.text, url: button.url }
+          : { text: button.text, callback_data: button.data },
+      ),
+    ),
+  };
+}
+
+/**
+ * 봇이 보내는 메시지. 프로필 원문·사진 URL 을 여기 싣지 않는다.
+ * `rows` 로 준 버튼이 위, 링크 버튼(`buttonText`/`buttonUrl`)이 그 아래 줄에 붙는다.
+ */
 export async function sendMessage(
   chatId: number,
   text: string,
-  options: { buttonText?: string; buttonUrl?: string } = {},
+  options: {
+    buttonText?: string;
+    buttonUrl?: string;
+    rows?: TelegramInlineButton[][];
+  } = {},
 ): Promise<void> {
-  const reply_markup =
-    options.buttonText && options.buttonUrl
-      ? { inline_keyboard: [[{ text: options.buttonText, url: options.buttonUrl }]] }
-      : undefined;
+  const rows: TelegramInlineButton[][] = [...(options.rows ?? [])];
+  if (options.buttonText && options.buttonUrl) {
+    rows.push([{ text: options.buttonText, url: options.buttonUrl }]);
+  }
   await callBotApi("sendMessage", {
     chat_id: chatId,
     text,
-    ...(reply_markup ? { reply_markup } : {}),
+    ...(rows.length > 0 ? { reply_markup: toInlineKeyboard(rows) } : {}),
+  });
+}
+
+/**
+ * 누름에 답한다. **답하지 않으면 텔레그램 클라이언트에 로딩 표시가 계속 돈다** —
+ * 처리에 실패했더라도 반드시 부른다. `text` 는 대화창이 아니라 잠깐 뜨는 알림이다.
+ */
+export async function answerCallbackQuery(
+  callbackQueryId: string,
+  text?: string,
+): Promise<void> {
+  await callBotApi("answerCallbackQuery", {
+    callback_query_id: callbackQueryId,
+    ...(text ? { text } : {}),
+  });
+}
+
+/**
+ * 이미 보낸 메시지의 버튼만 바꾼다. 고른 값을 버튼에 표시해 주기 위한 것이며,
+ * 메시지 본문은 그대로 둔다. 대상 메시지가 너무 오래됐으면 텔레그램이 거부하므로
+ * 실패를 삼키지 않고 호출부가 판단한다.
+ */
+export async function editMessageReplyMarkup(
+  chatId: number,
+  messageId: number,
+  rows: TelegramInlineButton[][],
+): Promise<void> {
+  await callBotApi("editMessageReplyMarkup", {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: toInlineKeyboard(rows),
   });
 }
 

@@ -7,9 +7,11 @@
  */
 import "server-only";
 import {
+  GENDER_LABELS,
   MATCH_INTENT_KIND_LABELS,
   TELEGRAM_MAX_ASSETS_PER_SESSION,
   type ExtractedFields,
+  type Gender,
   type MatchIntentKind,
 } from "@bolsaram/schemas";
 
@@ -109,6 +111,7 @@ export const messages = {
   analyzed: (fields: ExtractedFields, needsReview: boolean, groupName: string | null) => {
     const lines: string[] = ["분석이 완료됐습니다.", `담긴 곳 — ${roomName(groupName)}`, ""];
     const first = [
+      fields.gender ? GENDER_LABELS[fields.gender] : null,
       fields.birthYear ? `${fields.birthYear}년생` : null,
       fields.height ? `${fields.height}cm` : null,
     ]
@@ -124,14 +127,37 @@ export const messages = {
         ? "확인이 필요한 항목이 있습니다. 볼사람에서 검토해 주세요."
         : "볼사람에서 확인하고 등록해 주세요.",
     );
+    // 성별은 게시 전에 반드시 채워야 하고 AI 가 이름·말투로 추측하지 않는다.
+    // 검토 화면까지 가지 않고 여기서 누르면 끝나도록 버튼을 함께 보낸다.
+    lines.push(
+      fields.gender
+        ? "성별이 다르면 아래 버튼에서 바꿀 수 있습니다."
+        : "성별을 아래 버튼에서 골라주세요.",
+    );
     // 방은 검토 화면에서 바꿀 수 있다. 다시 보내지 않아도 된다는 것을 알려준다.
     lines.push("등록할 모임은 검토 화면에서 바꿀 수 있습니다.");
     return lines.join("\n");
   },
 
   /**
+   * 성별 버튼. 고른 값에 표시를 남겨 두 번 물어보지 않게 하고, 잘못 눌렀을 때
+   * 다시 바꿀 수 있도록 버튼은 그대로 둔다.
+   */
+  genderButton: (gender: Gender, selected: boolean) =>
+    `${selected ? "✓ " : ""}${GENDER_LABELS[gender]}`,
+
+  /** 버튼을 누른 사람에게만 잠깐 뜨는 알림. 대화창에는 남지 않는다. */
+  genderSaved: (gender: Gender) => `성별을 ${GENDER_LABELS[gender]}으로 저장했습니다.`,
+
+  /** 우리가 만들지 않은 버튼이거나 형식이 깨진 값. 조용히 넘기지 않고 알린다. */
+  buttonExpired: "이 버튼은 더 이상 쓸 수 없습니다. 볼사람에서 확인해 주세요.",
+
+  /** 누름에 대한 답은 짧아야 한다 — 연결 안내는 대화창이 아니라 알림으로 뜬다. */
+  notLinkedShort: "연결되지 않은 계정입니다.",
+
+  /**
    * `/room` 목록. 번호를 붙여 보여주고 `/room <번호>` 로 고르게 한다 —
-   * 봇은 눌러서 고르는 버튼(callback)을 다루지 않으므로 번호가 유일한 방법이다.
+   * 모임은 몇 개가 될지 모르고 이름이 길어 버튼으로 늘어놓지 않는다.
    * 1번은 항상 전체공개다.
    */
   roomList: (rooms: { name: string | null }[], activeIndex: number) =>
