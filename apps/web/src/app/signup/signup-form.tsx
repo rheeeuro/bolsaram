@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SIGNUP_PASSWORD_MIN } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ import { apiPost } from "@/lib/api-client";
  * 만들거나 초대 코드로 참여한다 — 화면에서 그 순서를 분명히 말해준다.
  */
 export function SignupForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -36,7 +34,9 @@ export function SignupForm() {
       setError(result.message);
       return;
     }
-    router.replace("/home");
+    // 세션이 생겼으니 문서를 새로 연다. 클라이언트 라우터로 넘기면 로그인 이전의
+    // 라우터 상태가 남아 이동한 화면이 다시 로그인으로 튕기고 무한 왕복이 된다.
+    window.location.replace("/home");
   }
 
   return (

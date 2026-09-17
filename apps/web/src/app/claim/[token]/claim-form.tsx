@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/field";
@@ -21,7 +20,6 @@ export function ClaimForm({
   alreadyLinked: boolean;
   next: string | null;
 }) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -41,7 +39,11 @@ export function ClaimForm({
               return;
             }
             // 처음이면 내 프로필을 확인하게, 재로그인이면 보려던 화면으로 보낸다.
-            router.replace(result.data.firstTime ? "/me" : (next ?? "/discover"));
+            // 세션이 생겼으니 문서를 새로 연다. 클라이언트 라우터로 넘기면 로그인 이전의
+            // 라우터 상태가 남아 이동한 화면이 다시 로그인으로 튕기고 무한 왕복이 된다.
+            window.location.replace(
+              result.data.firstTime ? "/me" : (next ?? "/discover"),
+            );
           })();
         }}
       >

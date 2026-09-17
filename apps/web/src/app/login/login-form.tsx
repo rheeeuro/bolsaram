@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormError, Input } from "@/components/ui/field";
@@ -14,7 +13,6 @@ import { apiPost } from "@/lib/api-client";
  * 실패 메시지는 서버가 계정 존재 여부를 구분하지 않고 내려주는 것을 그대로 쓴다.
  */
 export function LoginForm({ next }: { next: string | null }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +32,9 @@ export function LoginForm({ next }: { next: string | null }) {
             setError(result.message);
             return;
           }
-          router.replace(next ?? "/home");
+          // 세션이 생겼으니 문서를 새로 연다. 클라이언트 라우터로 넘기면 로그인 이전의
+          // 라우터 상태가 남아 이동한 화면이 다시 로그인으로 튕기고 무한 왕복이 된다.
+          window.location.replace(next ?? "/home");
         })();
       }}
     >
