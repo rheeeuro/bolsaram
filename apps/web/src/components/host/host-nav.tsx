@@ -6,14 +6,18 @@ import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GroupSwitcher, type GroupChoice } from "@/components/host/group-switcher";
+import { GroupMenu } from "@/components/host/group-menu";
 import { useChatStream } from "@/components/host/chat-stream";
 
 /**
  * 모임 목록과 선택한 모임의 화면을 계층으로 보여주는 내비게이션.
  *
- * 아래 목록에는 **보고 있는 모임에 속한 화면만** 둔다. 모임 자체를 다루는 `/group`
- * 은 계정 단위라 위쪽 모임 목록 옆의 「관리」로 간다 — 같은 줄에 섞으면 모임을
+ * 세 층이다 — 위에서 **모임을 고르고**, 가운데 이름 줄에서 **그 모임을 다루고**,
+ * 아래 `#` 목록에서 **그 모임 안의 화면**으로 간다. 아래 목록에는 모임에 속한 화면만
+ * 둔다. 설정·초대·나가기는 이름 줄의 메뉴로 들어간다 — 같은 줄에 섞으면 모임을
  * 바꿔도 안 바뀌는 화면이 하나 껴 있게 된다.
+ *
+ * 전체공개에는 메뉴가 없다. 이름도 주선자도 없는 공용 방이라 다룰 것이 없다.
  */
 
 type NavLink = { href: string; label: string; exact?: boolean };
@@ -73,12 +77,16 @@ export function HostNav({
         </div>
 
         <GroupSwitcher groups={groups} activeGroupId={activeGroupId} unread={unread} />
-        <div className="mt-2 border-t border-[var(--surface-border)] px-2 pt-3 lg:mt-4 lg:pt-5">
-          <p className="truncate text-[15px] font-semibold" title={activeName}>
-            {activeName}
-          </p>
-          <p className="mt-1 hidden text-[11px] text-[var(--surface-text-muted)] lg:block">
-            {activeGroupId ? "우리 모임의 공간" : "전체공개 프로필을 함께 살펴보세요"}
+        <div className="mt-2 border-t border-[var(--surface-border)] pt-3 lg:mt-4 lg:pt-5">
+          {activeGroupId ? (
+            <GroupMenu groupId={activeGroupId} groupName={activeName} />
+          ) : (
+            <p className="truncate px-2 text-[15px] font-semibold" title={activeName}>
+              {activeName}
+            </p>
+          )}
+          <p className="mt-1 hidden px-2 text-[11px] text-[var(--surface-text-muted)] lg:block">
+            {activeGroupId ? "이름을 눌러 설정·초대·나가기" : "전체공개 프로필을 함께 살펴보세요"}
           </p>
         </div>
         <nav

@@ -13,6 +13,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import {
+  closeGroup,
   consumeGroupInvite,
   issueGroupInvite,
   leaveGroup,
@@ -540,6 +541,97 @@ describe("모임 나가기", () => {
     });
     await leaveGroup(admin.userId, groupId);
     expect(await readActiveGroupId(admin.userId)).toBeNull();
+  });
+});
+
+describe("모임 폐쇄", () => {
+  it("모임장은 빈 모임을 폐쇄한다", async () => {
+    const owner = await newAdmin("폐쇄모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-폐쇄할모임`,
+    });
+
+    await closeGroup({ actorId: owner.userId, groupId });
+
+    const left = await withOwner(async (sql) => {
+      const r = await sql.query(`SELECT 1 FROM groups WHERE id = $1`, [groupId]);
+      return r.rowCount ?? 0;
+    });
+    expect(left).toBe(0);
+    expect(await readGroup(owner.userId, groupId)).toBeNull();
+  });
+
+  it("회원이 남아 있으면 폐쇄할 수 없다", async () => {
+    const owner = await newAdmin("회원남은모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-회원남은모임`,
+    });
+    await seedProfile({ groupId, createdBy: owner.userId, name: "폐쇄막는회원" });
+
+    // 모임이 사라지면 RLS 가 그 회원을 전부 가린다 — 되살릴 길이 없으므로 막는다.
+    await expect(closeGroup({ actorId: owner.userId, groupId })).rejects.toThrow(
+      /남아 있어 폐쇄할 수 없습니다/,
+    );
+    expect(await readGroup(owner.userId, groupId)).not.toBeNull();
+  });
+
+  it("모임장이 아닌 주선자는 폐쇄할 수 없다", async () => {
+    const owner = await newAdmin("폐쇄권한개설자");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-폐쇄권한모임`,
+    });
+    const colleague = await addColleague(owner, groupId, "폐쇄못하는동료");
+
+    await expect(closeGroup({ actorId: colleague.userId, groupId })).rejects.toThrow(
+      /모임장만/,
+    );
+    expect(await readGroup(owner.userId, groupId)).not.toBeNull();
+  });
+
+  it("속하지 않은 사람은 폐쇄할 수 없다", async () => {
+    const owner = await newAdmin("폐쇄남의모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-남의모임`,
+    });
+    const stranger = await newAdmin("폐쇄행인");
+
+    await expect(closeGroup({ actorId: stranger.userId, groupId })).rejects.toThrow(
+      /모임장만/,
+    );
+    expect(await readGroup(owner.userId, groupId)).not.toBeNull();
+  });
+
+  it("남은 주선자도 함께 빠지고 보고 있던 방을 잃는다", async () => {
+    const owner = await newAdmin("데리고나가는모임장");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-동료있는빈모임`,
+    });
+    const colleague = await addColleague(owner, groupId, "함께빠지는동료");
+    // 합류하면 그 모임을 보게 된다.
+    expect(await readActiveGroupId(colleague.userId)).toBe(groupId);
+
+    await closeGroup({ actorId: owner.userId, groupId });
+
+    expect(await readGroup(colleague.userId, groupId)).toBeNull();
+    // groups 가 사라지면 ON DELETE SET NULL 로 보고 있던 방도 비워진다(0036).
+    expect(await readActiveGroupId(colleague.userId)).toBeNull();
+  });
+
+  it("보고 있던 모임을 폐쇄하면 남은 모임으로 옮겨 간다", async () => {
+    const admin = await newAdmin("두모임폐쇄자");
+    const stays = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-남는방` });
+    const closes = await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-닫는방` });
+    await setActiveGroup(admin.userId, closes.groupId);
+
+    const result = await closeGroup({ actorId: admin.userId, groupId: closes.groupId });
+
+    expect(result.activeGroupId).toBe(stays.groupId);
+    expect(await readActiveGroupId(admin.userId)).toBe(stays.groupId);
   });
 });
 

@@ -66,10 +66,10 @@ apps/web/src/
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
 │   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용)
-│   │   └── group/            속한 모임들 · 주선자 구성원 · 초대 코드 · 나가기
+│   │   └── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·skeleton·auth-shell·markdown·brand-logo)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo)
 │   ├── member/               회원 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
@@ -118,7 +118,7 @@ server/
 │   ├── login.ts              주선자 비밀번호 (15분 5회 시도 제한)
 │   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
-│   ├── group-invite.ts       모임 소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환
+│   ├── group-invite.ts       모임 소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 회원 화면 → /enter, 주선자 화면 → /login)
@@ -201,6 +201,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/join`                  | POST                | 주선자            | 초대 코드로 모임 합류                |
 | `/api/admin/groups/active`                | PUT                 | 주선자            | 보고 있는 모임 전환 (`null` = 전체공개) |
 | `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
+| `/api/admin/groups/[id]/close`            | DELETE              | **모임장**        | 모임 폐쇄 (비어 있을 때만)           |
 | `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급           |
 | `/api/admin/groups/[id]/admins/[userId]`  | PATCH / DELETE      | **모임장**        | 모임장 넘기기 / 주선자 내보내기      |
 | `/api/admin/groups/[id]/messages`         | GET / POST          | 그 모임 주선자    | 채팅 읽기(`before`·`after`) / 쓰기   |

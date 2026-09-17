@@ -40,7 +40,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `admin-login.test.ts`          | 관리자 비밀번호 시도 제한·창 만료·권한 경계    | 필요 | 7    |
 | `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
-| `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기·모임장 위임/내보내기 | 필요 | 39 |
+| `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 45 |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
 | `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 30 |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
@@ -96,6 +96,8 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `group-isolation.test.ts` 「모임을 넘는 소개 신청」        | 테넌트 경계를 넘는 신청 차단        |
 | `admin-signup.test.ts` 「전체공개를 남이 고칠 수 없다」    | 보이는 것과 고치는 것을 분리         |
 | `admin-signup.test.ts` 「마지막 주선자는 …나갈 수 없다」   | 아무도 못 보는 회원을 만들지 않음    |
+| `admin-signup.test.ts` 「회원이 남아 있으면 폐쇄할 수 없다」| 방을 치우며 회원이 사라지지 않음     |
+| `admin-signup.test.ts` 「모임장이 아닌 …폐쇄할 수 없다」   | 방을 없애는 것은 모임장만            |
 | `group-isolation.test.ts` 「남의 프로필을 자기 것으로」    | 초대 없는 claim 차단 (0013)          |
 | `member-magic-link.test.ts` 「같은 링크를 두 번」          | 링크 replay 차단 (회원 로그인 수단)  |
 | `member-magic-link.test.ts` 「링크를 쓴 회원을 삭제」      | 탈퇴 처리가 제약에 막히지 않음 (0016)|

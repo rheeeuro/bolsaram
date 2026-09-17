@@ -145,6 +145,8 @@ export type GroupSummary = {
   isOwner: boolean;
   /** 이 모임에 등록된 회원 수. 목록에서 어느 방이 활발한지 가늠하는 데 쓴다. */
   memberCount: number;
+  /** 이 모임으로 가져온 Import 건수. 폐쇄를 막는 것이 무엇인지 화면에 적을 때 쓴다. */
+  importCount: number;
   admins: { userId: string; displayName: string | null; isOwner: boolean }[];
   /** 이 방의 새 채팅을 텔레그램으로도 받을 것인가(0040). 사람마다 따로 켠다. */
   chatNotify: boolean;
@@ -164,10 +166,12 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       description: string | null;
       is_owner: boolean;
       member_count: number;
+      import_count: number;
       chat_notify: boolean;
     }>(
       `SELECT g.id AS group_id, g.name, g.description, ga.is_owner,
               (SELECT count(*)::int FROM profiles p WHERE p.group_id = g.id) AS member_count,
+              (SELECT count(*)::int FROM import_sessions i WHERE i.group_id = g.id) AS import_count,
               COALESCE(pref.telegram_notify, false) AS chat_notify
          FROM group_admins ga
          JOIN groups g ON g.id = ga.group_id
@@ -196,6 +200,7 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       description: group.description,
       isOwner: group.is_owner,
       memberCount: group.member_count,
+      importCount: group.import_count,
       chatNotify: group.chat_notify,
       admins: admins.rows
         .filter((a) => a.group_id === group.group_id)
@@ -417,5 +422,70 @@ export async function leaveGroup(
       [userId],
     );
     return { deletedGroup, activeGroupId: current.rows[0]?.active_group_id ?? null };
+  });
+}
+
+/**
+ * 모임을 폐쇄한다. 모임장만 할 수 있다.
+ *
+ * **비어 있을 때만 지운다** — 회원이나 가져온 프로필이 하나라도 남아 있으면 막는다.
+ * 나가기(`leaveGroup`)가 마지막 주선자를 막는 것과 같은 기준이다. 모임이 사라지면
+ * 그 데이터는 RLS 가 전부 가려 아무도 되살릴 수 없기 때문에, 폐쇄는 「정리가 끝난
+ * 방을 치우는 일」로만 둔다.
+ *
+ * 다른 주선자가 남아 있어도 지운다. 잃을 회원이 없는 빈 방이고, 남은 사람들의 소속과
+ * 활성 채널은 CASCADE 와 `ON DELETE SET NULL` 이 함께 정리한다(0036).
+ */
+export async function closeGroup(input: {
+  actorId: string;
+  groupId: string;
+}): Promise<{ activeGroupId: string | null }> {
+  await assertGroupOwner(input.actorId, input.groupId);
+
+  return withOwnerTx(async (sql) => {
+    const left = await sql.query<{ count: number }>(
+      `SELECT (
+         (SELECT count(*) FROM profiles WHERE group_id = $1)
+         + (SELECT count(*) FROM import_sessions WHERE group_id = $1)
+       )::int AS count`,
+      [input.groupId],
+    );
+    if ((left.rows[0]?.count ?? 0) > 0) {
+      throw new DomainError(
+        "CONFLICT",
+        "모임에 회원이나 가져온 프로필이 남아 있어 폐쇄할 수 없습니다." +
+          " 전체공개로 옮기거나 정리한 뒤 다시 시도해 주세요.",
+      );
+    }
+
+    const mine = await sql.query<{ was_active: boolean }>(
+      `SELECT (active_group_id = $2) AS was_active FROM users WHERE id = $1`,
+      [input.actorId, input.groupId],
+    );
+
+    // group_admins·초대 코드·채팅은 CASCADE 로, 남은 사람들의 활성 채널은
+    // `users.active_group_id` 의 ON DELETE SET NULL 로 함께 정리된다.
+    await sql.query(`DELETE FROM groups WHERE id = $1`, [input.groupId]);
+
+    if (!mine.rows[0]?.was_active) {
+      const current = await sql.query<{ active_group_id: string | null }>(
+        `SELECT active_group_id FROM users WHERE id = $1`,
+        [input.actorId],
+      );
+      return { activeGroupId: current.rows[0]?.active_group_id ?? null };
+    }
+
+    // 보고 있던 방을 치웠다. 남은 모임 중 가장 먼저 들어온 곳으로 옮긴다.
+    const next = await sql.query<{ active_group_id: string | null }>(
+      `UPDATE users u
+          SET active_group_id = (
+                SELECT ga.group_id FROM group_admins ga
+                 WHERE ga.user_id = u.id ORDER BY ga.added_at LIMIT 1
+              )
+        WHERE u.id = $1
+        RETURNING u.active_group_id`,
+      [input.actorId],
+    );
+    return { activeGroupId: next.rows[0]?.active_group_id ?? null };
   });
 }

@@ -1,18 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { apiPut } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { Menu, MenuItem } from "@/components/ui/menu";
+import { GroupCreateDialogs } from "@/components/host/group-create";
 
 export type GroupChoice = { id: string; name: string };
 
 /**
  * 항상 보이는 모임 목록. 전환 완료까지 중복 요청을 막는다.
  *
- * 모임 자체를 다루는 `/group` 진입점이 여기 붙는 이유는 그것이 계정 단위이기
- * 때문이다 — 아래 화면 목록은 고른 모임 안에서만 뜻이 있다.
+ * 여기서 하는 일은 **어느 방을 볼지 고르는 것과 방을 늘리는 것** 둘뿐이다. 고른
+ * 모임을 고치는 일은 아래 이름 옆 메뉴에서 그 모임 안으로 들어간다 — 목록에 설정을
+ * 섞으면 어느 모임을 건드리는지가 목록 위치에 숨는다.
  */
 export function GroupSwitcher({
   groups,
@@ -28,6 +30,7 @@ export function GroupSwitcher({
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<"create" | "join" | null>(null);
 
   async function switchTo(groupId: string | null) {
     if (locked.current || pending || groupId === activeGroupId) return;
@@ -47,16 +50,10 @@ export function GroupSwitcher({
       aria-busy={busy || pending}
       className="min-h-0 lg:flex lg:flex-col"
     >
-      <div className="mb-2 flex items-center justify-between gap-2 px-2">
+      <div className="mb-2 px-2">
         <p className="text-[11px] font-medium tracking-wider text-[var(--surface-text-muted)]">
           내 모임
         </p>
-        <Link
-          href="/group"
-          className="shrink-0 text-[11px] text-[var(--surface-text-muted)] transition-colors hover:text-[var(--color-rose-600)]"
-        >
-          관리
-        </Link>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-2 lg:max-h-[32dvh] lg:flex-col lg:overflow-y-auto">
         {[{ id: null, name: "전체공개" }, ...groups].map((group) => {
@@ -105,15 +102,27 @@ export function GroupSwitcher({
             </button>
           );
         })}
-        <Link
-          href="/group"
-          className="flex min-h-12 shrink-0 items-center gap-2 rounded-xl px-3 text-[12px] text-[var(--surface-text-muted)] hover:bg-[var(--color-ivory-200)]"
+        <Menu
+          label="모임 추가"
+          className="shrink-0"
+          panelClassName="min-w-52"
+          trigger={(open) => (
+            <span
+              className={cn(
+                "flex min-h-12 items-center gap-2 rounded-xl px-3 text-[12px] text-[var(--surface-text-muted)] transition-colors",
+                open ? "bg-[var(--color-ivory-200)]" : "hover:bg-[var(--color-ivory-200)]",
+              )}
+            >
+              <span aria-hidden className="text-xl">
+                ＋
+              </span>{" "}
+              모임 만들기 · 참여하기
+            </span>
+          )}
         >
-          <span aria-hidden className="text-xl">
-            ＋
-          </span>{" "}
-          모임 만들기 · 참여하기
-        </Link>
+          <MenuItem onSelect={() => setDialog("create")}>새 모임 만들기</MenuItem>
+          <MenuItem onSelect={() => setDialog("join")}>초대 코드로 참여</MenuItem>
+        </Menu>
       </div>
       {(busy || pending) && (
         <p role="status" className="px-2 text-xs text-[var(--surface-text-muted)]">
@@ -125,6 +134,8 @@ export function GroupSwitcher({
           {error}
         </p>
       )}
+
+      <GroupCreateDialogs which={dialog} onClose={() => setDialog(null)} />
     </section>
   );
 }
