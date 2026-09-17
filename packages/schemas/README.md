@@ -22,6 +22,7 @@ Zod 스키마와 도메인 열거형의 **단일 원본**. 웹 앱·도메인 �
 packages/schemas/src/
 ├── enums.ts        도메인 열거형 + 한글 라벨 (성별·지역·직업군·종교·흡연·음주·상태 등)
 ├── extraction.ts   AI 추출 스키마 · strict JSON Schema 생성 · 신뢰도 기준
+├── hashtag.ts      해시태그 정규화·상한·표기 (저장과 검색이 같은 형태를 쓴다)
 ├── profile.ts      프로필 읽기/쓰기 · Discover 필터 · 관리자 목록 쿼리
 ├── match.ts        소개 신청 생성·거절·연결, 관심 토글
 ├── import.ts       Import 세션·에셋·원문·검토·commit
@@ -67,11 +68,22 @@ validate 한 뒤에만** 쓴다. 우리가 실제로 읽는 필드만 선언하�
 상한(25MB)보다 작다. 어떤 메시지를 무엇으로 해석할지는 여기가 아니라
 `@bolsaram/domain` 의 `classifyTelegramMessage` 가 정한다.
 
+### `hashtag.ts` — 저장 형태를 한 곳에서 정한다
+
+태그는 검색 키다. 쓰는 쪽(추출 결과·주선자 편집)과 읽는 쪽(탐색 쿼리)이 **같은 정규화**를
+지나야 「#여행」과 「여행 」이 한 태그가 된다. `normalizeHashtag` 이 `#`·공백·구두점을 걷어내고
+소문자로 맞추며, `normalizeHashtags` 가 중복과 개수 상한(`HASHTAG_MAX_COUNT`)을 처리한다.
+
+모델에 보내는 스키마에는 `rawHashtagListSchema`(transform 없음)를 쓴다 — `extraction.ts` 가
+이 스키마로 strict JSON Schema 를 만들기 때문에 transform 이 섞이면 생성이 깨진다.
+정규화는 저장 직전에 한 번 더 걸고, DB 도 같은 모양만 받는다(`profiles_hashtags_shape`).
+
 ### `profile.ts` — 쿼리스트링을 다루는 스키마
 
 `discoverQuerySchema` 는 URL 에서 오므로 문자열을 강제 변환한다. 쉼표 목록(`regions=SEOUL,BUSAN`)과
 배열 형태를 모두 받아 배열로 정규화한다. 자유 검색(`q`)은 공개 범위 안의 텍스트만 훑는다 —
-이름·연락처는 검색 대상이 아니다.
+이름·연락처는 검색 대상이 아니다. `tags` 는 해시태그 목록이며, 값 검사 대신 정규화를 건다
+(열거형이 아니라 프로필에서 올라온 자유 태그다).
 
 ---
 

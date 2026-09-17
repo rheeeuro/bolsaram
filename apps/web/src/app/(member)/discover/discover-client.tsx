@@ -1,7 +1,8 @@
 "use client";
 
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { GENDERS, GENDER_LABELS } from "@bolsaram/schemas";
+import { GENDERS, GENDER_LABELS, formatHashtag, normalizeHashtags } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { ProfileCard } from "@/components/member/profile-card";
@@ -27,8 +28,14 @@ type ViewMode = "list" | "grid";
 const VIEW_KEY = "bolsaram.discover.view";
 
 export function DiscoverClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [gender, setGender] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  // 해시태그만 주소에 담는다 — 프로필 상세의 태그를 눌러 들어오는 경로가 있어서다.
+  const [filters, setFilters] = useState<Filters>(() => ({
+    ...DEFAULT_FILTERS,
+    tags: normalizeHashtags((searchParams.get("tags") ?? "").split(",")),
+  }));
   const [sheetOpen, setSheetOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("list");
 
@@ -78,6 +85,12 @@ export function DiscoverClient() {
       // 기억하지 못할 뿐 보기 전환은 된다.
     }
   }
+
+  // 태그가 바뀌면 주소도 따라간다. 뒤로 가기 이력을 남기지 않으려고 replace 를 쓴다.
+  useEffect(() => {
+    const next = filters.tags.length > 0 ? `/discover?tags=${filters.tags.join(",")}` : "/discover";
+    router.replace(next, { scroll: false });
+  }, [filters.tags, router]);
 
   // 성별 탭이나 필터가 바뀌면 처음부터 다시 읽는다.
   useEffect(() => {
@@ -136,6 +149,27 @@ export function DiscoverClient() {
           ) : null}
         </button>
       </MemberSubBar>
+
+      {filters.tags.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5 pb-3 pt-3">
+          {filters.tags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              aria-label={`${formatHashtag(tag)} 조건 빼기`}
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  tags: prev.tags.filter((t) => t !== tag),
+                }))
+              }
+              className="rounded-full border border-[var(--color-rose-400)] bg-[var(--color-rose-100)] px-3 py-1 text-[13px] text-[var(--color-rose-600)]"
+            >
+              {formatHashtag(tag)} ×
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="pt-3">

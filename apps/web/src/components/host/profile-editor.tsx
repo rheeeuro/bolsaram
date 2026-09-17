@@ -7,6 +7,7 @@ import {
   DRINKING_LEVELS,
   GENDERS,
   GENDER_LABELS,
+  HASHTAG_MAX_COUNT,
   JOB_CATEGORIES,
   JOB_CATEGORY_LABELS,
   MBTI_TYPES,
@@ -20,6 +21,8 @@ import {
   SMOKING_LEVELS,
   VISIBILITIES,
   VISIBILITY_LABELS,
+  formatHashtag,
+  parseHashtagInput,
 } from "@bolsaram/schemas";
 import { isDiscoverable } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
@@ -52,6 +55,7 @@ function initialDraft(profile: ProfileDetailView): Draft {
     smoking: profile.smoking ?? "",
     drinking: profile.drinking ?? "",
     hobbies: profile.hobbies.join(", "),
+    hashtags: profile.hashtags.map(formatHashtag).join(" "),
     bio: profile.bio ?? "",
     idealTypeText: profile.idealTypeText ?? "",
     realName: profile.realName ?? "",
@@ -114,6 +118,8 @@ export function HostProfileEditor({
         .split(",")
         .map((s) => s.trim())
         .filter((s) => s.length > 0),
+      // 정규화는 스키마가 한 번 더 한다. 여기서 쪼개는 것은 입력 형태를 풀어 주기 위해서다.
+      hashtags: parseHashtagInput(draft.hashtags ?? ""),
       bio: draft.bio,
       idealTypeText: draft.idealTypeText,
       realName: draft.realName,
@@ -377,6 +383,13 @@ export function HostProfileEditor({
             <div className="mt-4 flex flex-col gap-3.5">
               <Field label="취미" hint="쉼표로 구분">
                 <Input value={draft.hobbies} onChange={(e) => set("hobbies")(e.target.value)} />
+              </Field>
+              <Field label="해시태그" hint={`공백이나 쉼표로 구분 · 최대 ${HASHTAG_MAX_COUNT}개`}>
+                <Input
+                  value={draft.hashtags}
+                  placeholder="#등산 #카페투어"
+                  onChange={(e) => set("hashtags")(e.target.value)}
+                />
               </Field>
               <Field label="자기소개">
                 <Textarea value={draft.bio} onChange={(e) => set("bio")(e.target.value)} />

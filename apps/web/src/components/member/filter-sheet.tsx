@@ -12,6 +12,9 @@ import {
   RELIGION_LABELS,
   SMOKING_LABELS,
   SMOKING_LEVELS,
+  formatHashtag,
+  normalizeHashtags,
+  parseHashtagInput,
 } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -148,6 +151,14 @@ export function FilterSheet({
           onToggle={(v) => toggle("drinking", v)}
           onClear={() => setDraft((p) => ({ ...p, drinking: [] }))}
         />
+
+        <TagGroup
+          selected={draft.tags}
+          onAdd={(tags) =>
+            setDraft((p) => ({ ...p, tags: normalizeHashtags([...p.tags, ...tags]) }))
+          }
+          onRemove={(tag) => setDraft((p) => ({ ...p, tags: p.tags.filter((t) => t !== tag) }))}
+        />
       </div>
 
       <footer
@@ -167,6 +178,67 @@ export function FilterSheet({
         </Button>
       </footer>
     </Dialog>
+  );
+}
+
+/**
+ * 해시태그 입력. 값을 미리 줄 수 없으므로(프로필에서 올라온 자유 태그) 칩 목록이
+ * 아니라 입력으로 받는다. 넣은 태그는 지울 수 있는 칩으로 남는다.
+ */
+function TagGroup({
+  selected,
+  onAdd,
+  onRemove,
+}: {
+  selected: string[];
+  onAdd: (tags: string[]) => void;
+  onRemove: (tag: string) => void;
+}) {
+  const [text, setText] = useState("");
+
+  function commit() {
+    const tags = parseHashtagInput(text);
+    if (tags.length > 0) onAdd(tags);
+    setText("");
+  }
+
+  return (
+    <section className="mb-6">
+      <h3 className="mb-2.5 text-[13px] font-medium text-[var(--color-ink-800)]">해시태그</h3>
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          // 스페이스로도 확정한다 — 태그를 이어 적는 흐름이 끊기지 않게.
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          commit();
+        }}
+        placeholder="#등산"
+        aria-label="해시태그 추가"
+        className="h-10 w-full rounded-[10px] border border-[var(--surface-border)] bg-white px-3 text-[14px] outline-none focus:border-[var(--color-rose-400)]"
+      />
+      {selected.length > 0 ? (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {selected.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => onRemove(tag)}
+              aria-label={`${formatHashtag(tag)} 빼기`}
+              className="rounded-full border border-[var(--color-rose-400)] bg-[var(--color-rose-100)] px-3 py-1 text-[13px] text-[var(--color-rose-600)]"
+            >
+              {formatHashtag(tag)} ×
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-[12px] text-[var(--color-ink-500)]">
+          프로필에 붙은 태그로 찾습니다. 여러 개를 넣으면 모두 가진 분만 보입니다.
+        </p>
+      )}
+    </section>
   );
 }
 

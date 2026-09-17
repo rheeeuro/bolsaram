@@ -11,6 +11,7 @@ import {
   extractionResultSchema,
   JOB_CATEGORIES,
   MBTI_TYPES,
+  normalizeHashtags,
   REGIONS,
   type ExtractedFields,
   type ExtractionConfidence,
@@ -119,6 +120,7 @@ export class MockExtractionProvider implements ExtractionProvider {
     set("smoking", matchRule(text, SMOKING_RULES), 0.8);
     set("drinking", matchRule(text, DRINKING_RULES), 0.75);
     set("hobbies", matchHobbies(text), 0.7);
+    set("hashtags", matchHashtags(text, fields.hobbies), 0.6);
     set("bio", matchLabeled(text, ["자기소개", "소개", "성격"]), 0.55);
     set("idealTypeText", matchLabeled(text, ["이상형", "원하는", "만나고 싶은"]), 0.6);
 
@@ -233,6 +235,19 @@ function matchHobbies(text: string): ExtractedFields["hobbies"] {
     .filter((s) => s.length > 0 && s.length <= 40)
     .slice(0, 12);
   return items.length > 0 ? items : null;
+}
+
+/**
+ * 해시태그. 원문에 적힌 `#태그` 를 먼저 쓰고, 없으면 이미 뽑은 취미를 태그로 옮긴다.
+ * 없는 성향을 만들어내지 않는다는 점에서 실제 모델 프롬프트와 같은 계약이다.
+ */
+function matchHashtags(
+  text: string,
+  hobbies: ExtractedFields["hobbies"],
+): ExtractedFields["hashtags"] {
+  const literal = [...text.matchAll(/#([\p{L}\p{N}_]{1,20})/gu)].map((m) => m[1] ?? "");
+  const tags = normalizeHashtags([...literal, ...(hobbies ?? [])]);
+  return tags.length > 0 ? tags : null;
 }
 
 /** `라벨: 값` 형태에서 값 부분만 한 줄 가져온다. */

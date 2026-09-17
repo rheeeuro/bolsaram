@@ -11,7 +11,7 @@ import {
   normalizeRawText,
   statusAfterExtraction,
 } from "@bolsaram/domain";
-import type { ExtractedFields } from "@bolsaram/schemas";
+import { normalizeHashtags, type ExtractedFields } from "@bolsaram/schemas";
 import { extractionProvider } from "../ai/index";
 import { writeAudit } from "../audit";
 import * as imports from "../repo/imports";
@@ -175,8 +175,8 @@ async function insertProfile(
     `INSERT INTO profiles (
        group_id, gender, birth_year, height, job_title, job_category, company, education,
        residence_region, workplace_region, religion, mbti, smoking, drinking,
-       hobbies, bio, ideal_type_text, status, visibility, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       hobbies, hashtags, bio, ideal_type_text, status, visibility, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
      RETURNING id`,
     [
       groupId,
@@ -194,6 +194,8 @@ async function insertProfile(
       fields.smoking,
       fields.drinking,
       fields.hobbies ?? [],
+      // 태그는 저장 직전에 정규화한다 — 검색 쿼리와 같은 형태여야 서로 맞는다.
+      normalizeHashtags(fields.hashtags ?? []),
       fields.bio,
       fields.idealTypeText,
       publish ? "ACTIVE" : "INACTIVE",
@@ -226,8 +228,9 @@ async function updateExistingProfile(
        smoking = COALESCE($13, smoking),
        drinking = COALESCE($14, drinking),
        hobbies = CASE WHEN cardinality($15::text[]) > 0 THEN $15::text[] ELSE hobbies END,
-       bio = COALESCE($16, bio),
-       ideal_type_text = COALESCE($17, ideal_type_text)
+       hashtags = CASE WHEN cardinality($16::text[]) > 0 THEN $16::text[] ELSE hashtags END,
+       bio = COALESCE($17, bio),
+       ideal_type_text = COALESCE($18, ideal_type_text)
      WHERE id = $1 RETURNING id`,
     [
       profileId,
@@ -245,6 +248,7 @@ async function updateExistingProfile(
       fields.smoking,
       fields.drinking,
       fields.hobbies ?? [],
+      normalizeHashtags(fields.hashtags ?? []),
       fields.bio,
       fields.idealTypeText,
     ],

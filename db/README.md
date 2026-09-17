@@ -69,6 +69,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0044_group_chat_system_messages.sql` | 방에 남는 사건 — 주선자 입·퇴장, 회원 등록, 신청·연결. 사람은 만들지도 지우지도 못한다 |
 | `0045_group_chat_visible_from_join.sql` | 채팅은 **들어온 시점부터** 보인다. 합류 전 대화는 정책이 막는다                     |
 | `0046_group_owner_actions.sql`     | 모임장이 한 일을 방에 구분해 남긴다 — 내보내기·모임장 넘기기                            |
+| `0047_profile_hashtags.sql`        | 프로필 해시태그 — `profiles.hashtags` + 모양 검사 + 태그 검색 인덱스                    |
 
 ## 테이블
 
@@ -129,6 +130,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `group_messages_read` 의 `app_group_chat_visible_from()` | 합류 전 대화를 뒤늦게 읽는 것 (목록·스트림·배지 모두) |
 | `group_messages_body_sane` (CHECK)                  | 본문 있는 시스템 메시지 · 본문 없는 사람의 글  |
 | `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
+| `profiles_hashtags_shape` · `profiles_hashtags_len` (CHECK) | `#`·공백이 섞인 태그, 11개째 태그 — 같은 태그가 둘로 갈리는 것 |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을
 DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.

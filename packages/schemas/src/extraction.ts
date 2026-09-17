@@ -7,6 +7,7 @@
  *  - 모델의 raw 출력은 반드시 이 스키마로 validate 한 뒤에만 사용한다.
  */
 import { z } from "zod";
+import { rawHashtagListSchema } from "./hashtag";
 import {
   DRINKING_LEVELS,
   GENDERS,
@@ -38,6 +39,12 @@ export const extractedFieldsSchema = z.object({
   smoking: z.enum(SMOKING_LEVELS).nullable(),
   drinking: z.enum(DRINKING_LEVELS).nullable(),
   hobbies: z.array(z.string().trim().min(1).max(40)).max(12).nullable(),
+  /**
+   * 원문에서 뽑은 해시태그. 검색이 걸리는 값이지만 여기서는 정규화하지 않는다 —
+   * 이 스키마로 모델용 JSON Schema 를 만들기 때문에 transform 을 걸 수 없다.
+   * 저장 직전에 `normalizeHashtags` 를 통과한다.
+   */
+  hashtags: rawHashtagListSchema.nullable(),
   bio: z.string().trim().max(2000).nullable(),
   idealTypeText: z.string().trim().max(2000).nullable(),
 });

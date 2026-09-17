@@ -40,6 +40,7 @@ export type ProfileDetailView = ProfileCardView & {
   smoking: string | null;
   drinking: string | null;
   hobbies: string[];
+  hashtags: string[];
   bio: string | null;
   idealTypeText: string | null;
   /** INTRODUCED 이후에만 채워진다. */
@@ -106,6 +107,7 @@ export function toDetailView(
     smoking: view.smoking ?? null,
     drinking: view.drinking ?? null,
     hobbies: view.hobbies ?? [],
+    hashtags: view.hashtags ?? [],
     bio: view.bio ?? null,
     idealTypeText: view.idealTypeText ?? null,
   };

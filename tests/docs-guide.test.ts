@@ -19,6 +19,7 @@ import {
   HEIGHT_RANGE,
 } from "../apps/web/src/components/member/filter-model";
 import {
+  HASHTAG_MAX_COUNT,
   LOW_CONFIDENCE_THRESHOLD,
   MATCH_REQUEST_STATUS_LABELS,
   PROFILE_STATUS_LABELS,
@@ -141,6 +142,11 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     const match = /MAX_IMAGE_BYTES\s*=\s*(\d+)\s*\*\s*1024\s*\*\s*1024/.exec(source);
     expect(match?.[1]).toBe("25");
     expect(ALL).toMatch(/25MB/);
+  });
+
+  it("해시태그 개수 상한을 가이드와 같게 안내한다", () => {
+    expect(HASHTAG_MAX_COUNT).toBe(10);
+    expect(guide("admin.md")).toMatch(new RegExp(`최대 ${HASHTAG_MAX_COUNT}개`));
   });
 
   it("낮은 신뢰도 기준 65%", () => {

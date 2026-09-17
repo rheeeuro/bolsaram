@@ -1,3 +1,4 @@
+import { formatHashtag } from "@bolsaram/schemas";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Panel } from "@/components/host/surface";
 import { label } from "@/lib/labels";
@@ -39,6 +40,10 @@ export function HostProfileReadonly({
     ["흡연", profile.smoking ? label.smoking(profile.smoking) : null],
     ["음주", profile.drinking ? label.drinking(profile.drinking) : null],
     ["취미", profile.hobbies.length > 0 ? profile.hobbies.join(", ") : null],
+    [
+      "해시태그",
+      profile.hashtags.length > 0 ? profile.hashtags.map(formatHashtag).join(" ") : null,
+    ],
   ];
 
   return (

@@ -4,9 +4,13 @@ import {
   BIRTH_YEAR_MAX,
   BIRTH_YEAR_MIN,
   EXTRACTED_FIELD_KEYS,
+  HASHTAG_MAX_COUNT,
   emptyExtractedFields,
   extractedFieldsSchema,
   extractionResultSchema,
+  normalizeHashtag,
+  normalizeHashtags,
+  parseHashtagInput,
   toStrictJsonSchema,
 } from "@bolsaram/schemas";
 import { MockExtractionProvider } from "../apps/web/src/server/ai/mock";
@@ -50,6 +54,38 @@ describe("extractedFieldsSchema", () => {
     expect(
       extractedFieldsSchema.safeParse({ ...emptyExtractedFields(), hobbies: many }).success,
     ).toBe(false);
+  });
+});
+
+describe("해시태그 정규화", () => {
+  it("`#`·공백·대소문자를 지우고 저장 형태로 만든다", () => {
+    expect(normalizeHashtag("#등산")).toBe("등산");
+    expect(normalizeHashtag("  카페 투어 ")).toBe("카페투어");
+    expect(normalizeHashtag("Cafe")).toBe("cafe");
+  });
+
+  it("남는 글자가 없으면 버린다", () => {
+    expect(normalizeHashtag("#")).toBeNull();
+    expect(normalizeHashtag("  ")).toBeNull();
+    expect(normalizeHashtag("!!!")).toBeNull();
+  });
+
+  it("같은 태그를 두 번 담지 않고 개수 상한을 지킨다", () => {
+    expect(normalizeHashtags(["#여행", "여행", " 여행 "])).toEqual(["여행"]);
+    const many = Array.from({ length: HASHTAG_MAX_COUNT + 5 }, (_, i) => `태그${i}`);
+    expect(normalizeHashtags(many)).toHaveLength(HASHTAG_MAX_COUNT);
+  });
+
+  it("자유 입력을 `#`·쉼표·공백 어디로 나눠 적어도 같은 목록이 된다", () => {
+    expect(parseHashtagInput("#등산 #카페투어")).toEqual(["등산", "카페투어"]);
+    expect(parseHashtagInput("등산, 카페투어")).toEqual(["등산", "카페투어"]);
+  });
+
+  it("DB 가 거부하는 모양(`#`·공백·빈 값)을 남기지 않는다", () => {
+    for (const tag of normalizeHashtags(["#여행 가기", "  ", "#", "운동 루틴"])) {
+      expect(tag).not.toMatch(/[#\s]/);
+      expect(tag.length).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -98,6 +134,20 @@ describe("MockExtractionProvider", () => {
     expect(result.fields.mbti).toBe("ENFP");
     expect(result.fields.smoking).toBe("NONE");
     expect(result.fields.hobbies).toEqual(["러닝", "전시", "커피"]);
+    // 원문에 태그가 없으면 이미 뽑은 취미를 태그로 옮긴다.
+    expect(result.fields.hashtags).toEqual(["러닝", "전시", "커피"]);
+  });
+
+  it("원문에 적힌 `#태그` 를 그대로 가져온다", async () => {
+    const result = await provider.extract({
+      text: "93년생 여자\n#등산 #카페투어\n취미: 러닝",
+    });
+    expect(result.fields.hashtags).toEqual(["등산", "카페투어", "러닝"]);
+  });
+
+  it("태그로 삼을 근거가 없으면 만들어내지 않는다", async () => {
+    const result = await provider.extract({ text: "안녕하세요 잘 부탁드립니다" });
+    expect(result.fields.hashtags).toBeNull();
   });
 
   it("두 자리 연도를 세기까지 고려해 환산한다", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatHashtag } from "@bolsaram/schemas";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -150,6 +151,23 @@ export function ProfileDetail({
             ]}
           />
         </Section>
+
+        {profile.hashtags.length > 0 ? (
+          <Section title="해시태그">
+            {/* 태그를 누르면 같은 태그를 가진 사람만 모아 본다. */}
+            <div className="flex flex-wrap gap-1.5">
+              {profile.hashtags.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/discover?tags=${encodeURIComponent(tag)}`}
+                  className="rounded-full border border-[var(--color-rose-300)] bg-[var(--color-rose-100)] px-3 py-1 text-[13px] text-[var(--color-rose-600)] transition-colors hover:border-[var(--color-rose-500)]"
+                >
+                  {formatHashtag(tag)}
+                </Link>
+              ))}
+            </div>
+          </Section>
+        ) : null}
 
         {profile.hobbies.length > 0 ? (
           <Section title="취미">

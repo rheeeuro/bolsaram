@@ -52,6 +52,7 @@ export const FIELD_LABELS: Record<string, string> = {
   smoking: "흡연",
   drinking: "음주",
   hobbies: "취미",
+  hashtags: "해시태그",
   bio: "자기소개",
   idealTypeText: "이상형",
   realName: "이름",

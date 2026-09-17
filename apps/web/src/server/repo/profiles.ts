@@ -26,7 +26,7 @@ const PROFILE_COLUMNS = `
   p.id, p.user_id, p.public_code, p.gender, p.birth_year, p.height,
   p.job_title, p.job_category, p.company, p.education,
   p.residence_region, p.workplace_region, p.religion, p.mbti,
-  p.smoking, p.drinking, p.hobbies, p.bio, p.ideal_type_text,
+  p.smoking, p.drinking, p.hobbies, p.hashtags, p.bio, p.ideal_type_text,
   p.real_name, p.contact_note, p.status, p.visibility,
   p.created_at, p.updated_at`;
 
@@ -48,6 +48,7 @@ type ProfileRow = {
   smoking: string | null;
   drinking: string | null;
   hobbies: string[];
+  hashtags: string[];
   bio: string | null;
   ideal_type_text: string | null;
   real_name: string | null;
@@ -98,6 +99,7 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     smoking: row.smoking,
     drinking: row.drinking,
     hobbies: row.hobbies ?? [],
+    hashtags: row.hashtags ?? [],
     bio: row.bio,
     idealTypeText: row.ideal_type_text,
     realName: row.real_name,
@@ -242,6 +244,7 @@ const UPDATABLE_COLUMNS: Record<keyof ProfileUpdate, string> = {
   smoking: "smoking",
   drinking: "drinking",
   hobbies: "hobbies",
+  hashtags: "hashtags",
   bio: "bio",
   idealTypeText: "ideal_type_text",
   realName: "real_name",
@@ -345,12 +348,16 @@ export async function findAdminProfiles(
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
   if (query.claimed === "yes") clauses.push("p.user_id IS NOT NULL");
   if (query.claimed === "no") clauses.push("p.user_id IS NULL");
+  // 태그는 여러 개를 주면 좁힌다. 회원 탐색과 같은 규칙이다.
+  if (query.tags?.length) clauses.push(`p.hashtags @> ${push(query.tags)}`);
   if (query.q) {
-    const term = push(`%${query.q}%`);
+    // `#17` 은 공개 번호, `#여행` 은 해시태그다. 숫자인지로 가른다.
     const codeMatch = /^#?(\d+)$/.exec(query.q);
+    const needle = query.q.replace(/^#+/u, "").trim();
+    const term = push(`%${needle.length > 0 ? needle : query.q}%`);
     const codeClause = codeMatch ? ` OR p.public_code = ${push(Number(codeMatch[1]))}` : "";
     clauses.push(
-      `(p.real_name ILIKE ${term} OR p.job_title ILIKE ${term} OR p.company ILIKE ${term}${codeClause})`,
+      `(p.real_name ILIKE ${term} OR p.job_title ILIKE ${term} OR p.company ILIKE ${term} OR array_to_string(p.hashtags, ' ') ILIKE ${term}${codeClause})`,
     );
   }
 

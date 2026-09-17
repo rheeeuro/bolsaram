@@ -16,6 +16,8 @@ export type Filters = {
   religions: string[];
   smoking: string[];
   drinking: string[];
+  /** 해시태그. 열거형이 아니라 프로필에서 올라온 자유 태그다. 여러 개면 전부 가진 사람만 남는다. */
+  tags: string[];
 };
 
 /** 슬라이더가 표현하는 폭. 도메인 유효범위가 아니라 화면에서 고를 수 있는 범위다. */
@@ -32,9 +34,17 @@ export const DEFAULT_FILTERS: Filters = {
   religions: [],
   smoking: [],
   drinking: [],
+  tags: [],
 };
 
-const CHIP_KEYS = ["regions", "jobCategories", "religions", "smoking", "drinking"] as const;
+const CHIP_KEYS = [
+  "regions",
+  "jobCategories",
+  "religions",
+  "smoking",
+  "drinking",
+  "tags",
+] as const;
 
 /** 끝에서 벗어난 경계만 쿼리로 보낸다. 끝에 붙은 쪽은 절을 만들지 않는다. */
 export function filtersToParams(filters: Filters, gender: string | null): URLSearchParams {

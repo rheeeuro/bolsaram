@@ -174,6 +174,39 @@ describe("commit idempotency", () => {
     ).resolves.toMatchObject({ reused: true });
   });
 
+  it("추출한 해시태그를 정규화해 저장한다", async () => {
+    const id = await newSession(`${SAMPLE_TEXT}\n#등산 #카페투어 #등산`);
+    await analyzeSession(admin, id);
+    const result = await commitSession(admin, {
+      sessionId: id,
+      idempotencyKey: `tags-${id}`,
+      publish: false,
+    });
+
+    const row = await withRls(admin, (sql) =>
+      sql.query<{ hashtags: string[] }>(`SELECT hashtags FROM profiles WHERE id = $1`, [
+        result.profileId,
+      ]),
+    );
+    const tags = row.rows[0]!.hashtags;
+    // `#`·공백 없이, 중복 없이 들어간다 — 검색 쿼리와 같은 형태다.
+    expect(tags.slice(0, 2)).toEqual(["등산", "카페투어"]);
+    for (const tag of tags) expect(tag).not.toMatch(/[#\s]/);
+  });
+
+  it("정규화되지 않은 태그는 DB 가 거부한다", async () => {
+    // 애플리케이션을 우회해도 같은 태그가 둘로 갈리지 않는다(0047).
+    await expect(
+      withOwner((sql) =>
+        sql.query(
+          `INSERT INTO profiles (gender, birth_year, residence_region, hashtags, created_by)
+           VALUES ('FEMALE', 1993, 'SEOUL', ARRAY['#등산'], $1)`,
+          [admin.userId],
+        ),
+      ),
+    ).rejects.toThrow(/profiles_hashtags_shape/);
+  });
+
   it("기본 등록은 비공개 상태로 만든다 — 자동 게시하지 않는다", async () => {
     const id = await newSession(SAMPLE_TEXT);
     await analyzeSession(admin, id);

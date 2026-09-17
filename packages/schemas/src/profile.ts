@@ -12,6 +12,7 @@ import {
   VISIBILITIES,
 } from "./enums";
 import { BIRTH_YEAR_MAX, BIRTH_YEAR_MIN, HEIGHT_MAX, HEIGHT_MIN } from "./extraction";
+import { HASHTAG_MAX_COUNT, hashtagListSchema, normalizeHashtags } from "./hashtag";
 
 export const uuidSchema = z.uuid();
 
@@ -41,6 +42,8 @@ export const profileWritableSchema = z.object({
   smoking: z.enum(SMOKING_LEVELS).nullable(),
   drinking: z.enum(DRINKING_LEVELS).nullable(),
   hobbies: z.array(z.string().trim().min(1).max(40)).max(12).default([]),
+  /** 저장 시점에 정규화한다 — 검색 쿼리와 같은 형태여야 태그가 서로 맞는다. */
+  hashtags: hashtagListSchema.default([]),
   bio: nullableTrimmed(2000),
   idealTypeText: nullableTrimmed(2000),
   /** 이름/연락처는 INTRODUCED 이후에만 공개된다(설계문서 §5). */
@@ -71,6 +74,17 @@ const csv = <T extends readonly [string, ...string[]]>(values: T) =>
     })
     .pipe(z.array(z.enum(values)).optional());
 
+/** 해시태그 목록. 열거형이 아니라 자유 입력이므로 값 검사 대신 정규화를 건다. */
+const tagCsv = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((v) => {
+    if (v == null) return undefined;
+    const list = Array.isArray(v) ? v : v.split(",");
+    const tags = normalizeHashtags(list).slice(0, HASHTAG_MAX_COUNT);
+    return tags.length > 0 ? tags : undefined;
+  });
+
 const intParam = (min: number, max: number) =>
   z.coerce.number().int().min(min).max(max).optional();
 
@@ -87,6 +101,8 @@ export const discoverQuerySchema = z.object({
   religions: csv(RELIGIONS),
   smoking: csv(SMOKING_LEVELS),
   drinking: csv(DRINKING_LEVELS),
+  /** 해시태그. 여러 개를 주면 **전부 가진** 프로필만 남는다. */
+  tags: tagCsv,
   q: z.string().trim().max(60).optional(),
   cursor: z.string().trim().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(60).default(DISCOVER_PAGE_SIZE),
@@ -96,6 +112,7 @@ export type DiscoverQuery = z.infer<typeof discoverQuerySchema>;
 /** 관리자 프로필 목록 필터. 회원 필터와 달리 status/visibility 를 직접 다룬다. */
 export const adminProfileQuerySchema = z.object({
   q: z.string().trim().max(60).optional(),
+  tags: tagCsv,
   status: csv(PROFILE_STATUSES),
   gender: z.enum(GENDERS).optional(),
   claimed: z.enum(["yes", "no"]).optional(),

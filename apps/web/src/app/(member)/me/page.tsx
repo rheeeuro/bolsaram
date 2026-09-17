@@ -1,6 +1,7 @@
 /** 내 프로필 + 로그아웃. 회원은 열람만 하고 수정은 주선자에게 요청한다. */
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
+import { formatHashtag } from "@bolsaram/schemas";
 import { requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Empty } from "@/components/ui/empty";
@@ -85,6 +86,7 @@ export default async function MePage() {
                   ["흡연", label.smoking(profile.smoking)],
                   ["음주", label.drinking(profile.drinking)],
                   ["취미", profile.hobbies.join(", ") || null],
+                  ["해시태그", profile.hashtags.map(formatHashtag).join(" ") || null],
                 ] as [string, string | null | undefined][]
               )
                 .filter(([, value]) => value != null && value !== "")

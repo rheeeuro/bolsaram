@@ -1,7 +1,7 @@
 /**
  * 단계적 정보 공개 규칙 (설계문서 §5).
  * LIST      — 익명 코드, 대표 사진, 출생연도, 키, 직업군, 넓은 지역
- * DETAIL    — 사진, 직업/회사, 학력, 지역, 종교, MBTI, 흡연/음주, 취미, 소개, 이상형
+ * DETAIL    — 사진, 직업/회사, 학력, 지역, 종교, MBTI, 흡연/음주, 취미, 해시태그, 소개, 이상형
  * INTRODUCED— 이름/연락 방식까지
  *
  * 이 파일은 순수 함수만 둔다. 실제 차단은 SQL(RLS) + API 권한 검사가 함께 담당한다.
@@ -27,6 +27,7 @@ export type FullProfile = {
   smoking: string | null;
   drinking: string | null;
   hobbies: string[];
+  hashtags: string[];
   bio: string | null;
   idealTypeText: string | null;
   realName: string | null;
@@ -56,6 +57,7 @@ const DETAIL_EXTRA_FIELDS = [
   "smoking",
   "drinking",
   "hobbies",
+  "hashtags",
   "bio",
   "idealTypeText",
 ] as const;

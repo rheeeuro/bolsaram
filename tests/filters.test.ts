@@ -66,6 +66,23 @@ describe("buildDiscoverWhere", () => {
     expect(where.values).toContain("%'; DROP TABLE profiles; --%");
   });
 
+  it("해시태그를 주면 전부 가진 프로필만 남긴다", () => {
+    const where = buildDiscoverWhere(parse({ tags: "#등산,카페투어" }), CTX);
+    expect(where.text).toContain("p.hashtags @>");
+    expect(where.values).toContainEqual(["등산", "카페투어"]);
+  });
+
+  it("태그 조건이 없으면 절을 만들지 않는다", () => {
+    expect(buildDiscoverWhere(parse({}), CTX).text).not.toContain("p.hashtags @>");
+    expect(buildDiscoverWhere(parse({ tags: "#" }), CTX).text).not.toContain("p.hashtags @>");
+  });
+
+  it("자유 검색은 해시태그도 훑고, 앞의 `#` 은 떼고 찾는다", () => {
+    const where = buildDiscoverWhere(parse({ q: "#등산" }), CTX);
+    expect(where.text).toContain("array_to_string(p.hashtags, ' ') ILIKE");
+    expect(where.values).toContain("%등산%");
+  });
+
   it("자리표시자 번호가 값 개수와 정확히 일치한다", () => {
     const where = buildDiscoverWhere(
       parse({
@@ -80,6 +97,7 @@ describe("buildDiscoverWhere", () => {
         smoking: "NONE",
         drinking: "SOCIAL",
         q: "러닝",
+        tags: "등산",
       }),
       CTX,
     );

@@ -63,6 +63,14 @@ const HOBBIES = [
   ["클라이밍", "영화", "음악"],
   ["테니스", "베이킹", "드라이브"],
 ];
+/** 해시태그는 취미와 겹치지 않는 결(성향·라이프스타일)로 둬서 검색이 실제처럼 걸린다. */
+const HASHTAGS = [
+  ["집순이", "맛집탐방", "주말여행"],
+  ["반려견", "미술관", "느긋한사람"],
+  ["아침형인간", "카페투어", "책읽기"],
+  ["운동루틴", "영화관", "고양이집사"],
+  ["드라이브", "홈베이킹", "다정한사람"],
+];
 const BIOS = [
   "일상의 작은 순간을 소중히 여깁니다. 좋은 사람과 좋은 시간을 함께하고 싶어요.",
   "주말에는 주로 밖에서 시간을 보냅니다. 새로운 걸 배우는 걸 좋아해요.",
@@ -171,9 +179,9 @@ async function main(): Promise<void> {
         `INSERT INTO profiles (
            gender, birth_year, height, job_title, job_category, company, education,
            residence_region, workplace_region, religion, mbti, smoking, drinking,
-           hobbies, bio, ideal_type_text, real_name, contact_note,
+           hobbies, hashtags, bio, ideal_type_text, real_name, contact_note,
            status, visibility, created_by, is_seed)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
                  -- 합성 데이터라는 표식. 실데이터와 섞였을 때
                  -- pnpm db:purge-seed 가 이걸 보고 걷어낸다.
                  true)
@@ -193,6 +201,7 @@ async function main(): Promise<void> {
           pick(SMOKING, i),
           pick(DRINKING, i),
           pick(HOBBIES, i),
+          pick(HASHTAGS, i),
           pick(BIOS, i),
           pick(IDEALS, i),
           realName,

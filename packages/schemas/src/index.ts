@@ -1,5 +1,6 @@
 export * from "./enums";
 export * from "./extraction";
+export * from "./hashtag";
 export * from "./profile";
 export * from "./match";
 export * from "./import";

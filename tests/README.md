@@ -28,11 +28,11 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | ------------------------------ | ---------------------------------------------- | ---- | ---- |
 | `match-transitions.test.ts`    | 상태 기계·행위자 권한·중복·자기 자신·거절·숨김 | –    | 18   |
 | `visibility.test.ts`           | 단계적 정보 공개·노출 규칙                     | –    | 10   |
-| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·조건 모델      | –    | 21   |
+| `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·해시태그 검색·조건 모델 | –    | 24   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
-| `extraction.test.ts`           | 추출 스키마·strict JSON Schema·mock 프로바이더 | –    | 15   |
+| `extraction.test.ts`           | 추출 스키마·strict JSON Schema·해시태그 정규화·mock 프로바이더 | –    | 22   |
 | `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·거절·숨김·담당이 갈리는 신청 | 필요 | 47 |
-| `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출                   | 필요 | 8    |
+| `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출·해시태그 정규 저장 | 필요 | 10   |
 | `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 4 |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
@@ -47,7 +47,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 리다이렉트 검증       | –    | 9    |
 | `seed-admin-password.test.ts`   | 시드 관리자 비밀번호 판정·고정값 금지          | –    | 8    |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
-| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 59   |
+| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 63   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
 `setup.ts` 가 리포 루트 `.env` 를 읽어 DB 접속 정보를 채운다.
@@ -80,6 +80,7 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `visibility.test.ts` 「INTRODUCED 에서만 이름·연락처」     | 연결 전 개인정보 비공개             |
 | `import-normalization.test.ts` 「확인이 남으면 공개 불가」 | AI 자동 게시 차단                   |
 | `import-commit.test.ts` 「동시 호출에도 프로필 하나」      | commit 멱등성                       |
+| `import-commit.test.ts` 「정규화되지 않은 태그는 DB 가 거부」 | 같은 해시태그가 둘로 갈리지 않음  |
 | `cleanup.test.ts` 「참조된 사진은 남긴다」                 | 정리 작업이 게시된 사진을 깨지 않음 |
 | `telegram-import.test.ts` 「같은 update_id 는 한 번만」    | webhook 재전송이 사진을 두 번 저장하지 않음 |
 | `telegram-import.test.ts` 「연결되지 않은 …신원이 없다」   | 검색으로 봇을 찾은 외부인 차단      |

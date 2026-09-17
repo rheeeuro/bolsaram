@@ -17,6 +17,8 @@ import {
   RELIGION_LABELS,
   SMOKING_LABELS,
   SMOKING_LEVELS,
+  formatHashtag,
+  parseHashtagInput,
 } from "@bolsaram/schemas";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -549,7 +551,9 @@ function toStringMap(fields: Record<string, unknown> | undefined): Record<string
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(fields)) {
     if (value == null) out[key] = "";
-    else if (Array.isArray(value)) out[key] = value.join(", ");
+    else if (key === "hashtags" && Array.isArray(value)) {
+      out[key] = value.map((tag) => formatHashtag(String(tag))).join(" ");
+    } else if (Array.isArray(value)) out[key] = value.join(", ");
     else out[key] = String(value);
   }
   return out;
@@ -569,6 +573,11 @@ function parseFieldValue(key: string, raw: string): unknown {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
     return items.length > 0 ? items : null;
+  }
+  if (key === "hashtags") {
+    // `#` 을 붙여 적든 쉼표로 나열하든 같은 태그가 되게 한다.
+    const tags = parseHashtagInput(trimmed);
+    return tags.length > 0 ? tags : null;
   }
   return trimmed;
 }

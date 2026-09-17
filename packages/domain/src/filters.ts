@@ -76,11 +76,19 @@ export function buildDiscoverWhere(
     clauses.push(`p.drinking = ANY(${push(query.drinking)})`);
   }
 
-  if (query.q) {
+  // 해시태그는 여러 개를 주면 좁힌다 — 「#여행 #운동」 은 둘 다 가진 사람이다.
+  // 저장값도 쿼리값도 normalizeHashtags 를 지나므로 배열 포함 연산으로 바로 맞는다.
+  if (query.tags?.length) {
+    clauses.push(`p.hashtags @> ${push(query.tags)}`);
+  }
+
+  // 앞의 `#` 은 태그 표기일 뿐 저장값에는 없다. 떼고 찾는다.
+  const needle = query.q?.replace(/^#+/u, "").trim();
+  if (needle) {
     // 자유 검색은 공개 범위 안의 텍스트만 훑는다. 이름/연락처는 대상이 아니다.
-    const term = push(`%${query.q}%`);
+    const term = push(`%${needle}%`);
     clauses.push(
-      `(p.bio ILIKE ${term} OR p.ideal_type_text ILIKE ${term} OR p.job_title ILIKE ${term} OR array_to_string(p.hobbies, ' ') ILIKE ${term})`,
+      `(p.bio ILIKE ${term} OR p.ideal_type_text ILIKE ${term} OR p.job_title ILIKE ${term} OR array_to_string(p.hobbies, ' ') ILIKE ${term} OR array_to_string(p.hashtags, ' ') ILIKE ${term})`,
     );
   }
 
