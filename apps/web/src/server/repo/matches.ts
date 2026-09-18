@@ -177,6 +177,11 @@ export async function createMatchRequest(
     if (hasPgCode(error, "23514")) {
       throw new DomainError("CONFLICT", CANNOT_REQUEST_MESSAGE);
     }
+    // 42501 = 정책 위반. 풀을 넘는 신청을 `match_requests_create` 가 막은 경우다
+    // (화면에서는 닿지 않지만 주소로는 올 수 있다). 막힌 이유를 더 말하지 않는다.
+    if (hasPgCode(error, "42501")) {
+      throw new DomainError("CONFLICT", CANNOT_REQUEST_MESSAGE);
+    }
     throw error;
   }
 }

@@ -13,7 +13,12 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
-import { assertCanEditProfile } from "../apps/web/src/server/repo/profiles";
+import { discoverQuerySchema } from "@bolsaram/schemas";
+import {
+  assertCanEditProfile,
+  findDiscoverProfiles,
+  isOutsidePoolForViewer,
+} from "../apps/web/src/server/repo/profiles";
 import { createSession, setSessionGroup } from "../apps/web/src/server/repo/imports";
 
 const TAG = `grouptest-${Date.now()}`;
@@ -347,5 +352,76 @@ describe("가져온 것을 다른 모임으로 옮기기", () => {
         return setSessionGroup(sql, session.id, null);
       }),
     ).rejects.toThrow(/이미 등록한 세션/);
+  });
+});
+
+/**
+ * 대행(`sessions.acting_profile_id`)은 멤버 화면을 주선자 세션으로 연다. 그때 커넥션의
+ * 권한은 주선자의 것이라 RLS 가 긋는 경계가 그 멤버의 것보다 넓다 — 전체공개 풀과 그
+ * 주선자의 다른 모임까지 열린다. 멤버 화면이 그 범위를 그대로 보여주면 「같은 풀
+ * 안에서만 본다」가 대행에서만 깨지고, 보낼 수도 없는 사람에게 마음 보내기 버튼이 붙는다.
+ */
+describe("대행 중에도 풀 경계는 그 멤버의 것이다", () => {
+  let sameGroupTarget = "";
+  let publicTarget = "";
+
+  beforeAll(async () => {
+    await withOwner(async (sql) => {
+      const same = await sql.query<{ id: string }>(
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
+                               status, visibility, real_name, created_by)
+         VALUES ($1, 'MALE', 1990, 'SEOUL', 'ACTIVE', 'LISTED', $2, $3) RETURNING id`,
+        [A.groupId, `${TAG}-a-같은모임남성`, A.adminId],
+      );
+      sameGroupTarget = same.rows[0]!.id;
+
+      const pub = await sql.query<{ id: string }>(
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
+                               status, visibility, real_name, created_by)
+         VALUES (NULL, 'MALE', 1991, 'SEOUL', 'ACTIVE', 'LISTED', $1, $2) RETURNING id`,
+        [`${TAG}-a-전체공개남성`, A.adminId],
+      );
+      publicTarget = pub.rows[0]!.id;
+    });
+  });
+
+  const acting = () => ({ ...A.admin, actingProfileId: A.profileId });
+  const discover = (ctx: RlsContext) =>
+    withRls(ctx, async (sql) => {
+      const page = await findDiscoverProfiles(sql, discoverQuerySchema.parse({}), A.profileId);
+      return page.items.map((p) => p.id);
+    });
+
+  it("멤버 본인의 목록에는 전체공개 프로필이 없다", async () => {
+    const ids = await discover(A.member);
+    expect(ids).toContain(sameGroupTarget);
+    expect(ids).not.toContain(publicTarget);
+  });
+
+  it("대행 중 목록도 같다 — 주선자 권한으로 넓어지지 않는다", async () => {
+    const ids = await discover(acting());
+    expect(ids).toContain(sameGroupTarget);
+    expect(ids).not.toContain(publicTarget);
+  });
+
+  it("풀 밖 상대는 상세에서도 가린다", async () => {
+    const [outside, inside] = await withRls(acting(), async (sql) => [
+      await isOutsidePoolForViewer(sql, A.profileId, publicTarget),
+      await isOutsidePoolForViewer(sql, A.profileId, sameGroupTarget),
+    ]);
+    expect(outside).toBe(true);
+    expect(inside).toBe(false);
+  });
+
+  it("대행 중에도 풀을 넘는 신청은 만들어지지 않는다", async () => {
+    await expect(
+      withRls(acting(), (sql) =>
+        sql.query(
+          `INSERT INTO match_requests (requester_profile_id, target_profile_id)
+           VALUES ($1, $2)`,
+          [A.profileId, publicTarget],
+        ),
+      ),
+    ).rejects.toThrow();
   });
 });

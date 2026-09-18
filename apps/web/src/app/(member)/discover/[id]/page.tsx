@@ -11,7 +11,11 @@ import {
   isRejectedBetween,
 } from "@/server/repo/matches";
 import { listPendingIntentsForProfile } from "@/server/repo/match-intents";
-import { findProfileById, isSameGenderForViewer } from "@/server/repo/profiles";
+import {
+  findProfileById,
+  isOutsidePoolForViewer,
+  isSameGenderForViewer,
+} from "@/server/repo/profiles";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 import { ProfileDetail } from "@/components/member/profile-detail";
 
@@ -56,12 +60,14 @@ export default async function ProfileDetailPage({
     ) {
       return null;
     }
-    // 멤버 화면은 이성만 본다. 목록에서 빠져도 주소로는 여기까지 올 수 있다.
+    // 멤버 화면은 이성만, 그리고 자기 풀 안만 본다. 목록에서 빠져도 주소로는 여기까지
+    // 올 수 있다. 풀 경계는 대행 중에만 갈린다 — 그때 RLS 는 주선자 범위다.
     if (
       isMemberView(viewer) &&
       viewer.profileId &&
       profile.userId !== viewer.userId &&
-      (await isSameGenderForViewer(sql, viewer.profileId, profile.gender))
+      ((await isSameGenderForViewer(sql, viewer.profileId, profile.gender)) ||
+        (await isOutsidePoolForViewer(sql, viewer.profileId, profile.id)))
     ) {
       return null;
     }

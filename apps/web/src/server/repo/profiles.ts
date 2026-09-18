@@ -167,6 +167,28 @@ export async function isSameGenderForViewer(
   return mine != null && !isOppositeGender(mine, targetGender as Gender);
 }
 
+/**
+ * 멤버 화면에서 가려야 하는 풀 밖의 사람인가 — 다른 모임이거나 전체공개 경계를 넘으면 가린다.
+ *
+ * 평소에는 RLS 가 같은 경계를 긋는다. **대행 중에는 아니다** — 커넥션의 권한이
+ * 주선자의 것이라 전체공개 풀과 그 주선자의 다른 모임까지 열린다. 목록에서 빼는
+ * 것만으로는 주소를 직접 열 수 있으므로 상세에서도 같은 판정을 한다.
+ */
+export async function isOutsidePoolForViewer(
+  sql: Sql,
+  viewerProfileId: string,
+  targetProfileId: string,
+): Promise<boolean> {
+  const result = await sql.query<{ outside: boolean }>(
+    `SELECT (viewer.group_id IS DISTINCT FROM target.group_id) AS outside
+       FROM profiles viewer, profiles target
+      WHERE viewer.id = $1 AND target.id = $2`,
+    [viewerProfileId, targetProfileId],
+  );
+  // 한쪽이라도 읽히지 않으면 보여주지 않는다.
+  return result.rows[0]?.outside ?? true;
+}
+
 export type DiscoverPage = {
   items: ProfileRecord[];
   nextCursor: string | null;

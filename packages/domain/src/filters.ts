@@ -57,6 +57,10 @@ export function buildDiscoverWhere(
     // 두는 이유는 "상대가 나를 숨겼다" 는 RLS 로 보이지 않는 사실이라서다 — 여기서
     // 서브쿼리로 직접 훑으면 그 방향이 빠진다.
     clauses.push(`p.id NOT IN (SELECT app_discover_excluded_profile_ids())`);
+    // 멤버는 자기 풀 안만 본다. RLS 가 이미 같은 경계를 긋지만 **대행 중에는 아니다** —
+    // 그때 커넥션의 권한은 주선자의 것이라 전체공개 풀과 그 주선자의 다른 모임까지
+    // 열린다. 판정은 보는 사람의 프로필이 정하므로 대행에서도 그 멤버 기준이다.
+    clauses.push(`p.group_id IS NOT DISTINCT FROM app_current_member_group()`);
   }
   // 이성만 본다. 화면에 성별 선택이 없고 주소로 넣을 수도 없다 — 볼 수 있는 성별은
   // 보는 사람의 프로필이 정한다(`isOppositeGender`).
