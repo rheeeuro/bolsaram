@@ -78,6 +78,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0049_self_request_keeps_its_own_reason.sql` | 자기 자신에게 낸 신청은 전용 제약이 이유를 말하도록 트리거가 비켜선다        |
 | `0050_oauth_login.sql`             | 주선자 인증을 소셜 로그인으로 — `oauth_accounts` 추가, 비밀번호 컬럼·시도 제한 테이블 삭제 |
 | `0051_avatar_images.sql`           | 주선자 프로필 사진(`users.avatar_key`)과 모임 사진(`groups.image_key`)                 |
+| `0052_users_identity_columns_readonly.sql` | 런타임 롤의 `users` UPDATE 에서 `email`·`phone` 제외 — 신원은 인증 레이어만 쓴다 |
 
 ## 테이블
 
@@ -131,7 +132,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_connections_own` 의 WITH CHECK            | 속하지 않은 모임을 봇 업로드 대상으로 두기    |
 | `group_admins_one_owner` (부분 유니크)              | 모임당 OWNER 두 명                            |
 | `users.active_group_id` 의 컬럼 UPDATE 권한 회수    | 런타임 롤이 보고 있는 모임을 바꾸는 것        |
-| `users` 의 컬럼 단위 UPDATE 권한 (`avatar_key` 포함) | 열어 주지 않은 컬럼을 런타임 롤이 고치는 것   |
+| `users` 의 컬럼 단위 UPDATE 권한 (`display_name`·`avatar_key`·`last_login_at`·`updated_at` 만) | 역할·이메일·전화번호·활성 모임을 런타임 롤이 고치는 것 |
 | `notifications_dedupe_idx` (부분 유니크)            | 같은 사건으로 같은 사람에게 두 번 알림        |
 | `notifications_group_pending_idx` (부분 유니크)     | 방 하나에 아직 안 보낸 채팅 알림 두 개 — 줄마다 울리는 것 |
 | `group_messages_update_guard` 트리거                | 남긴 글을 고치는 것 (지우기와 계정 삭제만 통과), 시스템 메시지를 지우는 것 |

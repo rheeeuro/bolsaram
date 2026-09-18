@@ -11,6 +11,8 @@ import {
   projectProfile,
   type FullProfile,
 } from "@bolsaram/domain";
+import { disclosureFor } from "../apps/web/src/server/views/profile-view";
+import type { ProfileRecord } from "../apps/web/src/server/repo/profiles";
 
 const profile: FullProfile = {
   id: "p1",
@@ -138,5 +140,66 @@ describe("이성 경계", () => {
   it("같은 성별에게 보내려 하면 막는다", () => {
     expect(() => assertOppositeGender("MALE", "MALE")).toThrow();
     expect(() => assertOppositeGender("MALE", "FEMALE")).not.toThrow();
+  });
+});
+
+/**
+ * 대행(대신 둘러보기)은 주선자 계정으로 멤버 화면을 연다. 공개 단계까지 주선자
+ * 기준으로 매기면 담당이라는 이유로 이름·연락처가 그 화면에 뜨고, 옆에서 함께 보는
+ * 멤버에게 그대로 보인다.
+ */
+describe("대행 중 공개 단계", () => {
+  const record = (id: string, userId: string | null = null) =>
+    ({ ...profile, id, userId, groupId: null }) as unknown as ProfileRecord;
+
+  it("담당 프로필이어도 이름이 열리지 않는다", () => {
+    expect(
+      disclosureFor({
+        profile: record("px"),
+        viewerRole: "MEMBER",
+        viewerUserId: "host",
+        viewerProfileId: "pm",
+        introducedWith: new Set(),
+        canEdit: true,
+      }),
+    ).toBe("DETAIL");
+  });
+
+  it("주선자가 맡은 다른 멤버의 연결을 끌어오지 않는다", () => {
+    // 대행 경로는 그 멤버의 연결만 담아 부른다. 담기지 않았으면 DETAIL 이다.
+    expect(
+      disclosureFor({
+        profile: record("px"),
+        viewerRole: "MEMBER",
+        viewerUserId: "host",
+        viewerProfileId: "pm",
+        introducedWith: new Set(["py"]),
+        canEdit: true,
+      }),
+    ).toBe("DETAIL");
+  });
+
+  it("대행 대상 본인의 프로필은 OWNER 다", () => {
+    expect(
+      disclosureFor({
+        profile: record("pm", "member-user"),
+        viewerRole: "MEMBER",
+        viewerUserId: "host",
+        viewerProfileId: "pm",
+        introducedWith: new Set(),
+      }),
+    ).toBe("OWNER");
+  });
+
+  it("주선자 화면은 그대로 담당이면 전부 본다", () => {
+    expect(
+      disclosureFor({
+        profile: record("px"),
+        viewerRole: "ADMIN",
+        viewerUserId: "host",
+        introducedWith: new Set(),
+        canEdit: true,
+      }),
+    ).toBe("ADMIN");
   });
 });

@@ -66,3 +66,17 @@ describe("private R2 storage", () => {
     expect(await r2ObjectSize(key)).toBe(42);
   });
 });
+
+/**
+ * 서명 URL 은 로그인한 사람이면 누구나 쓸 수 있다(유출·복사). 그래서 주선자 화면에서만
+ * 나오는 영역은 키 자체로 한 번 더 가른다.
+ */
+describe("스토리지 키 경계", () => {
+  it("Import 원본은 주선자 전용 영역이다", async () => {
+    const { isHostOnlyKey } = await import("../apps/web/src/server/storage/local");
+    expect(isHostOnlyKey("import/abc/x.jpg")).toBe(true);
+    expect(isHostOnlyKey("profile/abc/x.jpg")).toBe(false);
+    expect(isHostOnlyKey("avatar/abc/x.jpg")).toBe(false);
+    expect(isHostOnlyKey("group/abc/x.jpg")).toBe(false);
+  });
+});

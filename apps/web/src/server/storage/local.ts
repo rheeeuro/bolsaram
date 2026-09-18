@@ -58,6 +58,17 @@ function storageRoot(): string {
  * 저장 키를 만든다. `<namespace>/<ownerId>/<random>.<ext>`
  * ownerId 로 묶어두면 프로필 삭제 시 하위 전체를 지우기 쉽다.
  */
+/**
+ * 주선자만 열 수 있는 저장소 영역인가.
+ *
+ * Import 원본은 검토 전의 사진이라 프로필로 게시되기 전에도 스토리지에 있다. 서명
+ * URL 은 로그인한 사람이면 누구나 쓸 수 있으므로(유출·복사), 주선자 화면에서만 나오는
+ * 이 영역은 멤버 세션으로 열리지 않게 한 겹 더 막는다.
+ */
+export function isHostOnlyKey(key: string): boolean {
+  return key.startsWith("import/");
+}
+
 export function buildStorageKey(
   namespace: StorageNamespace,
   ownerId: string,

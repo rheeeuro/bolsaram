@@ -34,10 +34,13 @@ export const GET = route(async (_request: Request, { params }: Params) => {
     ) {
       throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     }
+    // 대행 중이면 주선자 계정으로 열어도 화면은 그 멤버의 것이다.
+    const memberView = isMemberView(viewer);
+
     // 멤버 화면은 이성만, 그리고 자기 풀 안만 본다. 있는지 없는지도 알리지 않으므로
     // 둘 다 같은 404 다. 풀 경계는 대행 중에만 갈린다 — 그때 RLS 는 주선자 범위다.
     if (
-      isMemberView(viewer) &&
+      memberView &&
       viewer.profileId &&
       profile.userId !== viewer.userId &&
       ((await isSameGenderForViewer(sql, viewer.profileId, profile.gender)) ||
@@ -46,19 +49,20 @@ export const GET = route(async (_request: Request, { params }: Params) => {
       throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     }
 
-    // 주선자는 자기 멤버가 낀 연결을, 멤버는 자기 연결을 본다.
-    const introducedWith =
-      viewer.role === "ADMIN"
-        ? await introducedWithManaged(sql)
-        : viewer.profileId
-          ? await introducedPartnerIds(sql, viewer.profileId)
-          : new Set<string>();
-    const editable =
-      viewer.role === "ADMIN" ? await canEditProfiles(sql, [profile.id]) : new Set<string>();
+    // 주선자는 자기 멤버가 낀 연결을, 멤버는 자기 연결을 본다. 대행 중에는 멤버
+    // 쪽이다 — 주선자가 맡은 다른 멤버의 연결이나 담당 권한으로 열지 않는다.
+    const hostView = !memberView && viewer.role === "ADMIN";
+    const introducedWith = hostView
+      ? await introducedWithManaged(sql)
+      : viewer.profileId
+        ? await introducedPartnerIds(sql, viewer.profileId)
+        : new Set<string>();
+    const editable = hostView ? await canEditProfiles(sql, [profile.id]) : new Set<string>();
     const level = disclosureFor({
       profile,
-      viewerRole: viewer.role,
+      viewerRole: memberView ? "MEMBER" : viewer.role,
       viewerUserId: viewer.userId,
+      viewerProfileId: viewer.profileId,
       introducedWith,
       canEdit: editable.has(profile.id),
     });

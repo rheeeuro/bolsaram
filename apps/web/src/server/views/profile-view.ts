@@ -127,6 +127,10 @@ export function toDetailView(
  * 열람자 기준의 공개 단계를 정한다.
  * 담당 주선자 > 본인 > 연결된 상대 > 일반 멤버 순으로 내려간다.
  *
+ * **대행 중에는 멤버 경로로 부른다.** 주선자 계정으로 열지만 화면은 그 멤버의 것이라,
+ * 담당이라는 이유로 이름·연락처를 열거나 그 주선자가 맡은 **다른** 멤버의 연결을
+ * 끌어오면 옆에서 함께 보는 사람에게 그대로 보인다.
+ *
  * **주선자라는 사실만으로 전부 열지 않는다.** 전체공개 풀은 모든 주선자가 보지만
  * 고치는 것은 등록한 사람뿐이고(0011), 가입은 열려 있다. 담당이 아닌 프로필의
  * 이름·연락처는 멤버와 같은 기준으로 가린다 — 자기가 맡은 멤버와 연결된 뒤에야
@@ -136,6 +140,11 @@ export function disclosureFor(input: {
   profile: ProfileRecord;
   viewerRole: "ADMIN" | "MEMBER";
   viewerUserId: string;
+  /**
+   * 멤버로서 보고 있는 프로필. 대행 중에는 계정이 아니라 이 값이 「본인」을 가린다 —
+   * 주선자 계정으로 열지만 화면의 주인은 대행 대상이다.
+   */
+  viewerProfileId?: string | null;
   introducedWith: Set<string>;
   /** 주선자가 이 프로필을 고칠 수 있는가. 멤버 경로에서는 보지 않는다. */
   canEdit?: boolean;
@@ -144,6 +153,7 @@ export function disclosureFor(input: {
     if (input.canEdit) return "ADMIN";
     return input.introducedWith.has(input.profile.id) ? "INTRODUCED" : "DETAIL";
   }
+  if (input.profile.id === input.viewerProfileId) return "OWNER";
   if (input.profile.userId === input.viewerUserId) return "OWNER";
   if (input.introducedWith.has(input.profile.id)) return "INTRODUCED";
   return "DETAIL";

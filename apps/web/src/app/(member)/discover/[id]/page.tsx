@@ -77,8 +77,10 @@ export default async function ProfileDetailPage({
       : new Set<string>();
     const level = disclosureFor({
       profile,
-      viewerRole: viewer.role,
+      // 대행 중이면 주선자 계정으로 열어도 화면은 그 멤버의 것이다.
+      viewerRole: isMemberView(viewer) ? "MEMBER" : viewer.role,
       viewerUserId: viewer.userId,
+      viewerProfileId: viewer.profileId,
       introducedWith,
     });
     const favorited = await isFavorited(sql, viewer.userId, profile.id);

@@ -7,7 +7,12 @@
 import { NextResponse } from "next/server";
 import { readSession } from "@/server/auth/session";
 import { fail, route } from "@/server/http/respond";
-import { objectSize, openObject, verifySignature } from "@/server/storage/local";
+import {
+  isHostOnlyKey,
+  objectSize,
+  openObject,
+  verifySignature,
+} from "@/server/storage/local";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { Readable } from "node:stream";
 
@@ -22,6 +27,12 @@ export const GET = route(async (request: Request) => {
   const exp = params.get("exp");
   const sig = params.get("sig");
   if (!key || !exp || !sig) return fail("VALIDATION", "잘못된 요청입니다.", 400);
+
+  // Import 원본은 주선자 전용이다. 서명이 유출돼도 멤버 세션으로는 열리지 않는다.
+  // 있는지 없는지 구분해 주지 않으므로 잘못된 서명과 같은 응답이다.
+  if (isHostOnlyKey(key) && user.role !== "ADMIN") {
+    return fail("FORBIDDEN", "잘못된 링크입니다.", 403);
+  }
 
   const verified = verifySignature("download", key, exp, sig);
   if (!verified.ok) {

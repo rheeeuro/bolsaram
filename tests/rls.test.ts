@@ -408,6 +408,23 @@ describe("표시 이름과 프로필 사진", () => {
     expect(after.rows[0]?.avatar_key).toBeNull();
   });
 
+  it("앱 롤은 이메일·전화번호를 바꾸지 못한다", async () => {
+    // 이메일은 소셜 로그인이 계정을 잇는 기준이다. 본인 행이라도 컬럼 권한에서
+    // 빠져 있어 인증 레이어(owner 커넥션)만 쓴다(0052).
+    await expect(
+      withRls(fx.admin, (sql) =>
+        sql.query(`UPDATE users SET email = $2 WHERE id = $1`, [fx.adminId, "x@test.local"]),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      withRls(fx.member1, (sql) =>
+        sql.query(`UPDATE users SET phone = '01099998888' WHERE id = $1`, [
+          fx.member1.userId,
+        ]),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
   it("앱 롤은 역할을 바꾸지 못한다", async () => {
     // 이름만 열려 있다. 본인 행이라도 role 은 컬럼 권한에서 빠져 있다(0036).
     await expect(
