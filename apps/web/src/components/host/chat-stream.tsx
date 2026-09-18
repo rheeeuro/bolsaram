@@ -39,6 +39,8 @@ export type ChatMessage = {
   /** 사람이 쓴 글이면 null. 값이 있으면 DB 가 남긴 사건이다(0044). */
   systemKind: GroupMessageSystemKind | null;
   payload: GroupMessagePayload;
+  /** payload 의 공개 번호 → 프로필 id. 볼 수 있는 번호만 들어온다(시스템 메시지 링크). */
+  profileIds: Record<string, string>;
 };
 
 export type ChatEvent = { kind: "message" | "deleted"; message: ChatMessage };

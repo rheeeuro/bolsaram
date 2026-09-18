@@ -12,6 +12,7 @@
  *   * 계정이 지워져도 대화는 남는다(0041).
  *   * 새 글과 지움이 `LISTEN/NOTIFY` 로 알려지고, 그 payload 에 본문이 없다(0043).
  *   * 모임의 사건이 시스템 메시지로 남고, 사람은 그것을 만들지도 지우지도 못한다(0044).
+ *   * 시스템 메시지의 공개 번호는 볼 수 있을 때만 프로필 id 로 풀린다(화면의 링크).
  *   * 나중에 합류한 주선자에게는 **들어오기 전 대화가 보이지 않는다**(0045).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -404,10 +405,43 @@ describe("시스템 메시지", () => {
       (m) => m.systemKind === "PROFILE_REGISTERED",
     );
     expect(registered).toHaveLength(1);
-    expect(registered[0]!.payload.profileCode).toBeGreaterThan(0);
+    const code = registered[0]!.payload.profileCode!;
+    expect(code).toBeGreaterThan(0);
 
     // 방에 멤버 이름이 적히지 않는다. 픽스처의 이름은 `${TAG}-…-이름` 이다.
     expect(JSON.stringify(registered[0]!.payload)).not.toContain("-이름");
+
+    // 번호에 링크를 달 수 있도록 프로필 id 가 함께 온다. payload 에는 넣지 않는다 —
+    // 저장된 사실은 번호뿐이고 id 는 읽을 때 RLS 를 통과해 붙는다.
+    const profileId = await withOwner(async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `SELECT id FROM profiles WHERE public_code = $1`,
+        [code],
+      );
+      return r.rows[0]!.id;
+    });
+    expect(registered[0]!.profileIds).toEqual({ [String(code)]: profileId });
+    expect(JSON.stringify(registered[0]!.payload)).not.toContain(profileId);
+  });
+
+  it("볼 수 없는 번호에는 링크를 달지 않는다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `g${Date.now() % 100000}`));
+    const before = (await systemMessages(party.owner, party.groupId)).filter(
+      (m) => m.systemKind === "PROFILE_REGISTERED",
+    );
+    const code = before[0]!.payload.profileCode!;
+    expect(before[0]!.profileIds[String(code)]).toBeDefined();
+
+    // 프로필이 사라지면 사건 기록은 남지만 갈 곳이 없다. 화면이 죽은 링크를 만들지
+    // 않도록 map 에서 빠진다 — 번호는 글자로만 남는다.
+    await withOwner((sql) => sql.query(`DELETE FROM profiles WHERE public_code = $1`, [code]));
+
+    const after = (await systemMessages(party.owner, party.groupId)).filter(
+      (m) => m.systemKind === "PROFILE_REGISTERED",
+    );
+    expect(after).toHaveLength(1);
+    expect(after[0]!.payload.profileCode).toBe(code);
+    expect(after[0]!.profileIds).toEqual({});
   });
 
   it("신청과 연결이 남는다", async () => {

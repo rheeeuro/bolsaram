@@ -8,6 +8,7 @@
  * 메시지는 고칠 수 없다. 지우기만 되고, 그것도 자기 것만이다(DB 가드 트리거).
  */
 import "server-only";
+import { z } from "zod";
 import type { Sql } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
 import {
@@ -30,6 +31,13 @@ export type GroupMessageRecord = {
   systemKind: GroupMessageSystemKind | null;
   /** 시스템 메시지가 싣는 것. 사람의 글에서는 비어 있다. */
   payload: GroupMessagePayload;
+  /**
+   * payload 의 공개 번호 → 프로필 id. 화면이 번호에 링크를 달 때 쓴다.
+   *
+   * **볼 수 있는 것만 들어온다** — 조회가 RLS 를 통과하므로 지워졌거나 담당 채널을
+   * 벗어난 번호는 빠진다. 그런 번호는 링크 없이 글자로만 남는다.
+   */
+  profileIds: Record<string, string>;
 };
 
 type Row = {
@@ -42,12 +50,38 @@ type Row = {
   deleted_at: Date | null;
   system_kind: GroupMessageSystemKind | null;
   payload: unknown;
+  profile_ids: unknown;
 };
 
+/**
+ * 시스템 메시지의 공개 번호를 프로필 id 로 바꿔 함께 읽는다.
+ *
+ * payload 에는 번호만 있다(0044) — 이름을 적지 않기로 한 규칙이라 그대로 두고, 화면이
+ * 링크를 걸 수 있도록 여기서 한 번 더 찾아 준다. 사람이 쓴 글에서는 찾을 것이 없으므로
+ * 조인 조건으로 걸러 아예 돌지 않게 한다.
+ *
+ * 번호는 전역에서 유일하므로(`profiles.public_code UNIQUE`) 모임을 따로 묻지 않는다.
+ * 볼 수 없는 프로필은 RLS 가 걸러 map 에서 빠진다.
+ */
+const PROFILE_LINKS = `LEFT JOIN LATERAL (
+                           SELECT jsonb_object_agg(p.public_code::text, p.id) AS ids
+                             FROM profiles p
+                            WHERE p.public_code = ANY (ARRAY[
+                                    (m.payload->>'profileCode')::int,
+                                    (m.payload->>'requesterCode')::int,
+                                    (m.payload->>'targetCode')::int
+                                  ])
+                         ) links ON m.system_kind IS NOT NULL`;
+
 const SELECT_MESSAGE = `SELECT m.id, m.group_id, m.author_user_id, u.display_name AS author_name,
-                               m.body, m.created_at, m.deleted_at, m.system_kind, m.payload
+                               m.body, m.created_at, m.deleted_at, m.system_kind, m.payload,
+                               links.ids AS profile_ids
                           FROM group_messages m
-                          LEFT JOIN users u ON u.id = m.author_user_id`;
+                          LEFT JOIN users u ON u.id = m.author_user_id
+                          ${PROFILE_LINKS}`;
+
+/** DB 가 만든 map 이지만 화면으로 나가기 전에 형태를 확인한다. payload 와 같은 규칙이다. */
+const profileIdsSchema = z.record(z.string(), z.uuid());
 
 function toRecord(row: Row): GroupMessageRecord {
   return {
@@ -63,6 +97,7 @@ function toRecord(row: Row): GroupMessageRecord {
     // DB 가 만든 값이지만 화면으로 나가기 전에 형태를 확인한다. 모양이 어긋나면
     // 문장을 만들지 못할 뿐 목록 전체가 깨지지는 않게 빈 값으로 떨어뜨린다.
     payload: groupMessagePayloadSchema.safeParse(row.payload).data ?? {},
+    profileIds: profileIdsSchema.safeParse(row.profile_ids).data ?? {},
   };
 }
 

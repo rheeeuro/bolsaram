@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GROUP_MESSAGE_MAX_LENGTH } from "@bolsaram/schemas";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
@@ -7,7 +8,7 @@ import { useChatStream, type ChatMessage } from "@/components/host/chat-stream";
 import { Button } from "@/components/ui/button";
 import { FormError, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
-import { groupSystemMessageText } from "@/lib/labels";
+import { groupSystemMessageParts } from "@/lib/labels";
 
 /**
  * 모임 채팅방 (마이그레이션 0040).
@@ -20,7 +21,8 @@ import { groupSystemMessageText } from "@/lib/labels";
  * 그래야 보고 있는 방의 글이 안 읽음으로 세어지지 않는다.
  *
  * 모임에서 일어난 일(입장·퇴장·멤버 등록·신청·연결)도 같은 줄기에 섞여 내려온다.
- * 그것은 말이 아니라 사건이므로 가운데 한 줄로 조용히 흐르게 둔다.
+ * 그것은 말이 아니라 사건이므로 가운데 한 줄로 조용히 흐르게 둔다. 거기 적힌 멤버
+ * 번호는 그 프로필로 가는 링크다 — 사건을 읽고 바로 그 사람을 열어 보는 자리다.
  *
  * 보이는 범위는 **들어온 시점부터**다(0045). 화면이 자르는 것이 아니라 정책이 막으므로
  * 여기서는 따로 다루지 않는다 — 새로 합류한 사람에게는 자기 입장 기록이 첫 줄이 된다.
@@ -256,6 +258,9 @@ export function GroupChat({
 /**
  * 모임에서 일어난 일. 말풍선도 이름도 없이 가운데 한 줄로 흐른다 — 읽히되 대화를
  * 끊지 않는 자리다. 지울 수 없으므로 지우기 버튼도 없다.
+ *
+ * 멤버 번호는 그 프로필로 가는 링크가 된다. 볼 수 없는 번호(지워졌거나 담당 채널을
+ * 벗어난 것)는 id 가 오지 않으므로 글자로만 남는다 — 죽은 링크를 만들지 않는다.
  */
 function SystemRow({
   message,
@@ -266,7 +271,22 @@ function SystemRow({
     <div className="flex items-center gap-2.5 px-1 py-2">
       <span aria-hidden className="h-px flex-1 bg-[var(--surface-border)]" />
       <span className="text-center text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
-        {groupSystemMessageText(message.systemKind, message.payload)}
+        {groupSystemMessageParts(message.systemKind, message.payload).map((part, index) => {
+          const profileId = part.kind === "code" && part.code != null
+            ? message.profileIds[String(part.code)]
+            : undefined;
+          if (!profileId) return <span key={index}>{part.text}</span>;
+          return (
+            <Link
+              key={index}
+              href={`/profiles/${profileId}`}
+              className="underline decoration-dotted underline-offset-2 transition-colors hover:text-[var(--color-rose-600)]"
+            >
+              <span className="sr-only">멤버 번호 </span>
+              {part.text}
+            </Link>
+          );
+        })}
         <time dateTime={message.createdAt} className="ml-1.5 text-[11px] opacity-80">
           {formatTime(message.createdAt)}
         </time>
