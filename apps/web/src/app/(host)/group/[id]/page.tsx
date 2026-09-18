@@ -11,6 +11,7 @@
 import { notFound } from "next/navigation";
 import { requireAdminPage } from "@/server/auth/guard";
 import { readMyGroups, setActiveGroup } from "@/server/auth/group-invite";
+import { imageUrlFor } from "@/server/views/image-url";
 import { PageHeader } from "@/components/host/surface";
 import { GroupSettings } from "@/components/host/group-settings";
 
@@ -38,7 +39,10 @@ export default async function HostGroupSettingsPage({
         title="모임 설정"
         description="이 모임에만 적용됩니다. 다른 모임을 고치려면 그 모임으로 옮겨 간 뒤 여기로 옵니다."
       />
-      <GroupSettings group={group} viewerUserId={viewer.userId} />
+      <GroupSettings
+        group={{ ...group, imageUrl: imageUrlFor(group.imageKey) }}
+        viewerUserId={viewer.userId}
+      />
     </>
   );
 }

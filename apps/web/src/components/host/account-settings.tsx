@@ -9,6 +9,7 @@ import {
 } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
+import { ImagePicker } from "@/components/host/image-picker";
 import { Field, FormError, Input } from "@/components/ui/field";
 import { ProviderMark } from "@/components/ui/provider-mark";
 import { apiPatch, apiPost } from "@/lib/api-client";
@@ -33,8 +34,20 @@ export type LoginMethod = {
   lastLoginAt: string | null;
 };
 
-/** 표시 이름 수정. 저장하면 사이드바·모임 채팅의 이름이 함께 바뀐다. */
-export function AccountNamePanel({ displayName }: { displayName: string | null }) {
+/**
+ * 이름과 사진. 저장하면 사이드바·모임 채팅에 함께 반영된다.
+ *
+ * 둘 다 처음에는 카카오·구글이 준 값이고 그 뒤로는 본인이 정한다. 사진은 없어도
+ * 되므로 지우면 이름 앞글자로 돌아간다.
+ */
+export function AccountNamePanel({
+  displayName,
+  avatarUrl,
+}: {
+  displayName: string | null;
+  /** 내 프로필 사진의 단기 signed URL. 없으면 앞글자를 그린다. */
+  avatarUrl: string | null;
+}) {
   const router = useRouter();
   const current = displayName ?? "";
   const [value, setValue] = useState(current);
@@ -47,20 +60,15 @@ export function AccountNamePanel({ displayName }: { displayName: string | null }
   const ready = displayNameSchema.safeParse(value).success && dirty;
 
   return (
-    <Panel title="내 이름">
-      <div className="mb-4 flex items-center gap-3">
-        <span
-          aria-hidden
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--color-rose-100)] text-[17px] font-semibold text-[var(--color-burgundy-800)]"
-        >
-          {Array.from(displayName ?? "주선자")[0]}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold text-[var(--surface-text)]">
-            {displayName ?? "주선자"} 님
-          </p>
-          <p className="text-[12px] text-[var(--surface-text-muted)]">주선자</p>
-        </div>
+    <Panel title="내 이름과 사진">
+      <div className="mb-4 border-b border-[var(--surface-border)] pb-4">
+        <ImagePicker
+          endpoint="/api/admin/me/avatar"
+          url={avatarUrl}
+          name={displayName ?? "주선자"}
+          shape="circle"
+          hint="처음에는 카카오·구글 사진으로 시작합니다. 지우면 이름 앞글자가 보입니다."
+        />
       </div>
 
       <form

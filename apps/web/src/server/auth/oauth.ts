@@ -22,8 +22,14 @@ import {
 import { z } from "zod";
 import { env, isOAuthProviderEnabled } from "../env";
 import { hmac, randomToken, safeEqual, sha256b64url } from "../crypto";
+import {
+  buildStorageKey,
+  deleteObject,
+  isAllowedImageType,
+  putObject,
+} from "../storage/local";
 
-/** 제공자가 알려준 신원. 이 세 가지 말고는 받지 않는다. */
+/** 제공자가 알려준 신원. 여기 적힌 것 말고는 받지 않는다. */
 export type OAuthIdentity = {
   provider: OAuthProvider;
   /** 제공자의 고유 식별자. 이메일과 달리 바뀌지 않으므로 계정을 찾는 기준이다. */
@@ -31,6 +37,8 @@ export type OAuthIdentity = {
   /** 동의를 받지 못하면 없다(카카오). 계정을 **잇는 힌트**로만 쓴다. */
   email: string | null;
   displayName: string | null;
+  /** 제공자 프로필 사진의 주소. 가입할 때 한 번 받아 우리 저장소에 둔다. */
+  avatarUrl: string | null;
 };
 
 type ProviderConfig = {
@@ -49,7 +57,14 @@ const kakaoProfileSchema = z.object({
   kakao_account: z
     .object({
       email: z.string().email().nullish(),
-      profile: z.object({ nickname: z.string().nullish() }).nullish(),
+      profile: z
+        .object({
+          nickname: z.string().nullish(),
+          profile_image_url: z.string().nullish(),
+          // 카카오가 넣어준 기본 이미지다. 앞글자 자리표시가 더 낫다.
+          is_default_image: z.boolean().nullish(),
+        })
+        .nullish(),
     })
     .nullish(),
 });
@@ -60,6 +75,7 @@ const googleProfileSchema = z.object({
   // 확인되지 않은 이메일로 기존 계정에 붙이면 계정 탈취가 된다.
   email_verified: z.boolean().nullish(),
   name: z.string().nullish(),
+  picture: z.string().nullish(),
 });
 
 const PROVIDERS: Record<OAuthProvider, ProviderConfig> = {
@@ -69,17 +85,21 @@ const PROVIDERS: Record<OAuthProvider, ProviderConfig> = {
     tokenUrl: "https://kauth.kakao.com/oauth/token",
     userInfoUrl: "https://kapi.kakao.com/v2/user/me",
     // 이메일은 선택 동의라 거절될 수 있다. 거절돼도 로그인은 되어야 한다.
-    scope: "profile_nickname account_email",
+    // `profile_image` 는 카카오 개발자 콘솔에서 **동의항목을 켜 두어야** 한다 —
+    // 켜지 않은 항목을 요구하면 인가 단계에서 막힌다(KOE205).
+    scope: "profile_nickname profile_image account_email",
     credentials: () => ({
       clientId: env().KAKAO_CLIENT_ID!,
       clientSecret: env().KAKAO_CLIENT_SECRET,
     }),
     parseProfile: (raw) => {
       const p = kakaoProfileSchema.parse(raw);
+      const profile = p.kakao_account?.profile;
       return {
         subject: String(p.id),
         email: p.kakao_account?.email ?? null,
-        displayName: p.kakao_account?.profile?.nickname ?? null,
+        displayName: profile?.nickname ?? null,
+        avatarUrl: profile?.is_default_image ? null : httpsUrl(profile?.profile_image_url),
       };
     },
   },
@@ -99,6 +119,7 @@ const PROVIDERS: Record<OAuthProvider, ProviderConfig> = {
         subject: p.sub,
         email: p.email_verified === false ? null : (p.email ?? null),
         displayName: p.name ?? null,
+        avatarUrl: httpsUrl(p.picture),
       };
     },
   },
@@ -106,6 +127,21 @@ const PROVIDERS: Record<OAuthProvider, ProviderConfig> = {
 
 export function providerSlug(provider: OAuthProvider): string {
   return PROVIDERS[provider].slug;
+}
+
+/**
+ * 제공자가 준 사진 주소 중 https 만 통과시킨다.
+ *
+ * 이 주소로 우리 서버가 직접 요청을 보내므로(`adoptProviderAvatar`) 제공자가 무엇을
+ * 주든 그대로 따라가지 않는다 — 사설망을 가리키는 http 주소를 받아 두지 않는다.
+ */
+function httpsUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 제공자 콘솔에 등록해야 하는 Redirect URI. 화면 안내와 실제 요청이 같은 값을 쓴다. */
@@ -285,6 +321,9 @@ async function fetchIdentity(
  *
  * 2번은 이메일을 믿는 단계라 조건을 좁게 둔다. 구글은 `email_verified` 가 거짓이면
  * 이메일을 버리고 오고, 멤버 계정에는 절대 붙이지 않는다 — 멤버는 초대 링크로만 들어온다.
+ *
+ * 제공자 프로필 사진은 **연결을 새로 만들 때만** 받아 둔다(`adoptProviderAvatar`).
+ * 이름과 같은 규칙이다 — 본인이 정한 사진을 제공자 쪽 변경이 덮지 않는다.
  */
 export async function loginWithOAuth(identity: OAuthIdentity): Promise<string> {
   const linked = await withOwner(async (sql) => {
@@ -299,7 +338,7 @@ export async function loginWithOAuth(identity: OAuthIdentity): Promise<string> {
   });
   if (linked) return linked;
 
-  return withOwnerTx(async (sql) => {
+  const userId = await withOwnerTx(async (sql) => {
     let userId: string | null = null;
 
     if (identity.email) {
@@ -341,6 +380,57 @@ export async function loginWithOAuth(identity: OAuthIdentity): Promise<string> {
     );
     return userId;
   });
+
+  // 사진은 트랜잭션 **밖에서** 받는다 — 제공자 CDN 이 느려도 가입이 붙잡히지 않고,
+  // 받지 못해도 로그인은 끝난다(앞글자 자리표시로 시작할 뿐이다).
+  if (identity.avatarUrl) await adoptProviderAvatar(userId, identity.avatarUrl);
+  return userId;
+}
+
+/** 제공자 사진을 받아 둘 때의 상한. 제공자 썸네일이라 업로드 상한(25MB)보다 훨씬 작다. */
+const MAX_PROVIDER_AVATAR_BYTES = 4 * 1024 * 1024;
+const PROVIDER_AVATAR_TIMEOUT_MS = 5_000;
+
+/**
+ * 제공자 프로필 사진을 우리 저장소로 옮긴다. **사진이 없는 계정에만** 붙인다.
+ *
+ * 제공자 CDN 의 주소를 그대로 화면에 쓰지 않는다 — 우리 사진은 전부 private 스토리지에
+ * 있고 단기 signed URL 로만 나간다. 제공자 쪽에서 사진을 바꿔도 따라가지 않으며,
+ * 그 뒤로 이 사진을 정하는 것은 본인이다(계정 설정).
+ *
+ * 실패는 조용히 넘긴다. 사진이 없으면 화면이 앞글자를 그리므로 로그인을 막을 이유가 없다.
+ * 주소는 로그에 남기지 않는다.
+ */
+async function adoptProviderAvatar(userId: string, avatarUrl: string): Promise<void> {
+  try {
+    const response = await fetch(avatarUrl, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(PROVIDER_AVATAR_TIMEOUT_MS),
+    });
+    if (!response.ok) return;
+
+    const mimeType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    if (!isAllowedImageType(mimeType)) return;
+    const declared = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_PROVIDER_AVATAR_BYTES) return;
+
+    const body = Buffer.from(await response.arrayBuffer());
+    if (body.byteLength === 0 || body.byteLength > MAX_PROVIDER_AVATAR_BYTES) return;
+
+    const key = buildStorageKey("avatar", userId, mimeType);
+    await putObject(key, body);
+    // 이미 사진이 있으면 덮지 않는다. 그 경우 방금 올린 파일은 주인이 없으므로 지운다.
+    const claimed = await withOwner((sql) =>
+      sql.query(`UPDATE users SET avatar_key = $2 WHERE id = $1 AND avatar_key IS NULL`, [
+        userId,
+        key,
+      ]),
+    );
+    if (claimed.rowCount === 0) await deleteObject(key);
+  } catch (error) {
+    // 주소도 본문도 남기지 않는다 — 무엇이 막혔는지만 남긴다.
+    console.error("제공자 프로필 사진 가져오기 실패", error instanceof Error ? error.name : "unknown");
+  }
 }
 
 /** 내 계정에 붙어 있는 소셜 계정 하나. 계정 설정의 「로그인 방식」이 읽는다. */

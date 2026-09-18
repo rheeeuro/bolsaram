@@ -177,6 +177,8 @@ export type GroupSummary = {
   name: string;
   /** 주선자들끼리 보는 메모. 멤버에게는 노출하지 않는다. */
   description: string | null;
+  /** 모임 사진의 저장 키. 없으면 화면이 모임 이름의 앞글자를 그린다. */
+  imageKey: string | null;
   isOwner: boolean;
   /** 이 모임에 등록된 멤버 수. 목록에서 어느 방이 활발한지 가늠하는 데 쓴다. */
   memberCount: number;
@@ -199,12 +201,13 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       group_id: string;
       name: string;
       description: string | null;
+      image_key: string | null;
       is_owner: boolean;
       member_count: number;
       import_count: number;
       chat_notify: boolean;
     }>(
-      `SELECT g.id AS group_id, g.name, g.description, ga.is_owner,
+      `SELECT g.id AS group_id, g.name, g.description, g.image_key, ga.is_owner,
               (SELECT count(*)::int FROM profiles p WHERE p.group_id = g.id) AS member_count,
               (SELECT count(*)::int FROM import_sessions i WHERE i.group_id = g.id) AS import_count,
               COALESCE(pref.telegram_notify, false) AS chat_notify
@@ -233,6 +236,7 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       groupId: group.group_id,
       name: group.name,
       description: group.description,
+      imageKey: group.image_key,
       isOwner: group.is_owner,
       memberCount: group.member_count,
       importCount: group.import_count,
@@ -273,6 +277,30 @@ export async function updateGroup(input: {
   if (result.rowCount === 0) {
     throw new DomainError("NOT_FOUND", "모임을 찾을 수 없습니다.");
   }
+}
+
+/**
+ * 모임 사진을 바꾸거나(`imageKey`) 지운다(`null`).
+ *
+ * 이름·설명과 같은 취급이다 — 그 모임의 주선자면 누구나 바꾼다. 밀려난 사진의 저장
+ * 키를 돌려주므로 호출부가 실제 파일도 지운다.
+ */
+export async function updateGroupImage(input: {
+  groupId: string;
+  imageKey: string | null;
+}): Promise<{ previousKey: string | null }> {
+  const result = await withOwner((sql) =>
+    sql.query<{ previous_key: string | null }>(
+      `UPDATE groups AS g SET image_key = $2
+         FROM (SELECT image_key FROM groups WHERE id = $1) AS old
+        WHERE g.id = $1
+        RETURNING old.image_key AS previous_key`,
+      [input.groupId, input.imageKey],
+    ),
+  );
+  const row = result.rows[0];
+  if (!row) throw new DomainError("NOT_FOUND", "모임을 찾을 수 없습니다.");
+  return { previousKey: row.previous_key };
 }
 
 /**

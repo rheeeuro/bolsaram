@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
+import { ImagePicker } from "@/components/host/image-picker";
 import { CopyField } from "@/components/ui/copy-field";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, FormError, Input, Textarea } from "@/components/ui/field";
@@ -19,7 +20,7 @@ import { cn } from "@/lib/cn";
  *
  * 네 묶음으로 가른다. 자주 여는 것(이름·동료)이 앞이고 되돌리기 어려운 것이 맨 뒤다.
  *
- *   개요     이름·설명
+ *   개요     사진·이름·설명
  *   주선자   구성원 목록 · 초대 코드 · 모임장 넘기기 · 내보내기
  *   알림     이 방의 채팅을 텔레그램으로도 받을지 (사람마다 따로)
  *   위험     모임 나가기 · 모임 폐쇄
@@ -34,6 +35,8 @@ export type Group = {
   groupId: string;
   name: string;
   description: string | null;
+  /** 모임 사진의 단기 signed URL. 없으면 모임 이름의 앞글자를 그린다. */
+  imageUrl: string | null;
   isOwner: boolean;
   memberCount: number;
   importCount: number;
@@ -107,7 +110,7 @@ export function GroupSettings({
   );
 }
 
-/** 이름·설명 수정. 설명은 주선자끼리만 보는 메모다. */
+/** 사진·이름·설명 수정. 설명은 주선자끼리만 보는 메모다. */
 function Overview({ group }: { group: Group }) {
   const router = useRouter();
   const [name, setName] = useState(group.name);
@@ -121,6 +124,16 @@ function Overview({ group }: { group: Group }) {
   return (
     <>
       <Panel title="모임 정보">
+        <div className="mb-4 border-b border-[var(--surface-border)] pb-4">
+          <ImagePicker
+            endpoint={`/api/admin/groups/${group.groupId}/image`}
+            url={group.imageUrl}
+            name={group.name}
+            shape="square"
+            hint="모임 목록에 보입니다. 지우면 모임 이름의 앞글자가 보입니다."
+          />
+        </div>
+
         <Field label="모임 이름">
           <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
         </Field>

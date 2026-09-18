@@ -334,7 +334,7 @@ describe("관리자 전용 테이블", () => {
   });
 });
 
-describe("표시 이름", () => {
+describe("표시 이름과 프로필 사진", () => {
   it("본인 이름은 바꿀 수 있다", async () => {
     const changed = `${TAG}-바꾼이름`;
     await withRls(fx.admin, (sql) =>
@@ -365,6 +365,47 @@ describe("표시 이름", () => {
       ]),
     );
     expect(after.rows[0]?.display_name).toBe(before.rows[0]?.display_name);
+  });
+
+  it("본인 프로필 사진은 붙이고 지울 수 있다", async () => {
+    // 컬럼 단위 UPDATE 권한이 `avatar_key` 를 포함해야 통과한다(0051).
+    const key = `avatar/${fx.adminId}/rlstest.jpg`;
+    await withRls(fx.admin, (sql) =>
+      sql.query(`UPDATE users SET avatar_key = $2 WHERE id = $1`, [fx.adminId, key]),
+    );
+    const set = await withOwner((sql) =>
+      sql.query<{ avatar_key: string | null }>(`SELECT avatar_key FROM users WHERE id = $1`, [
+        fx.adminId,
+      ]),
+    );
+    expect(set.rows[0]?.avatar_key).toBe(key);
+
+    // 사진이 없는 것이 정상이다 — 지우는 것도 같은 경로로 통과해야 한다.
+    await withRls(fx.admin, (sql) =>
+      sql.query(`UPDATE users SET avatar_key = NULL WHERE id = $1`, [fx.adminId]),
+    );
+    const cleared = await withOwner((sql) =>
+      sql.query<{ avatar_key: string | null }>(`SELECT avatar_key FROM users WHERE id = $1`, [
+        fx.adminId,
+      ]),
+    );
+    expect(cleared.rows[0]?.avatar_key).toBeNull();
+  });
+
+  it("남의 프로필 사진은 바꾸지 못한다", async () => {
+    const result = await withRls(fx.strangerAdmin, (sql) =>
+      sql.query(`UPDATE users SET avatar_key = $2 WHERE id = $1`, [
+        fx.adminId,
+        `avatar/${fx.adminId}/가로채기.jpg`,
+      ]),
+    );
+    expect(result.rowCount).toBe(0);
+    const after = await withOwner((sql) =>
+      sql.query<{ avatar_key: string | null }>(`SELECT avatar_key FROM users WHERE id = $1`, [
+        fx.adminId,
+      ]),
+    );
+    expect(after.rows[0]?.avatar_key).toBeNull();
   });
 
   it("앱 롤은 역할을 바꾸지 못한다", async () => {

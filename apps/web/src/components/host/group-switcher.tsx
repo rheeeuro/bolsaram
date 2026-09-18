@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { Avatar } from "@/components/ui/avatar";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { GroupCreateDialogs } from "@/components/host/group-create";
 import { useGroupSwitch } from "@/components/host/use-group-switch";
 
-export type GroupChoice = { id: string; name: string };
+export type GroupChoice = {
+  id: string;
+  name: string;
+  /** 모임 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
+  imageUrl: string | null;
+};
 
 /**
  * 사이드바에 항상 펼쳐져 있는 모임 목록. 좁은 화면에서는 대신 상단의 모임 시트를 쓴다.
@@ -35,7 +41,7 @@ export function GroupSwitcher({
         </p>
       </div>
       <div className="flex max-h-[32dvh] flex-col gap-2 overflow-y-auto pb-2">
-        {[{ id: null, name: "전체공개" }, ...groups].map((group) => {
+        {[{ id: null, name: "전체공개", imageUrl: null }, ...groups].map((group) => {
           const active = group.id === activeGroupId;
           const count = group.id ? (unread[group.id] ?? 0) : 0;
           return (
@@ -53,17 +59,17 @@ export function GroupSwitcher({
                   : "border-transparent hover:bg-[var(--color-ivory-200)]",
               )}
             >
-              <span
-                aria-hidden
+              <Avatar
+                src={group.imageUrl}
+                name={group.name}
+                fallback={group.id ? undefined : "◎"}
                 className={cn(
                   "flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-semibold",
                   active
                     ? "bg-[var(--color-rose-600)] text-white"
                     : "bg-[var(--color-ivory-200)] text-[var(--color-ink-600)]",
                 )}
-              >
-                {group.id ? Array.from(group.name)[0] : "◎"}
-              </span>
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-medium">{group.name}</span>
                 <span className="block text-[11px] text-[var(--surface-text-muted)]">

@@ -8,6 +8,7 @@
 import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { unreadByGroup } from "@/server/repo/group-chat";
+import { imageUrlFor } from "@/server/views/image-url";
 import { HostNav } from "@/components/host/host-nav";
 import { ChatStreamProvider } from "@/components/host/chat-stream";
 
@@ -30,9 +31,15 @@ export default async function HostLayout({ children }: { children: React.ReactNo
         since={countedAt}
         viewerId={viewer.userId}
       >
+        {/* 사진은 키로 들고 다니다가 그리기 직전에 단기 signed URL 로 바꾼다. */}
         <HostNav
           displayName={viewer.displayName}
-          groups={viewer.groups}
+          avatarUrl={imageUrlFor(viewer.avatarKey)}
+          groups={viewer.groups.map((group) => ({
+            id: group.id,
+            name: group.name,
+            imageUrl: imageUrlFor(group.imageKey),
+          }))}
           activeGroupId={viewer.groupId}
         />
         {/* 좁은 화면에서는 하단 탭이 본문 위에 떠 있다 — 그만큼 바닥을 비운다.

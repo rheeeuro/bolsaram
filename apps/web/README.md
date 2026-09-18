@@ -69,7 +69,7 @@ apps/web/src/
 │   │   └── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar)
 │   ├── member/               멤버 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
@@ -115,9 +115,9 @@ server/
 ├── audit.ts                  감사 로그 (민감값 제외)
 ├── auth/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
-│   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 연결된 계정 조회)
+│   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 프로필 사진 가져오기, 연결된 계정 조회)
 │   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·1회용)
-│   ├── group-invite.ts       모임 만들기·소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
+│   ├── group-invite.ts       모임 만들기·소속·사진·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
@@ -129,7 +129,7 @@ server/
 │   ├── openai.ts             OpenAI multimodal + Structured Outputs
 │   └── index.ts              AI_PROVIDER 로 선택
 ├── repo/                     SQL 접근 (모두 withRls 트랜잭션 안에서 호출된다)
-│   ├── users.ts              내 계정 — 표시 이름
+│   ├── users.ts              내 계정 — 표시 이름·프로필 사진
 │   ├── profiles.ts           Discover·상세·주선자 목록·수정
 │   ├── matches.ts            신청 생성·전이·시그널 목록·연결 상대
 │   ├── match-intents.ts      멤버가 낸 요청(주선자 확인 대기) — 승인해야 신청이 된다
@@ -149,7 +149,9 @@ server/
 │   ├── outbox.ts             미발송 알림 선점·기록 (owner)
 │   └── dispatch.ts           발송 루프 + 기동 시 주기 스윕
 ├── services/import-service.ts  분석 실행 + idempotent commit
-├── views/profile-view.ts     공개 단계 판정·적용 + signed URL 부착
+├── views/
+│   ├── profile-view.ts       공개 단계 판정·적용 + signed URL 부착
+│   └── image-url.ts          사진 하나짜리 저장 키 → 단기 signed URL (주선자·모임 사진)
 └── http/
     ├── respond.ts            DomainError → HTTP status, 입력 검증
     └── context.ts            asUser / asAdmin / asMember (세션 + RLS 묶음)
@@ -185,6 +187,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |
 | `/api/admin/me`                           | PATCH               | 주선자            | 내 표시 이름 바꾸기                  |
+| `/api/admin/me/avatar`                    | POST / DELETE       | 주선자            | 내 프로필 사진 올리기(슬롯·확정) / 지우기 |
 | `/api/admin/acting`                       | POST / DELETE       | 주선자            | 대행 시작 / 종료 (고칠 수 있는 프로필) |
 | `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 멤버 요청 approve · decline          |
 | `/api/favorites`                          | GET / POST / DELETE | 멤버              | 관심 목록·토글                       |
@@ -203,6 +206,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/active`                | PUT                 | 주선자            | 보고 있는 모임 전환 (`null` = 전체공개) |
 | `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
 | `/api/admin/groups/[id]/close`            | DELETE              | **모임장**        | 모임 폐쇄 (비어 있을 때만)           |
+| `/api/admin/groups/[id]/image`            | POST / DELETE       | 그 모임 주선자    | 모임 사진 올리기(슬롯·확정) / 지우기 |
 | `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급           |
 | `/api/admin/groups/[id]/admins/[userId]`  | PATCH / DELETE      | **모임장**        | 모임장 넘기기 / 주선자 내보내기      |
 | `/api/admin/groups/[id]/messages`         | GET / POST          | 그 모임 주선자    | 채팅 읽기(`before`·`after`) / 쓰기   |
@@ -233,7 +237,13 @@ Route Handler
 ### 이미지
 
 업로드는 서버가 키를 정하고 서명 토큰을 발급한다 — 클라이언트가 경로를 정할 수 없다.
+확정 단계에서 그 키가 **올린 사람의 것인지**(`avatar/<userId>/`·`group/<groupId>/`·
+`profile/<profileId>/`) 다시 본다.
 다운로드는 서명 + **로그인**을 함께 요구한다. URL 이 유출돼도 외부인은 쓸 수 없다.
+
+주선자 프로필 사진과 모임 사진도 같은 저장소에 있다. 사진이 **없는 것이 정상**이며
+그때 화면은 이름의 앞글자를 그린다(`components/ui/avatar.tsx`). 주선자 사진은 카카오·구글
+계정을 처음 연결할 때 한 번 받아 두고, 그 뒤로는 본인이 정한다.
 시드가 만든 SVG 는 CSP `sandbox` 로 스크립트를 무력화해 서빙한다(업로드 허용 목록에는 없다).
 
 ### Import

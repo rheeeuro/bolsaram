@@ -33,10 +33,13 @@ import { useChatStream } from "@/components/host/chat-stream";
  */
 export function HostNav({
   displayName,
+  avatarUrl,
   groups,
   activeGroupId,
 }: {
   displayName: string | null;
+  /** 내 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
+  avatarUrl: string | null;
   groups: GroupChoice[];
   activeGroupId: string | null;
 }) {
@@ -44,11 +47,13 @@ export function HostNav({
     <>
       <HostSidebar
         displayName={displayName}
+        avatarUrl={avatarUrl}
         groups={groups}
         activeGroupId={activeGroupId}
       />
       <HostMobileNav
         displayName={displayName}
+        avatarUrl={avatarUrl}
         groups={groups}
         activeGroupId={activeGroupId}
       />
@@ -58,10 +63,12 @@ export function HostNav({
 
 function HostSidebar({
   displayName,
+  avatarUrl,
   groups,
   activeGroupId,
 }: {
   displayName: string | null;
+  avatarUrl: string | null;
   groups: GroupChoice[];
   activeGroupId: string | null;
 }) {
@@ -81,7 +88,7 @@ function HostSidebar({
           </Link>
 
           <div className="flex w-full min-w-0 items-center justify-between gap-3">
-            <AccountName displayName={displayName} />
+            <AccountName displayName={displayName} avatarUrl={avatarUrl} />
             <button
               type="button"
               className="text-[12.5px] text-[var(--surface-text-muted)] transition-colors hover:text-[var(--color-rose-600)]"

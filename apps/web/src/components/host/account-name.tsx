@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
+import { Avatar } from "@/components/ui/avatar";
 
 /**
  * 사이드바의 「○○ 님」 — 계정 설정(`/account`)으로 들어가는 자리.
@@ -15,7 +16,14 @@ import { cn } from "@/lib/cn";
  * 모임 목록 위에 있다 — 계정은 모임과 무관하고, 아래 화면 목록은 모두 모임 안의
  * 것이기 때문이다.
  */
-export function AccountName({ displayName }: { displayName: string | null }) {
+export function AccountName({
+  displayName,
+  avatarUrl,
+}: {
+  displayName: string | null;
+  /** 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
+  avatarUrl: string | null;
+}) {
   const pathname = usePathname();
   const active = pathname.startsWith("/account");
   const current = displayName ?? "주선자";
@@ -33,17 +41,16 @@ export function AccountName({ displayName }: { displayName: string | null }) {
           : "text-[var(--surface-text-muted)] hover:bg-[var(--color-ivory-200)] hover:text-[var(--surface-text)]",
       )}
     >
-      <span
-        aria-hidden
+      <Avatar
+        src={avatarUrl}
+        name={current}
         className={cn(
           "grid size-6 shrink-0 place-items-center rounded-full text-[11.5px] font-semibold",
           active
             ? "bg-[var(--color-rose-600)] text-white"
             : "bg-[var(--color-ivory-200)] text-[var(--color-ink-600)]",
         )}
-      >
-        {Array.from(current)[0]}
-      </span>
+      />
       <span className="min-w-0 flex-1 truncate text-[12.5px]">{current} 님</span>
       <GearIcon
         className={cn(

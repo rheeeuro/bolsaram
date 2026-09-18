@@ -20,6 +20,13 @@ export type SessionUser = {
   role: UserRole;
   displayName: string | null;
   /**
+   * 내 프로필 사진의 저장 키. 없으면 화면이 이름 앞글자를 그린다.
+   *
+   * 키만 들고 다닌다 — 영구 URL 을 만들지 않으므로 그리는 쪽에서 그때그때 단기
+   * signed URL 로 바꾼다(`server/views/avatar.ts`).
+   */
+  avatarKey: string | null;
+  /**
    * 멤버로서 보는 프로필.
    *
    * Claim 이 끝난 멤버는 자기 프로필, 주선자가 대행 중이면 그 대상이다.
@@ -48,7 +55,7 @@ export type SessionUser = {
    * 한 사람이 여러 모임에 속할 수 있다 — 어느 모임의 데이터를 다룰 수 있는지는
    * 이 목록이 아니라 RLS 가 정한다.
    */
-  groups: { id: string; name: string }[];
+  groups: { id: string; name: string; imageKey: string | null }[];
 };
 
 function signSessionId(sessionId: string): string {
@@ -113,10 +120,11 @@ export async function readSession(): Promise<SessionUser | null> {
       user_id: string;
       role: UserRole;
       display_name: string | null;
+      avatar_key: string | null;
       profile_id: string | null;
       acting_profile_id: string | null;
       group_id: string | null;
-      groups: { id: string; name: string }[];
+      groups: { id: string; name: string; imageKey: string | null }[];
     }>(
       // 주선자의 채널은 users.active_group_id, 멤버의 모임은 자기 프로필에서 온다.
       // 주선자의 활성 채널은 **지금도 그 모임에 속해 있을 때만** 살린다 — 나간 모임을
@@ -128,7 +136,7 @@ export async function readSession(): Promise<SessionUser | null> {
       // 권한이 사라질 수 있으므로 세션을 읽을 때마다 다시 본다. 조건은
       // `app_can_edit_profile` 과 같고, owner 커넥션이라 RLS 컨텍스트가 없어 여기서는
       // 그 함수 대신 같은 판정을 직접 쓴다. 최종 판정은 RLS 가 한 번 더 한다.
-      `SELECT u.id AS user_id, u.role, u.display_name, p.id AS profile_id,
+      `SELECT u.id AS user_id, u.role, u.display_name, u.avatar_key, p.id AS profile_id,
               ap.id AS acting_profile_id,
               CASE WHEN u.role = 'ADMIN' THEN (
                      SELECT ga.group_id FROM group_admins ga
@@ -136,7 +144,8 @@ export async function readSession(): Promise<SessionUser | null> {
                    )
                    ELSE p.group_id END AS group_id,
               COALESCE(
-                (SELECT json_agg(json_build_object('id', g.id, 'name', g.name)
+                (SELECT json_agg(json_build_object('id', g.id, 'name', g.name,
+                                                   'imageKey', g.image_key)
                                  ORDER BY ga.added_at)
                    FROM group_admins ga JOIN groups g ON g.id = ga.group_id
                   WHERE ga.user_id = u.id AND u.role = 'ADMIN'),
@@ -172,6 +181,7 @@ export async function readSession(): Promise<SessionUser | null> {
       userId: row.user_id,
       role: row.role,
       displayName: row.display_name,
+      avatarKey: row.avatar_key,
       profileId: row.acting_profile_id ?? row.profile_id,
       actingProfileId: row.acting_profile_id,
       groupId: row.group_id,

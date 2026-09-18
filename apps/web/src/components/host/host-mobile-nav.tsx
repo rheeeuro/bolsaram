@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { Avatar } from "@/components/ui/avatar";
 import { Dialog, DialogClose } from "@/components/ui/dialog";
 import { GroupCreateDialogs } from "@/components/host/group-create";
 import { useChatStream } from "@/components/host/chat-stream";
@@ -30,10 +31,13 @@ import type { GroupChoice } from "@/components/host/group-switcher";
  */
 export function HostMobileNav({
   displayName,
+  avatarUrl,
   groups,
   activeGroupId,
 }: {
   displayName: string | null;
+  /** 내 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
+  avatarUrl: string | null;
   groups: GroupChoice[];
   activeGroupId: string | null;
 }) {
@@ -153,6 +157,7 @@ export function HostMobileNav({
         links={secondary}
         pathname={pathname}
         displayName={displayName}
+        avatarUrl={avatarUrl}
         activeGroupId={activeGroupId}
         activeName={activeName}
         onClose={() => setSheet(null)}
@@ -184,7 +189,7 @@ function GroupSheet({
         <SheetHead title="내 모임" onClose={onClose} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3" aria-busy={busy}>
-          {[{ id: null, name: "전체공개" }, ...groups].map((group) => {
+          {[{ id: null, name: "전체공개", imageUrl: null }, ...groups].map((group) => {
             const active = group.id === activeGroupId;
             const count = group.id ? (unread[group.id] ?? 0) : 0;
             return (
@@ -201,17 +206,17 @@ function GroupSheet({
                     : "hover:bg-[var(--color-ivory-200)]",
                 )}
               >
-                <span
-                  aria-hidden
+                <Avatar
+                  src={group.imageUrl}
+                  name={group.name}
+                  fallback={group.id ? undefined : "◎"}
                   className={cn(
                     "flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold",
                     active
                       ? "bg-[var(--color-rose-600)] text-white"
                       : "bg-[var(--color-ivory-200)] text-[var(--color-ink-600)]",
                   )}
-                >
-                  {group.id ? Array.from(group.name)[0] : "◎"}
-                </span>
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-medium">{group.name}</span>
                   <span className="block text-[11.5px] text-[var(--surface-text-muted)]">
@@ -252,6 +257,7 @@ function MoreSheet({
   links,
   pathname,
   displayName,
+  avatarUrl,
   activeGroupId,
   activeName,
   onClose,
@@ -260,6 +266,7 @@ function MoreSheet({
   links: typeof HOST_LINKS;
   pathname: string;
   displayName: string | null;
+  avatarUrl: string | null;
   activeGroupId: string | null;
   activeName: string;
   onClose: () => void;
@@ -298,12 +305,11 @@ function MoreSheet({
               href="/account"
               active={pathname.startsWith("/account")}
               icon={
-                <span
-                  aria-hidden
+                <Avatar
+                  src={avatarUrl}
+                  name={displayName ?? "주선자"}
                   className="grid size-8 place-items-center rounded-full bg-[var(--color-ivory-200)] text-[12.5px] font-semibold text-[var(--color-ink-600)]"
-                >
-                  {Array.from(displayName ?? "주선자")[0]}
-                </span>
+                />
               }
             >
               <span className="min-w-0">

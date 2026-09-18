@@ -21,7 +21,15 @@ import { env } from "../env";
 import { b64url, hmac, randomToken, safeEqual } from "../crypto";
 import { randomBytes } from "node:crypto";
 
-export type StorageNamespace = "profile" | "import";
+/**
+ * 저장 공간의 갈래. 키 앞머리가 되고, 확정 단계에서 「이 경로가 맞는가」를 보는 기준이다.
+ *
+ *   profile  멤버 프로필 사진      ownerId = profileId
+ *   import   가져오기 원본 사진    ownerId = importSessionId
+ *   avatar   주선자 프로필 사진    ownerId = userId
+ *   group    모임 사진             ownerId = groupId
+ */
+export type StorageNamespace = "profile" | "import" | "avatar" | "group";
 
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",

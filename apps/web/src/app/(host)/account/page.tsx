@@ -14,6 +14,7 @@ import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { listLinkedOAuthAccounts } from "@/server/auth/oauth";
 import { enabledOAuthProviders, isTelegramEnabled } from "@/server/env";
 import { findConnectionForUser } from "@/server/repo/telegram";
+import { imageUrlFor } from "@/server/views/image-url";
 import { PageHeader } from "@/components/host/surface";
 import {
   AccountNamePanel,
@@ -41,7 +42,10 @@ export default async function HostAccountPage() {
       />
 
       <div className="grid max-w-3xl gap-4">
-        <AccountNamePanel displayName={viewer.displayName} />
+        <AccountNamePanel
+          displayName={viewer.displayName}
+          avatarUrl={imageUrlFor(viewer.avatarKey)}
+        />
 
         <LoginMethodsPanel
           methods={methods.map((method) => ({
