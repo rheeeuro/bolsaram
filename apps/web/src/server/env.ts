@@ -4,6 +4,7 @@
  */
 import "server-only";
 import { validateStorageConfig } from "@bolsaram/db/r2";
+import type { OAuthProvider } from "@bolsaram/schemas";
 import { z } from "zod";
 
 const envSchema = z.object({
@@ -44,6 +45,21 @@ const envSchema = z.object({
     .max(256)
     .regex(/^[A-Za-z0-9_-]+$/, "TELEGRAM_WEBHOOK_SECRET 에는 A-Z a-z 0-9 _ - 만 쓸 수 있습니다.")
     .optional(),
+
+  /**
+   * 주선자 로그인 — 카카오·구글 OAuth.
+   *
+   * 제공자마다 따로 켜진다. 키가 없으면 그 버튼이 화면에 뜨지 않는다(전부 없으면
+   * 아무도 로그인할 수 없으므로 기동 시 경고한다). 비밀번호를 우리가 보관하지 않으니
+   * 이 값들이 유일한 인증 경로다 — 로그에 남기지 않는다.
+   *
+   * 카카오는 「REST API 키」가 client_id 이고 client_secret 은 콘솔에서 켤 때만 생긴다.
+   * 구글은 둘 다 필수다.
+   */
+  KAKAO_CLIENT_ID: z.string().min(1).optional(),
+  KAKAO_CLIENT_SECRET: z.string().min(1).optional(),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /**
@@ -114,8 +130,39 @@ export function env(): Env {
     }
   }
 
+  // 구글은 client_secret 이 반드시 있어야 토큰 교환이 된다. 반쯤 켜진 상태를 만들지 않는다.
+  if (parsed.data.GOOGLE_CLIENT_ID && !parsed.data.GOOGLE_CLIENT_SECRET) {
+    throw new Error("GOOGLE_CLIENT_ID 를 주면 GOOGLE_CLIENT_SECRET 도 필요합니다.");
+  }
+  // 하나도 없으면 주선자가 들어올 방법이 없다. 회원 초대 링크는 그대로 도니 기동은
+  // 막지 않고, 대신 기동 로그에서 확인할 수 있게 남긴다.
+  if (!parsed.data.KAKAO_CLIENT_ID && !parsed.data.GOOGLE_CLIENT_ID) {
+    console.warn(
+      "소셜 로그인 키가 없습니다 — 주선자가 로그인할 수 없습니다. " +
+        "KAKAO_CLIENT_ID 또는 GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET 를 설정하세요.",
+    );
+  }
+
   cached = parsed.data;
   return cached;
+}
+
+/**
+ * 지금 쓸 수 있는 소셜 로그인 제공자.
+ *
+ * 로그인 화면과 OAuth 라우트가 같은 판정을 봐야 한다 — 화면에 없는 버튼의 경로를
+ * 직접 두드려도 열리지 않게 한다.
+ */
+export function enabledOAuthProviders(): OAuthProvider[] {
+  const e = env();
+  const list: OAuthProvider[] = [];
+  if (e.KAKAO_CLIENT_ID) list.push("KAKAO");
+  if (e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET) list.push("GOOGLE");
+  return list;
+}
+
+export function isOAuthProviderEnabled(provider: OAuthProvider): boolean {
+  return enabledOAuthProviders().includes(provider);
 }
 
 /** 쿠키 secure 플래그 등 런타임 동작 판정용. */

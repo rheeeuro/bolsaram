@@ -59,8 +59,8 @@ beforeAll(async () => {
       [TAG],
     );
     const r = await sql.query<{ id: string }>(
-      `INSERT INTO users (role, email, password_hash, display_name)
-       VALUES ('ADMIN',$1,'x',$2) RETURNING id`,
+      `INSERT INTO users (role, email, display_name)
+       VALUES ('ADMIN',$1,$2) RETURNING id`,
       [`${TAG}@test.local`, TAG],
     );
     return { group: g.rows[0]!.id, userId: r.rows[0]!.id };

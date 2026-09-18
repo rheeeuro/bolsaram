@@ -5,17 +5,23 @@
  * 실제 인물의 이름·사진·연락처를 넣지 않는다. 사진은 코드로 생성한 SVG 이며
  * 어떤 실존 인물도 나타내지 않는다.
  */
-import { createHash, randomBytes, scryptSync } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { closePools, withOwner } from "../client";
 import { loadDotEnv } from "./dotenv";
-import { resolveSeedAdminPassword, seedAdminPasswordFromEnv } from "./seed-admin-password";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 
-const ADMIN_EMAIL = "admin@bolsaram.local";
+/**
+ * 시드가 만드는 주선자 계정의 이메일.
+ *
+ * 주선자는 카카오·구글로만 들어온다 — 비밀번호가 없다. 이 계정으로 직접 들어가 보려면
+ * `SEED_ADMIN_EMAIL` 에 **본인 소셜 계정 이메일**을 넣는다. 처음 로그인할 때 같은
+ * 이메일의 주선자 계정에 소셜 계정이 이어붙는다(apps/web/src/server/auth/oauth.ts).
+ */
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL?.trim() || "admin@bolsaram.local";
 
 /** 실존 인물과 겹치지 않도록 지어낸 두 글자 이름. */
 const GIVEN_NAMES = [
@@ -87,12 +93,6 @@ function pick<T>(list: readonly T[], index: number): T {
   return list[index % list.length]!;
 }
 
-function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const hash = scryptSync(password.normalize("NFKC"), salt, 64, { N: 16384 });
-  return `scrypt$16384$${salt.toString("base64url")}$${hash.toString("base64url")}`;
-}
-
 /** 코드로 만든 자리표시 이미지. 실제 사진이 아니다. */
 function placeholderSvg(seed: string, labelText: string): Buffer {
   const hue = parseInt(createHash("sha256").update(seed).digest("hex").slice(0, 4), 16) % 360;
@@ -128,38 +128,24 @@ async function main(): Promise<void> {
     }
 
     // ── 관리자 ──────────────────────────────────────────────
-    // 계정이 이미 있으면 비밀번호를 그대로 둔다. 새로 만들 때만 값을 정하고 알려준다.
+    // 비밀번호가 없다. 이 계정으로 들어가려면 같은 이메일의 소셜 계정으로 로그인한다.
     const existingAdmin = await sql.query<{ id: string }>(
       `SELECT id FROM users WHERE email = $1`,
       [ADMIN_EMAIL],
     );
     let adminId: string;
-    let adminPasswordLine: string;
     if (existingAdmin.rows[0]) {
       adminId = existingAdmin.rows[0].id;
-      if (seedAdminPasswordFromEnv()) {
-        const { password } = resolveSeedAdminPassword();
-        await sql.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [
-          adminId,
-          hashPassword(password),
-        ]);
-        adminPasswordLine = `  관리자 — ${ADMIN_EMAIL} / SEED_ADMIN_PASSWORD 값으로 교체했습니다`;
-      } else {
-        adminPasswordLine = `  관리자 — ${ADMIN_EMAIL} / 기존 비밀번호를 그대로 둡니다`;
-      }
     } else {
-      const { password, fromEnv } = resolveSeedAdminPassword();
       const created = await sql.query<{ id: string }>(
-        `INSERT INTO users (role, email, password_hash, display_name)
-         VALUES ('ADMIN', $1, $2, '주선자')
+        `INSERT INTO users (role, email, display_name)
+         VALUES ('ADMIN', $1, '주선자')
          RETURNING id`,
-        [ADMIN_EMAIL, hashPassword(password)],
+        [ADMIN_EMAIL],
       );
       adminId = created.rows[0]!.id;
-      adminPasswordLine = fromEnv
-        ? `  관리자 — ${ADMIN_EMAIL} / SEED_ADMIN_PASSWORD 값`
-        : `  관리자 — ${ADMIN_EMAIL} / ${password}  ← 이번 실행에서만 보여줍니다`;
     }
+    const adminLine = `  주선자 — ${ADMIN_EMAIL} / 같은 이메일의 카카오·구글 계정으로 로그인합니다`;
 
     // ── 프로필 ──────────────────────────────────────────────
     const profileIds: string[] = [];
@@ -269,7 +255,7 @@ async function main(): Promise<void> {
         "시드 완료",
         `  프로필 ${total}개 (공개 20 / 대기 4), 사진 ${total * 2}장`,
         `  회원 계정 6개 — 로그인 번호 01020001000 ~ 01020001005`,
-        adminPasswordLine,
+        adminLine,
         "",
         "  모든 인물 정보와 사진은 합성 데이터입니다.",
         `  회원은 비밀번호가 없습니다 — 관리자 화면에서 초대 링크를 발급해 로그인합니다.`,

@@ -34,8 +34,8 @@ beforeAll(async () => {
     const user = async (role: string, key: string) => {
       const result = await sql.query<{ id: string }>(
         role === "ADMIN"
-          ? `INSERT INTO users (role, email, password_hash, display_name)
-             VALUES ('ADMIN', $1, 'x', $2) RETURNING id`
+          ? `INSERT INTO users (role, email, display_name)
+             VALUES ('ADMIN', $1, $2) RETURNING id`
           : `INSERT INTO users (role, phone, display_name) VALUES ('MEMBER', $1, $2) RETURNING id`,
         role === "ADMIN" ? [`${TAG}-${key}@test.local`, key] : [phoneFor(key), key],
       );
@@ -710,8 +710,8 @@ describe("담당이 갈리는 신청 (전체공개 풀)", () => {
     await withOwner(async (sql) => {
       const admin = async (key: string) => {
         const r = await sql.query<{ id: string }>(
-          `INSERT INTO users (role, email, password_hash, display_name)
-           VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+          `INSERT INTO users (role, email, display_name)
+           VALUES ('ADMIN', $1, $2) RETURNING id`,
           [`${TAG}-${key}@test.local`, key],
         );
         return r.rows[0]!.id;

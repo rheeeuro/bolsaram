@@ -34,8 +34,8 @@ async function newProfile(name: string): Promise<string> {
 beforeAll(async () => {
   adminId = await withOwner(async (sql) => {
     const r = await sql.query<{ id: string }>(
-      `INSERT INTO users (role, email, password_hash, display_name)
-       VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+      `INSERT INTO users (role, email, display_name)
+       VALUES ('ADMIN', $1, $2) RETURNING id`,
       [`${TAG}@test.local`, `${TAG}-주선자`],
     );
     return r.rows[0]!.id;

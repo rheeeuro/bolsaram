@@ -17,23 +17,19 @@ description: 볼사람 웹 앱을 띄우고 실제 화면·API 동작을 확인�
 
 ## 로그인
 
-주선자 비밀번호는 저장소에 없다. 시드가 계정을 만들 때 한 번 출력하고, 이 호스트의
-값은 교체돼 있다. 확인용 계정이 필요하면 `/api/auth/signup` 으로 새로 만든다.
+주선자 로그인은 **카카오·구글 OAuth** 다(0050). 동의 화면이 브라우저를 거쳐야 해서
+curl 로 끝낼 수 없다. 점검용 세션은 앱 밖의 CLI 로 만든다 — 앱에 뒷문을 두지 않는다.
 
 ```bash
-# 주선자 — 확인용 계정을 만들어 쓴다(가입은 열려 있다. 비밀번호는 10자 이상)
-PW="$(openssl rand -base64 12 | tr -d '/+=')"
-curl -s -c /tmp/admin.jar -H 'content-type: application/json' \
-  -d "{\"email\":\"check-$$@bolsaram.local\",\"password\":\"$PW\",\"displayName\":\"점검\"}" \
-  http://127.0.0.1:3020/api/auth/signup
+# 주선자 — 세션 쿠키를 발급받아 그대로 쓴다(기본 1일, APP_ENV=production 에서는 거절)
+ADMIN="$(pnpm -s dev:session)"
+curl -s -o /dev/null -w '%{http_code}\n' -b "$ADMIN" http://127.0.0.1:3020/home
 
-# 이미 아는 계정으로 들어갈 때
-curl -s -c /tmp/admin.jar -H 'content-type: application/json' \
-  -d "{\"email\":\"admin@bolsaram.local\",\"password\":\"$PW\"}" \
-  http://127.0.0.1:3020/api/auth/admin-login
+# 특정 주선자로 보고 싶으면 이메일을 준다(없으면 그 이메일로 계정을 만든다)
+pnpm -s dev:session admin@bolsaram.local
 
 # 회원 — 비밀번호가 없다. 주선자로 초대를 발급해 그 토큰을 소비한다(1회용).
-TOKEN=$(curl -s -b /tmp/admin.jar -H 'content-type: application/json' \
+TOKEN=$(curl -s -b "$ADMIN" -H 'content-type: application/json' \
   -d '{"profileId":"<프로필 UUID>","expiresInHours":72}' \
   http://127.0.0.1:3020/api/admin/invites \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
@@ -41,15 +37,23 @@ curl -s -c /tmp/m.jar -H 'content-type: application/json' \
   -d "{\"token\":\"$TOKEN\"}" http://127.0.0.1:3020/api/claim
 ```
 
+소셜 로그인 **경로 자체**를 확인할 때는 리다이렉트만 본다. 제공자 키가 없으면
+`/login` 에 버튼이 뜨지 않고 시작 경로도 `/login?error=start` 로 되돌린다.
+
+```bash
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' \
+  http://127.0.0.1:3020/api/auth/oauth/google/start
+```
+
 프로필 UUID 는 `db-query` 스킬로 찾는다(`SELECT id, public_code FROM profiles LIMIT 5`).
-토큰은 **입장코드와 같은 값**이고 한 번 쓰면 무효다 — 다시 로그인하려면 새로 발급한다.
+초대 토큰은 **입장코드와 같은 값**이고 한 번 쓰면 무효다 — 다시 로그인하려면 새로 발급한다.
 신청/수락을 확인하려면 서로 다른 두 계정이 필요하다.
 
 ## 확인할 것
 
 변경한 화면에 따라 골라 확인하고, **결과를 추측하지 말고 실제 응답을 인용**한다.
 
-- 인증 화면: `/` `/enter`(회원 입장코드) `/login`(주선자) `/signup` `/claim/<토큰>`
+- 인증 화면: `/` `/enter`(회원 입장코드) `/login`(주선자 소셜 로그인) `/claim/<토큰>`
 - 회원 화면: `/discover` `/discover/<id>` `/signals` `/favorites` `/me`
 - 주선자 화면: `/home` `/imports` `/profiles` `/requests` `/members` `/group`
 - 권한: 쿠키 없이 호출해 401, 회원 쿠키로 `/home` 호출해 `/discover` 리다이렉트인지

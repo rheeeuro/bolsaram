@@ -31,7 +31,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0006_rls.sql`                     | 전 테이블 RLS 정책 + 권한 부여                                                         |
 | `0007_require_auth_for_browse.sql` | 익명 열람 차단 (로그인 없이는 프로필 0건)                                              |
 | `0008_telegram.sql`                | 텔레그램 Import 채널: 계정 연결·연결 코드·봇 대화·webhook 이벤트                       |
-| `0009_admin_login_failures.sql`    | 관리자 비밀번호 시도 제한 (실패 기록)                                                  |
+| `0009_admin_login_failures.sql`    | 관리자 비밀번호 시도 제한 (실패 기록) — 0050 에서 제거                                  |
 | `0010_groups.sql`                  | 모임(테넌트) 격리: `groups` · `group_admins` + 전 정책 재작성                          |
 | `0011_public_pool.sql`             | 전체공개 풀: 모임 소속을 선택으로 (`group_id IS NULL` = 전체공개)                      |
 | `0012_group_invites.sql`           | 모임 초대 코드 (동료 주선자 합류)                                                      |
@@ -72,6 +72,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0047_profile_hashtags.sql`        | 프로필 해시태그 — `profiles.hashtags` + 모양 검사 + 태그 검색 인덱스                    |
 | `0048_opposite_gender_only.sql`    | 회원이 보는 사람은 **이성만**. 열람 정책에 성별 조건 + 동성 신청 금지 트리거             |
 | `0049_self_request_keeps_its_own_reason.sql` | 자기 자신에게 낸 신청은 전용 제약이 이유를 말하도록 트리거가 비켜선다        |
+| `0050_oauth_login.sql`             | 주선자 인증을 소셜 로그인으로 — `oauth_accounts` 추가, 비밀번호 컬럼·시도 제한 테이블 삭제 |
 
 ## 테이블
 
@@ -97,7 +98,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `sessions`                                     | 세션                                               | **권한 없음** (owner 커넥션 전용)   |
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
 | `group_invite_codes`                           | 모임 초대 코드(해시). 동료 주선자 합류             | **권한 없음** (owner 커넥션 전용)   |
-| `admin_login_failures`                         | 관리자 로그인 실패 기록 (시도 제한 판정)           | **권한 없음** (owner 커넥션 전용)   |
+| `oauth_accounts`                               | 주선자 신원 — 제공자(카카오·구글) + 제공자 고유 id | **권한 없음** (owner 커넥션 전용)   |
 
 ## 무결성을 DB 가 지키는 것
 

@@ -37,15 +37,14 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 31   |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기·권한 경계 | 필요 | 29 |
-| `admin-login.test.ts`          | 관리자 비밀번호 시도 제한·창 만료·권한 경계    | 필요 | 7    |
+| `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
 | `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
-| `admin-signup.test.ts`         | 가입·전체공개 풀·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 45 |
+| `admin-signup.test.ts`         | 가입(소셜 첫 로그인)·계정 잇기·전체공개 풀·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 48 |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
 | `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 30 |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 리다이렉트 검증       | –    | 9    |
-| `seed-admin-password.test.ts`   | 시드 관리자 비밀번호 판정·고정값 금지          | –    | 8    |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 63   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
@@ -91,8 +90,9 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `telegram-import.test.ts` 「웹에서 보는 채널을 바꿔도」    | 봇이 담는 곳이 화면을 따라 움직이지 않음 |
 | `telegram-import.test.ts` 「속하지 않은 모임은 정책이」    | 봇 업로드 대상이 소속을 벗어나지 못함 |
 | `telegram-state.test.ts` 「직접 보낸 글이 …우선한다」      | 원문 우선순위(§5.4)                 |
-| `admin-login.test.ts` 「실패가 쌓이면 …거절한다」          | 관리자 비밀번호 무한 시도 차단      |
-| `admin-login.test.ts` 「창이 지난 실패는 세지 않는다」     | 영구 락아웃 없음(계정 잠그기 방지)  |
+| `oauth-login.test.ts` 「state 가 다르면 거절한다」         | 남이 시작한 로그인으로 세션을 못 만듦 |
+| `oauth-login.test.ts` 「쿠키를 고치면 …거절한다」          | 왕복 상태 위조 차단                 |
+| `admin-signup.test.ts` 「회원 계정에는 …붙이지 않는다」    | 회원 계정이 소셜 로그인으로 열리지 않음 |
 | `group-isolation.test.ts` 「남의 모임 …못한다」            | 주선자 자유 가입의 마지막 방어선    |
 | `group-isolation.test.ts` 「모임을 넘는 소개 신청」        | 테넌트 경계를 넘는 신청 차단        |
 | `admin-signup.test.ts` 「전체공개를 남이 고칠 수 없다」    | 보이는 것과 고치는 것을 분리         |

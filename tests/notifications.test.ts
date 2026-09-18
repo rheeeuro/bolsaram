@@ -35,8 +35,8 @@ async function makeParty(sql: Sql, key: string): Promise<Party> {
   const groupId = g.rows[0]!.id;
 
   const a = await sql.query<{ id: string }>(
-    `INSERT INTO users (role, email, password_hash, display_name)
-     VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+    `INSERT INTO users (role, email, display_name)
+     VALUES ('ADMIN', $1, $2) RETURNING id`,
     [`${TAG}-${key}-admin@test.local`, `${TAG}-${key}-admin`],
   );
   const adminId = a.rows[0]!.id;

@@ -7,7 +7,7 @@
 import { groupCreateSchema } from "@bolsaram/schemas";
 import { requireAdmin } from "@/server/auth/guard";
 import { readMyGroups } from "@/server/auth/group-invite";
-import { createGroupForAdmin } from "@/server/auth/signup";
+import { createGroupForAdmin } from "@/server/auth/group-invite";
 import { ok, readJson, route } from "@/server/http/respond";
 
 export const dynamic = "force-dynamic";

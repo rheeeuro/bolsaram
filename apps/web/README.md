@@ -47,9 +47,8 @@ apps/web/src/
 │   ├── page.tsx              인트로 (로그인 상태면 역할별 리다이렉트)
 │   ├── layout.tsx            폰트·메타데이터·noindex
 │   ├── globals.css           Tailwind + 디자인 토큰 + 전역 스타일
-│   ├── login/                주선자 로그인 (이메일·비밀번호)
+│   ├── login/                주선자 로그인 = 가입 (카카오·구글)
 │   ├── enter/                회원 입장 — 입장코드 하나만 묻는다
-│   ├── signup/               주선자 가입 → 모임 생성
 │   ├── claim/[token]/        초대 링크 → 프로필 연결 (실패 시 /enter 로 코드 유지)
 │   ├── privacy/              개인정보 처리방침 — docs/guide/privacy.md 를 그대로 렌더 (로그인 불필요)
 │   ├── (member)/             회원 영역 (하단 탭 레이아웃)
@@ -115,10 +114,9 @@ server/
 ├── audit.ts                  감사 로그 (민감값 제외)
 ├── auth/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
-│   ├── login.ts              주선자 비밀번호 (15분 5회 시도 제한)
+│   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기)
 │   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
-│   ├── signup.ts             주선자 가입 (계정만) · 모임 만들기
-│   ├── group-invite.ts       모임 소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
+│   ├── group-invite.ts       모임 만들기·소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 회원 화면 → /enter, 주선자 화면 → /login)
@@ -174,8 +172,8 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 
 | 경로                                      | 메서드              | 권한              | 용도                                 |
 | ----------------------------------------- | ------------------- | ----------------- | ------------------------------------ |
-| `/api/auth/signup`                        | POST                | –                 | 주선자 가입 (계정만)                 |
-| `/api/auth/admin-login`                   | POST                | –                 | 주선자 로그인 (15분 5회 시도 제한)   |
+| `/api/auth/oauth/[provider]/start`        | GET                 | –                 | 소셜 로그인 시작 (제공자로 302)      |
+| `/api/auth/oauth/[provider]/callback`     | GET                 | –                 | 소셜 로그인 완료 = 가입·세션 생성    |
 | `/api/auth/logout`                        | POST                | –                 | 세션 폐기                            |
 | `/api/claim`                              | POST                | **초대 토큰**     | 회원 로그인 (매직 링크) + 최초 계정 생성 |
 | `/api/profiles`                           | GET                 | 회원              | Discover 목록 (필터·커서)            |

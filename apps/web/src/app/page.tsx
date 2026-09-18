@@ -46,8 +46,9 @@ export default async function IntroPage() {
         </div>
 
         <div className="animate-fade mt-16 flex flex-col gap-2.5">
+          {/* 가입 화면이 따로 없다 — 소셜 로그인 한 번이 가입이고 로그인이다. */}
           <Link
-            href="/signup"
+            href="/login"
             className="flex h-13 items-center justify-center rounded-xl bg-[var(--color-rose-600)] py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[var(--color-burgundy-700)]"
           >
             주선자로 시작하기
@@ -58,16 +59,10 @@ export default async function IntroPage() {
           >
             입장코드로 들어가기
           </Link>
-          <p className="mt-1 text-center text-[13px] text-[var(--color-ink-600)]">
-            주선자 계정이 있으신가요?{" "}
-            <Link href="/login" className="text-[var(--color-rose-600)] underline">
-              로그인
-            </Link>
-          </p>
           <p className="mt-3 text-center text-[12px] leading-relaxed text-[var(--color-ink-600)]">
             볼사람은 주선자가 검증한 분만 참여하는 비공개 서비스입니다.
             <br />
-            회원은 아이디·비밀번호가 없습니다 — 초대 링크를 열면 바로 들어갑니다.
+            주선자는 카카오·구글로 들어오고, 회원은 초대 링크를 열면 바로 들어갑니다.
           </p>
           <p className="text-center text-[12px] text-[var(--color-ink-600)]">
             <Link href="/privacy" className="underline">

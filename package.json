@@ -28,6 +28,7 @@
     "db:cleanup": "pnpm --filter @bolsaram/db cleanup",
     "db:backup": "bash scripts/db-backup.sh",
     "db:purge-seed": "tsx scripts/purge-seed.ts",
+    "dev:session": "tsx scripts/dev-session.ts",
     "db:backup:list": "bash scripts/db-backup.sh --list",
     "db:backup:verify": "bash scripts/db-backup.sh --verify",
     "pm2:start": "pm2 start ecosystem.config.cjs && pm2 save",

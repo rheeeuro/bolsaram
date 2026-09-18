@@ -8,29 +8,27 @@ export const phoneSchema = z
   .transform((v) => v.replace(/[^0-9]/g, ""))
   .pipe(z.string().regex(/^01[016789][0-9]{7,8}$/, "휴대폰 번호 형식이 아닙니다."));
 
-export const adminLoginSchema = z.object({
-  email: z.email().max(200),
-  password: z.string().min(8).max(200),
-});
-
 /**
- * 주선자 가입. **계정만** 만든다 — 모임은 가입 후에 만들거나 초대로 참여한다.
+ * 주선자 로그인에 쓰는 소셜 제공자. DB 의 `oauth_provider` enum 과 같은 값이다.
  *
- * 비밀번호 최소 길이를 로그인 스키마(8)보다 길게 둔다 — 이 계정 하나로 모임 전체
- * 회원의 이름·연락처에 접근하므로 새로 만드는 계정은 더 강한 기준을 적용한다.
- * 로그인은 기존 계정도 받아야 하므로 8 을 유지한다.
+ * 우리는 비밀번호를 받지 않는다 — 처음 들어온 제공자 계정이 곧 가입이고, 그 뒤로는
+ * 같은 버튼이 로그인이다. 그래서 로그인 스키마와 가입 스키마가 따로 없다.
  */
-export const SIGNUP_PASSWORD_MIN = 10;
+export const OAUTH_PROVIDERS = ["KAKAO", "GOOGLE"] as const;
+export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
 
-export const adminSignupSchema = z.object({
-  email: z.email().max(200),
-  password: z
-    .string()
-    .min(SIGNUP_PASSWORD_MIN, `비밀번호는 ${SIGNUP_PASSWORD_MIN}자 이상이어야 합니다.`)
-    .max(200),
-  displayName: z.string().trim().min(1).max(60),
-});
-export type AdminSignupInput = z.infer<typeof adminSignupSchema>;
+/** 화면과 URL 에서는 소문자로 쓴다(`/api/auth/oauth/kakao/start`). */
+export const OAUTH_PROVIDER_LABELS: Record<OAuthProvider, string> = {
+  KAKAO: "카카오",
+  GOOGLE: "구글",
+};
+
+/** URL 구간으로 들어온 제공자 이름. 대소문자를 가리지 않고 받아 enum 값으로 맞춘다. */
+export const oauthProviderSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.toUpperCase())
+  .pipe(z.enum(OAUTH_PROVIDERS));
 
 /** 모임 이름·설명. `groups` 의 CHECK 와 같은 범위를 쓴다. */
 export const groupNameSchema = z.string().trim().min(1).max(80);

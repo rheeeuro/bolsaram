@@ -21,6 +21,7 @@ import {
 import {
   HASHTAG_MAX_COUNT,
   LOW_CONFIDENCE_THRESHOLD,
+  OAUTH_PROVIDER_LABELS,
   MATCH_REQUEST_STATUS_LABELS,
   PROFILE_STATUS_LABELS,
   VISIBILITY_LABELS,
@@ -110,17 +111,34 @@ describe("가이드가 언급하는 화면이 실제로 있다", () => {
 });
 
 describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
+  /** 인증 레이어 전체. 어떤 인증 경로가 살아 있는지는 이 디렉터리가 말한다. */
+  const authSource = (() => {
+    const dir = path.join(ROOT, "apps/web/src/server/auth");
+    return readdirSync(dir)
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => readFileSync(path.join(dir, f), "utf8"))
+      .join("\n");
+  })();
+
   it("회원 로그인에 인증번호를 쓰지 않는다", () => {
     // SMS 를 쓰지 않기로 해서 OTP 경로를 제거했다(0015). 안 쓰는 인증 경로를
     // 코드에 남겨두면 가이드와 실제가 어긋난다.
     // 주석에는 "OTP 경로를 제거했다"처럼 남을 수 있으므로 **함수와 상수**만 본다.
-    const login = readFileSync(
-      path.join(ROOT, "apps/web/src/server/auth/login.ts"),
-      "utf8",
+    expect(authSource).not.toMatch(
+      /issueLoginCode|verifyLoginCode|OTP_TTL_MS|OTP_MAX_ATTEMPTS/,
     );
-    expect(login).not.toMatch(/issueLoginCode|verifyLoginCode|OTP_TTL_MS|OTP_MAX_ATTEMPTS/);
     // 회원 로그인 경로는 초대 링크뿐이다.
     expect(guide("member.md")).toMatch(/링크/);
+  });
+
+  it("주선자 로그인은 소셜 계정뿐이다 — 비밀번호를 받지 않는다", () => {
+    // 비밀번호를 우리가 보관하지 않는다(0050). 남아 있으면 가이드의 약속이 거짓이 된다.
+    expect(authSource).not.toMatch(/hashPassword|verifyPassword|password_hash/);
+    const admin = guide("admin.md");
+    for (const label of Object.values(OAUTH_PROVIDER_LABELS)) {
+      expect(admin, `${label} 로그인 안내 없음`).toContain(label);
+    }
+    expect(ALL).toMatch(/비밀번호(를)? 볼사람에 저장|비밀번호를 저장하지 않/);
   });
 
   it("로그인 유지 30일", () => {
@@ -171,14 +189,6 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     // 정리가 지운 것도 하루치 백업에는 남아 있어야 실수를 되돌릴 수 있다.
     expect(cronOf("bolsaram-backup")).toEqual({ hour: "3", minute: "40" });
     expect(ALL).toMatch(/3시 40분/);
-  });
-
-  it("관리자 로그인 시도 제한 5회 / 15분", () => {
-    const src = "apps/web/src/server/auth/login.ts";
-    expect(constantOf(src, "ADMIN_LOGIN_MAX_FAILURES")).toBe(5);
-    expect(constantOf(src, "ADMIN_LOGIN_WINDOW_MS") / 60_000).toBe(15);
-    const admin = guide("admin.md");
-    expect(admin).toMatch(/15분 안에 5번/);
   });
 
   it("봇 연결 코드 유효시간 15분", () => {

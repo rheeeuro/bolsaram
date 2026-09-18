@@ -1,5 +1,5 @@
 /**
- * 주선자 가입 · 전체공개 풀 · 모임 참여 통합 테스트.
+ * 주선자 가입(소셜 첫 로그인) · 전체공개 풀 · 모임 참여 통합 테스트.
  *
  * 이 서비스의 전제는 **가입이 열려 있다**는 것이다. 따라서 지켜야 하는 성질은
  * "가입이 되는가"보다 **"가입한 사람이 무엇까지 볼 수 있는가"** 다.
@@ -15,6 +15,7 @@ import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import {
   closeGroup,
   consumeGroupInvite,
+  createGroupForAdmin,
   issueGroupInvite,
   leaveGroup,
   readMyGroups,
@@ -23,16 +24,25 @@ import {
   transferGroupOwnership,
   updateGroup,
 } from "../apps/web/src/server/auth/group-invite";
-import { loginAdmin } from "../apps/web/src/server/auth/login";
-import { createGroupForAdmin, signupAdmin } from "../apps/web/src/server/auth/signup";
+import { loginWithOAuth } from "../apps/web/src/server/auth/oauth";
 
 const TAG = `signuptest-${Date.now()}`;
-const PASSWORD = "signup-password-1234";
 
 let seq = 0;
 function nextEmail(): string {
   seq += 1;
   return `${TAG}-${seq}@test.local`;
+}
+
+/** 제공자가 알려준 신원. 실제 호출 없이 그 뒤의 계정 처리만 본다. */
+function identity(input: { email: string | null; displayName: string; subject?: string }) {
+  seq += 1;
+  return {
+    provider: "GOOGLE" as const,
+    subject: input.subject ?? `${TAG}-sub-${seq}`,
+    email: input.email,
+    displayName: input.displayName,
+  };
 }
 
 /** 속한 모임 하나. 여러 모임에 속할 수 있으므로 어느 것인지 지정해 꺼낸다. */
@@ -54,12 +64,10 @@ async function readActiveGroupId(userId: string): Promise<string | null> {
 }
 
 async function newAdmin(label: string): Promise<RlsContext & { userId: string }> {
-  const created = await signupAdmin({
-    email: nextEmail(),
-    password: PASSWORD,
-    displayName: `${TAG}-${label}`,
-  });
-  return { userId: created.userId, role: "ADMIN" };
+  const userId = await loginWithOAuth(
+    identity({ email: nextEmail(), displayName: `${TAG}-${label}` }),
+  );
+  return { userId, role: "ADMIN" };
 }
 
 /** 방에 남은 사건 종류를 순서대로. 나간 것과 내보내진 것을 구분해 본다(0046). */
@@ -108,7 +116,6 @@ afterAll(async () => {
     await sql.query(`DELETE FROM profiles WHERE real_name LIKE $1`, [`${TAG}%`]);
     await sql.query(`DELETE FROM users WHERE display_name LIKE $1`, [`${TAG}%`]);
     await sql.query(`DELETE FROM groups WHERE name LIKE $1`, [`${TAG}%`]);
-    await sql.query(`DELETE FROM admin_login_failures WHERE email LIKE $1`, [`${TAG}%`]);
   });
   await closePools();
 });
@@ -124,21 +131,45 @@ describe("가입", () => {
     expect(groups).toBe(0);
   });
 
-  it("가입한 비밀번호로 바로 로그인된다", async () => {
-    const email = nextEmail();
-    const created = await signupAdmin({
-      email,
-      password: PASSWORD,
-      displayName: `${TAG}-로그인`,
-    });
-    await expect(loginAdmin(email, PASSWORD)).resolves.toBe(created.userId);
+  it("같은 소셜 계정으로 다시 들어오면 같은 계정이다", async () => {
+    // 첫 로그인이 가입이고 그다음부터는 로그인이다. 두 번째에 계정이 또 생기면 안 된다.
+    const first = identity({ email: nextEmail(), displayName: `${TAG}-재로그인` });
+    const userId = await loginWithOAuth(first);
+    await expect(loginWithOAuth(first)).resolves.toBe(userId);
   });
 
-  it("같은 이메일로 두 번 가입할 수 없다", async () => {
+  it("제공자가 다르더라도 확인된 이메일이 같으면 한 계정으로 잇는다", async () => {
     const email = nextEmail();
-    const base = { password: PASSWORD, displayName: `${TAG}-중복` };
-    await signupAdmin({ email, ...base });
-    await expect(signupAdmin({ email, ...base })).rejects.toThrow(/이미 등록된 이메일/);
+    const userId = await loginWithOAuth(
+      identity({ email, displayName: `${TAG}-구글쪽` }),
+    );
+    const kakao = { ...identity({ email, displayName: `${TAG}-카카오쪽` }), provider: "KAKAO" as const };
+    await expect(loginWithOAuth(kakao)).resolves.toBe(userId);
+  });
+
+  it("이메일을 주지 않아도 로그인된다 — 매번 새 계정이 되지는 않는다", async () => {
+    // 카카오는 이메일이 선택 동의라 거절될 수 있다. 계정을 찾는 기준은 subject 다.
+    const anonymous = {
+      ...identity({ email: null, displayName: `${TAG}-이메일없음` }),
+      provider: "KAKAO" as const,
+    };
+    const userId = await loginWithOAuth(anonymous);
+    await expect(loginWithOAuth(anonymous)).resolves.toBe(userId);
+  });
+
+  it("회원 계정에는 소셜 계정을 붙이지 않는다", async () => {
+    // 회원은 초대 링크로만 들어온다. 이메일이 겹친다고 회원 계정을 열어주면 안 된다.
+    const email = nextEmail();
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO users (role, phone, email, display_name)
+         VALUES ('MEMBER', $1, $2, $3)`,
+        [`0102000${(9000 + seq).toString().slice(-4)}`, email, `${TAG}-회원`],
+      ),
+    );
+    await expect(
+      loginWithOAuth(identity({ email, displayName: `${TAG}-회원가장` })),
+    ).rejects.toThrow(/회원 계정/);
   });
 });
 

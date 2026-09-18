@@ -71,8 +71,8 @@ beforeAll(async () => {
     );
     const group = g.rows[0]!.id;
     const a = await sql.query<{ id: string }>(
-      `INSERT INTO users (role, email, password_hash, display_name)
-       VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+      `INSERT INTO users (role, email, display_name)
+       VALUES ('ADMIN', $1, $2) RETURNING id`,
       [`${TAG}-admin@test.local`, `${TAG}-admin`],
     );
     const m = await sql.query<{ id: string }>(
@@ -82,8 +82,8 @@ beforeAll(async () => {
     );
     // 모임에 넣지 않는다 — group_admins 행이 없는 주선자다.
     const solo = await sql.query<{ id: string }>(
-      `INSERT INTO users (role, email, password_hash, display_name)
-       VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+      `INSERT INTO users (role, email, display_name)
+       VALUES ('ADMIN', $1, $2) RETURNING id`,
       [`${TAG}-solo@test.local`, `${TAG}-solo`],
     );
     await sql.query(
@@ -256,8 +256,8 @@ describe("계정 연결", () => {
   it("다른 주선자에게 연결된 텔레그램 계정은 빼앗을 수 없다", async () => {
     const otherId = await withOwner(async (sql) => {
       const r = await sql.query<{ id: string }>(
-        `INSERT INTO users (role, email, password_hash, display_name)
-         VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+        `INSERT INTO users (role, email, display_name)
+         VALUES ('ADMIN', $1, $2) RETURNING id`,
         [`${TAG}-admin2@test.local`, `${TAG}-admin2`],
       );
       return r.rows[0]!.id;

@@ -32,7 +32,6 @@ packages/db/src/
     ├── migrate.ts  번호순 SQL 적용 + 체크섬 검사
     ├── reset.ts    public 스키마 초기화 (로컬 전용)
     ├── seed.ts     합성 시드 데이터
-    ├── seed-admin-password.ts  시드 관리자 비밀번호 판정 (고정값 없음)
     ├── r2.ts           웹·정리 CLI 공용 R2 객체 접근 및 설정 검증
 ├── cleanup.ts  정리 실행기 (PM2 cron 이 호출)
     └── dotenv.ts   최소 .env 로더 (CLI 전용)

@@ -49,8 +49,8 @@ async function makeParty(sql: Sql, key: string): Promise<Party> {
 
   const admin = async (suffix: string, isOwner: boolean) => {
     const r = await sql.query<{ id: string }>(
-      `INSERT INTO users (role, email, password_hash, display_name)
-       VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+      `INSERT INTO users (role, email, display_name)
+       VALUES ('ADMIN', $1, $2) RETURNING id`,
       [`${TAG}-${key}-${suffix}@test.local`, `${TAG}-${key}-${suffix}`],
     );
     const id = r.rows[0]!.id;
@@ -283,8 +283,8 @@ describe("들어온 시점부터 보인다", () => {
 
     const latecomerId = await withOwner(async (sql) => {
       const u = await sql.query<{ id: string }>(
-        `INSERT INTO users (role, email, password_hash, display_name)
-         VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+        `INSERT INTO users (role, email, display_name)
+         VALUES ('ADMIN', $1, $2) RETURNING id`,
         [`${TAG}-${key}-late@test.local`, `${TAG}-${key}-late`],
       );
       const id = u.rows[0]!.id;

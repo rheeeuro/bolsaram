@@ -37,8 +37,8 @@ async function makeParty(sql: Parameters<Parameters<typeof withOwner>[0]>[0], ke
   const groupId = g.rows[0]!.id;
 
   const a = await sql.query<{ id: string }>(
-    `INSERT INTO users (role, email, password_hash, display_name)
-     VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+    `INSERT INTO users (role, email, display_name)
+     VALUES ('ADMIN', $1, $2) RETURNING id`,
     [`${TAG}-${key}-admin@test.local`, `${TAG}-${key}-admin`],
   );
   const adminId = a.rows[0]!.id;
@@ -252,8 +252,8 @@ describe("모임에 속하지 않은 주선자", () => {
   it("모임 소속 프로필은 보지 못한다 (전체공개는 본다)", async () => {
     const orphan = await withOwner(async (sql) => {
       const r = await sql.query<{ id: string }>(
-        `INSERT INTO users (role, email, password_hash, display_name)
-         VALUES ('ADMIN', $1, 'x', $2) RETURNING id`,
+        `INSERT INTO users (role, email, display_name)
+         VALUES ('ADMIN', $1, $2) RETURNING id`,
         [`${TAG}-orphan@test.local`, `${TAG}-orphan`],
       );
       return { userId: r.rows[0]!.id, role: "ADMIN" as const };

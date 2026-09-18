@@ -1,6 +1,6 @@
 /** 서명/해시 유틸. 비밀은 전부 env 에서만 읽는다. */
 import "server-only";
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 /** base64url — 쿠키·URL 에 그대로 넣을 수 있는 형태. */
 export function b64url(buf: Buffer): string {
@@ -32,34 +32,11 @@ export function peppered(secret: string, value: string): string {
 }
 
 /**
- * 비밀번호 해시. scrypt 를 쓰고 salt 를 함께 저장한다.
- * 형식: `scrypt$<N>$<salt>$<hash>`
+ * PKCE code_challenge. `S256` 은 verifier 의 SHA-256 을 base64url 로 적는다.
+ *
+ * 카카오는 client_secret 을 콘솔에서 켤 때만 주므로, 인가 코드를 가로챈 쪽이 그대로
+ * 교환하는 것을 막아 주는 것이 이 값뿐일 수 있다.
  */
-const SCRYPT_COST = 16384;
-const SCRYPT_KEYLEN = 64;
-
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const hash = scryptSync(password.normalize("NFKC"), salt, SCRYPT_KEYLEN, {
-    N: SCRYPT_COST,
-  });
-  return `scrypt$${SCRYPT_COST}$${salt.toString("base64url")}$${hash.toString("base64url")}`;
-}
-
-export function verifyPassword(password: string, stored: string): boolean {
-  const parts = stored.split("$");
-  if (parts.length !== 4 || parts[0] !== "scrypt") return false;
-  const cost = Number(parts[1]);
-  const salt = parts[2];
-  const expected = parts[3];
-  if (!Number.isInteger(cost) || !salt || !expected) return false;
-  const actual = scryptSync(
-    password.normalize("NFKC"),
-    Buffer.from(salt, "base64url"),
-    SCRYPT_KEYLEN,
-    {
-      N: cost,
-    },
-  ).toString("base64url");
-  return safeEqual(actual, expected);
+export function sha256b64url(value: string): string {
+  return createHash("sha256").update(value).digest("base64url");
 }
