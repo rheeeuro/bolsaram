@@ -12,7 +12,7 @@ import { findConnectionForUser } from "@/server/repo/telegram";
 import { isTelegramEnabled } from "@/server/env";
 import { label } from "@/lib/labels";
 import { NewImportPanel } from "@/components/host/new-import-panel";
-import { TelegramLinkPanel } from "@/components/host/telegram-link-panel";
+import { TelegramImportNote } from "@/components/host/telegram-import-note";
 
 export const dynamic = "force-dynamic";
 
@@ -33,13 +33,16 @@ export default async function ImportInboxPage() {
       <div className="grid gap-5 lg:grid-cols-[380px_1fr]">
         <div className="flex flex-col gap-5">
           <NewImportPanel groups={viewer.groups} activeGroupId={viewer.groupId} />
-          <TelegramLinkPanel
-            enabled={isTelegramEnabled()}
-            connected={connection != null}
-            lastSeenAt={connection?.lastSeenAt?.toISOString() ?? null}
-            groups={viewer.groups}
-            uploadGroupId={connection?.uploadGroupId ?? null}
-          />
+          {/* 봇 연결 자체는 계정 설정에 있다 — 여기서는 상태만 알린다. */}
+          {isTelegramEnabled() ? (
+            <TelegramImportNote
+              connected={connection != null}
+              uploadGroupName={
+                viewer.groups.find((group) => group.id === connection?.uploadGroupId)?.name ??
+                "전체공개"
+              }
+            />
+          ) : null}
         </div>
 
         <Panel

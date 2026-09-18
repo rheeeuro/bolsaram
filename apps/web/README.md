@@ -60,6 +60,7 @@ apps/web/src/
 │   │   └── me/               내 프로필 + 로그아웃
 │   ├── (host)/               주선자 영역 (PC 왼쪽 사이드바 · 모바일 상단 모임 + 하단 탭)
 │   │   ├── home/             오늘 할 일 + 지표 + 최근 신청
+│   │   ├── account/          계정 설정 — 내 이름·로그인 방식·텔레그램 연결·로그아웃
 │   │   ├── imports/          가져오기 + 검토 상세
 │   │   ├── profiles/         카드 목록 + 상세 편집·게시·초대
 │   │   ├── requests/         신청 목록 + 연결 처리
@@ -68,7 +69,7 @@ apps/web/src/
 │   │   └── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·marks)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks)
 │   ├── member/               멤버 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
@@ -114,7 +115,7 @@ server/
 ├── audit.ts                  감사 로그 (민감값 제외)
 ├── auth/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
-│   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기)
+│   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 연결된 계정 조회)
 │   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── group-invite.ts       모임 만들기·소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
@@ -260,8 +261,8 @@ owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세�
 만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 주선자 요청과 완전히 같다.
 
 **담기는 모임은 연결 설정에 붙어 있다**(`telegram_connections.upload_group_id`). 화면 위쪽에서
-보고 있는 채널과 별개의 값이며, 「가져오기」의 텔레그램 연결 패널과 봇의 `/room` 이 같은 값을
-바꾼다. 카카오톡에서 넘길 때는 웹을 보고 있지 않으므로 담을 곳이 화면을 따라 움직이지 않는다.
+보고 있는 채널과 별개의 값이며, 계정 설정(`/account`)의 텔레그램 연결 패널과 봇의 `/room` 이
+같은 값을 바꾼다. 「가져오기」는 지금 담기는 방을 읽기 전용으로만 보여준다. 카카오톡에서 넘길 때는 웹을 보고 있지 않으므로 담을 곳이 화면을 따라 움직이지 않는다.
 
 ### 알림
 

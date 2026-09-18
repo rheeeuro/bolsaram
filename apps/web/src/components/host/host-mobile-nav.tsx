@@ -7,7 +7,6 @@ import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { Dialog, DialogClose } from "@/components/ui/dialog";
-import { NameDialog } from "@/components/host/account-name";
 import { GroupCreateDialogs } from "@/components/host/group-create";
 import { useChatStream } from "@/components/host/chat-stream";
 import { useGroupSwitch } from "@/components/host/use-group-switch";
@@ -57,7 +56,10 @@ export function HostMobileNav({
 
   const primary = HOST_LINKS.filter((link) => link.primary);
   const secondary = HOST_LINKS.filter((link) => !link.primary);
-  const moreActive = secondary.some((link) => isHostLinkActive(link, pathname));
+  // 계정 설정도 「더보기」 안에 있다 — 그 화면에 있으면 탭도 함께 켠다.
+  const moreActive =
+    secondary.some((link) => isHostLinkActive(link, pathname)) ||
+    pathname.startsWith("/account");
 
   return (
     <>
@@ -263,7 +265,6 @@ function MoreSheet({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [nameOpen, setNameOpen] = useState(false);
 
   return (
     <>
@@ -292,13 +293,25 @@ function MoreSheet({
           ) : null}
 
           <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
+            {/* 계정은 모임과 무관하다 — 모임 설정 아래에 선을 두고 따로 묶는다. */}
             <SheetItem
-              onSelect={() => {
-                onClose();
-                setNameOpen(true);
-              }}
+              href="/account"
+              active={pathname.startsWith("/account")}
+              icon={
+                <span
+                  aria-hidden
+                  className="grid size-8 place-items-center rounded-full bg-[var(--color-ivory-200)] text-[12.5px] font-semibold text-[var(--color-ink-600)]"
+                >
+                  {Array.from(displayName ?? "주선자")[0]}
+                </span>
+              }
             >
-              {displayName ?? "주선자"} 님 — 이름 바꾸기
+              <span className="min-w-0">
+                <span className="block truncate">{displayName ?? "주선자"} 님</span>
+                <span className="block text-[11.5px] text-[var(--surface-text-muted)]">
+                  계정 설정 — 이름 · 텔레그램 연결
+                </span>
+              </span>
             </SheetItem>
             <SheetItem
               danger
@@ -314,12 +327,6 @@ function MoreSheet({
           </div>
         </div>
       </Dialog>
-
-      <NameDialog
-        open={nameOpen}
-        current={displayName ?? ""}
-        onClose={() => setNameOpen(false)}
-      />
     </>
   );
 }

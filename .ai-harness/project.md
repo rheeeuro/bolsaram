@@ -17,7 +17,7 @@
 **볼사람에 별도의 관리자 제품은 없습니다.** 주선자가 쓰는 화면이 곧 볼사람이고,
 멤버 화면과 같은 브랜드 톤(warm ivory · serif display · muted rose)으로 만듭니다.
 화면 경로에 `/admin` 을 두지 않습니다 — 주선자 화면은 `/home` `/profiles` `/requests`
-`/imports` `/members` `/group` 입니다. DB 역할 이름 `ADMIN` 과 권한 경계를 드러내는
+`/imports` `/members` `/chat` `/group` `/account` 입니다. DB 역할 이름 `ADMIN` 과 권한 경계를 드러내는
 API 경로 `/api/admin/*` 은 그대로 둡니다(설계문서 §13에서 벗어난 결정은
 `docs/implementation-plan.md`).
 

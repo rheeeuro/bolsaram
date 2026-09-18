@@ -5,14 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { CopyField } from "@/components/ui/copy-field";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { Field } from "@/components/ui/field";
-import { GroupPicker, PUBLIC_GROUP_LABEL, type GroupChoice } from "@/components/host/group-picker";
+import { Label } from "@/components/ui/field";
+import {
+  GroupDropdown,
+  PUBLIC_GROUP_LABEL,
+  type GroupChoice,
+} from "@/components/host/group-picker";
 import { apiDelete, apiPatch, apiPost } from "@/lib/api-client";
 
 type Issued = { code: string; expiresAt: string; deepLink: string | null };
 
 /**
- * 텔레그램 계정 연결 (설계 변경 문서 TELEGRAM v1 §14).
+ * 텔레그램 계정 연결 (설계 변경 문서 TELEGRAM v1 §14). 계정 설정(`/account`)의 한 칸이다 —
+ * 연결은 모임이 아니라 사람에게 붙는다.
  *
  * 봇은 검색으로 누구나 찾을 수 있으므로 연결된 주선자만 Import 할 수 있다.
  * 발급된 코드는 **이 화면에서 한 번만** 보인다 — 서버는 해시만 저장한다.
@@ -39,18 +44,22 @@ export function TelegramLinkPanel({
   const [error, setError] = useState<string | null>(null);
   const [linked, setLinked] = useState(connected);
   const [uploadGroup, setUploadGroup] = useState<string | null>(uploadGroupId);
+  const [groupSaved, setGroupSaved] = useState(false);
 
   const uploadGroupName = groups.find((g) => g.id === uploadGroup)?.name ?? PUBLIC_GROUP_LABEL;
 
   async function changeUploadGroup(groupId: string | null) {
     const previous = uploadGroup;
-    // 먼저 고른 대로 보여주고, 실패하면 되돌린다 — 알약 하나 누르는 데
-    // 대기 표시가 끼면 고르는 흐름이 끊긴다.
+    // 먼저 고른 대로 보여주고, 실패하면 되돌린다 — 한 번 고르는 데 대기 표시가 끼면
+    // 고르는 흐름이 끊긴다. 고른 것이 실제로 저장됐는지는 아래 한 줄이 말한다.
     setUploadGroup(groupId);
     setBusy(true);
     setError(null);
+    setGroupSaved(false);
     const result = await apiPatch("/api/admin/telegram", { groupId });
-    if (!result.ok) {
+    if (result.ok) {
+      setGroupSaved(true);
+    } else {
       setUploadGroup(previous);
       setError(result.message);
     }
@@ -102,22 +111,30 @@ export function TelegramLinkPanel({
             ) : null}
           </p>
           <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-            봇에게 프로필 사진을 보내고 이어서 프로필 글을 보내면 여기 Inbox 에 올라옵니다.
-            글을 받는 즉시 분석하고, 등록은 검토 후에만 이루어집니다.
+            봇에게 프로필 사진을 보내고 이어서 프로필 글을 보내면 「가져오기」 화면에
+            올라옵니다. 글을 받는 즉시 분석하고, 등록은 검토 후에만 이루어집니다.
           </p>
 
           <div className="pt-1">
-            <Field
-              label="업로드할 모임"
-              hint={`봇으로 보낸 프로필은 ${uploadGroupName}에 담깁니다`}
+            {/* label 로 감싸지 않는다 — 안쪽이 입력창이 아니라 여닫는 버튼이다. */}
+            <Label hint="고르면 바로 저장됩니다">업로드할 모임</Label>
+            <GroupDropdown
+              groups={groups}
+              value={uploadGroup}
+              disabled={busy}
+              className="max-w-sm"
+              onChange={(groupId) => void changeUploadGroup(groupId)}
+            />
+            <p
+              role="status"
+              className="mt-1.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]"
             >
-              <GroupPicker
-                groups={groups}
-                value={uploadGroup}
-                disabled={busy}
-                onChange={(groupId) => void changeUploadGroup(groupId)}
-              />
-            </Field>
+              {busy
+                ? "바꾸는 중…"
+                : `봇으로 보낸 프로필은 ${uploadGroupName}에 담깁니다${
+                    groupSaved ? " — 저장했습니다." : ""
+                  }`}
+            </p>
             <p className="mt-1.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
               화면 위쪽에서 보고 있는 모임을 바꿔도 여기는 그대로입니다. 봇 대화창에서{" "}
               <code>/room</code> 으로도 바꿀 수 있습니다.

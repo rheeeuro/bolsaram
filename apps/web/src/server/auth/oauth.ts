@@ -342,3 +342,44 @@ export async function loginWithOAuth(identity: OAuthIdentity): Promise<string> {
     return userId;
   });
 }
+
+/** 내 계정에 붙어 있는 소셜 계정 하나. 계정 설정의 「로그인 방식」이 읽는다. */
+export type LinkedOAuthAccount = {
+  provider: OAuthProvider;
+  /** 마지막 로그인에서 받은 값. 카카오는 동의를 받지 못하면 비어 있다. */
+  email: string | null;
+  linkedAt: Date;
+  lastLoginAt: Date | null;
+};
+
+/**
+ * 무엇으로 로그인하고 있는지 보여주기 위한 조회. **본인 것만** 읽는다.
+ *
+ * `oauth_accounts` 는 인증 전용 테이블이라 런타임 롤에 권한이 없다(0050) — 그래서
+ * 이 파일의 다른 경로와 같이 owner 커넥션을 쓰고, `user_id` 를 조건에 박아 범위를
+ * 세션 주인 한 사람으로 묶는다. 제공자 식별자(subject)는 화면에 쓸 일이 없어 뽑지 않는다.
+ */
+export async function listLinkedOAuthAccounts(
+  userId: string,
+): Promise<LinkedOAuthAccount[]> {
+  return withOwner(async (sql) => {
+    const result = await sql.query<{
+      provider: OAuthProvider;
+      email: string | null;
+      linked_at: Date;
+      last_login_at: Date | null;
+    }>(
+      `SELECT provider, email, linked_at, last_login_at
+         FROM oauth_accounts
+        WHERE user_id = $1
+        ORDER BY linked_at`,
+      [userId],
+    );
+    return result.rows.map((row) => ({
+      provider: row.provider,
+      email: row.email,
+      linkedAt: row.linked_at,
+      lastLoginAt: row.last_login_at,
+    }));
+  });
+}

@@ -1,116 +1,70 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { displayNameSchema } from "@bolsaram/schemas";
-import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
-import { Field, FormError, Input } from "@/components/ui/field";
-import { apiPatch } from "@/lib/api-client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/cn";
 
 /**
- * 상단의 「○○ 님」 — 누르면 표시 이름을 바꾼다.
+ * 사이드바의 「○○ 님」 — 계정 설정(`/account`)으로 들어가는 자리.
  *
  * 이름은 카카오·구글이 준 값으로 시작하지만 그 뒤로는 본인이 정한다. 제공자 쪽에서
- * 닉네임을 바꿔도 여기는 따라가지 않으므로, 바꿀 길을 화면에 둬야 한다.
+ * 닉네임을 바꿔도 여기는 따라가지 않으므로 바꿀 길이 화면에 있어야 하고, 그 길이
+ * 이 줄이다. 이름만 고치는 창이 아니라 **계정 화면 전체**로 가므로 톱니 아이콘을
+ * 붙여 「설정으로 간다」를 드러낸다.
  *
- * 이름이 보이는 곳은 이 자리와 모임 설정의 주선자 목록, 모임 채팅의 작성자다.
- * 멤버에게는 보이지 않는다.
+ * 모임 목록 위에 있다 — 계정은 모임과 무관하고, 아래 화면 목록은 모두 모임 안의
+ * 것이기 때문이다.
  */
 export function AccountName({ displayName }: { displayName: string | null }) {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const active = pathname.startsWith("/account");
   const current = displayName ?? "주선자";
 
   return (
-    <>
-      <button
-        type="button"
-        title={`${current} 님 — 눌러서 이름 바꾸기`}
-        onClick={() => setOpen(true)}
-        className="min-w-0 truncate rounded-lg px-2 py-1 text-[12.5px] text-[var(--surface-text-muted)] transition-colors hover:bg-[var(--color-ivory-200)] hover:text-[var(--surface-text)]"
+    <Link
+      href="/account"
+      aria-current={active ? "page" : undefined}
+      title={`${current} 님 — 계정 설정`}
+      className={cn(
+        "group flex min-h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg px-1.5 py-1",
+        "transition-colors duration-[var(--duration-quick)]",
+        active
+          ? "bg-[var(--color-rose-600)]/10 text-[var(--color-rose-600)]"
+          : "text-[var(--surface-text-muted)] hover:bg-[var(--color-ivory-200)] hover:text-[var(--surface-text)]",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-6 shrink-0 place-items-center rounded-full text-[11.5px] font-semibold",
+          active
+            ? "bg-[var(--color-rose-600)] text-white"
+            : "bg-[var(--color-ivory-200)] text-[var(--color-ink-600)]",
+        )}
       >
-        {current} 님
-      </button>
-      <NameDialog
-        open={open}
-        current={displayName ?? ""}
-        onClose={() => setOpen(false)}
+        {Array.from(current)[0]}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[12.5px]">{current} 님</span>
+      <GearIcon
+        className={cn(
+          "shrink-0 transition-opacity duration-[var(--duration-quick)]",
+          active ? "opacity-100" : "opacity-45 group-hover:opacity-100",
+        )}
       />
-    </>
+    </Link>
   );
 }
 
-/** 이름 바꾸기 창. 모바일 「더보기」 시트도 이 창을 연다. */
-export function NameDialog({
-  open,
-  current,
-  onClose,
-}: {
-  open: boolean;
-  current: string;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const [value, setValue] = useState(current);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // 스키마가 최종 판정을 하고, 여기서는 버튼을 잠글지만 본다.
-  const ready = displayNameSchema.safeParse(value).success && value.trim() !== current;
-
-  function close() {
-    setValue(current);
-    setError(null);
-    onClose();
-  }
-
+function GearIcon({ className }: { className?: string }) {
   return (
-    <Dialog open={open} onClose={close} label="이름 바꾸기">
-      <h2 className="display text-[19px] text-[var(--surface-text)]">이름 바꾸기</h2>
-      <p className="mb-4 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-        동료 주선자에게 보이는 이름입니다. 모임 설정의 주선자 목록과 모임 채팅의 작성자
-        이름에 쓰입니다. <b>멤버에게는 보이지 않습니다.</b>
-      </p>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!ready || busy) return;
-          void (async () => {
-            setBusy(true);
-            setError(null);
-            const result = await apiPatch("/api/admin/me", { displayName: value.trim() });
-            setBusy(false);
-            if (!result.ok) {
-              setError(result.message);
-              return;
-            }
-            onClose();
-            // 이름은 서버 컴포넌트가 세션에서 읽어 그린다. 새로 받아야 바뀐 값이 보인다.
-            router.refresh();
-          })();
-        }}
-      >
-        <Field label="이름" hint="40자까지">
-          <Input
-            value={value}
-            maxLength={40}
-            autoComplete="name"
-            autoFocus
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </Field>
-        <FormError>{error}</FormError>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="ghost" disabled={busy} onClick={close}>
-            그만두기
-          </Button>
-          <Button type="submit" disabled={!ready || busy}>
-            {busy ? "바꾸는 중…" : "바꾸기"}
-          </Button>
-        </div>
-      </form>
-    </Dialog>
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden className={className}>
+      <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="M10 2.6v1.8M10 15.6v1.8M3.8 10H2m16 0h-1.8M5.6 5.6 4.3 4.3m11.4 11.4-1.3-1.3M5.6 14.4l-1.3 1.3M15.7 4.3l-1.3 1.3"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
