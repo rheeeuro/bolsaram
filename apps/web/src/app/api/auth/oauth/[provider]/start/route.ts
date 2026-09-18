@@ -8,7 +8,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { oauthProviderSchema } from "@bolsaram/schemas";
 import { OAUTH_COOKIE, OAUTH_STATE_TTL_MS, startOAuth } from "@/server/auth/oauth";
-import { isProduction } from "@/server/env";
+import { env, isProduction } from "@/server/env";
 import { safeNextPath } from "@/lib/next-path";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +35,8 @@ export async function GET(
     return NextResponse.redirect(authorizeUrl);
   } catch (error) {
     console.error("소셜 로그인 시작 실패", error);
-    return NextResponse.redirect(new URL("/login?error=start", url.origin));
+    // 되돌아갈 주소는 요청이 아니라 APP_ORIGIN 에서 온다 — 터널 뒤에서는 요청의
+    // host 가 loopback 이라 그대로 쓰면 사용자를 localhost 로 보낸다.
+    return NextResponse.redirect(new URL("/login?error=start", env().APP_ORIGIN));
   }
 }

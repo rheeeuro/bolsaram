@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { oauthProviderSchema } from "@bolsaram/schemas";
 import { OAUTH_COOKIE, completeOAuth, loginWithOAuth } from "@/server/auth/oauth";
 import { createSession } from "@/server/auth/session";
+import { env } from "@/server/env";
 import { safeNextPath } from "@/lib/next-path";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +21,11 @@ export async function GET(
   { params }: { params: Promise<{ provider: string }> },
 ) {
   const url = new URL(request.url);
+  // 돌아갈 곳은 요청이 아니라 APP_ORIGIN 이 정한다. Cloudflare Tunnel 뒤에서는 요청의
+  // host 가 loopback 이라, 요청에서 뽑으면 사용자를 localhost 로 보낸다.
+  const origin = env().APP_ORIGIN;
   const back = (reason: string) =>
-    NextResponse.redirect(new URL(`/login?error=${reason}`, url.origin));
+    NextResponse.redirect(new URL(`/login?error=${reason}`, origin));
 
   // 성공하든 실패하든 왕복 상태는 한 번만 쓴다. 남겨두면 재생의 여지가 된다.
   const store = await cookies();
@@ -40,7 +44,7 @@ export async function GET(
     const { identity, next } = await completeOAuth({ provider, code, state, cookieValue });
     const userId = await loginWithOAuth(identity);
     await createSession(userId, request.headers.get("user-agent") ?? undefined);
-    return NextResponse.redirect(new URL(safeNextPath(next) ?? "/home", url.origin));
+    return NextResponse.redirect(new URL(safeNextPath(next) ?? "/home", origin));
   } catch (error) {
     // 신원·토큰은 남기지 않는다. 무엇이 실패했는지만 남긴다.
     console.error("소셜 로그인 콜백 실패", error);

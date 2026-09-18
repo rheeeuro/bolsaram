@@ -2786,3 +2786,18 @@ vitest 환경에서는 `next/headers` 가 아예 해석되지 않는다.
 `users_self_update` 정책과 0036 의 컬럼 권한이 이미 필요한 만큼만 열어 두고 있어서
 마이그레이션이 필요 없었다 — 앱 롤은 본인 행의 `display_name` 은 고칠 수 있고
 `role` 은 컬럼 권한에서 빠져 있다. 두 경계 모두 `tests/rls.test.ts` 가 고정한다.
+
+
+### 로그인 뒤 돌아갈 주소는 요청이 아니라 `APP_ORIGIN` 이 정한다 (2026-09-18)
+
+카카오 로그인을 마치면 `https://localhost:3020/home` 으로 튕겼다. 콜백이 절대 주소를
+들어온 요청(`new URL(request.url).origin`)에서 만들었기 때문이다 — Cloudflare Tunnel
+뒤에서는 그 값이 공개 주소가 아니라 loopback 이다.
+
+인가 요청의 `redirect_uri` 는 처음부터 `APP_ORIGIN` 을 썼기 때문에 카카오 쪽 검증은
+통과했고, 로그인 자체도 성공했다. 깨진 것은 **마지막 한 번의 이동**뿐이라 증상이
+「로그인은 됐는데 열리지 않는 주소로 간다」로 나타났다.
+
+초대 링크·봇 버튼·알림은 모두 `APP_ORIGIN` 을 쓰고 있었다. 새로 만든 두 라우트만
+예외였다. `tests/auth-links.test.ts` 가 소스에서 이 규약을 확인한다 — 이 라우트들은
+`next/headers` 를 쓰기 때문에 vitest 에서 실행할 수 없다.
