@@ -79,7 +79,7 @@ const envSchema = z.object({
    *
    * PM2 로 띄우면 NODE_ENV 는 항상 production 이지만, 이 호스트의 인스턴스는 아직
    * 실제 사용자를 받지 않는 로컬 스테이징이다. 두 축을 섞으면 "빌드 최적화를 켜려면
-   * 회원 로그인을 포기해야 하는" 상황이 된다.
+   * 멤버 로그인을 포기해야 하는" 상황이 된다.
    *
    * production 으로 두면 개발 편의 기능이 전부 잠긴다. 실제 배포에서는 반드시 이 값을 쓴다.
    */
@@ -118,7 +118,7 @@ export function env(): Env {
   }
   // production 은 실제 사용자를 받는 배포다. 여기서 걸러야 할 설정 실수가 있다.
   if (parsed.data.APP_ENV === "production") {
-    // 초대 링크·봇 검토 버튼이 이 주소로 나간다. loopback 이면 회원에게 보낸 링크가
+    // 초대 링크·봇 검토 버튼이 이 주소로 나간다. loopback 이면 멤버에게 보낸 링크가
     // 열리지 않는다(실제로 이 호스트에서 한 번 겪었다).
     if (!parsed.data.APP_ORIGIN.startsWith("https://")) {
       throw new Error(
@@ -146,7 +146,7 @@ export function env(): Env {
   if (parsed.data.GOOGLE_CLIENT_ID && !parsed.data.GOOGLE_CLIENT_SECRET) {
     throw new Error("GOOGLE_CLIENT_ID 를 주면 GOOGLE_CLIENT_SECRET 도 필요합니다.");
   }
-  // 하나도 없으면 주선자가 들어올 방법이 없다. 회원 초대 링크는 그대로 도니 기동은
+  // 하나도 없으면 주선자가 들어올 방법이 없다. 멤버 초대 링크는 그대로 도니 기동은
   // 막지 않고, 대신 기동 로그에서 확인할 수 있게 남긴다.
   if (!parsed.data.KAKAO_CLIENT_ID && !parsed.data.GOOGLE_CLIENT_ID) {
     console.warn(

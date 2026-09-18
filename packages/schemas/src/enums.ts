@@ -15,7 +15,7 @@ export const USER_ROLES = ["ADMIN", "MEMBER"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: "주선자",
-  MEMBER: "회원",
+  MEMBER: "멤버",
 };
 
 /** 설계문서 §9 Profile status */
@@ -35,7 +35,7 @@ export const PROFILE_STATUS_LABELS: Record<ProfileStatus, string> = {
   ARCHIVED: "보관",
 };
 
-/** Discover 리스트에 노출되는 상태. 그 외는 회원에게 보이지 않는다. */
+/** Discover 리스트에 노출되는 상태. 그 외는 멤버에게 보이지 않는다. */
 export const DISCOVERABLE_PROFILE_STATUSES = ["ACTIVE", "MATCHING"] as const;
 
 /**
@@ -280,9 +280,9 @@ export const TELEGRAM_SESSION_STATE_LABELS: Record<TelegramSessionState, string>
 };
 
 /**
- * 회원이 낸 의사 (마이그레이션 0026).
+ * 멤버가 낸 의사 (마이그레이션 0026).
  *
- * 회원이 누르는 것은 결정이 아니라 **요청**이다. 주선자가 확인해야 실제 신청이
+ * 멤버가 누르는 것은 결정이 아니라 **요청**이다. 주선자가 확인해야 실제 신청이
  * 만들어지거나 상태가 옮겨진다. 상대는 확인 전까지 이 행을 읽을 수 없다.
  */
 export const MATCH_INTENT_KINDS = ["SEND", "ACCEPT", "REJECT", "CANCEL"] as const;
@@ -308,7 +308,7 @@ export const MATCH_INTENT_STATUS_LABELS: Record<MatchIntentStatus, string> = {
  * 모임 채팅방의 시스템 메시지 (마이그레이션 0044).
  *
  * 사람이 만들 수 없다 — DB 트리거만 남긴다. 본문 대신 종류와 payload 를 저장하고
- * 화면이 문장을 만든다. 회원은 언제나 공개 번호로만 등장한다.
+ * 화면이 문장을 만든다. 멤버는 언제나 공개 번호로만 등장한다.
  */
 export const GROUP_MESSAGE_SYSTEM_KINDS = [
   "ADMIN_JOINED",

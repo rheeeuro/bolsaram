@@ -2,8 +2,8 @@
  * 알림 아웃박스 통합 테스트 (마이그레이션 0017).
  *
  * 여기서 지키는 성질:
- *   * 신청이 생기면 **회원의 RLS 컨텍스트에서** 담당 주선자에게 알림 행이 생긴다.
- *     회원은 그 행을 만들 권한이 없고, 트리거가 대신 만든다.
+ *   * 신청이 생기면 **멤버의 RLS 컨텍스트에서** 담당 주선자에게 알림 행이 생긴다.
+ *     멤버는 그 행을 만들 권한이 없고, 트리거가 대신 만든다.
  *   * 수락(=연결)도 알림을 만든다 — 실제 소개는 사람이 하므로 주선자가 알아야 한다.
  *   * 거절·취소는 알림을 만들지 않는다.
  *   * 같은 사건으로 두 번 보내지 않는다.
@@ -75,7 +75,7 @@ async function makeParty(sql: Sql, key: string): Promise<Party> {
 }
 
 /**
- * 회원 명의로 신청을 만든다 — 실제 요청 경로와 같은 컨텍스트다.
+ * 멤버 명의로 신청을 만든다 — 실제 요청 경로와 같은 컨텍스트다.
  * 같은 쌍에 활성 신청이 하나만 있을 수 있으므로(부분 유니크 인덱스) 앞 케이스가
  * 남긴 것을 먼저 치운다. 알림 행은 CASCADE 로 함께 사라진다.
  */
@@ -133,7 +133,7 @@ afterAll(async () => {
 });
 
 describe("신청이 알림을 만든다", () => {
-  it("회원이 신청하면 담당 주선자에게 알림이 생긴다", async () => {
+  it("멤버가 신청하면 담당 주선자에게 알림이 생긴다", async () => {
     const id = await requestAs(A);
     const rows = await notifications(id);
     expect(rows).toHaveLength(1);
@@ -178,7 +178,7 @@ describe("신청이 알림을 만든다", () => {
     expect(accepted).toHaveLength(1);
   });
 
-  // 거절당한 회원 화면에는 알림이 뜨지 않고 상대는 목록에서 조용히 사라진다.
+  // 거절당한 멤버 화면에는 알림이 뜨지 않고 상대는 목록에서 조용히 사라진다.
   // 사정을 말해줄 사람이 필요하므로 신청한 쪽 담당자에게 알린다(0032).
   it("거절하면 신청한 쪽 담당 주선자에게 알린다", async () => {
     const id = await requestAs(A);
@@ -195,7 +195,7 @@ describe("신청이 알림을 만든다", () => {
 
   it("거절을 처리한 주선자에게는 알리지 않는다", async () => {
     const id = await requestAs(A);
-    // 주선자가 회원을 대신해 거절을 기록한 경우. 자기가 방금 한 일이다.
+    // 주선자가 멤버를 대신해 거절을 기록한 경우. 자기가 방금 한 일이다.
     await withRls(A.admin, (sql) =>
       sql.query(`UPDATE match_requests SET status = 'REJECTED' WHERE id = $1`, [id]),
     );
@@ -245,7 +245,7 @@ describe("알림은 받는 사람만 읽는다", () => {
     expect(count).toBe(0);
   });
 
-  it("회원은 알림을 읽지 못한다", async () => {
+  it("멤버는 알림을 읽지 못한다", async () => {
     const id = await requestAs(A);
     const count = await withRls(A.member, async (sql) => {
       const r = await sql.query(`SELECT id FROM notifications WHERE match_request_id = $1`, [id]);

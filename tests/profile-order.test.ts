@@ -115,7 +115,7 @@ function labels(items: { id: string }[]): string[] {
   return items.map((i) => names.get(i.id)).filter((n): n is string => n != null);
 }
 
-describe("회원 Discover", () => {
+describe("멤버 Discover", () => {
   it("사진 있는 프로필을 먼저, 그 안에서 최신순으로 준다", async () => {
     const page = await withRls(member, (sql) =>
       findDiscoverProfiles(sql, discoverQuerySchema.parse({ limit: 60 }), viewerProfileId),

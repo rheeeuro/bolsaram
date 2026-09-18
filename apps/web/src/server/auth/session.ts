@@ -20,10 +20,10 @@ export type SessionUser = {
   role: UserRole;
   displayName: string | null;
   /**
-   * 회원으로서 보는 프로필.
+   * 멤버로서 보는 프로필.
    *
-   * Claim 이 끝난 회원은 자기 프로필, 주선자가 대행 중이면 그 대상이다.
-   * 그래서 `asMember` · `actorFor` 같은 회원 경로가 대행에서도 그대로 동작한다.
+   * Claim 이 끝난 멤버는 자기 프로필, 주선자가 대행 중이면 그 대상이다.
+   * 그래서 `asMember` · `actorFor` 같은 멤버 경로가 대행에서도 그대로 동작한다.
    */
   profileId: string | null;
   /**
@@ -35,7 +35,7 @@ export type SessionUser = {
    * 지금 보고 있는 모임(채널). **null 이면 전체공개**다.
    *
    * 주선자는 `users.active_group_id` 이고 실제 소속(`group_admins`)일 때만 살아난다 —
-   * 나간 모임을 가리키고 있으면 전체공개로 떨어뜨린다. 회원은 자기 프로필의 모임이며
+   * 나간 모임을 가리키고 있으면 전체공개로 떨어뜨린다. 멤버는 자기 프로필의 모임이며
    * 바꿀 수 없다.
    *
    * RLS 는 이 값을 믿지 않는다 — 정책이 `group_admins` 를 직접 조회한다.
@@ -43,7 +43,7 @@ export type SessionUser = {
    */
   groupId: string | null;
   /**
-   * 주선자가 속한 모임 전부. 채널 전환기가 쓴다. 회원은 빈 배열이다.
+   * 주선자가 속한 모임 전부. 채널 전환기가 쓴다. 멤버는 빈 배열이다.
    *
    * 한 사람이 여러 모임에 속할 수 있다 — 어느 모임의 데이터를 다룰 수 있는지는
    * 이 목록이 아니라 RLS 가 정한다.
@@ -118,7 +118,7 @@ export async function readSession(): Promise<SessionUser | null> {
       group_id: string | null;
       groups: { id: string; name: string }[];
     }>(
-      // 주선자의 채널은 users.active_group_id, 회원의 모임은 자기 프로필에서 온다.
+      // 주선자의 채널은 users.active_group_id, 멤버의 모임은 자기 프로필에서 온다.
       // 주선자의 활성 채널은 **지금도 그 모임에 속해 있을 때만** 살린다 — 나간 모임을
       // 가리키고 있으면 전체공개(null)로 떨어진다. 소속 판정은 group_admins 가 하고
       // active_group_id 는 그중 어디를 보고 있는지만 말한다(0036).

@@ -3,7 +3,7 @@
  *
  * 방의 경계는 모임이고 참여자 명단은 `group_admins` 다. 여기서 지키는 성질 —
  * 대부분 "안 되는 것"이다.
- *   * 같은 모임 주선자끼리만 읽고 쓴다. 다른 모임도 회원도 들어오지 못한다.
+ *   * 같은 모임 주선자끼리만 읽고 쓴다. 다른 모임도 멤버도 들어오지 못한다.
  *   * 남의 이름으로 쓸 수 없다.
  *   * 쓴 글은 고칠 수 없다. 지우기만 되고, 그것도 자기 것만이다.
  *   * 지운 글의 본문은 DB 에도 남지 않는다.
@@ -141,7 +141,7 @@ describe("방은 모임 안에서만 열린다", () => {
     ).rejects.toThrow();
   });
 
-  it("회원은 방을 읽지 못한다", async () => {
+  it("멤버는 방을 읽지 못한다", async () => {
     const seen = await withRls(A.member, async (sql) => {
       const r = await sql.query(`SELECT id FROM group_messages WHERE group_id = $1`, [A.groupId]);
       return r.rowCount ?? 0;
@@ -243,7 +243,7 @@ describe("안 읽은 개수", () => {
     expect(after.find((g) => g.groupId === party.groupId)?.unread).toBe(0);
   });
 
-  /** 방을 만들면 시스템 메시지(입장·회원 등록)가 먼저 쌓인다 — 늘어난 만큼을 본다. */
+  /** 방을 만들면 시스템 메시지(입장·멤버 등록)가 먼저 쌓인다 — 늘어난 만큼을 본다. */
   async function unreadOf(ctx: RlsContext, userId: string, groupId: string): Promise<number> {
     const rows = await withRls(ctx, (sql) => unreadByGroup(sql, userId));
     return rows.find((g) => g.groupId === groupId)?.unread ?? 0;
@@ -397,7 +397,7 @@ describe("시스템 메시지", () => {
     expect(left[0]!.payload.actorName).toContain(TAG);
   });
 
-  it("회원 등록은 공개 번호로만 남는다", async () => {
+  it("멤버 등록은 공개 번호로만 남는다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `r${Date.now() % 100000}`));
 
     const registered = (await systemMessages(party.owner, party.groupId)).filter(
@@ -406,7 +406,7 @@ describe("시스템 메시지", () => {
     expect(registered).toHaveLength(1);
     expect(registered[0]!.payload.profileCode).toBeGreaterThan(0);
 
-    // 방에 회원 이름이 적히지 않는다. 픽스처의 이름은 `${TAG}-…-이름` 이다.
+    // 방에 멤버 이름이 적히지 않는다. 픽스처의 이름은 `${TAG}-…-이름` 이다.
     expect(JSON.stringify(registered[0]!.payload)).not.toContain("-이름");
   });
 

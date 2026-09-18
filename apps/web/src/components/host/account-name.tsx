@@ -15,7 +15,7 @@ import { apiPatch } from "@/lib/api-client";
  * 닉네임을 바꿔도 여기는 따라가지 않으므로, 바꿀 길을 화면에 둬야 한다.
  *
  * 이름이 보이는 곳은 이 자리와 모임 설정의 주선자 목록, 모임 채팅의 작성자다.
- * 회원에게는 보이지 않는다.
+ * 멤버에게는 보이지 않는다.
  */
 export function AccountName({ displayName }: { displayName: string | null }) {
   const [open, setOpen] = useState(false);
@@ -40,7 +40,8 @@ export function AccountName({ displayName }: { displayName: string | null }) {
   );
 }
 
-function NameDialog({
+/** 이름 바꾸기 창. 모바일 「더보기」 시트도 이 창을 연다. */
+export function NameDialog({
   open,
   current,
   onClose,
@@ -68,7 +69,7 @@ function NameDialog({
       <h2 className="display text-[19px] text-[var(--surface-text)]">이름 바꾸기</h2>
       <p className="mb-4 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
         동료 주선자에게 보이는 이름입니다. 모임 설정의 주선자 목록과 모임 채팅의 작성자
-        이름에 쓰입니다. <b>회원에게는 보이지 않습니다.</b>
+        이름에 쓰입니다. <b>멤버에게는 보이지 않습니다.</b>
       </p>
 
       <form

@@ -67,7 +67,7 @@ function initialDraft(profile: ProfileDetailView): Draft {
 /**
  * 프로필 상세 편집.
  *
- * 회원이 보게 될 사람을 먼저 크게 보여주고(사진·공개 번호·요약), 그 아래에서 고친다.
+ * 멤버가 보게 될 사람을 먼저 크게 보여주고(사진·공개 번호·요약), 그 아래에서 고친다.
  * 공개 여부와 초대는 오른쪽에 모아 둔다 — 주선자가 가장 자주 누르는 두 가지다.
  */
 export function HostProfileEditor({
@@ -231,7 +231,7 @@ export function HostProfileEditor({
               {label.profileStatus(profile.status)}
             </Badge>
             <Badge tone={visible ? "active" : "neutral"}>
-              {visible ? "회원에게 보임" : "회원에게 안 보임"}
+              {visible ? "멤버에게 보임" : "멤버에게 안 보임"}
             </Badge>
             <span className="text-[12.5px] text-[var(--surface-text-muted)]">
               {label.visibility(profile.visibility)}
@@ -255,7 +255,7 @@ export function HostProfileEditor({
 
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-5">
-          <Panel title="회원에게 보이는 내용">
+          <Panel title="멤버에게 보이는 내용">
             <div className="grid gap-3.5 sm:grid-cols-2">
               <Field label="성별">
                 <Select value={draft.gender} onChange={(e) => set("gender")(e.target.value)}>
@@ -472,8 +472,8 @@ export function HostProfileEditor({
               }
             >
               {visible
-                ? "지금 회원 목록에 보입니다."
-                : `지금 회원 목록에 보이지 않습니다 — ${reasonHidden(profile.status, profile.visibility)}.`}
+                ? "지금 멤버 목록에 보입니다."
+                : `지금 멤버 목록에 보이지 않습니다 — ${reasonHidden(profile.status, profile.visibility)}.`}
             </p>
             <div className="flex flex-col gap-3.5">
               <Field label="상태">
@@ -554,7 +554,7 @@ export function HostProfileEditor({
             ) : (
               <>
                 <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                  회원은 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인입니다.
+                  멤버는 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인입니다.
                 </p>
                 {invite && !invite.claimed ? (
                   <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
@@ -601,7 +601,7 @@ export function HostProfileEditor({
                     <CopyField label="초대 링크" value={issued.url} />
                     <CopyField label="입장코드" value={issued.code} />
                     <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                      둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 회원은 입장
+                      둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 멤버는 입장
                       화면에서 코드를 넣습니다.
                     </p>
                   </div>

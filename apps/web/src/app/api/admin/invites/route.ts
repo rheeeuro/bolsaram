@@ -13,7 +13,7 @@ export const POST = route(async (request: Request) => {
   const viewer = await requireAdmin();
   const input = await readJson(request, inviteCreateSchema);
 
-  // 초대 링크는 그 회원의 로그인 수단이다. `ADMIN` 인 것만으로는 부족하고
+  // 초대 링크는 그 멤버의 로그인 수단이다. `ADMIN` 인 것만으로는 부족하고
   // 그 프로필을 실제로 관리하는 주선자여야 한다 — issueInvite 는 owner 커넥션이라
   // invites 정책(app_can_edit_profile)을 지나가므로 여기서 막는다.
   await withRls(rlsContextOf(viewer), (sql) => assertCanEditProfile(sql, input.profileId));
@@ -35,7 +35,7 @@ export const POST = route(async (request: Request) => {
     }),
   );
 
-  // 평문 토큰은 이 응답에서만 볼 수 있다. 링크를 못 여는 회원을 위해 같은 값을
+  // 평문 토큰은 이 응답에서만 볼 수 있다. 링크를 못 여는 멤버를 위해 같은 값을
   // 입장코드로도 내려준다 — 코드와 링크는 같은 것이고 함께 무효가 된다.
   return ok(
     { url: inviteUrl(invite.token), code: invite.token, expiresAt: invite.expiresAt },

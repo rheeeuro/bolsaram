@@ -47,7 +47,7 @@ export default async function HostGroupIndexPage() {
                     {group.name}
                   </span>
                   <span className="mt-0.5 block text-[12px] text-[var(--surface-text-muted)]">
-                    회원 {group.memberCount}명 · 주선자 {group.admins.length}명
+                    멤버 {group.memberCount}명 · 주선자 {group.admins.length}명
                     {group.isOwner ? " · 내가 모임장" : ""}
                   </span>
                 </span>

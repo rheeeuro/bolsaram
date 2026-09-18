@@ -8,7 +8,7 @@
  *
  * 두 곳을 따로 찌른다.
  *   local  — 127.0.0.1:PORT   앱 자체가 살아 있는가
- *   public — APP_ORIGIN       회원이 실제로 닿는 길(Cloudflare Tunnel)이 살아 있는가
+ *   public — APP_ORIGIN       멤버가 실제로 닿는 길(Cloudflare Tunnel)이 살아 있는가
  * 갈라 놓아야 「앱이 죽었다」와 「터널이 죽었다」에 다른 대응을 할 수 있다.
  *
  *   pnpm health:check   한 번 확인하고 끝낸다 (알림 없음, 실패 시 exit 1)

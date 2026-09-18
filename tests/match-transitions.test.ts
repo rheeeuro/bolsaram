@@ -255,7 +255,7 @@ function catchError(fn: () => unknown): unknown {
   }
 }
 
-describe("회원 요청 → 전이 매핑 (0026)", () => {
+describe("멤버 요청 → 전이 매핑 (0026)", () => {
   it("SEND 는 전이가 아니다 — 승인 시 신청을 새로 만든다", () => {
     expect(actionForIntent("SEND")).toBeNull();
   });
@@ -266,7 +266,7 @@ describe("회원 요청 → 전이 매핑 (0026)", () => {
     expect(actionForIntent("CANCEL")).toBe("cancel");
   });
 
-  it("승인은 요청을 낸 회원의 자격으로 판정된다 — 주선자 자격이 아니다", () => {
+  it("승인은 요청을 낸 멤버의 자격으로 판정된다 — 주선자 자격이 아니다", () => {
     // 받은 쪽이 낸 수락 요청. 주선자는 그 답을 옮길 뿐이라 actor 는 target 이다.
     expect(
       resolveTransition({ action: "accept", current: "REQUESTED", actor: "target" }).to,

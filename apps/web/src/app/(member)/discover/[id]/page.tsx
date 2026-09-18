@@ -56,7 +56,7 @@ export default async function ProfileDetailPage({
     ) {
       return null;
     }
-    // 회원 화면은 이성만 본다. 목록에서 빠져도 주소로는 여기까지 올 수 있다.
+    // 멤버 화면은 이성만 본다. 목록에서 빠져도 주소로는 여기까지 올 수 있다.
     if (
       isMemberView(viewer) &&
       viewer.profileId &&

@@ -108,7 +108,7 @@ export async function consumeTelegramLinkCode(input: {
     if (!row) {
       throw new DomainError("NOT_FOUND", "만료되었거나 이미 사용된 연결 코드입니다.");
     }
-    // 주선자 전용 채널이다. 회원 계정으로는 연결하지 않는다(§15).
+    // 주선자 전용 채널이다. 멤버 계정으로는 연결하지 않는다(§15).
     if (row.role !== "ADMIN") {
       throw new DomainError("FORBIDDEN", "주선자 계정만 봇을 연결할 수 있습니다.");
     }

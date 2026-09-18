@@ -1,4 +1,4 @@
-/** 내 프로필 + 로그아웃. 회원은 열람만 하고 수정은 주선자에게 요청한다. */
+/** 내 프로필 + 로그아웃. 멤버는 열람만 하고 수정은 주선자에게 요청한다. */
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
 import { requireUserPage, rlsContextOf } from "@/server/auth/guard";

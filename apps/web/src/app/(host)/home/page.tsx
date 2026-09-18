@@ -41,7 +41,7 @@ export default async function HostHomePage() {
     const stats = await sql.query<Kpi>(
       `
       SELECT
-        -- 회원이 실제로 보는 조건과 같아야 한다. 상태만 세면 「공개인데 안 보이는」
+        -- 멤버가 실제로 보는 조건과 같아야 한다. 상태만 세면 「공개인데 안 보이는」
         -- 프로필까지 들어가 숫자가 부풀려진다(isDiscoverable · filters.ts).
         (SELECT count(*) FROM profiles
           WHERE group_id IS NOT DISTINCT FROM $1
@@ -130,13 +130,13 @@ export default async function HostHomePage() {
           accent={kpi.inboxPending > 0}
         />
         <Stat
-          label="회원에게 보이는 프로필"
+          label="멤버에게 보이는 프로필"
           value={kpi.profilesActive}
           hint={`등록한 프로필 ${kpi.profilesTotal}명`}
           href="/profiles?status=ACTIVE"
         />
         <Stat
-          label="들어온 회원"
+          label="들어온 멤버"
           value={kpi.membersTotal}
           hint={`초대를 기다리는 프로필 ${kpi.profilesUnclaimed}개`}
           href="/members"
@@ -225,7 +225,7 @@ export default async function HostHomePage() {
             <QuickLink
               href="/members"
               title="초대 링크 · 입장코드 보내기"
-              description="회원은 이 링크로만 들어옵니다."
+              description="멤버는 이 링크로만 들어옵니다."
             />
             <QuickLink
               href="/group"

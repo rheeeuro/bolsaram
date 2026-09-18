@@ -1,4 +1,4 @@
-# @bolsaram/web — 웹 앱 (주선자 화면 + 회원 화면 + API)
+# @bolsaram/web — 웹 앱 (주선자 화면 + 멤버 화면 + API)
 
 Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에 있고 `:3020` 에서 뜬다.
 별도 백엔드 프로세스는 없다.
@@ -23,8 +23,8 @@ Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에
 > **읽기와 쓰기를 다르게 준다.** 전체공개 프로필은 누구나 보지만 고치는 것은 등록한
 > 주선자만이다. 모임 소속을 바꾸는 것(`group_admins`)은 인증 레이어만 할 수 있다.
 > **이름과 연락처도 주선자라는 사실만으로 열지 않는다** — 담당이 아닌 프로필은
-> 회원과 같은 기준을 쓰고(`disclosureFor` 의 `canEdit`), 자기 회원과 연결된 뒤에
-> 열린다. 그전에 필요하면 대행으로 회원 화면에서 보고 감사에 남긴다.
+> 멤버와 같은 기준을 쓰고(`disclosureFor` 의 `canEdit`), 자기 멤버와 연결된 뒤에
+> 열린다. 그전에 필요하면 대행으로 멤버 화면에서 보고 감사에 남긴다.
 >
 > **불변식 6: 보고 있는 모임은 화면 필터이지 권한이 아니다.**
 > 한 주선자가 여러 모임에 속한다. `viewer.groupId`(= `users.active_group_id`)는 그중
@@ -48,17 +48,17 @@ apps/web/src/
 │   ├── layout.tsx            폰트·메타데이터·noindex
 │   ├── globals.css           Tailwind + 디자인 토큰 + 전역 스타일
 │   ├── login/                주선자 로그인 = 가입 (카카오·구글)
-│   ├── enter/                회원 입장 — 입장코드 하나만 묻는다
+│   ├── enter/                멤버 입장 — 입장코드 하나만 묻는다
 │   ├── claim/[token]/        초대 링크 → 프로필 연결 (실패 시 /enter 로 코드 유지)
 │   ├── privacy/              개인정보 처리방침 — docs/guide/privacy.md 를 그대로 렌더 (로그인 불필요)
-│   ├── (member)/             회원 영역 (하단 탭 레이아웃)
+│   ├── (member)/             멤버 영역 (하단 탭 레이아웃)
 │   │   ├── discover/         프로필 목록 + 필터 시트
 │   │   ├── discover/[id]/    상세 + 신청 모달 + 연출
 │   │   ├── signals/          받은·보낸·연결됨
 │   │   ├── favorites/        관심 목록
 │   │   ├── hidden/           숨긴 사람 (해제는 상세에서)
 │   │   └── me/               내 프로필 + 로그아웃
-│   ├── (host)/               주선자 영역 (PC 모임 사이드바 · 모바일 가로 모임 목록)
+│   ├── (host)/               주선자 영역 (PC 왼쪽 사이드바 · 모바일 상단 모임 + 하단 탭)
 │   │   ├── home/             오늘 할 일 + 지표 + 최근 신청
 │   │   ├── imports/          가져오기 + 검토 상세
 │   │   ├── profiles/         카드 목록 + 상세 편집·게시·초대
@@ -69,7 +69,7 @@ apps/web/src/
 │   └── api/                  Route Handler (아래 표)
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·marks)
-│   ├── member/               회원 화면
+│   ├── member/               멤버 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
 │   ├── api-client.ts         fetch 래퍼 — 오류를 판별 가능한 결과로 변환
@@ -81,7 +81,7 @@ apps/web/src/
 └── server/                   서버 전용 (아래 참고)
 ```
 
-모든 페이지가 `force-dynamic` 이고 요청마다 DB 를 읽는다. 그래서 회원 화면 다섯 곳과
+모든 페이지가 `force-dynamic` 이고 요청마다 DB 를 읽는다. 그래서 멤버 화면 다섯 곳과
 주선자 영역에 `loading.tsx` 를 둔다 — 모임 내비게이션은 바로 뜨고 본문만 스켈레톤이 된다.
 스켈레톤은 `aria-hidden` 이라 `LoadingLabel` 을 같이 놓아야 화면을 보지 않는 사용자에게도
 「불러오는 중」이 전달된다.
@@ -115,11 +115,11 @@ server/
 ├── auth/
 │   ├── session.ts            서명 쿠키 + sessions 테이블
 │   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기)
-│   ├── invite.ts             초대 링크 = 회원 로그인 (매직 링크, 해시 저장·1회용)
+│   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── group-invite.ts       모임 만들기·소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
 │   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
-│                             (미로그인: 회원 화면 → /enter, 주선자 화면 → /login)
+│                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)
 ├── storage/local.ts          로컬/R2 private 저장소 + signed download/upload URL
 ├── ai/
@@ -131,7 +131,7 @@ server/
 │   ├── users.ts              내 계정 — 표시 이름
 │   ├── profiles.ts           Discover·상세·주선자 목록·수정
 │   ├── matches.ts            신청 생성·전이·시그널 목록·연결 상대
-│   ├── match-intents.ts      회원이 낸 요청(주선자 확인 대기) — 승인해야 신청이 된다
+│   ├── match-intents.ts      멤버가 낸 요청(주선자 확인 대기) — 승인해야 신청이 된다
 │   ├── profile-images.ts     사진 추가·삭제·대표 지정 (순서와 대표 불변식)
 │   ├── favorites.ts          관심 토글·목록
 │   ├── hides.ts              숨기기 토글·목록 + 양방향 판정
@@ -158,7 +158,7 @@ server/
 
 ## API
 
-인증이 필요 없는 경로는 없다(`/api/auth/*` 제외). 미인증은 401, 회원의 주선자 경로 접근은 403.
+인증이 필요 없는 경로는 없다(`/api/auth/*` 제외). 미인증은 401, 멤버의 주선자 경로 접근은 403.
 
 권한 열의 「주선자」는 DB 의 `ADMIN` 역할이다. 화면 경로에서 `/admin` 은 없앴지만
 API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한다.
@@ -176,18 +176,18 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/auth/oauth/[provider]/start`        | GET                 | –                 | 소셜 로그인 시작 (제공자로 302)      |
 | `/api/auth/oauth/[provider]/callback`     | GET                 | –                 | 소셜 로그인 완료 = 가입·세션 생성    |
 | `/api/auth/logout`                        | POST                | –                 | 세션 폐기                            |
-| `/api/claim`                              | POST                | **초대 토큰**     | 회원 로그인 (매직 링크) + 최초 계정 생성 |
-| `/api/profiles`                           | GET                 | 회원              | Discover 목록 (필터·커서)            |
-| `/api/profiles/[id]`                      | GET / PATCH         | 회원 / 주선자     | 상세 조회 / 내용 수정                |
+| `/api/claim`                              | POST                | **초대 토큰**     | 멤버 로그인 (매직 링크) + 최초 계정 생성 |
+| `/api/profiles`                           | GET                 | 멤버              | Discover 목록 (필터·커서)            |
+| `/api/profiles/[id]`                      | GET / PATCH         | 멤버 / 주선자     | 상세 조회 / 내용 수정                |
 | `/api/profiles/[id]/status`               | PATCH               | 주선자            | 상태·노출 변경                       |
-| `/api/match-requests`                     | GET / POST          | 회원(프로필 필요) | 시그널 목록 / 소개 신청              |
+| `/api/match-requests`                     | GET / POST          | 멤버(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |
 | `/api/admin/me`                           | PATCH               | 주선자            | 내 표시 이름 바꾸기                  |
 | `/api/admin/acting`                       | POST / DELETE       | 주선자            | 대행 시작 / 종료 (고칠 수 있는 프로필) |
-| `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 회원 요청 approve · decline          |
-| `/api/favorites`                          | GET / POST / DELETE | 회원              | 관심 목록·토글                       |
-| `/api/hides`                              | GET / POST / DELETE | 회원(프로필 필요) | 숨긴 사람 목록·토글                  |
+| `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 멤버 요청 approve · decline          |
+| `/api/favorites`                          | GET / POST / DELETE | 멤버              | 관심 목록·토글                       |
+| `/api/hides`                              | GET / POST / DELETE | 멤버(프로필 필요) | 숨긴 사람 목록·토글                  |
 | `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
 | `/api/imports`                            | GET / POST          | 주선자            | 가져오기 목록(현재 방) / 세션 생성 + 업로드 슬롯 (`groupId` 필수) |
 | `/api/imports/[id]`                       | GET / DELETE        | 주선자            | 원본·추출 결과 / 세션 삭제           |
@@ -266,13 +266,13 @@ owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세�
 ### 알림
 
 ```
-회원의 신청·수락 (RLS 트랜잭션)
+멤버의 신청·수락 (RLS 트랜잭션)
   → DB 트리거가 notifications 에 행 추가      담당 주선자 = app_profile_admins()
   → scheduleDispatch()                        응답을 기다리지 않고 띄운다
   → 디스패처가 선점(attempts+1) → 텔레그램 → sent_at
 ```
 
-**요청 트랜잭션 안에서 텔레그램을 호출하지 않는다.** 회원 컨텍스트에서는 주선자의
+**요청 트랜잭션 안에서 텔레그램을 호출하지 않는다.** 멤버 컨텍스트에서는 주선자의
 텔레그램 연결을 읽을 수 없고(정책이 없다), 봇이 느리면 「마음 보내기」가 같이 느려진다.
 보낼 것을 DB 에 남기므로 발송에 실패해도 신청은 남고 다음 스윕이 다시 시도한다.
 

@@ -29,7 +29,7 @@ export default async function HostProfilesPage({
   const page = await withRls(rlsContextOf(viewer), async (sql) => {
     const result = await findAdminProfiles(sql, query, { groupId: viewer.groupId });
     // 전체공개 풀에는 남이 등록한 프로필도 함께 있다. 담당이 아니면 이름·연락처를
-    // 가린다 — 판정은 회원 경로와 같은 함수가 한다.
+    // 가린다 — 판정은 멤버 경로와 같은 함수가 한다.
     const editable = await canEditProfiles(
       sql,
       result.items.map((p) => p.id),
@@ -141,7 +141,7 @@ export default async function HostProfilesPage({
                   <p className="mt-1.5">
                     {/* 사진 위 칩이 상태를, 여기가 결론을 말한다. */}
                     <Badge tone={visible ? "active" : "neutral"}>
-                      {visible ? "회원에게 보임" : "회원에게 안 보임"}
+                      {visible ? "멤버에게 보임" : "멤버에게 안 보임"}
                     </Badge>
                   </p>
                 </div>

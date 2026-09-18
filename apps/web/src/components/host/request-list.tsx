@@ -58,7 +58,7 @@ export function HostRequestList({
   /**
    * 당사자를 대신해 상태를 옮긴다.
    *
-   * 회원은 초대 링크로만 세션이 생긴다 — 자기 폰을 쓰지 않거나 30일이 지난 회원은
+   * 멤버는 초대 링크로만 세션이 생긴다 — 자기 폰을 쓰지 않거나 30일이 지난 멤버는
    * 스스로 누를 수 없다. 그 의사를 주선자가 확인해 여기서 기록한다.
    */
   async function act(id: string, action: "accept" | "reject" | "cancel" | "close") {
@@ -192,7 +192,7 @@ const BEHALF_LABELS: Record<BehalfAction, string> = {
 /**
  * 당사자를 대신해 처리하는 줄.
  *
- * 회원은 초대 링크로만 세션이 생기므로 자기 폰을 쓰지 않는 분은 직접 누를 수 없다.
+ * 멤버는 초대 링크로만 세션이 생기므로 자기 폰을 쓰지 않는 분은 직접 누를 수 없다.
  * 주선자가 카카오톡·대면으로 의사를 확인한 뒤 그 답을 여기에 기록한다.
  */
 function OnBehalf({

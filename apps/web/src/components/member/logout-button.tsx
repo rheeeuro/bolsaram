@@ -8,7 +8,7 @@ import { apiPost } from "@/lib/api-client";
 /**
  * 로그아웃.
  *
- * 회원은 스스로 다시 들어올 수 없다 — 주선자가 새 초대 링크를 발급해야 한다.
+ * 멤버는 스스로 다시 들어올 수 없다 — 주선자가 새 초대 링크를 발급해야 한다.
  * 되돌릴 수 없는 동작이라 한 번 확인하고, 무엇이 필요해지는지 먼저 알려준다.
  */
 export function LogoutButton({ needsInviteAgain }: { needsInviteAgain: boolean }) {

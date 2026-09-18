@@ -1,15 +1,15 @@
 /**
- * 회원 로그인 = 초대 링크 (매직 링크) 통합 테스트.
+ * 멤버 로그인 = 초대 링크 (매직 링크) 통합 테스트.
  *
- * SMS 를 쓰지 않으므로 회원에게 인증번호를 보낼 방법이 없다. 주선자가 카카오톡으로
- * 보내는 초대 링크가 곧 로그인이며, **이 경로가 유일한 회원 가입 경로**다.
+ * SMS 를 쓰지 않으므로 멤버에게 인증번호를 보낼 방법이 없다. 주선자가 카카오톡으로
+ * 보내는 초대 링크가 곧 로그인이며, **이 경로가 유일한 멤버 가입 경로**다.
  *
  * 여기서 지키는 성질:
  *   * 링크 하나로 계정이 만들어지고 프로필에 연결된다.
  *   * 같은 링크를 두 번 쓸 수 없다(replay 차단).
  *   * 이미 주인이 있는 프로필은 계정을 새로 만들지 않고 재로그인한다.
  *   * 만료·회수된 링크는 통하지 않는다.
- *   * 링크를 쓴 회원을 나중에 삭제할 수 있다(0016 제약 완화).
+ *   * 링크를 쓴 멤버를 나중에 삭제할 수 있다(0016 제약 완화).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner } from "@bolsaram/db";
@@ -81,7 +81,7 @@ describe("최초 진입", () => {
     });
     expect(linked?.user_id).toBe(result.userId);
     expect(linked?.role).toBe("MEMBER");
-    // 전화번호는 더 이상 신원이 아니다 — 없어도 회원이 된다(0015).
+    // 전화번호는 더 이상 신원이 아니다 — 없어도 멤버가 된다(0015).
     expect(linked?.phone).toBeNull();
   });
 
@@ -154,8 +154,8 @@ describe("링크 미리보기", () => {
   });
 });
 
-describe("회원 삭제", () => {
-  it("링크를 쓴 회원을 삭제할 수 있다", async () => {
+describe("멤버 삭제", () => {
+  it("링크를 쓴 멤버를 삭제할 수 있다", async () => {
     // 0016 이전에는 invites_claim_pair 때문에 DELETE 가 실패했다 —
     // FK 가 claimed_by 를 NULL 로 바꾸려 하면 제약에 걸렸다. 탈퇴 처리가 막히는 셈이다.
     const profileId = await newProfile("탈퇴");

@@ -211,7 +211,7 @@ describe("계정 연결", () => {
     ).rejects.toThrow(/만료되었거나 이미 사용된/);
   });
 
-  it("회원 계정으로는 봇을 연결할 수 없다", async () => {
+  it("멤버 계정으로는 봇을 연결할 수 없다", async () => {
     // 텔레그램은 주선자용 운영 채널이다(§15).
     const issued = await issueTelegramLinkCode(memberId);
     await expect(
@@ -493,7 +493,7 @@ describe("대화와 사진 묶기", () => {
 });
 
 describe("권한 경계", () => {
-  it("회원은 봇 대화를 읽지 못한다", async () => {
+  it("멤버는 봇 대화를 읽지 못한다", async () => {
     const rows = await withRls(member, async (sql) => {
       const r = await sql.query(`SELECT id FROM telegram_import_sessions`);
       return r.rowCount ?? 0;
@@ -501,13 +501,13 @@ describe("권한 경계", () => {
     expect(rows).toBe(0);
   });
 
-  it("회원은 봇 대화를 만들지 못한다", async () => {
+  it("멤버는 봇 대화를 만들지 못한다", async () => {
     await expect(
       withRls(member, async (sql) => {
         const session = await sql.query<{ id: string }>(
           `SELECT id FROM import_sessions LIMIT 1`,
         );
-        // 회원은 import_sessions 도 못 읽으므로 임의의 uuid 로 시도한다.
+        // 멤버는 import_sessions 도 못 읽으므로 임의의 uuid 로 시도한다.
         const target = session.rows[0]?.id ?? "00000000-0000-0000-0000-000000000000";
         return sql.query(
           `INSERT INTO telegram_import_sessions
@@ -519,7 +519,7 @@ describe("권한 경계", () => {
     ).rejects.toThrow();
   });
 
-  it("회원은 계정 연결 정보를 읽지 못한다", async () => {
+  it("멤버는 계정 연결 정보를 읽지 못한다", async () => {
     const rows = await withRls(member, async (sql) => {
       const r = await sql.query(`SELECT id FROM telegram_connections`);
       return r.rowCount ?? 0;

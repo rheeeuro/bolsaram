@@ -119,7 +119,7 @@ describe("buildDiscoverWhere", () => {
   });
 
   it("성별은 요청으로 바꿀 수 없다 — 주소에 넣어도 무시한다", () => {
-    // 회원이 고르는 값이 아니다. 스키마가 이미 버리고, 필터도 보는 사람만 본다.
+    // 멤버가 고르는 값이 아니다. 스키마가 이미 버리고, 필터도 보는 사람만 본다.
     const where = buildDiscoverWhere(parse({ gender: "FEMALE" }), CTX);
     expect(where.values).toContain("MALE");
     expect(where.values).not.toContain("FEMALE");
@@ -179,7 +179,7 @@ describe("커서", () => {
 
 /**
  * 화면의 조건 모델. "보이는 범위"와 "실제로 걸리는 절"이 어긋나면
- * 회원은 걸러졌다고 믿는 사람을 계속 보게 된다 — 그 어긋남을 여기서 막는다.
+ * 멤버는 걸러졌다고 믿는 사람을 계속 보게 된다 — 그 어긋남을 여기서 막는다.
  */
 describe("filtersToParams", () => {
   const withRange = (over: Partial<Filters>): Filters => ({ ...DEFAULT_FILTERS, ...over });

@@ -2,7 +2,7 @@
  * 주선자 영역.
  *
  * 볼사람은 주선자를 위한 서비스다 — 이 화면들이 관리 도구가 아니라 제품 본체다.
- * 회원 화면과 같은 warm ivory 팔레트를 쓰고, 밀도만 한 단 높인다(설계문서 §13에서
+ * 멤버 화면과 같은 warm ivory 팔레트를 쓰고, 밀도만 한 단 높인다(설계문서 §13에서
  * 벗어난 결정은 `docs/implementation-plan.md` 참고).
  */
 import { withRls } from "@bolsaram/db";
@@ -35,8 +35,18 @@ export default async function HostLayout({ children }: { children: React.ReactNo
           groups={viewer.groups}
           activeGroupId={viewer.groupId}
         />
+        {/* 좁은 화면에서는 하단 탭이 본문 위에 떠 있다 — 그만큼 바닥을 비운다.
+            넓은 화면에는 탭이 없고 사이드바가 왼쪽을 차지한다. */}
         <div className="lg:pl-64">
-          <main className="mx-auto max-w-6xl px-5 pb-16 pt-7">{children}</main>
+          <main
+            className="mx-auto max-w-6xl px-5 pt-5 lg:pt-7"
+            style={{
+              paddingBottom:
+                "calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 1.5rem)",
+            }}
+          >
+            {children}
+          </main>
         </div>
       </ChatStreamProvider>
     </div>

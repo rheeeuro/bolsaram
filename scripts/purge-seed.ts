@@ -1,8 +1,8 @@
 /**
  * 합성 시드 데이터 정리.
  *
- * 실회원을 받기 시작하면 `pnpm db:seed` 가 만든 합성 프로필이 진짜 사람들 사이에
- * 섞여 있게 된다. 회원 눈에는 구분이 안 되고, 그 프로필로 신청이 들어오면 아무도
+ * 실제 멤버를 받기 시작하면 `pnpm db:seed` 가 만든 합성 프로필이 진짜 사람들 사이에
+ * 섞여 있게 된다. 멤버 눈에는 구분이 안 되고, 그 프로필로 신청이 들어오면 아무도
  * 연결해 줄 수 없다.
  *
  *   pnpm db:purge-seed          무엇이 지워질지만 보여준다 (기본)
@@ -12,7 +12,7 @@
  * `is_seed = true` 다(마이그레이션 0020). 주선자가 등록한 프로필에는 이 값이 붙지
  * 않으므로 잘못 지울 수 없다.
  *
- * 지우는 것: 합성 프로필, 그 사진 파일, 그 프로필에 연결된 회원 계정.
+ * 지우는 것: 합성 프로필, 그 사진 파일, 그 프로필에 연결된 멤버 계정.
  * 신청·관심·초대는 FK CASCADE 로 함께 사라진다.
  * **주선자 계정과 모임은 건드리지 않는다** — 사람이 쓰는 계정이다.
  */
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
       `SELECT count(*)::int AS count FROM profiles WHERE NOT is_seed`,
     );
 
-    console.info(`합성 프로필 ${profileIds.length}건, 사진 ${keys.length}장, 회원 계정 ${userIds.length}개`);
+    console.info(`합성 프로필 ${profileIds.length}건, 사진 ${keys.length}장, 멤버 계정 ${userIds.length}개`);
     console.info(`  번호: ${found.rows.map((r) => r.public_code).filter((v, i, a) => a.indexOf(v) === i).join(", ")}`);
     console.info(`남는 프로필: ${rest.rows[0]?.count ?? 0}건`);
 
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
         : { rowCount: 0 };
 
     console.info(
-      `\n지웠습니다 — 프로필 ${profiles.rowCount ?? 0}건, 사진 ${files}장, 회원 계정 ${users.rowCount ?? 0}개`,
+      `\n지웠습니다 — 프로필 ${profiles.rowCount ?? 0}건, 사진 ${files}장, 멤버 계정 ${users.rowCount ?? 0}개`,
     );
   });
 }

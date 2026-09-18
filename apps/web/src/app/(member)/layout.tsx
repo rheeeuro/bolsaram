@@ -1,5 +1,5 @@
 /**
- * 회원 영역 레이아웃.
+ * 멤버 영역 레이아웃.
  * 모바일 우선 — 하단 탭 네비게이션, 데스크톱에서는 좌측으로 옮기지 않고
  * 컨텐츠 폭만 넓힌다(설계문서 §6, 부트스트랩 §5).
  */
@@ -19,7 +19,7 @@ export default async function MemberLayout({ children }: { children: React.React
   // (`requireUserPage("/signals")` → `/enter?next=/signals`).
   const user = await readSession();
 
-  // 받은 신청 수를 탭에 띄운다. 회원에게는 알림이 가지 않으므로 이 배지가
+  // 받은 신청 수를 탭에 띄운다. 멤버에게는 알림이 가지 않으므로 이 배지가
   // 새 신청을 알아차릴 유일한 신호다.
   const profileId = user?.profileId ?? null;
   const acting = user?.actingProfileId ?? null;

@@ -5,7 +5,7 @@
  * 것은 본인이다(`server/auth/oauth.ts` 의 `loginWithOAuth` 가 기존 이름을 덮지 않는다).
  *
  * 이름이 보이는 곳은 상단의 「○○ 님」, 모임 설정의 주선자 목록, 모임 채팅의 작성자다.
- * 회원에게는 보이지 않는다 — 회원과 주선자가 만나는 자리에는 이름이 나오지 않는다.
+ * 멤버에게는 보이지 않는다 — 멤버와 주선자가 만나는 자리에는 이름이 나오지 않는다.
  */
 import { displayNameUpdateSchema } from "@bolsaram/schemas";
 import { asAdmin } from "@/server/http/context";

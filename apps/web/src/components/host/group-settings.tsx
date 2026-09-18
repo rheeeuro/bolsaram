@@ -168,7 +168,7 @@ function Overview({ group }: { group: Group }) {
 
       <Panel title="이 모임에 있는 것">
         <dl className="grid grid-cols-2 gap-3 text-[13px]">
-          <Stat label="회원" value={`${group.memberCount}명`} />
+          <Stat label="멤버" value={`${group.memberCount}명`} />
           <Stat label="주선자" value={`${group.admins.length}명`} />
           <Stat label="가져오기" value={`${group.importCount}건`} />
           <Stat label="내 역할" value={group.isOwner ? "모임장" : "주선자"} />
@@ -307,7 +307,7 @@ function AdminRow({ group, admin, isMe }: { group: Group; admin: Admin; isMe: bo
               variant="danger"
               label="내보내기"
               confirmLabel="내보내기"
-              message={`${name} 님은 이 모임의 회원을 더 이상 볼 수 없습니다. 다시 들어오려면 초대 코드가 필요합니다.`}
+              message={`${name} 님은 이 모임의 멤버를 더 이상 볼 수 없습니다. 다시 들어오려면 초대 코드가 필요합니다.`}
               disabled={busy}
               onConfirm={() =>
                 void send(() =>
@@ -383,7 +383,7 @@ function DangerZone({ group }: { group: Group }) {
   );
 }
 
-/** 모임 나가기. 마지막 주선자는 회원이 남아 있는 동안 나갈 수 없다(서버가 막는다). */
+/** 모임 나가기. 마지막 주선자는 멤버가 남아 있는 동안 나갈 수 없다(서버가 막는다). */
 function LeaveGroup({ group }: { group: Group }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -392,14 +392,14 @@ function LeaveGroup({ group }: { group: Group }) {
   return (
     <DangerPanel
       title="모임 나가기"
-      description="나가면 이 모임의 회원이 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다. 마지막 주선자라면 회원이 남아 있는 동안 나갈 수 없습니다."
+      description="나가면 이 모임의 멤버가 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다. 마지막 주선자라면 멤버가 남아 있는 동안 나갈 수 없습니다."
       error={error}
     >
       <ConfirmButton
         variant="danger"
         label={busy ? "나가는 중…" : "모임 나가기"}
         confirmLabel="나가기"
-        message={`「${group.name}」 의 회원이 더 이상 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다.`}
+        message={`「${group.name}」 의 멤버가 더 이상 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다.`}
         disabled={busy}
         onConfirm={() =>
           void (async () => {
@@ -442,7 +442,7 @@ function CloseGroup({ group }: { group: Group }) {
   }
 
   const left = [
-    group.memberCount > 0 ? `회원 ${group.memberCount}명` : null,
+    group.memberCount > 0 ? `멤버 ${group.memberCount}명` : null,
     group.importCount > 0 ? `가져오기 ${group.importCount}건` : null,
   ].filter(Boolean);
 

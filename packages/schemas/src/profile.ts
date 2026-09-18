@@ -91,7 +91,7 @@ const intParam = (min: number, max: number) =>
 export const DISCOVER_PAGE_SIZE = 24;
 
 export const discoverQuerySchema = z.object({
-  // 성별은 필터가 아니다 — 회원은 이성만 보고, 그 값은 자기 프로필이 정한다.
+  // 성별은 필터가 아니다 — 멤버는 이성만 보고, 그 값은 자기 프로필이 정한다.
   ageMin: intParam(18, 99),
   ageMax: intParam(18, 99),
   heightMin: intParam(HEIGHT_MIN, HEIGHT_MAX),
@@ -109,7 +109,7 @@ export const discoverQuerySchema = z.object({
 });
 export type DiscoverQuery = z.infer<typeof discoverQuerySchema>;
 
-/** 관리자 프로필 목록 필터. 회원 필터와 달리 status/visibility 를 직접 다룬다. */
+/** 관리자 프로필 목록 필터. 멤버 필터와 달리 status/visibility 를 직접 다룬다. */
 export const adminProfileQuerySchema = z.object({
   q: z.string().trim().max(60).optional(),
   tags: tagCsv,

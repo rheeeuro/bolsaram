@@ -37,8 +37,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0012_group_invites.sql`           | 모임 초대 코드 (동료 주선자 합류)                                                      |
 | `0013_drop_open_claim.sql`         | `profiles_claim` 제거 — 누구나 주인 없는 프로필을 가져갈 수 있었다                     |
 | `0014_group_description.sql`       | 모임 설명 (주선자끼리 보는 메모)                                                       |
-| `0015_magic_link_login.sql`        | 회원 로그인을 매직 링크로 — `login_codes` 제거, 전화번호 필수 해제                     |
-| `0016_invite_claim_pair.sql`       | `invites_claim_pair` 완화 — 링크를 쓴 회원을 삭제할 수 있게                            |
+| `0015_magic_link_login.sql`        | 멤버 로그인을 매직 링크로 — `login_codes` 제거, 전화번호 필수 해제                     |
+| `0016_invite_claim_pair.sql`       | `invites_claim_pair` 완화 — 링크를 쓴 멤버를 삭제할 수 있게                            |
 | `0017_notifications.sql`           | 알림 아웃박스: `notifications` + 신청·수락 트리거 (담당 주선자에게)                    |
 | `0018_notifications_readonly.sql`  | 알림은 런타임 롤에서 읽기 전용 (기본 권한으로 딸려온 DML 회수)                         |
 | `0019_profile_consent.sql`         | 등록 동의 기록 (0020 에서 되돌림)                                                      |
@@ -48,12 +48,12 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0023_reject_and_hide.sql`         | 거절 관계 재신청 금지 + `profile_hides` (숨기기). 둘 다 양방향                         |
 | `0024_hide_requires_no_active_request.sql` | 활성 신청이 있는 상대는 숨길 수 없다 (0023 의 반대 방향)                       |
 | `0025_acting_profile.sql`          | 주선자 대행 — `sessions.acting_profile_id` + `app_current_profile_id()` 대행 분기      |
-| `0026_match_intents.sql`           | `match_intents` — 회원의 의사는 요청이고 확정은 주선자가 한다                          |
+| `0026_match_intents.sql`           | `match_intents` — 멤버의 의사는 요청이고 확정은 주선자가 한다                          |
 | `0027_match_request_admin_both_sides.sql` | 신청 읽기·수정을 **양쪽** 담당 주선자에게                                       |
-| `0028_admin_creates_request_on_approval.sql` | 담당 주선자가 회원을 대신해 신청을 만든다 (승인 경로)                       |
+| `0028_admin_creates_request_on_approval.sql` | 담당 주선자가 멤버를 대신해 신청을 만든다 (승인 경로)                       |
 | `0029_intent_notification_payload.sql` | 요청 알림 payload 키를 아웃박스가 읽는 이름으로                                 |
-| `0030_hide_declined_intent_targets.sql` | 보류된 「마음 보내기」의 상대를 그 회원 목록에서 뺀다 (한 방향)               |
-| `0031_intent_declined_notification.sql` | 보류를 그 회원의 담당 주선자에게 알린다 (누른 사람 제외)                     |
+| `0030_hide_declined_intent_targets.sql` | 보류된 「마음 보내기」의 상대를 그 멤버 목록에서 뺀다 (한 방향)               |
+| `0031_intent_declined_notification.sql` | 보류를 그 멤버의 담당 주선자에게 알린다 (누른 사람 제외)                     |
 | `0032_match_rejected_notification.sql` | 거절을 **신청자 쪽** 담당 주선자에게 알린다 (누른 사람 제외)                    |
 | `0033_match_canceled_notification.sql` | 취소를 **받는 쪽** 담당 주선자에게 알린다 (누른 사람 제외)                      |
 | `0034_profile_images_owner_write.sql` | 사진 쓰기를 `app_is_admin()` 에서 `app_can_edit_profile` 로 조인다              |
@@ -66,11 +66,11 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0041_group_message_author_cleared.sql` | 계정 삭제 시 메시지의 작성자만 비우도록 가드 트리거 완화                            |
 | `0042_group_chat_millisecond_cursors.sql` | 채팅 시각을 `timestamptz(3)` 로 — 화면이 들고 있는 ISO 커서와 정밀도를 맞춘다     |
 | `0043_group_chat_notify.sql`       | 채팅 변화를 `pg_notify` 로 알린다 — 화면에 밀어주는 SSE 의 뿌리                          |
-| `0044_group_chat_system_messages.sql` | 방에 남는 사건 — 주선자 입·퇴장, 회원 등록, 신청·연결. 사람은 만들지도 지우지도 못한다 |
+| `0044_group_chat_system_messages.sql` | 방에 남는 사건 — 주선자 입·퇴장, 멤버 등록, 신청·연결. 사람은 만들지도 지우지도 못한다 |
 | `0045_group_chat_visible_from_join.sql` | 채팅은 **들어온 시점부터** 보인다. 합류 전 대화는 정책이 막는다                     |
 | `0046_group_owner_actions.sql`     | 모임장이 한 일을 방에 구분해 남긴다 — 내보내기·모임장 넘기기                            |
 | `0047_profile_hashtags.sql`        | 프로필 해시태그 — `profiles.hashtags` + 모양 검사 + 태그 검색 인덱스                    |
-| `0048_opposite_gender_only.sql`    | 회원이 보는 사람은 **이성만**. 열람 정책에 성별 조건 + 동성 신청 금지 트리거             |
+| `0048_opposite_gender_only.sql`    | 멤버가 보는 사람은 **이성만**. 열람 정책에 성별 조건 + 동성 신청 금지 트리거             |
 | `0049_self_request_keeps_its_own_reason.sql` | 자기 자신에게 낸 신청은 전용 제약이 이유를 말하도록 트리거가 비켜선다        |
 | `0050_oauth_login.sql`             | 주선자 인증을 소셜 로그인으로 — `oauth_accounts` 추가, 비밀번호 컬럼·시도 제한 테이블 삭제 |
 
@@ -78,7 +78,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 
 | 테이블                                         | 역할                                               | 앱 롤 접근                          |
 | ---------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
-| `groups`                                       | 모임. 이름·설명. 가입과 별개로 만든다              | 소속 주선자 + 소속 회원             |
+| `groups`                                       | 모임. 이름·설명. 가입과 별개로 만든다              | 소속 주선자 + 소속 멤버             |
 | `group_admins`                                 | 모임 ↔ 주선자 (**다대다**, 모임마다 OWNER 한 명)   | 같은 모임 주선자만 조회             |
 | `group_messages`                               | 모임 채팅방의 글과 사건(`system_kind`). 고칠 수 없고 사람의 글만 지워진다 | 같은 모임 주선자 중 **들어온 뒤의 것만** (쓰기는 본인 명의·사람의 글만) |
 | `group_chat_prefs`                             | 주선자별 방 상태 — 읽은 위치·텔레그램 알림 여부    | 본인 것만                           |
@@ -88,8 +88,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
 | `favorites`                                    | 관심                                               | 본인만                              |
 | `profile_hides`                                | 숨긴 상대. 양방향으로 목록·신청을 막는다           | **숨긴 사람만** (상대·관리자 불가)  |
-| `match_intents`                                | 회원이 낸 요청. 승인 전까지 **상대는 못 읽는다**   | 본인 + 담당 주선자                  |
-| `invites`                                      | **회원 로그인 링크** (토큰 해시만 저장)            | 관리자만                            |
+| `match_intents`                                | 멤버가 낸 요청. 승인 전까지 **상대는 못 읽는다**   | 본인 + 담당 주선자                  |
+| `invites`                                      | **멤버 로그인 링크** (토큰 해시만 저장)            | 관리자만                            |
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
 | `notifications`                                | 알림 아웃박스. 트리거가 만들고 디스패처가 보낸다   | 받는 사람이 **읽기만**              |
@@ -154,7 +154,7 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 
 `profile_hides_block_active_request` 트리거가 그 반대 방향을 막는다 — 활성 신청이 있는
 상대는 숨기지 못한다. 두 트리거가 함께 있어야 「숨김 + 활성 신청」이 어느 순서로도
-만들어지지 않는다. 그 조합은 회원이 스스로 되돌릴 수 없는 상태다.
+만들어지지 않는다. 그 조합은 멤버가 스스로 되돌릴 수 없는 상태다.
 
 `group_messages_broadcast_created` · `group_messages_broadcast_deleted` 트리거가 채널
 `bolsaram_group_chat` 으로 `pg_notify` 한다. **payload 에 본문이 없다** — 이 채널은
@@ -176,8 +176,8 @@ DB 에서 채운다. 코드가 빠뜨려도 기록이 남는다.
 (전체공개 · 삭제 중인 모임)는 조용히 넘어간다. **문장이 아니라 사실을 저장한다** —
 본문은 비우고 종류와 `payload`(공개 번호 · 주선자 이름)만 남겨 화면이 문장을 만든다.
 작성자 자리에는 그 사건을 일으킨 **주선자**만 들어간다(`app_group_chat_actor()`) —
-회원이 낸 신청은 비어 있다. 주선자 방에 회원 계정을 작성자로 박으면 이름 조인으로
-회원 이름이 새어 나간다.
+멤버가 낸 신청은 비어 있다. 주선자 방에 멤버 계정을 작성자로 박으면 이름 조인으로
+멤버 이름이 새어 나간다.
 
 `group_messages_notify` 트리거가 새 글을 알림을 켜 둔 같은 방 주선자에게 넣는다.
 **시스템 메시지는 빼고** 보낸다(0044) — 신청·연결은 0017 계열이 이미 알린다. 쓴 사람은
@@ -226,26 +226,26 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 | `app_can_view_profile_as_admin(uuid)`  | 전체공개이거나 자기 모임인가 (읽기)                 |
 | `app_can_edit_profile(uuid)`           | 자기 모임이거나, 전체공개인데 자기가 등록했는가     |
 | `app_can_edit_import(uuid)`            | 위와 같은 판정을 Import 세션에                      |
-| `app_current_member_group()`           | 현재 회원이 속한 풀 (전체공개 회원은 NULL)          |
-| `app_current_member_gender()`          | 현재 회원(대행 중이면 그 프로필)의 성별             |
+| `app_current_member_group()`           | 현재 멤버가 속한 풀 (전체공개 멤버는 NULL)          |
+| `app_current_member_gender()`          | 현재 멤버(대행 중이면 그 프로필)의 성별             |
 | `app_profile_admins(uuid)`             | 그 프로필의 담당 주선자 집합 (알림 수신자)          |
 | `app_is_rejected_between(uuid[, uuid])` | 어느 방향이든 거절 이력이 있는가                   |
 | `app_is_hidden_between(uuid[, uuid])`  | 어느 방향이든 숨긴 관계인가                         |
 
 - 익명(둘 다 NULL)은 어떤 프로필도 읽지 못한다.
 - 모임에 속하지 않은 주선자는 전체공개 프로필만 보고, 고치는 것은 자기가 등록한 것뿐이다.
-- 회원은 **자기와 같은 풀** 안의 공개 프로필만 보고, 풀을 넘는 소개 신청은 만들 수 없다
-  (`IS NOT DISTINCT FROM` 이라 전체공개 회원끼리도 서로 보인다).
-- 회원이 보는 사람은 **이성뿐이다**(`gender <> app_current_member_gender()`). 동성에게는
+- 멤버는 **자기와 같은 풀** 안의 공개 프로필만 보고, 풀을 넘는 소개 신청은 만들 수 없다
+  (`IS NOT DISTINCT FROM` 이라 전체공개 멤버끼리도 서로 보인다).
+- 멤버가 보는 사람은 **이성뿐이다**(`gender <> app_current_member_gender()`). 동성에게는
   신청도 만들어지지 않는다 — `match_requests_require_opposite_gender` 트리거가 막는다.
   **대행 중인 주선자는 이 정책으로 걸리지 않는다** — 주선자 절로 먼저 통과하기 때문이며,
   대행의 경계는 애플리케이션 레이어(`isMemberView`)가 판정한다.
 - **claim 정책은 없다.** 주인 없는 프로필을 자기 것으로 만드는 것은 해시된 초대 토큰을
   검증하는 인증 레이어(owner 커넥션)에서만 일어난다. 정책으로 열어두면 초대 없이도
   남의 프로필을 가져갈 수 있다(0013 에서 제거).
-- 회원은 공개 프로필과 자기 프로필만 읽고, 프로필을 만들거나 남의 것을 고칠 수 없다.
+- 멤버는 공개 프로필과 자기 프로필만 읽고, 프로필을 만들거나 남의 것을 고칠 수 없다.
 - 신청은 **자기 명의로만** 만들 수 있다(`requester_profile_id = app_current_profile_id()`).
-  담당 주선자가 회원의 요청을 승인하며 만드는 경로는 예외이고, 그때도 풀 경계는 지킨다.
+  담당 주선자가 멤버의 요청을 승인하며 만드는 경로는 예외이고, 그때도 풀 경계는 지킨다.
 - **신청을 옮기는 것은 그 답을 낸 사람의 담당 주선자다.** 읽기는 양쪽 담당이 함께 하지만
   수락·거절은 받은 쪽 담당, 취소는 신청자 쪽 담당만 기록한다 — 수락은 연락처 상호 공개라
   그 동의가 상대의 것이어야 한다. 종료는 목록 정리라 양쪽 누구나 한다.

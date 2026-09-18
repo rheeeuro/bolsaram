@@ -8,7 +8,7 @@ import type { ProfileDetailView } from "@/server/views/profile-view";
  * 담당이 아닌 프로필의 상세.
  *
  * 전체공개 풀은 모든 주선자가 보지만 고치는 것은 등록한 사람뿐이다(0011). 그래서
- * 편집 폼·공개 전환·초대를 두지 않고 회원에게 소개하는 데 필요한 것만 보여준다.
+ * 편집 폼·공개 전환·초대를 두지 않고 멤버에게 소개하는 데 필요한 것만 보여준다.
  * 이름과 연락처는 공개 단계가 허락할 때만 `profile` 에 들어온다 — 여기서 다시
  * 판정하지 않는다.
  */
@@ -89,7 +89,7 @@ export function HostProfileReadonly({
         </Panel>
       ) : null}
 
-      <Panel title="회원에게 보이는 내용">
+      <Panel title="멤버에게 보이는 내용">
         <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {facts
             .filter((f): f is [string, string] => f[1] != null && f[1] !== "")

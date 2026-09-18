@@ -19,7 +19,7 @@ docker exec -it bolsaram_postgres psql -U bolsaram_owner -d bolsaram
 - `bolsaram_owner` — 마이그레이션·시드·인증 경로. **RLS 를 우회한다.**
 - `bolsaram_app` — 런타임. `NOBYPASSRLS` 라 정책을 통과해야 한다.
 
-owner 로 조회하면 정책이 적용되지 않으므로, **"회원에게 보이는가"를 확인할 때는
+owner 로 조회하면 정책이 적용되지 않으므로, **"멤버에게 보이는가"를 확인할 때는
 owner psql 로 판단하지 말 것.** RLS 동작은 `tests/rls.test.ts` 나 실제 API 호출로 확인한다.
 
 ## 자주 쓰는 조회

@@ -39,7 +39,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기·권한 경계 | 필요 | 29 |
 | `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
 | `group-isolation.test.ts`      | 모임 간 격리·claim 가로채기 차단               | 필요 | 12   |
-| `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·회원 삭제    | 필요 | 8    |
+| `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·멤버 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입(소셜 첫 로그인)·계정 잇기·전체공개 풀·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 48 |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 11   |
 | `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 30 |
@@ -84,7 +84,7 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `cleanup.test.ts` 「참조된 사진은 남긴다」                 | 정리 작업이 게시된 사진을 깨지 않음 |
 | `telegram-import.test.ts` 「같은 update_id 는 한 번만」    | webhook 재전송이 사진을 두 번 저장하지 않음 |
 | `telegram-import.test.ts` 「연결되지 않은 …신원이 없다」   | 검색으로 봇을 찾은 외부인 차단      |
-| `telegram-import.test.ts` 「회원 계정으로는 …없다」        | 텔레그램은 주선자 전용 채널         |
+| `telegram-import.test.ts` 「멤버 계정으로는 …없다」        | 텔레그램은 주선자 전용 채널         |
 | `telegram-import.test.ts` 「같은 앨범이 동시에」           | 앨범 사진의 순서·번호 충돌 없음     |
 | `telegram-import.test.ts` 「런타임 롤은 …접근할 수 없다」  | 봇 연결 코드·webhook 이벤트 격리    |
 | `telegram-import.test.ts` 「모임이 없어도 …만든다」        | 모임 없는 주선자도 봇을 쓸 수 있음  |
@@ -93,16 +93,16 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `telegram-state.test.ts` 「직접 보낸 글이 …우선한다」      | 원문 우선순위(§5.4)                 |
 | `oauth-login.test.ts` 「state 가 다르면 거절한다」         | 남이 시작한 로그인으로 세션을 못 만듦 |
 | `oauth-login.test.ts` 「쿠키를 고치면 …거절한다」          | 왕복 상태 위조 차단                 |
-| `admin-signup.test.ts` 「회원 계정에는 …붙이지 않는다」    | 회원 계정이 소셜 로그인으로 열리지 않음 |
+| `admin-signup.test.ts` 「멤버 계정에는 …붙이지 않는다」    | 멤버 계정이 소셜 로그인으로 열리지 않음 |
 | `group-isolation.test.ts` 「남의 모임 …못한다」            | 주선자 자유 가입의 마지막 방어선    |
 | `group-isolation.test.ts` 「모임을 넘는 소개 신청」        | 테넌트 경계를 넘는 신청 차단        |
 | `admin-signup.test.ts` 「전체공개를 남이 고칠 수 없다」    | 보이는 것과 고치는 것을 분리         |
-| `admin-signup.test.ts` 「마지막 주선자는 …나갈 수 없다」   | 아무도 못 보는 회원을 만들지 않음    |
-| `admin-signup.test.ts` 「회원이 남아 있으면 폐쇄할 수 없다」| 방을 치우며 회원이 사라지지 않음     |
+| `admin-signup.test.ts` 「마지막 주선자는 …나갈 수 없다」   | 아무도 못 보는 멤버를 만들지 않음    |
+| `admin-signup.test.ts` 「멤버가 남아 있으면 폐쇄할 수 없다」| 방을 치우며 멤버가 사라지지 않음     |
 | `admin-signup.test.ts` 「모임장이 아닌 …폐쇄할 수 없다」   | 방을 없애는 것은 모임장만            |
 | `group-isolation.test.ts` 「남의 프로필을 자기 것으로」    | 초대 없는 claim 차단 (0013)          |
-| `member-magic-link.test.ts` 「같은 링크를 두 번」          | 링크 replay 차단 (회원 로그인 수단)  |
-| `member-magic-link.test.ts` 「링크를 쓴 회원을 삭제」      | 탈퇴 처리가 제약에 막히지 않음 (0016)|
+| `member-magic-link.test.ts` 「같은 링크를 두 번」          | 링크 replay 차단 (멤버 로그인 수단)  |
+| `member-magic-link.test.ts` 「링크를 쓴 멤버를 삭제」      | 탈퇴 처리가 제약에 막히지 않음 (0016)|
 | `notifications.test.ts` 「남의 모임 주선자에게는」         | 알림이 담당자 밖으로 새지 않음      |
 | `notifications.test.ts` 「런타임 롤은 …만들지 못한다」     | 남의 봇으로 임의 발송 차단          |
 | `group-chat.test.ts` 「다른 모임 주선자는 읽지 못한다」    | 운영 대화가 모임 밖으로 새지 않음   |
@@ -110,7 +110,7 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `group-chat.test.ts` 「계정이 지워져도 대화는 남고」       | 가드가 계정 삭제를 막지 않음 (0041) |
 | `group-chat.test.ts` 「payload 에 본문이 없다」            | 권한 없는 채널로 내용이 새지 않음 (0043) |
 | `group-chat.test.ts` 「사람이 시스템 메시지를 만들지」     | 사건 기록을 손으로 지어내지 못함 (0044) |
-| `group-chat.test.ts` 「회원 등록은 공개 번호로만」         | 방에 회원 이름이 적히지 않음 (0044) |
+| `group-chat.test.ts` 「멤버 등록은 공개 번호로만」         | 방에 멤버 이름이 적히지 않음 (0044) |
 | `group-chat.test.ts` 「합류 전 대화는 보이지 않는다」      | 초대가 과거 전부를 열지 않음 (0045) |
 | `group-chat.test.ts` 「자기 입장 기록이 첫 줄이다」        | 정밀도 차이로 첫 줄이 빠지지 않음 (0045) |
 | `docs-guide.test.ts`                                       | 사용자 문서와 구현의 정합성         |

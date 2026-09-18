@@ -6,7 +6,7 @@
  * 모임을 보고 있는지는 `users.active_group_id` 에 있고(0036) 소속이 아닌 것을 가리키면
  * 전체공개로 떨어진다.
  *
- * 초대 코드는 `invites`(회원 초대)·`telegram_link_codes` 와 같은 방식이다 — 평문을
+ * 초대 코드는 `invites`(멤버 초대)·`telegram_link_codes` 와 같은 방식이다 — 평문을
  * 저장하지 않고 pepper 를 섞은 해시만 남기며, 소비는 조건부 UPDATE 로 한 번만
  * 성공한다(replay 차단).
  *
@@ -55,7 +55,7 @@ export async function createGroupForAdmin(input: {
   });
 }
 
-/** 초대 코드 유효시간. 회원 초대(72시간)보다 짧게 둔다 — 주선자 권한이 더 세다. */
+/** 초대 코드 유효시간. 멤버 초대(72시간)보다 짧게 둔다 — 주선자 권한이 더 세다. */
 export const GROUP_INVITE_TTL_HOURS = 24;
 
 function hashCode(code: string): string {
@@ -175,10 +175,10 @@ export async function consumeGroupInvite(input: {
 export type GroupSummary = {
   groupId: string;
   name: string;
-  /** 주선자들끼리 보는 메모. 회원에게는 노출하지 않는다. */
+  /** 주선자들끼리 보는 메모. 멤버에게는 노출하지 않는다. */
   description: string | null;
   isOwner: boolean;
-  /** 이 모임에 등록된 회원 수. 목록에서 어느 방이 활발한지 가늠하는 데 쓴다. */
+  /** 이 모임에 등록된 멤버 수. 목록에서 어느 방이 활발한지 가늠하는 데 쓴다. */
   memberCount: number;
   /** 이 모임으로 가져온 Import 건수. 폐쇄를 막는 것이 무엇인지 화면에 적을 때 쓴다. */
   importCount: number;
@@ -334,7 +334,7 @@ export async function transferGroupOwnership(input: {
  * 다른 주선자를 모임에서 내보낸다. 모임장만 할 수 있다.
  *
  * 나가는 것(`leaveGroup`)과 결과는 같지만 **부르는 사람이 다르다.** 초대 코드가 잘못
- * 전달됐을 때 되돌릴 수 있는 유일한 경로다 — 소속이 사라지면 RLS 가 그 모임의 회원을
+ * 전달됐을 때 되돌릴 수 있는 유일한 경로다 — 소속이 사라지면 RLS 가 그 모임의 멤버를
  * 전부 가린다.
  *
  * 자기 자신은 이 경로로 뺄 수 없다. 모임장이 빠지는 것은 나가기이고, 그쪽은 남은
@@ -369,9 +369,9 @@ export async function removeGroupAdmin(input: {
 /**
  * 모임 하나에서 나간다.
  *
- * 막는 경우가 하나 있다 — **마지막 주선자인데 모임에 회원이나 Import 가 남아 있으면**
+ * 막는 경우가 하나 있다 — **마지막 주선자인데 모임에 멤버나 Import 가 남아 있으면**
  * 나갈 수 없다. 나가면 그 데이터를 아무도 볼 수 없게 되고(RLS 가 전부 막는다) 되돌릴
- * 방법도 없다. 먼저 회원을 전체공개로 옮기거나 동료를 초대하라고 알려준다.
+ * 방법도 없다. 먼저 멤버를 전체공개로 옮기거나 동료를 초대하라고 알려준다.
  *
  * 비어 있는 모임이면 나가면서 모임까지 지운다 — 주인 없는 빈 모임을 남기지 않는다.
  * 모임장이 나가고 다른 주선자가 남으면 가장 먼저 들어온 사람에게 모임장을 넘긴다
@@ -412,7 +412,7 @@ export async function leaveGroup(
       if ((left.rows[0]?.count ?? 0) > 0) {
         throw new DomainError(
           "CONFLICT",
-          "모임에 회원이나 가져온 프로필이 남아 있어 나갈 수 없습니다." +
+          "모임에 멤버나 가져온 프로필이 남아 있어 나갈 수 없습니다." +
             " 전체공개로 옮기거나 동료 주선자를 초대한 뒤 나가 주세요.",
         );
       }
@@ -463,12 +463,12 @@ export async function leaveGroup(
 /**
  * 모임을 폐쇄한다. 모임장만 할 수 있다.
  *
- * **비어 있을 때만 지운다** — 회원이나 가져온 프로필이 하나라도 남아 있으면 막는다.
+ * **비어 있을 때만 지운다** — 멤버나 가져온 프로필이 하나라도 남아 있으면 막는다.
  * 나가기(`leaveGroup`)가 마지막 주선자를 막는 것과 같은 기준이다. 모임이 사라지면
  * 그 데이터는 RLS 가 전부 가려 아무도 되살릴 수 없기 때문에, 폐쇄는 「정리가 끝난
  * 방을 치우는 일」로만 둔다.
  *
- * 다른 주선자가 남아 있어도 지운다. 잃을 회원이 없는 빈 방이고, 남은 사람들의 소속과
+ * 다른 주선자가 남아 있어도 지운다. 잃을 멤버가 없는 빈 방이고, 남은 사람들의 소속과
  * 활성 채널은 CASCADE 와 `ON DELETE SET NULL` 이 함께 정리한다(0036).
  */
 export async function closeGroup(input: {
@@ -488,7 +488,7 @@ export async function closeGroup(input: {
     if ((left.rows[0]?.count ?? 0) > 0) {
       throw new DomainError(
         "CONFLICT",
-        "모임에 회원이나 가져온 프로필이 남아 있어 폐쇄할 수 없습니다." +
+        "모임에 멤버나 가져온 프로필이 남아 있어 폐쇄할 수 없습니다." +
           " 전체공개로 옮기거나 정리한 뒤 다시 시도해 주세요.",
       );
     }

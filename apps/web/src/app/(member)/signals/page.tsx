@@ -2,7 +2,11 @@
 import { withRls } from "@bolsaram/db";
 import { requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { Empty } from "@/components/ui/empty";
-import { listSignals, type SignalDirection } from "@/server/repo/matches";
+import {
+  listSignals,
+  type MatchRequestRecord,
+  type SignalDirection,
+} from "@/server/repo/matches";
 import { listPendingIntentsForProfile } from "@/server/repo/match-intents";
 import { findProfilesByIds } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
@@ -36,9 +40,18 @@ export default async function SignalsPage({
   }
 
   const profileId = viewer.profileId;
-  const items = await withRls(rlsContextOf(viewer), async (sql) => {
-    const signals = await listSignals(sql, profileId, direction);
-    // 주선자 확인을 기다리는 요청(0026). 이것이 없으면 회원은 방금 누른 것이 어디로
+  const groups = await withRls(rlsContextOf(viewer), async (sql) => {
+    // 세 방향을 한 번에 읽는다 — 탭 전환은 화면에서 일어나고 서버를 다시 부르지
+    // 않는다. 한 사람의 시그널은 세 방향을 합쳐도 적다. 커넥션 하나를 쓰므로
+    // 동시에 던지지 않고 차례로 읽는다.
+    const byDirection: Record<SignalDirection, MatchRequestRecord[]> = {
+      incoming: [],
+      outgoing: [],
+      connected: [],
+    };
+    for (const d of DIRECTIONS) byDirection[d] = await listSignals(sql, profileId, d);
+
+    // 주선자 확인을 기다리는 요청(0026). 이것이 없으면 멤버는 방금 누른 것이 어디로
     // 갔는지 알 수 없다 — 신청은 승인된 뒤에야 생기기 때문이다.
     const pending = await listPendingIntentsForProfile(sql, profileId);
     const pendingByRequest = new Map(
@@ -47,26 +60,24 @@ export default async function SignalsPage({
         .map((intent) => [intent.matchRequestId!, intent]),
     );
     // 아직 신청이 없는 「마음 보내기」는 보낸 탭에 요청 그대로 세운다.
-    const pendingSends =
-      direction === "outgoing"
-        ? pending.filter((intent) => intent.kind === "SEND" && intent.targetProfileId != null)
-        : [];
+    const pendingSends = pending.filter(
+      (intent) => intent.kind === "SEND" && intent.targetProfileId != null,
+    );
+
+    const otherOf = (signal: MatchRequestRecord) =>
+      signal.requesterProfileId === profileId
+        ? signal.targetProfileId
+        : signal.requesterProfileId;
 
     const otherIds = [
-      ...signals.map((s) =>
-        s.requesterProfileId === profileId ? s.targetProfileId : s.requesterProfileId,
-      ),
+      ...DIRECTIONS.flatMap((d) => byDirection[d].map(otherOf)),
       ...pendingSends.map((intent) => intent.targetProfileId!),
     ];
     const profiles = await findProfilesByIds(sql, [...new Set(otherIds)]);
     const byId = new Map(profiles.map((p) => [p.id, p]));
 
-    const fromSignals = signals.map((signal) => {
-      const otherId =
-        signal.requesterProfileId === profileId
-          ? signal.targetProfileId
-          : signal.requesterProfileId;
-      const other = byId.get(otherId);
+    const toItem = (signal: MatchRequestRecord) => {
+      const other = byId.get(otherOf(signal));
       return {
         id: signal.id,
         status: signal.status,
@@ -77,7 +88,7 @@ export default async function SignalsPage({
         profile: other ? toCardView(other) : null,
         pendingKind: pendingByRequest.get(signal.id)?.kind ?? null,
       };
-    });
+    };
 
     const fromIntents = pendingSends.map((intent) => {
       const other = byId.get(intent.targetProfileId!);
@@ -93,12 +104,16 @@ export default async function SignalsPage({
       };
     });
 
-    return [...fromIntents, ...fromSignals];
+    return {
+      incoming: byDirection.incoming.map(toItem),
+      outgoing: [...fromIntents, ...byDirection.outgoing.map(toItem)],
+      connected: byDirection.connected.map(toItem),
+    };
   });
 
   return (
     <PageShell>
-      <SignalTabs direction={direction} items={items} />
+      <SignalTabs initialTab={direction} groups={groups} />
     </PageShell>
   );
 }

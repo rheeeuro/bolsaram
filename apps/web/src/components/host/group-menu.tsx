@@ -139,7 +139,7 @@ function InviteDialog({
   );
 }
 
-/** 모임 나가기. 마지막 주선자는 회원이 남아 있는 동안 나갈 수 없다(서버가 막는다). */
+/** 모임 나가기. 마지막 주선자는 멤버가 남아 있는 동안 나갈 수 없다(서버가 막는다). */
 function LeaveDialog({
   open,
   groupId,
@@ -159,8 +159,8 @@ function LeaveDialog({
     <Dialog open={open} onClose={onClose} label="모임 나가기">
       <h2 className="display text-[19px] text-[var(--surface-text)]">모임 나가기</h2>
       <p className="mb-4 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-        「{groupName}」 의 회원이 더 이상 보이지 않습니다. 다시 들어오려면 초대 코드가
-        필요합니다. 마지막 주선자라면 회원이 남아 있는 동안 나갈 수 없습니다.
+        「{groupName}」 의 멤버가 더 이상 보이지 않습니다. 다시 들어오려면 초대 코드가
+        필요합니다. 마지막 주선자라면 멤버가 남아 있는 동안 나갈 수 없습니다.
       </p>
       <FormError>{error}</FormError>
       <div className="mt-5 flex justify-end gap-2">

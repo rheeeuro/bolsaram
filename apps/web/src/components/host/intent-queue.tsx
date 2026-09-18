@@ -34,9 +34,9 @@ const EFFECT: Record<MatchIntentKind, string> = {
 };
 
 /**
- * 회원이 낸 요청을 확인하는 큐 (0026).
+ * 멤버가 낸 요청을 확인하는 큐 (0026).
  *
- * 볼사람에서 회원이 누르는 것은 결정이 아니라 요청이다. 여기서 주선자가 확인해야
+ * 볼사람에서 멤버가 누르는 것은 결정이 아니라 요청이다. 여기서 주선자가 확인해야
  * 상대에게 전달되거나 연결된다 — 그래서 신청 목록보다 위에 둔다.
  */
 export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
@@ -64,7 +64,7 @@ export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
       className="mb-5 border-[var(--color-rose-200)]"
     >
       <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-        회원이 누른 것은 아직 상대에게 가지 않았습니다. 확인하면 그때 전달됩니다.
+        멤버가 누른 것은 아직 상대에게 가지 않았습니다. 확인하면 그때 전달됩니다.
         보고 있는 모임과 상관없이 맡은 분들의 요청을 모두 보여줍니다.
       </p>
 

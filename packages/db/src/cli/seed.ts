@@ -216,12 +216,12 @@ async function main(): Promise<void> {
       }
     }
 
-    // ── 회원 계정 + Claim (앞 6명) ─────────────────────────
+    // ── 멤버 계정 + Claim (앞 6명) ─────────────────────────
     for (let i = 0; i < 6; i += 1) {
       const phone = `0102000${String(1000 + i)}`;
       const user = await sql.query<{ id: string }>(
         `INSERT INTO users (role, phone, display_name) VALUES ('MEMBER', $1, $2) RETURNING id`,
-        [phone, `회원${i + 1}`],
+        [phone, `멤버${i + 1}`],
       );
       await sql.query(`UPDATE profiles SET user_id = $2 WHERE id = $1`, [
         profileIds[i]!,
@@ -242,7 +242,7 @@ async function main(): Promise<void> {
        VALUES ($1,$2,'REJECTED','취미가 비슷해서 반가웠어요.','지금은 어려울 것 같아요.', now())`,
       [c, d],
     );
-    // 안내문이 있는 연결 건. 새로 쓰는 경로는 없지만 회원 화면이 아직 표시한다.
+    // 안내문이 있는 연결 건. 새로 쓰는 경로는 없지만 멤버 화면이 아직 표시한다.
     await sql.query(
       `INSERT INTO match_requests
          (requester_profile_id, target_profile_id, status, responded_at, introduced_at, introduce_note)
@@ -254,11 +254,11 @@ async function main(): Promise<void> {
       [
         "시드 완료",
         `  프로필 ${total}개 (공개 20 / 대기 4), 사진 ${total * 2}장`,
-        `  회원 계정 6개 — 로그인 번호 01020001000 ~ 01020001005`,
+        `  멤버 계정 6개 — 로그인 번호 01020001000 ~ 01020001005`,
         adminLine,
         "",
         "  모든 인물 정보와 사진은 합성 데이터입니다.",
-        `  회원은 비밀번호가 없습니다 — 관리자 화면에서 초대 링크를 발급해 로그인합니다.`,
+        `  멤버는 비밀번호가 없습니다 — 관리자 화면에서 초대 링크를 발급해 로그인합니다.`,
       ].join("\n"),
     );
   });

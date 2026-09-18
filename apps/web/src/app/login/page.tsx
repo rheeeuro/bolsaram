@@ -2,7 +2,7 @@
  * 주선자 로그인 — 카카오 · 구글.
  *
  * 가입 화면이 따로 없다. 처음 들어온 소셜 계정이면 그 자리에서 주선자 계정이 만들어지고,
- * 그다음부터는 같은 버튼이 로그인이다. 회원 입장은 `/enter`(입장코드)로 분리돼 있다.
+ * 그다음부터는 같은 버튼이 로그인이다. 멤버 입장은 `/enter`(입장코드)로 분리돼 있다.
  */
 import { redirect } from "next/navigation";
 import { OAUTH_PROVIDER_LABELS } from "@bolsaram/schemas";
@@ -36,11 +36,11 @@ export default async function LoginPage({
   return (
     <AuthShell
       title="주선자 로그인"
-      description="회원을 등록하고 연결하는 분을 위한 화면입니다. 처음이시면 로그인과 동시에 계정이 만들어집니다."
+      description="멤버를 등록하고 연결하는 분을 위한 화면입니다. 처음이시면 로그인과 동시에 계정이 만들어집니다."
       footer={
         <>
           <AuthFooterLink href="/enter" label="입장코드로 들어가기">
-            초대받은 회원이신가요?
+            초대받은 멤버이신가요?
           </AuthFooterLink>
         </>
       }

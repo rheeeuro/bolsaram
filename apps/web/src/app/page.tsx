@@ -62,7 +62,7 @@ export default async function IntroPage() {
           <p className="mt-3 text-center text-[12px] leading-relaxed text-[var(--color-ink-600)]">
             볼사람은 주선자가 검증한 분만 참여하는 비공개 서비스입니다.
             <br />
-            주선자는 카카오·구글로 들어오고, 회원은 초대 링크를 열면 바로 들어갑니다.
+            주선자는 카카오·구글로 들어오고, 멤버는 초대 링크를 열면 바로 들어갑니다.
           </p>
           <p className="text-center text-[12px] text-[var(--color-ink-600)]">
             <Link href="/privacy" className="underline">

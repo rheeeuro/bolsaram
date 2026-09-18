@@ -9,7 +9,7 @@ import { apiPost } from "@/lib/api-client";
  * 초대 링크 진입 버튼.
  *
  * 로그인 화면을 거치지 않는다 — 이 버튼이 곧 로그인이다. 링크를 소비하면 세션이
- * 생기고, 처음이면 회원 계정도 함께 만들어진다.
+ * 생기고, 처음이면 멤버 계정도 함께 만들어진다.
  */
 export function ClaimForm({
   token,

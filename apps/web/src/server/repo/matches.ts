@@ -87,7 +87,7 @@ export async function findActiveBetween(
  * 판정을 DEFINER 함수에 맡긴다 — 정책상 당사자에게는 두 방향이 다 보이지만, 신청
  * 차단이 호출자에게 보이는 행에 좌우되면 안 된다.
  *
- * 두 프로필을 모두 인자로 넘긴다. 주선자가 회원의 요청을 승인하는 경로에는 세션
+ * 두 프로필을 모두 인자로 넘긴다. 주선자가 멤버의 요청을 승인하는 경로에는 세션
  * 프로필이 없어(NULL) 한쪽을 세션에서 가져오면 어떤 관계도 찾지 못한다.
  */
 export async function isRejectedBetween(
@@ -106,7 +106,7 @@ export async function isRejectedBetween(
  * 신청을 만들 수 있는 관계인지 본다(자기 자신 / 활성 중복 / 거절·숨김 / 이성 여부).
  *
  * 신청을 바로 만드는 경로와, 주선자 확인을 기다리는 요청(0026)을 남기는 경로가
- * **같은 판정**을 써야 한다. 회원에게 「확인 중」이라고 해놓고 주선자가 승인할 때
+ * **같은 판정**을 써야 한다. 멤버에게 「확인 중」이라고 해놓고 주선자가 승인할 때
  * 비로소 막히면 안 된다.
  */
 export async function assertRequestable(
@@ -277,7 +277,7 @@ export async function listSignals(
 /**
  * 아직 답하지 않은 받은 신청 수. 하단 탭 배지에 쓴다.
  *
- * 회원에게는 알림을 보내지 않으므로(주선자만 텔레그램으로 받는다) 회원이 새 신청을
+ * 멤버에게는 알림을 보내지 않으므로(주선자만 텔레그램으로 받는다) 멤버가 새 신청을
  * 알아차릴 곳은 이 배지뿐이다.
  */
 export async function countPendingIncoming(sql: Sql, profileId: string): Promise<number> {
@@ -319,11 +319,11 @@ export async function listForAdmin(
 }
 
 /**
- * **주선자 화면용.** 자기가 맡은 회원이 낀 연결에서 상대 쪽 프로필 id 집합.
+ * **주선자 화면용.** 자기가 맡은 멤버가 낀 연결에서 상대 쪽 프로필 id 집합.
  *
- * 담당이 아닌 프로필의 이름·연락처를 언제 여는지를 정한다 — 자기 회원과 연결된
+ * 담당이 아닌 프로필의 이름·연락처를 언제 여는지를 정한다 — 자기 멤버와 연결된
  * 뒤에야 연다. RLS 가 이미 자기가 낀 신청만 보여주므로(0027) 여기서 다시 거르지
- * 않는다. CLOSED 를 포함하는 이유는 회원 경로와 같다(0022).
+ * 않는다. CLOSED 를 포함하는 이유는 멤버 경로와 같다(0022).
  */
 export async function introducedWithManaged(sql: Sql): Promise<Set<string>> {
   const result = await sql.query<{ other: string }>(

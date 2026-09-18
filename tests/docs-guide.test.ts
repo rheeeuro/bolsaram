@@ -120,14 +120,14 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
       .join("\n");
   })();
 
-  it("회원 로그인에 인증번호를 쓰지 않는다", () => {
+  it("멤버 로그인에 인증번호를 쓰지 않는다", () => {
     // SMS 를 쓰지 않기로 해서 OTP 경로를 제거했다(0015). 안 쓰는 인증 경로를
     // 코드에 남겨두면 가이드와 실제가 어긋난다.
     // 주석에는 "OTP 경로를 제거했다"처럼 남을 수 있으므로 **함수와 상수**만 본다.
     expect(authSource).not.toMatch(
       /issueLoginCode|verifyLoginCode|OTP_TTL_MS|OTP_MAX_ATTEMPTS/,
     );
-    // 회원 로그인 경로는 초대 링크뿐이다.
+    // 멤버 로그인 경로는 초대 링크뿐이다.
     expect(guide("member.md")).toMatch(/링크/);
   });
 
@@ -403,7 +403,7 @@ describe("가이드가 보안 약속을 정확히 설명한다", () => {
 
   it("텔레그램이 주선자 전용 통로라고 적혀 있다", () => {
     // consumeTelegramLinkCode 가 ADMIN 이 아닌 계정을 거부한다
-    // (tests/telegram-import.test.ts 「회원 계정으로는 봇을 연결할 수 없다」).
+    // (tests/telegram-import.test.ts 「멤버 계정으로는 봇을 연결할 수 없다」).
     expect(ALL).toMatch(/주선자 전용 통로/);
   });
 

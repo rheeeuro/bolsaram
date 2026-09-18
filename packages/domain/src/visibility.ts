@@ -106,7 +106,7 @@ function primaryImageOnly(profile: FullProfile): FullProfile["images"] {
   return primary ? [primary] : [];
 }
 
-/** 회원이 Discover 에서 볼 수 있는 프로필인지. */
+/** 멤버가 Discover 에서 볼 수 있는 프로필인지. */
 export function isDiscoverable(profile: {
   status: ProfileStatus;
   visibility: Visibility;
@@ -118,14 +118,14 @@ export function isDiscoverable(profile: {
 }
 
 /**
- * 회원이 볼 수 있는 상대인가 — **이성만**이다.
+ * 멤버가 볼 수 있는 상대인가 — **이성만**이다.
  *
  * 볼사람은 이성 소개만 다룬다. 성별이 같으면 목록·상세·신청 어디에서도 만나지 않는다.
  * 한 곳에서만 걸러도 다른 경로로 새므로(목록에서 빠져도 주소를 직접 열 수 있다)
  * 판정을 여기 하나로 두고 각 경로가 같은 함수를 부른다.
  *
  * 주선자 화면은 이 경계를 쓰지 않는다 — 주선자는 양쪽을 다 보고 등록한다.
- * 대행 중인 주선자는 **회원 화면을 보는 것**이므로 대행 프로필 기준으로 걸린다.
+ * 대행 중인 주선자는 **멤버 화면을 보는 것**이므로 대행 프로필 기준으로 걸린다.
  */
 export function isOppositeGender(viewerGender: Gender, targetGender: Gender): boolean {
   return viewerGender !== targetGender;
@@ -158,7 +158,7 @@ export function isDetailAccessible(profile: {
 /**
  * 익명 코드 표기. 리스트/상세 모두 `17번` 형태로 통일한다.
  *
- * 기호를 붙이지 않는다 — 화면에서 `#` 은 해시태그의 것이고, 다른 기호를 회원번호에
+ * 기호를 붙이지 않는다 — 화면에서 `#` 은 해시태그의 것이고, 다른 기호를 멤버 번호에
  * 주면 둘 다 기호로 시작해 한눈에 갈리지 않는다. 종류는 앞에 붙는 아이콘이 말하고
  * (`components/ui/marks.tsx`), 아이콘을 쓸 수 없는 문장에서도 「17번 님이」처럼
  * 그대로 읽힌다. 모임 채팅의 시스템 메시지가 쓰는 어법과 같다.

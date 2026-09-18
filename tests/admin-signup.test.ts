@@ -157,19 +157,19 @@ describe("가입", () => {
     await expect(loginWithOAuth(anonymous)).resolves.toBe(userId);
   });
 
-  it("회원 계정에는 소셜 계정을 붙이지 않는다", async () => {
-    // 회원은 초대 링크로만 들어온다. 이메일이 겹친다고 회원 계정을 열어주면 안 된다.
+  it("멤버 계정에는 소셜 계정을 붙이지 않는다", async () => {
+    // 멤버는 초대 링크로만 들어온다. 이메일이 겹친다고 멤버 계정을 열어주면 안 된다.
     const email = nextEmail();
     await withOwner((sql) =>
       sql.query(
         `INSERT INTO users (role, phone, email, display_name)
          VALUES ('MEMBER', $1, $2, $3)`,
-        [`0102000${(9000 + seq).toString().slice(-4)}`, email, `${TAG}-회원`],
+        [`0102000${(9000 + seq).toString().slice(-4)}`, email, `${TAG}-멤버`],
       ),
     );
     await expect(
-      loginWithOAuth(identity({ email, displayName: `${TAG}-회원가장` })),
-    ).rejects.toThrow(/회원 계정/);
+      loginWithOAuth(identity({ email, displayName: `${TAG}-멤버가장` })),
+    ).rejects.toThrow(/멤버 계정/);
   });
 });
 
@@ -179,7 +179,7 @@ describe("전체공개 풀", () => {
     const publicId = await seedProfile({
       groupId: null,
       createdBy: owner.userId,
-      name: "공개회원",
+      name: "공개멤버",
     });
 
     const fresh = await newAdmin("신규");
@@ -200,7 +200,7 @@ describe("전체공개 풀", () => {
     const hidden = await seedProfile({
       groupId,
       createdBy: owner.userId,
-      name: "모임회원",
+      name: "모임멤버",
     });
 
     const fresh = await newAdmin("외부인");
@@ -216,7 +216,7 @@ describe("전체공개 풀", () => {
     const publicId = await seedProfile({
       groupId: null,
       createdBy: owner.userId,
-      name: "남의공개회원",
+      name: "남의공개멤버",
     });
 
     const other = await newAdmin("남");
@@ -233,7 +233,7 @@ describe("전체공개 풀", () => {
     const publicId = await seedProfile({
       groupId: null,
       createdBy: owner.userId,
-      name: "내공개회원",
+      name: "내공개멤버",
     });
     const updated = await withRls(owner, async (sql) => {
       const r = await sql.query(`UPDATE profiles SET bio = $2 WHERE id = $1`, [
@@ -349,7 +349,7 @@ describe("모임 참여 (초대 코드)", () => {
     expect(await readMyGroups(invited.userId)).toHaveLength(1);
   });
 
-  it("여러 모임에 속하면 양쪽 회원을 모두 다룰 수 있다", async () => {
+  it("여러 모임에 속하면 양쪽 멤버를 모두 다룰 수 있다", async () => {
     const owner = await newAdmin("겸업초대자");
     const a = await createGroupForAdmin({ userId: owner.userId, name: `${TAG}-겸업A` });
     const worker = await newAdmin("겸업주선자");
@@ -358,8 +358,8 @@ describe("모임 참여 (초대 코드)", () => {
     const issued = await issueGroupInvite({ groupId: a.groupId, createdBy: owner.userId });
     await consumeGroupInvite({ code: issued.code, userId: worker.userId });
 
-    const inA = await seedProfile({ groupId: a.groupId, createdBy: owner.userId, name: "A회원" });
-    const inB = await seedProfile({ groupId: b.groupId, createdBy: worker.userId, name: "B회원" });
+    const inA = await seedProfile({ groupId: a.groupId, createdBy: owner.userId, name: "A멤버" });
+    const inB = await seedProfile({ groupId: b.groupId, createdBy: worker.userId, name: "B멤버" });
 
     // 보고 있는 채널과 무관하게 **두 모임 모두** RLS 를 통과한다 — 채널은 화면
     // 필터이지 권한이 아니다.
@@ -483,26 +483,26 @@ describe("모임 나가기", () => {
     expect(left).toBe(0);
   });
 
-  it("마지막 주선자는 회원이 남아 있으면 나갈 수 없다", async () => {
+  it("마지막 주선자는 멤버가 남아 있으면 나갈 수 없다", async () => {
     const admin = await newAdmin("마지막주선자");
     const { groupId } = await createGroupForAdmin({
       userId: admin.userId,
-      name: `${TAG}-회원있는모임`,
+      name: `${TAG}-멤버있는모임`,
     });
-    await seedProfile({ groupId, createdBy: admin.userId, name: "남는회원" });
+    await seedProfile({ groupId, createdBy: admin.userId, name: "남는멤버" });
 
-    // 나가면 그 회원을 아무도 볼 수 없게 된다 — 되돌릴 방법이 없으므로 막는다.
+    // 나가면 그 멤버를 아무도 볼 수 없게 된다 — 되돌릴 방법이 없으므로 막는다.
     await expect(leaveGroup(admin.userId, groupId)).rejects.toThrow(/남아 있어 나갈 수 없습니다/);
     expect(await readGroup(admin.userId)).not.toBeNull();
   });
 
-  it("동료가 있으면 회원이 남아 있어도 나갈 수 있다", async () => {
+  it("동료가 있으면 멤버가 남아 있어도 나갈 수 있다", async () => {
     const owner = await newAdmin("떠나는개설자");
     const { groupId } = await createGroupForAdmin({
       userId: owner.userId,
       name: `${TAG}-인수모임`,
     });
-    await seedProfile({ groupId, createdBy: owner.userId, name: "인수될회원" });
+    await seedProfile({ groupId, createdBy: owner.userId, name: "인수될멤버" });
 
     const issued = await issueGroupInvite({ groupId, createdBy: owner.userId });
     const successor = await newAdmin("후임");
@@ -518,7 +518,7 @@ describe("모임 나가기", () => {
     expect(after?.admins).toHaveLength(1);
   });
 
-  it("나간 뒤에는 그 모임 회원이 보이지 않는다", async () => {
+  it("나간 뒤에는 그 모임 멤버가 보이지 않는다", async () => {
     const owner = await newAdmin("나갈사람");
     const { groupId } = await createGroupForAdmin({
       userId: owner.userId,
@@ -593,15 +593,15 @@ describe("모임 폐쇄", () => {
     expect(await readGroup(owner.userId, groupId)).toBeNull();
   });
 
-  it("회원이 남아 있으면 폐쇄할 수 없다", async () => {
-    const owner = await newAdmin("회원남은모임장");
+  it("멤버가 남아 있으면 폐쇄할 수 없다", async () => {
+    const owner = await newAdmin("멤버남은모임장");
     const { groupId } = await createGroupForAdmin({
       userId: owner.userId,
-      name: `${TAG}-회원남은모임`,
+      name: `${TAG}-멤버남은모임`,
     });
-    await seedProfile({ groupId, createdBy: owner.userId, name: "폐쇄막는회원" });
+    await seedProfile({ groupId, createdBy: owner.userId, name: "폐쇄막는멤버" });
 
-    // 모임이 사라지면 RLS 가 그 회원을 전부 가린다 — 되살릴 길이 없으므로 막는다.
+    // 모임이 사라지면 RLS 가 그 멤버를 전부 가린다 — 되살릴 길이 없으므로 막는다.
     await expect(closeGroup({ actorId: owner.userId, groupId })).rejects.toThrow(
       /남아 있어 폐쇄할 수 없습니다/,
     );
@@ -727,7 +727,7 @@ describe("모임장", () => {
     expect(await readGroup(owner.userId, groupId)).toMatchObject({ isOwner: true });
   });
 
-  it("내보낸 주선자는 그 모임 회원을 더 이상 보지 못한다", async () => {
+  it("내보낸 주선자는 그 모임 멤버를 더 이상 보지 못한다", async () => {
     const owner = await newAdmin("내보내는모임장");
     const { groupId } = await createGroupForAdmin({
       userId: owner.userId,

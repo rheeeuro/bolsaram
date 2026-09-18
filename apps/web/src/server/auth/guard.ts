@@ -53,7 +53,7 @@ export async function requireGroupOwner(groupId: string): Promise<Viewer> {
 }
 
 /**
- * Claim 을 마친 회원만 통과. 신청/관심 등 프로필이 있어야 하는 동작에 쓴다.
+ * Claim 을 마친 멤버만 통과. 신청/관심 등 프로필이 있어야 하는 동작에 쓴다.
  * 관리자는 자기 프로필이 없을 수 있으므로 이 가드를 쓰지 않는다.
  */
 export async function requireMemberProfile(): Promise<Viewer & { profileId: string }> {
@@ -65,9 +65,9 @@ export async function requireMemberProfile(): Promise<Viewer & { profileId: stri
 }
 
 /**
- * 회원 화면으로 보고 있는가 — 회원 본인이거나, 주선자가 대행 중일 때다.
+ * 멤버 화면으로 보고 있는가 — 멤버 본인이거나, 주선자가 대행 중일 때다.
  *
- * 회원 화면은 **이성만** 보여준다(`isOppositeGender`). 그 경계가 주선자 화면까지
+ * 멤버 화면은 **이성만** 보여준다(`isOppositeGender`). 그 경계가 주선자 화면까지
  * 번지면 안 되므로, 무엇을 기준으로 가르는지 한 곳에서 정한다. 대행 중이면
  * 세션의 `profileId` 가 대행 프로필로 바뀌어 있어 그 사람 기준으로 걸린다.
  */
@@ -78,8 +78,8 @@ export function isMemberView(viewer: Viewer): boolean {
 /** 페이지(서버 컴포넌트)용. 실패 시 예외 대신 리다이렉트한다. */
 export async function requireUserPage(next?: string): Promise<Viewer> {
   const user = await readSession();
-  // 회원 화면이다 — 회원에게는 이메일·비밀번호가 없으므로 입장코드 화면으로 보낸다.
-  // 주선자가 회원 화면(`/me`)에서 만료됐다면 그 화면의 링크로 로그인으로 넘어간다.
+  // 멤버 화면이다 — 멤버에게는 이메일·비밀번호가 없으므로 입장코드 화면으로 보낸다.
+  // 주선자가 멤버 화면(`/me`)에서 만료됐다면 그 화면의 링크로 로그인으로 넘어간다.
   if (!user) redirect(enterPath(next));
   return user;
 }

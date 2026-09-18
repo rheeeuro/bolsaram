@@ -27,7 +27,7 @@ export default async function HostChatPage() {
       <>
         <PageHeader
           title="채팅"
-          description="모임 주선자끼리 쓰는 방입니다. 회원은 들어오지 않습니다."
+          description="모임 주선자끼리 쓰는 방입니다. 멤버는 들어오지 않습니다."
         />
         <Empty
           title="전체공개에는 채팅방이 없습니다"
@@ -53,7 +53,7 @@ export default async function HostChatPage() {
       <PageHeader
         title={groupName}
         kicker="채팅"
-        description="이 모임의 주선자만 봅니다. 회원 이름·연락처는 여기 적지 말고 공개 번호로 부릅니다."
+        description="이 모임의 주선자만 봅니다. 멤버 이름·연락처는 여기 적지 말고 공개 번호로 부릅니다."
       />
       <GroupChat
         groupId={groupId}

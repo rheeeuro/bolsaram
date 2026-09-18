@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/match-intents/:id/approve|decline
  *
- * 회원이 낸 요청을 주선자가 확인한다 (0026).
+ * 멤버가 낸 요청을 주선자가 확인한다 (0026).
  *
  * 승인하면 그때 비로소 `match_requests` 가 만들어지거나 상태가 옮겨진다. 그 전까지
  * 상대는 아무것도 알지 못한다 — 요청 행 자체를 읽을 수 없다.
@@ -40,7 +40,7 @@ export const POST = route(async (request: Request, { params }: Params) => {
   }
 
   return asAdmin(async (sql, viewer) => {
-    // RLS 가 담당 회원의 요청만 남긴다. 남의 것은 여기서 이미 안 보인다.
+    // RLS 가 담당 멤버의 요청만 남긴다. 남의 것은 여기서 이미 안 보인다.
     const intent = await findIntentById(sql, id);
     if (!intent) throw new DomainError("NOT_FOUND", "요청을 찾을 수 없습니다.");
     if (intent.status !== "PENDING") {
@@ -97,7 +97,7 @@ export const POST = route(async (request: Request, { params }: Params) => {
     const matchAction = actionForIntent(intent.kind);
     if (!matchAction) throw new DomainError("INVALID_STATE", "옮길 수 없는 요청입니다.");
 
-    // 행위자는 주선자가 아니라 **요청을 낸 회원**이다. 주선자는 그 답을 옮길 뿐이다.
+    // 행위자는 주선자가 아니라 **요청을 낸 멤버**이다. 주선자는 그 답을 옮길 뿐이다.
     const updated = await transition(sql, {
       id: record.id,
       action: matchAction,

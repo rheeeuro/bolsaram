@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * 회원 화면 상단 바와, 그 아래 붙는 sticky 하위 바.
+ * 멤버 화면 상단 바와, 그 아래 붙는 sticky 하위 바.
  *
  * 둘을 한 파일에 두는 이유는 높이 계약을 공유하기 때문이다. 헤더는 제목이 로고든
  * 글자든 `--member-header-h` 로 높이를 고정하고, 하위 바는 같은 변수를 읽어 붙는다.

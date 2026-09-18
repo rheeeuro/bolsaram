@@ -56,7 +56,7 @@ packages/db/src/
 | `bolsaram_owner` | `DATABASE_URL`     | 마이그레이션·시드·정리·인증 경로 | 우회            |
 | `bolsaram_app`   | `APP_DATABASE_URL` | 모든 일반 요청                   | **NOBYPASSRLS** |
 
-`bolsaram_app` 은 정책을 우회할 수 없다. 그래서 "회원에게 보이는가"는 owner psql 로 판단하면
+`bolsaram_app` 은 정책을 우회할 수 없다. 그래서 "멤버에게 보이는가"는 owner psql 로 판단하면
 안 된다 — `tests/rls.test.ts` 나 실제 API 호출로 확인한다.
 
 ## `withRls` 가 하는 일

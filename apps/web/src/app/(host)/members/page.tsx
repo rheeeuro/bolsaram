@@ -1,4 +1,4 @@
-/** 회원 — 초대/가입/Claim 현황 (설계문서 §6). */
+/** 멤버 — 초대/가입/Claim 현황 (설계문서 §6). */
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
@@ -66,7 +66,7 @@ export default async function HostMembersPage({
     const page = Math.min(requestedPage, totalPages);
 
     const result = await sql.query<MemberRow>(
-      // 지금 보고 있는 채널의 회원만 본다. 볼 수 있는 범위는 RLS 가 이미 정했고
+      // 지금 보고 있는 채널의 멤버만 본다. 볼 수 있는 범위는 RLS 가 이미 정했고
       // 여기서 좁히는 것은 「지금 이 모임」이라는 화면의 약속이다.
       //
       // 담당분만 남긴다. 이 화면은 초대를 발급하고 연결 현황을 보는 곳인데 그 동작은
@@ -135,7 +135,7 @@ export default async function HostMembersPage({
   return (
     <>
       <PageHeader
-        title="회원"
+        title="멤버"
         description="등록한 분에게 초대 링크를 보내면 그 링크로 들어옵니다. 아이디와 비밀번호는 없습니다."
         aside={<Count>{listing.total}명</Count>}
       />
@@ -164,7 +164,7 @@ export default async function HostMembersPage({
         <Panel>
           <Blank>
             {q
-              ? "검색 조건에 맞는 회원이 없습니다."
+              ? "검색 조건에 맞는 멤버가 없습니다."
               : "아직 등록된 프로필이 없습니다. 「가져오기」에서 첫 프로필을 만들어 보세요."}
           </Blank>
         </Panel>
@@ -222,7 +222,7 @@ export default async function HostMembersPage({
           ) : null}
 
           {listing.totalPages > 1 ? (
-            <nav aria-label="회원 목록 페이지" className="flex items-center justify-center gap-3">
+            <nav aria-label="멤버 목록 페이지" className="flex items-center justify-center gap-3">
               {listing.page > 1 ? (
                 <Link
                   href={pageHref(listing.page - 1)}

@@ -12,7 +12,7 @@ export type FilterContext = {
   viewerProfileId: string | null;
   /**
    * 보는 사람의 성별. 목록은 **이성만** 보여주므로 이 값이 곧 필터다.
-   * 회원이 고를 수 있는 값이 아니다 — 프로필에 적힌 성별을 그대로 쓴다.
+   * 멤버가 고를 수 있는 값이 아니다 — 프로필에 적힌 성별을 그대로 쓴다.
    * null 이면(프로필이 없는 주선자) 좁히지 않는다.
    */
   viewerGender: Gender | null;

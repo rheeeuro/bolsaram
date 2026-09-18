@@ -3,7 +3,7 @@ import { formatHashtag } from "@bolsaram/schemas";
 import { cn } from "@/lib/cn";
 
 /**
- * 회원번호는 `17번`, 해시태그는 `#등산` 이다. **기호는 해시태그만 쓴다** — 둘 다 기호로
+ * 멤버 번호는 `17번`, 해시태그는 `#등산` 이다. **기호는 해시태그만 쓴다** — 둘 다 기호로
  * 시작하면 한눈에 갈리지 않는다. 종류는 앞에 붙는 아이콘이 말한다(번호는 사람, 태그는 라벨).
  *
  * 아이콘 크기를 `em` 으로 두어 어디에 놓든 옆 글자를 따라간다.
@@ -52,7 +52,7 @@ export function TagIcon({ className }: { className?: string }) {
 }
 
 /**
- * 회원번호 표기. `code` 는 이미 `17번` 형태다(`formatPublicCode`).
+ * 멤버 번호 표기. `code` 는 이미 `17번` 형태다(`formatPublicCode`).
  * 읽어 주는 이름을 함께 달아 화면 낭독기에서도 태그와 섞이지 않는다.
  */
 export function ProfileCode({ code, className }: { code: string; className?: string }) {
@@ -60,7 +60,7 @@ export function ProfileCode({ code, className }: { code: string; className?: str
     <span className={cn("inline-flex items-center gap-1", className)}>
       <PersonIcon className="opacity-60" />
       <span>
-        <span className="sr-only">회원번호 </span>
+        <span className="sr-only">멤버 번호 </span>
         {code}
       </span>
     </span>

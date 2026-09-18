@@ -4,7 +4,7 @@
  * 비밀번호를 우리가 받지 않는다. **처음 들어온 제공자 계정이 곧 가입**이고 그 뒤로는
  * 같은 버튼이 로그인이다 — 그래서 로그인과 가입 경로가 하나다.
  *
- * 회원은 여기를 지나지 않는다. 회원 로그인은 주선자가 보내는 초대 링크뿐이다
+ * 멤버는 여기를 지나지 않는다. 멤버 로그인은 주선자가 보내는 초대 링크뿐이다
  * (`server/auth/invite.ts`).
  *
  * owner 커넥션을 쓰는 이유는 세션·초대 검증과 같다 — 인증 이전이라 RLS 컨텍스트가 없다.
@@ -284,7 +284,7 @@ async function fetchIdentity(
  *   3. 없으면 새 주선자 계정
  *
  * 2번은 이메일을 믿는 단계라 조건을 좁게 둔다. 구글은 `email_verified` 가 거짓이면
- * 이메일을 버리고 오고, 회원 계정에는 절대 붙이지 않는다 — 회원은 초대 링크로만 들어온다.
+ * 이메일을 버리고 오고, 멤버 계정에는 절대 붙이지 않는다 — 멤버는 초대 링크로만 들어온다.
  */
 export async function loginWithOAuth(identity: OAuthIdentity): Promise<string> {
   const linked = await withOwner(async (sql) => {
@@ -312,7 +312,7 @@ export async function loginWithOAuth(identity: OAuthIdentity): Promise<string> {
         if (row.role !== "ADMIN") {
           throw new DomainError(
             "FORBIDDEN",
-            "이 이메일은 회원 계정입니다. 회원은 주선자가 보낸 초대 링크로 들어옵니다.",
+            "이 이메일은 멤버 계정입니다. 멤버는 주선자가 보낸 초대 링크로 들어옵니다.",
           );
         }
         userId = row.id;

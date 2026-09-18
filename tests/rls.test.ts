@@ -119,7 +119,7 @@ describe("profiles 읽기 정책", () => {
     expect(result.rowCount).toBe(0);
   });
 
-  it("회원은 같은 성별인 프로필을 보지 못한다", async () => {
+  it("멤버는 같은 성별인 프로필을 보지 못한다", async () => {
     // p1(여성)에게 p4(여성)는 없는 사람이다. 목록에서 빼는 것과 별개로 정책이 막는다.
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.p4]),
@@ -127,7 +127,7 @@ describe("profiles 읽기 정책", () => {
     expect(result.rowCount).toBe(0);
   });
 
-  it("회원은 이성 프로필을 본다", async () => {
+  it("멤버는 이성 프로필을 본다", async () => {
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.p2]),
     );
@@ -143,14 +143,14 @@ describe("profiles 읽기 정책", () => {
   });
 
   it("주선자는 성별과 무관하게 본다", async () => {
-    // 주선자는 양쪽을 다 보고 등록한다 — 이성 경계는 회원 화면의 것이다.
+    // 주선자는 양쪽을 다 보고 등록한다 — 이성 경계는 멤버 화면의 것이다.
     const result = await withRls(fx.admin, (sql) =>
       sql.query(`SELECT id FROM profiles WHERE id = ANY($1)`, [[fx.p1, fx.p4]]),
     );
     expect(result.rowCount).toBe(2);
   });
 
-  it("회원은 비공개(PRIVATE) 프로필을 보지 못한다", async () => {
+  it("멤버는 비공개(PRIVATE) 프로필을 보지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.pHidden]),
     );
@@ -166,21 +166,21 @@ describe("profiles 읽기 정책", () => {
 });
 
 describe("profiles 쓰기 정책", () => {
-  it("회원은 남의 프로필을 수정할 수 없다", async () => {
+  it("멤버는 남의 프로필을 수정할 수 없다", async () => {
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`UPDATE profiles SET bio = 'hacked' WHERE id = $1`, [fx.p2]),
     );
     expect(result.rowCount).toBe(0);
   });
 
-  it("회원은 자기 프로필도 임의로 수정할 수 없다 — 수정은 주선자의 몫", async () => {
+  it("멤버는 자기 프로필도 임의로 수정할 수 없다 — 수정은 주선자의 몫", async () => {
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`UPDATE profiles SET bio = 'self edit' WHERE id = $1`, [fx.p1]),
     );
     expect(result.rowCount).toBe(0);
   });
 
-  it("회원은 프로필을 새로 만들 수 없다", async () => {
+  it("멤버는 프로필을 새로 만들 수 없다", async () => {
     await expect(
       withRls(fx.member1, (sql) =>
         sql.query(
@@ -309,14 +309,14 @@ describe("match_requests 정책", () => {
 });
 
 describe("관리자 전용 테이블", () => {
-  it("회원은 Import 세션을 보지 못한다", async () => {
+  it("멤버는 Import 세션을 보지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`SELECT id FROM import_sessions`),
     );
     expect(result.rowCount).toBe(0);
   });
 
-  it("회원은 초대를 보지 못한다", async () => {
+  it("멤버는 초대를 보지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) => sql.query(`SELECT id FROM invites`));
     expect(result.rowCount).toBe(0);
   });
@@ -328,7 +328,7 @@ describe("관리자 전용 테이블", () => {
   });
 
 
-  it("회원은 감사 로그를 읽지 못한다", async () => {
+  it("멤버는 감사 로그를 읽지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) => sql.query(`SELECT id FROM audit_logs`));
     expect(result.rowCount).toBe(0);
   });
@@ -416,7 +416,7 @@ describe("모임 소속(group_admins)", () => {
     expect(removed.rowCount).toBe(0);
   });
 
-  it("회원은 주선자 목록을 읽지 못한다", async () => {
+  it("멤버는 주선자 목록을 읽지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`SELECT user_id FROM group_admins`),
     );
@@ -451,7 +451,7 @@ describe("favorites 정책", () => {
 });
 
 describe("주선자 대행", () => {
-  /** 대행 컨텍스트에서 회원으로 인식되는 프로필. NULL 이면 대행이 성립하지 않은 것이다. */
+  /** 대행 컨텍스트에서 멤버로 인식되는 프로필. NULL 이면 대행이 성립하지 않은 것이다. */
   async function actingAs(ctx: RlsContext, profileId: string): Promise<string | null> {
     const result = await withRls({ ...ctx, actingProfileId: profileId }, (sql) =>
       sql.query<{ id: string | null }>(`SELECT app_current_profile_id() AS id`),
@@ -474,19 +474,19 @@ describe("주선자 대행", () => {
     expect(await actingAs(fx.strangerAdmin, fx.pHidden)).toBeNull();
   });
 
-  it("회원은 대행하지 못한다 — 자기 프로필로 떨어진다", async () => {
+  it("멤버는 대행하지 못한다 — 자기 프로필로 떨어진다", async () => {
     // 대행 값을 직접 넣어도 app_is_admin() 이 막고 COALESCE 가 본인 프로필을 준다.
     expect(await actingAs(fx.member2, fx.p1)).toBe(fx.p2);
   });
 
   /**
-   * 대행 중에도 회원 화면은 이성만 보여준다.
+   * 대행 중에도 멤버 화면은 이성만 보여준다.
    *
-   * **RLS 만으로는 여기가 막히지 않는다** — 대행 중인 주선자는 회원 절이 아니라
+   * **RLS 만으로는 여기가 막히지 않는다** — 대행 중인 주선자는 멤버 절이 아니라
    * 주선자 절로 프로필을 보기 때문이다(그래서 아래 첫 단언은 「보인다」다).
    * 목록을 만드는 곳이 대행 프로필의 성별로 좁힌다.
    */
-  it("대행 중 목록에는 그 회원의 이성만 담긴다", async () => {
+  it("대행 중 목록에는 그 멤버의 이성만 담긴다", async () => {
     const acting: RlsContext = { ...fx.admin, actingProfileId: fx.p1 };
 
     // 정책은 통과시킨다. 대행은 주선자 명의로 도는 요청이다.
@@ -506,7 +506,7 @@ describe("주선자 대행", () => {
     expect(new Set(page.items.map((item) => item.gender))).toEqual(new Set(["MALE"]));
   });
 
-  it("대행하지 않는 주선자에게는 회원 프로필이 없다", async () => {
+  it("대행하지 않는 주선자에게는 멤버 프로필이 없다", async () => {
     // COALESCE 의 두 번째 가지. 주선자 계정에는 프로필이 붙지 않으므로 NULL 이다.
     const result = await withRls(fx.admin, (sql) =>
       sql.query<{ id: string | null }>(`SELECT app_current_profile_id() AS id`),
@@ -859,7 +859,7 @@ describe("담당이 갈리는 신청 (전체공개 풀)", () => {
 
   it("주선자 세션에서도 거절·숨김 관계를 찾는다", async () => {
     // 한 인자 형태는 세션 프로필(NULL)을 기준으로 삼아 아무것도 찾지 못한다. 주선자가
-    // 회원의 요청을 승인하며 신청을 만드는 경로는 두 인자 형태를 써야 한다(0038).
+    // 멤버의 요청을 승인하며 신청을 만드는 경로는 두 인자 형태를 써야 한다(0038).
     const id = await newRequest();
     await withOwner((sql) =>
       sql.query(`UPDATE match_requests SET status = 'REJECTED' WHERE id = $1`, [id]),

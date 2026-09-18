@@ -62,7 +62,7 @@ export const FIELD_LABELS: Record<string, string> = {
 /**
  * 모임 채팅방의 시스템 메시지 문장 (마이그레이션 0044).
  *
- * DB 에는 종류와 값만 있고 문장은 여기서 만든다. 회원은 **공개 번호로만** 부른다 —
+ * DB 에는 종류와 값만 있고 문장은 여기서 만든다. 멤버는 **공개 번호로만** 부른다 —
  * 방에 이름을 적지 않기로 한 규칙이 시스템 메시지에도 그대로 적용된다.
  */
 export function groupSystemMessageText(
@@ -84,7 +84,7 @@ export function groupSystemMessageText(
     case "OWNER_TRANSFERRED":
       return `${who} 님이 모임장이 됐습니다.`;
     case "PROFILE_REGISTERED":
-      return `${code(payload.profileCode)} 회원이 등록됐습니다. (${who})`;
+      return `${code(payload.profileCode)} 멤버가 등록됐습니다. (${who})`;
     case "MATCH_REQUESTED":
       return `${code(payload.requesterCode)} → ${code(payload.targetCode)} 소개를 신청했습니다.`;
     case "MATCH_INTRODUCED":

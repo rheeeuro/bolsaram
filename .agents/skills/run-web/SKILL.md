@@ -28,7 +28,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -b "$ADMIN" http://127.0.0.1:3020/home
 # 특정 주선자로 보고 싶으면 이메일을 준다(없으면 그 이메일로 계정을 만든다)
 pnpm -s dev:session admin@bolsaram.local
 
-# 회원 — 비밀번호가 없다. 주선자로 초대를 발급해 그 토큰을 소비한다(1회용).
+# 멤버 — 비밀번호가 없다. 주선자로 초대를 발급해 그 토큰을 소비한다(1회용).
 TOKEN=$(curl -s -b "$ADMIN" -H 'content-type: application/json' \
   -d '{"profileId":"<프로필 UUID>","expiresInHours":72}' \
   http://127.0.0.1:3020/api/admin/invites \
@@ -53,10 +53,10 @@ curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' \
 
 변경한 화면에 따라 골라 확인하고, **결과를 추측하지 말고 실제 응답을 인용**한다.
 
-- 인증 화면: `/` `/enter`(회원 입장코드) `/login`(주선자 소셜 로그인) `/claim/<토큰>`
-- 회원 화면: `/discover` `/discover/<id>` `/signals` `/favorites` `/me`
+- 인증 화면: `/` `/enter`(멤버 입장코드) `/login`(주선자 소셜 로그인) `/claim/<토큰>`
+- 멤버 화면: `/discover` `/discover/<id>` `/signals` `/favorites` `/me`
 - 주선자 화면: `/home` `/imports` `/profiles` `/requests` `/members` `/group`
-- 권한: 쿠키 없이 호출해 401, 회원 쿠키로 `/home` 호출해 `/discover` 리다이렉트인지
+- 권한: 쿠키 없이 호출해 401, 멤버 쿠키로 `/home` 호출해 `/discover` 리다이렉트인지
 - 정보 공개: 연결되지 않은 상대의 상세에 `realName` 키가 **없는지**
 
 ## 브라우저 스크린샷

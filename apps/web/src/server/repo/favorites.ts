@@ -41,7 +41,7 @@ export async function isFavorited(
  * 있으므로 저장 시점에 걸러도 소용이 없다. 탐색에서만 빼고 관심 목록에 남겨 두면,
  * 목록으로 들어가 「지금은 보낼 수 없어요」 를 보게 된다.
  *
- * 행은 지우지 않는다 — 회원이 담아둔 기록이고, 관계가 풀리면 다시 보여야 한다.
+ * 행은 지우지 않는다 — 멤버가 담아둔 기록이고, 관계가 풀리면 다시 보여야 한다.
  */
 export async function favoriteProfileIds(sql: Sql, userId: string): Promise<string[]> {
   const result = await sql.query<{ profile_id: string }>(

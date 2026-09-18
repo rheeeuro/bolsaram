@@ -32,7 +32,7 @@ export const GET = route(async (_request: Request, { params }: Params) => {
     ) {
       throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     }
-    // 회원 화면은 이성만 본다. 있는지 없는지도 알리지 않으므로 같은 404 다.
+    // 멤버 화면은 이성만 본다. 있는지 없는지도 알리지 않으므로 같은 404 다.
     if (
       isMemberView(viewer) &&
       viewer.profileId &&
@@ -42,7 +42,7 @@ export const GET = route(async (_request: Request, { params }: Params) => {
       throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     }
 
-    // 주선자는 자기 회원이 낀 연결을, 회원은 자기 연결을 본다.
+    // 주선자는 자기 멤버가 낀 연결을, 멤버는 자기 연결을 본다.
     const introducedWith =
       viewer.role === "ADMIN"
         ? await introducedWithManaged(sql)

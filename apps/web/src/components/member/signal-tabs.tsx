@@ -58,35 +58,71 @@ const EMPTY_COPY: Record<string, { title: string; description: string }> = {
   },
 };
 
-export function SignalTabs({ direction, items }: { direction: string; items: SignalItem[] }) {
+/**
+ * 세 방향을 한 번에 받아 두고 고르는 것만 화면에서 한다.
+ *
+ * 예전에는 탭이 `?tab=` 링크였다. 이 화면은 `force-dynamic` 이라 한 번 누를 때마다
+ * 서버와 DB 를 다시 거쳤고, 누른 탭이 바뀌기까지 아무 반응이 없었다. 한 사람의
+ * 시그널은 세 방향을 합쳐도 적어서 처음에 다 받아 두는 편이 싸다.
+ */
+export function SignalTabs({
+  initialTab,
+  groups,
+}: {
+  initialTab: string;
+  groups: Record<string, SignalItem[]>;
+}) {
+  const [direction, setDirection] = useState(
+    TABS.some((tab) => tab.key === initialTab) ? initialTab : "incoming",
+  );
+  const items = groups[direction] ?? [];
+
+  function select(next: string) {
+    if (next === direction) return;
+    setDirection(next);
+    // 프로필 상세로 갔다 돌아오는 링크가 이 값을 읽는다. `router.replace` 는
+    // 서버 컴포넌트를 다시 부르므로(이 화면은 force-dynamic) 주소만 갈아 끼운다.
+    window.history.replaceState(null, "", `/signals?tab=${next}`);
+  }
+
   return (
     <>
-      <MemberSubBar className="gap-1.5">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.key}
-            href={`/signals?tab=${tab.key}`}
-            className={cn(
-              "rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
-              direction === tab.key
-                ? "bg-[var(--color-ink-900)] text-white"
-                : "border border-[var(--surface-border)] bg-white text-[var(--color-ink-600)]",
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
+      <MemberSubBar>
+        <div role="tablist" aria-label="시그널 종류" className="flex gap-1.5">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              id={`signal-tab-${tab.key}`}
+              aria-selected={direction === tab.key}
+              aria-controls="signal-panel"
+              onClick={() => select(tab.key)}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 text-[13px] font-medium",
+                "transition-colors duration-[var(--duration-quick)]",
+                direction === tab.key
+                  ? "bg-[var(--color-ink-900)] text-white"
+                  : "border border-[var(--surface-border)] bg-white text-[var(--color-ink-600)]",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </MemberSubBar>
 
-      {items.length === 0 ? (
-        <Empty {...(EMPTY_COPY[direction] ?? EMPTY_COPY.incoming!)} />
-      ) : (
-        <ul className="flex flex-col gap-2.5 pb-8">
-          {items.map((item) => (
-            <SignalRow key={item.id} item={item} direction={direction} />
-          ))}
-        </ul>
-      )}
+      <div id="signal-panel" role="tabpanel" aria-labelledby={`signal-tab-${direction}`}>
+        {items.length === 0 ? (
+          <Empty {...(EMPTY_COPY[direction] ?? EMPTY_COPY.incoming!)} />
+        ) : (
+          <ul className="flex flex-col gap-2.5 pb-8">
+            {items.map((item) => (
+              <SignalRow key={item.id} item={item} direction={direction} />
+            ))}
+          </ul>
+        )}
+      </div>
     </>
   );
 }

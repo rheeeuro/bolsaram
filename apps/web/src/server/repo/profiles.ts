@@ -153,7 +153,7 @@ async function genderOf(sql: Sql, profileId: string): Promise<Gender | null> {
 }
 
 /**
- * 회원 화면에서 가려야 하는 상대인가 — 같은 성별이면 가린다.
+ * 멤버 화면에서 가려야 하는 상대인가 — 같은 성별이면 가린다.
  *
  * 목록에서 빼는 것만으로는 새어 나간다. 주소를 직접 열거나 시그널에서 넘어오는
  * 경로가 있어서, 상세를 여는 쪽에서도 같은 판정을 한다.
@@ -175,7 +175,7 @@ export type DiscoverPage = {
 };
 
 /**
- * 회원 탐색 목록.
+ * 멤버 탐색 목록.
  *
  * **이성만 보여준다.** 보는 사람의 성별은 프로필에서 읽는다 — 요청으로 받으면
  * 대행 중인 주선자나 조작된 값으로 경계가 흔들린다. 대행 중이면 세션의
@@ -302,7 +302,7 @@ const UPDATABLE_COLUMNS: Record<keyof ProfileUpdate, string> = {
  * 여러 프로필을 한 번에 물어 고칠 수 있는 것만 돌려준다.
  *
  * 목록 화면이 프로필마다 판정 함수를 부르면 행 수만큼 쿼리가 늘어난다. 주선자
- * 화면은 이 집합으로 공개 단계를 가르므로(담당이면 전부, 아니면 회원과 같은 단계)
+ * 화면은 이 집합으로 공개 단계를 가르므로(담당이면 전부, 아니면 멤버와 같은 단계)
  * 한 번에 읽는 경로가 필요하다.
  */
 export async function canEditProfiles(sql: Sql, ids: string[]): Promise<Set<string>> {
@@ -385,7 +385,7 @@ export async function findAdminProfiles(
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
   if (query.claimed === "yes") clauses.push("p.user_id IS NOT NULL");
   if (query.claimed === "no") clauses.push("p.user_id IS NULL");
-  // 태그는 여러 개를 주면 좁힌다. 회원 탐색과 같은 규칙이다.
+  // 태그는 여러 개를 주면 좁힌다. 멤버 탐색과 같은 규칙이다.
   if (query.tags?.length) clauses.push(`p.hashtags @> ${push(query.tags)}`);
   if (query.q) {
     // `17번` 은 공개 번호, `#여행` 은 해시태그다. 숫자인지로 가른다.
