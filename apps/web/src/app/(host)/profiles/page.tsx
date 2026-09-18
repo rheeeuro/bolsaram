@@ -76,7 +76,7 @@ export default async function HostProfilesPage({
     <>
       <PageHeader
         title="프로필"
-        description="등록한 분들입니다. 카드를 누르면 내용을 고치고 공개 여부를 정할 수 있습니다."
+        description="등록한 분들입니다. 카드를 누르면 상세가 열리고, 내가 등록한 분은 거기서 공개 여부를 정하거나 내용을 고칩니다."
         aside={<Count>{page.total}명</Count>}
       />
 

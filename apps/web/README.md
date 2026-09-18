@@ -62,7 +62,8 @@ apps/web/src/
 │   │   ├── home/             오늘 할 일 + 지표 + 최근 신청
 │   │   ├── account/          계정 설정 — 내 이름·로그인 방식·텔레그램 연결·로그아웃
 │   │   ├── imports/          가져오기 + 검토 상세
-│   │   ├── profiles/         카드 목록 + 상세 편집·게시·초대
+│   │   ├── profiles/         카드 목록 + 상세(게시·초대·대행)
+│   │   ├── profiles/[id]/edit/  내용 편집 — 등록한 주선자만
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
 │   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용)
@@ -151,6 +152,7 @@ server/
 ├── services/import-service.ts  분석 실행 + idempotent commit
 ├── views/
 │   ├── profile-view.ts       공개 단계 판정·적용 + signed URL 부착
+│   ├── host-profile.ts       주선자 상세·편집이 함께 쓰는 프로필 하나 읽기 (권한·공개 단계·초대)
 │   └── image-url.ts          사진 하나짜리 저장 키 → 단기 signed URL (주선자·모임 사진)
 └── http/
     ├── respond.ts            DomainError → HTTP status, 입력 검증

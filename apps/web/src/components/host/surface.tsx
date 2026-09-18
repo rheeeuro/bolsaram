@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProfileCode } from "@/components/ui/marks";
 import { cn } from "@/lib/cn";
 import type { ReactNode } from "react";
 
@@ -9,6 +10,49 @@ import type { ReactNode } from "react";
  * warm ivory 바탕, serif display 제목, 부드러운 카드를 쓴다. 밀도가 필요한 곳
  * (Import 검토)에서만 안쪽 간격을 좁힌다.
  */
+
+/**
+ * 한 단계 들어간 화면의 위치 표시.
+ *
+ * 상세와 편집이 다른 주소로 갈렸으므로 지금 어디인지와 돌아갈 곳을 같은 모양으로
+ * 말해야 한다. 공개 번호는 `code` 로 넘기면 본문과 같은 서체로 찍는다.
+ */
+export function Breadcrumb({
+  items,
+}: {
+  items: { label?: string; code?: string; href?: string }[];
+}) {
+  return (
+    <nav className="mb-5 flex flex-wrap items-center gap-2 text-[12.5px] text-[var(--surface-text-muted)]">
+      {items.map((item, index) => {
+        const body = item.code ? (
+          <span className="display text-[13px] text-[var(--surface-text)]">
+            <ProfileCode code={item.code} />
+          </span>
+        ) : (
+          item.label
+        );
+        const last = index === items.length - 1;
+        return (
+          <span
+            key={item.href ?? item.code ?? item.label ?? index}
+            className="flex items-center gap-2"
+          >
+            {index > 0 ? <span aria-hidden>·</span> : null}
+            {item.href ? (
+              <Link href={item.href} className="hover:text-[var(--color-rose-600)]">
+                {body}
+              </Link>
+            ) : (
+              // 링크가 없는 마지막 칸이 지금 화면이다.
+              <span {...(last ? { "aria-current": "page" as const } : {})}>{body}</span>
+            )}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
 
 export function PageHeader({
   kicker,

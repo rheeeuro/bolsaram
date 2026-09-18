@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -11,30 +12,22 @@ import {
   JOB_CATEGORIES,
   JOB_CATEGORY_LABELS,
   MBTI_TYPES,
-  PROFILE_STATUSES,
-  PROFILE_STATUS_LABELS,
   REGIONS,
   REGION_LABELS,
   RELIGIONS,
   RELIGION_LABELS,
   SMOKING_LABELS,
   SMOKING_LEVELS,
-  VISIBILITIES,
-  VISIBILITY_LABELS,
   formatHashtag,
   parseHashtagInput,
 } from "@bolsaram/schemas";
-import { isDiscoverable } from "@bolsaram/domain";
-import { Badge, toneForStatus } from "@/components/ui/badge";
 import { ProfileCode } from "@/components/ui/marks";
 import { cn } from "@/lib/cn";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { ProfilePhotos } from "@/components/host/profile-photos";
-import { CopyField } from "@/components/ui/copy-field";
 import { Field, FormError, Input, Select, Textarea } from "@/components/ui/field";
-import { apiPatch, apiPost } from "@/lib/api-client";
-import { label } from "@/lib/labels";
+import { apiPatch } from "@/lib/api-client";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 
 type Draft = Record<string, string>;
@@ -65,21 +58,17 @@ function initialDraft(profile: ProfileDetailView): Draft {
 }
 
 /**
- * 프로필 상세 편집.
+ * 프로필 내용 편집.
  *
- * 멤버가 보게 될 사람을 먼저 크게 보여주고(사진·공개 번호·요약), 그 아래에서 고친다.
- * 공개 여부와 초대는 오른쪽에 모아 둔다 — 주선자가 가장 자주 누르는 두 가지다.
+ * 이 화면은 **고치는 일만** 한다 — 공개 여부·초대·대행은 상세(`/profiles/[id]`)에
+ * 남겼다. 저장을 눌러야 반영되는 것과 누르는 즉시 끝나는 것을 한 화면에 섞으면
+ * 어느 쪽이 아직 저장 전인지 알 수 없다.
+ *
+ * 사진은 여기 둔다. 고르는 순간 올라가지만 「내용을 고치는 일」의 일부다.
  */
-export function HostProfileEditor({
-  profile,
-  claimed,
-  invite,
-}: {
-  profile: ProfileDetailView;
-  claimed: boolean;
-  invite: { expiresAt: string; claimed: boolean } | null;
-}) {
+export function HostProfileEditor({ profile }: { profile: ProfileDetailView }) {
   const router = useRouter();
+  const detailHref = `/profiles/${profile.id}`;
   // 저장 기준점. 저장에 성공하면 여기를 지금 값으로 옮긴다 — 그래야 「고친 것이 있는지」를
   // 서버가 돌려준 값이 아니라 화면에서 바로 판정할 수 있다.
   const [saved, setSaved] = useState<Draft>(() => initialDraft(profile));
@@ -87,8 +76,6 @@ export function HostProfileEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // 발급 직후 한 번만 보여줄 값. 링크와 입장코드는 같은 토큰이다.
-  const [issued, setIssued] = useState<{ url: string; code: string } | null>(null);
 
   // 고치기 시작하면 지난 결과 문구를 지운다 — 다음 편집 중에 「저장했습니다」가
   // 남아 있으면 방금 저장된 것으로 읽힌다.
@@ -97,7 +84,7 @@ export function HostProfileEditor({
     setDraft((p) => ({ ...p, [key]: value }));
   };
 
-  async function save() {
+  async function save(then?: "back") {
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -133,19 +120,10 @@ export function HostProfileEditor({
     }
     setSaved(draft);
     setMessage("저장했습니다.");
-    router.refresh();
-  }
-
-  async function changeStatus(status: string, visibility?: string) {
-    setBusy(true);
-    setError(null);
-    const result = await apiPatch(`/api/profiles/${profile.id}/status`, {
-      status,
-      ...(visibility ? { visibility } : {}),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.message);
+    if (then === "back") {
+      // 이탈 확인은 링크 클릭과 새로고침만 잡는다. 저장이 끝난 뒤의 이동이라
+      // 여기서 확인창이 뜰 일은 없다.
+      router.push(detailHref);
       return;
     }
     router.refresh();
@@ -188,69 +166,20 @@ export function HostProfileEditor({
     };
   }, [dirty]);
 
-  // 상태와 노출은 직교한다 — 「공개」인데 노출이 「비공개」면 아무도 못 본다.
-  // 두 드롭다운을 나란히 두기만 하면 그 조합을 사람이 머릿속에서 계산해야 한다.
-  const visible = isDiscoverable({
-    status: (profile.status ?? "INACTIVE") as Parameters<typeof isDiscoverable>[0]["status"],
-    visibility: (profile.visibility ?? "PRIVATE") as Parameters<
-      typeof isDiscoverable
-    >[0]["visibility"],
-  });
-
-  const summary = [
-    label.gender(profile.gender),
-    `${profile.birthYear}년생`,
-    profile.height ? `${profile.height}cm` : null,
-    profile.jobTitle ?? label.jobCategory(profile.jobCategory),
-    label.region(profile.residenceRegion),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-wrap items-center gap-5 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-card)]">
-        <div className="h-32 w-24 shrink-0 overflow-hidden rounded-[12px] bg-[var(--color-ivory-200)]">
-          {profile.images[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profile.images[0].url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="grid h-full place-items-center text-[11.5px] text-[var(--color-ink-700)]">
-              사진 없음
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-48 flex-1">
-          <h1 className="display text-[28px] leading-none text-[var(--color-ink-900)]">
-            <ProfileCode code={profile.code} />
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-card)] px-5 py-4 shadow-[var(--shadow-card)]">
+        <div>
+          <h1 className="display text-[22px] leading-none text-[var(--color-ink-900)]">
+            <ProfileCode code={profile.code} /> 내용 고치기
           </h1>
-          <p className="mt-2.5 text-[13.5px] text-[var(--surface-text-muted)]">{summary}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge tone={toneForStatus(profile.status ?? "")}>
-              {label.profileStatus(profile.status)}
-            </Badge>
-            <Badge tone={visible ? "active" : "neutral"}>
-              {visible ? "멤버에게 보임" : "멤버에게 안 보임"}
-            </Badge>
-            <span className="text-[12.5px] text-[var(--surface-text-muted)]">
-              {label.visibility(profile.visibility)}
-            </span>
-            <span className="text-[12.5px] text-[var(--surface-text-muted)]">
-              {claimed ? "· 본인 계정 연결됨" : "· 아직 초대하지 않았습니다"}
-            </span>
-          </div>
+          <p className="mt-2 text-[12.5px] text-[var(--surface-text-muted)]">
+            공개 여부와 초대는 상세 화면에서 다룹니다.
+          </p>
         </div>
-
-        {profile.status !== "ACTIVE" ? (
-          <Button
-            size="lg"
-            disabled={busy}
-            onClick={() => void changeStatus("ACTIVE", "LISTED")}
-          >
-            지금 공개하기
-          </Button>
-        ) : null}
+        <Link href={detailHref} className={buttonClasses({ variant: "secondary" })}>
+          상세로 돌아가기
+        </Link>
       </section>
 
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
@@ -291,10 +220,7 @@ export function HostProfileEditor({
                 </Select>
               </Field>
               <Field label="직업">
-                <Input
-                  value={draft.jobTitle}
-                  onChange={(e) => set("jobTitle")(e.target.value)}
-                />
+                <Input value={draft.jobTitle} onChange={(e) => set("jobTitle")(e.target.value)} />
               </Field>
               <Field label="직업군">
                 <Select
@@ -344,10 +270,7 @@ export function HostProfileEditor({
                 </Select>
               </Field>
               <Field label="종교">
-                <Select
-                  value={draft.religion}
-                  onChange={(e) => set("religion")(e.target.value)}
-                >
+                <Select value={draft.religion} onChange={(e) => set("religion")(e.target.value)}>
                   <option value="">선택 안 함</option>
                   {RELIGIONS.map((r) => (
                     <option key={r} value={r}>
@@ -367,10 +290,7 @@ export function HostProfileEditor({
                 </Select>
               </Field>
               <Field label="음주">
-                <Select
-                  value={draft.drinking}
-                  onChange={(e) => set("drinking")(e.target.value)}
-                >
+                <Select value={draft.drinking} onChange={(e) => set("drinking")(e.target.value)}>
                   <option value="">선택 안 함</option>
                   {DRINKING_LEVELS.map((d) => (
                     <option key={d} value={d}>
@@ -410,10 +330,7 @@ export function HostProfileEditor({
             </p>
             <div className="grid gap-3.5 sm:grid-cols-2">
               <Field label="이름">
-                <Input
-                  value={draft.realName}
-                  onChange={(e) => set("realName")(e.target.value)}
-                />
+                <Input value={draft.realName} onChange={(e) => set("realName")(e.target.value)} />
               </Field>
               <Field label="연락 방법">
                 <Input
@@ -425,7 +342,7 @@ export function HostProfileEditor({
             </div>
           </Panel>
 
-          {/* 패널이 아홉 개라 맨 아래 버튼 하나로는 고친 것을 두고 화면을 떠나기 쉽다.
+          {/* 칸이 스무 개가 넘어 맨 아래 버튼 하나로는 고친 것을 두고 화면을 떠나기 쉽다.
               아래에 붙여 두고, 고친 것이 있을 때만 눈에 띄게 한다. */}
           <div
             className={cn(
@@ -438,6 +355,17 @@ export function HostProfileEditor({
             <Button size="lg" disabled={busy || !dirty} onClick={() => void save()}>
               {busy ? "저장 중…" : "저장"}
             </Button>
+            {/* 고친 뒤 상세로 돌아가는 것이 기본 흐름이다 — 저장하고 나가기를 한 번에 한다. */}
+            {dirty ? (
+              <Button
+                size="lg"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void save("back")}
+              >
+                저장하고 닫기
+              </Button>
+            ) : null}
             {dirty && !busy ? (
               <span className="text-[13px] text-[var(--color-burgundy-700)]">
                 저장하지 않은 변경이 있습니다.
@@ -462,171 +390,8 @@ export function HostProfileEditor({
               }))}
             />
           </Panel>
-
-          <Panel title="공개 설정">
-            <p
-              className={
-                visible
-                  ? "mb-3.5 rounded-[10px] bg-[var(--color-success)]/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--color-success)]"
-                  : "mb-3.5 rounded-[10px] bg-[var(--color-ivory-100)] px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]"
-              }
-            >
-              {visible
-                ? "지금 멤버 목록에 보입니다."
-                : `지금 멤버 목록에 보이지 않습니다 — ${reasonHidden(profile.status, profile.visibility)}.`}
-            </p>
-            <div className="flex flex-col gap-3.5">
-              <Field label="상태">
-                <Select
-                  value={profile.status ?? ""}
-                  onChange={(e) => void changeStatus(e.target.value)}
-                  disabled={busy}
-                >
-                  {PROFILE_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {PROFILE_STATUS_LABELS[s]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="노출">
-                <Select
-                  value={profile.visibility ?? ""}
-                  onChange={(e) =>
-                    void changeStatus(profile.status ?? "INACTIVE", e.target.value)
-                  }
-                  disabled={busy}
-                >
-                  {VISIBILITIES.map((v) => (
-                    <option key={v} value={v}>
-                      {VISIBILITY_LABELS[v]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-          </Panel>
-
-          <Panel title="대신 둘러보기">
-            <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-              휴대폰 쓰기를 꺼리는 분은 주선자가 자기 폰으로 대신 봅니다. 초대는 소진되지 않고
-              주선자 로그인도 그대로 유지됩니다.
-            </p>
-            <Button
-              variant="secondary"
-              className="w-full"
-              disabled={busy}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true);
-                  setError(null);
-                  const result = await apiPost("/api/admin/acting", {
-                    profileId: profile.id,
-                  });
-                  setBusy(false);
-                  if (!result.ok) {
-                    setError(result.message);
-                    return;
-                  }
-                  router.push("/discover");
-                })();
-              }}
-            >
-              이 분으로 둘러보기
-            </Button>
-            <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-              대행 중에는 화면 아래에 띠가 뜨고, 거기서 언제든 주선자로 돌아옵니다. 끝내지
-              않으면 로그아웃할 때까지 이어집니다.
-            </p>
-            {claimed ? (
-              <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                본인 계정이 연결된 분입니다. 본인도 같은 화면을 직접 볼 수 있으니, 대신 누르기
-                전에 확인해 주세요.
-              </p>
-            ) : null}
-          </Panel>
-
-          <Panel title="본인에게 보내기">
-            {claimed ? (
-              <p className="text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                이미 본인 계정에 연결되어 있습니다. 본인이 직접 들어와 시그널을 확인합니다.
-              </p>
-            ) : (
-              <>
-                <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                  멤버는 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인입니다.
-                </p>
-                {invite && !invite.claimed ? (
-                  <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
-                    발급된 초대가 있습니다 (만료{" "}
-                    {new Date(invite.expiresAt).toLocaleString("ko-KR", {
-                      month: "numeric",
-                      day: "numeric",
-                      hour: "2-digit",
-                    })}
-                    ). 새로 발급하면 기존 링크와 입장코드는 무효가 됩니다.
-                  </p>
-                ) : null}
-
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  disabled={busy}
-                  onClick={() => {
-                    void (async () => {
-                      setBusy(true);
-                      setError(null);
-                      const result = await apiPost<{ url: string; code: string }>(
-                        "/api/admin/invites",
-                        { profileId: profile.id, expiresInHours: 72 },
-                      );
-                      setBusy(false);
-                      if (!result.ok) {
-                        setError(result.message);
-                        return;
-                      }
-                      setIssued({ url: result.data.url, code: result.data.code });
-                      router.refresh();
-                    })();
-                  }}
-                >
-                  초대 링크 발급
-                </Button>
-
-                {issued ? (
-                  <div className="mt-3.5 flex flex-col gap-2.5 rounded-[12px] bg-[var(--color-ivory-100)] p-3">
-                    <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                      지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요.
-                    </p>
-                    <CopyField label="초대 링크" value={issued.url} />
-                    <CopyField label="입장코드" value={issued.code} />
-                    <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                      둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 멤버는 입장
-                      화면에서 코드를 넣습니다.
-                    </p>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </Panel>
         </aside>
       </div>
     </div>
   );
-}
-
-/**
- * 왜 안 보이는지 한 마디로 말한다.
- *
- * 「상태를 공개로 바꿨는데 왜 안 보이지」가 가장 흔한 막힘이다 — 노출이 따로 남아
- * 있기 때문인데 화면이 말해주지 않으면 알 길이 없다.
- */
-function reasonHidden(
-  status: string | null | undefined,
-  visibility: string | null | undefined,
-): string {
-  if (status !== "ACTIVE" && status !== "MATCHING") {
-    return `상태가 「${label.profileStatus(status) ?? status}」입니다`;
-  }
-  return `노출이 「${label.visibility(visibility) ?? visibility}」입니다`;
 }
