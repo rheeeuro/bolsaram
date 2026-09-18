@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { AccountName } from "@/components/host/account-name";
 import { GroupSwitcher, type GroupChoice } from "@/components/host/group-switcher";
 import { GroupMenu } from "@/components/host/group-menu";
 import { useChatStream } from "@/components/host/chat-stream";
@@ -58,9 +59,7 @@ export function HostNav({
           </div>
 
           <div className="flex min-w-0 items-center gap-3 lg:w-full lg:justify-between">
-            <span className="hidden truncate text-[12.5px] text-[var(--surface-text-muted)] sm:inline">
-              {displayName ?? "주선자"} 님
-            </span>
+            <AccountName displayName={displayName} />
             <button
               type="button"
               className="text-[12.5px] text-[var(--surface-text-muted)] transition-colors hover:text-[var(--color-rose-600)]"

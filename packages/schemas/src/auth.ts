@@ -114,3 +114,14 @@ export const inviteClaimSchema = z.object({
 });
 
 export const displayNameSchema = z.string().trim().min(1).max(40);
+
+/**
+ * 표시 이름 바꾸기.
+ *
+ * 소셜 제공자가 준 이름은 **처음 계정을 만들 때만** 쓰고, 그 뒤로는 본인이 정한 값이
+ * 기준이다. 모임 채팅의 작성자 이름이 제공자 프로필 사정에 따라 흔들리면 동료를
+ * 알아보기 어렵다.
+ */
+export const displayNameUpdateSchema = z.object({
+  displayName: displayNameSchema,
+});

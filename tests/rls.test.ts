@@ -334,6 +334,49 @@ describe("관리자 전용 테이블", () => {
   });
 });
 
+describe("표시 이름", () => {
+  it("본인 이름은 바꿀 수 있다", async () => {
+    const changed = `${TAG}-바꾼이름`;
+    await withRls(fx.admin, (sql) =>
+      sql.query(`UPDATE users SET display_name = $2 WHERE id = $1`, [fx.adminId, changed]),
+    );
+    const read = await withOwner((sql) =>
+      sql.query<{ display_name: string }>(`SELECT display_name FROM users WHERE id = $1`, [
+        fx.adminId,
+      ]),
+    );
+    expect(read.rows[0]?.display_name).toBe(changed);
+  });
+
+  it("남의 이름은 바꾸지 못한다", async () => {
+    // `users_self_update` 가 본인 행만 통과시킨다. 모임 동료여도 예외가 없다.
+    const before = await withOwner((sql) =>
+      sql.query<{ display_name: string }>(`SELECT display_name FROM users WHERE id = $1`, [
+        fx.adminId,
+      ]),
+    );
+    const result = await withRls(fx.strangerAdmin, (sql) =>
+      sql.query(`UPDATE users SET display_name = $2 WHERE id = $1`, [fx.adminId, "가로채기"]),
+    );
+    expect(result.rowCount).toBe(0);
+    const after = await withOwner((sql) =>
+      sql.query<{ display_name: string }>(`SELECT display_name FROM users WHERE id = $1`, [
+        fx.adminId,
+      ]),
+    );
+    expect(after.rows[0]?.display_name).toBe(before.rows[0]?.display_name);
+  });
+
+  it("앱 롤은 역할을 바꾸지 못한다", async () => {
+    // 이름만 열려 있다. 본인 행이라도 role 은 컬럼 권한에서 빠져 있다(0036).
+    await expect(
+      withRls(fx.admin, (sql) =>
+        sql.query(`UPDATE users SET role = 'MEMBER' WHERE id = $1`, [fx.adminId]),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
+});
+
 describe("모임 소속(group_admins)", () => {
   it("주선자는 자기 모임의 주선자 목록만 읽는다", async () => {
     const mine = await withRls(fx.admin, (sql) =>

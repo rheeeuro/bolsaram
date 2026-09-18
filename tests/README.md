@@ -31,7 +31,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·해시태그 검색·조건 모델 | –    | 24   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·해시태그 정규화·mock 프로바이더 | –    | 22   |
-| `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·거절·숨김·담당이 갈리는 신청 | 필요 | 47 |
+| `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·표시 이름·거절·숨김·담당이 갈리는 신청 | 필요 | 56 |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출·해시태그 정규 저장 | 필요 | 10   |
 | `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 4 |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
@@ -71,6 +71,7 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `rls.test.ts` 「익명은 아무 프로필도 보지 못한다」         | 로그인 없이 열람 불가 (DB 레벨)     |
 | `rls.test.ts` 「남의 명의로 신청할 수 없다」               | 신청 사칭 차단                      |
 | `rls.test.ts` 「GUC 가 남지 않는다」                       | 커넥션 재사용 시 권한 유출 없음     |
+| `rls.test.ts` 「남의 이름은 바꾸지 못한다」                | 표시 이름은 본인만 고침             |
 | `rls.test.ts` 「거절 이력이 있으면 …막힌다」               | 거절 후 재신청 차단 (양방향)        |
 | `rls.test.ts` 「숨긴 사실은 숨긴 사람만 읽는다」           | 숨기기가 상대·주선자에게 통보되지 않음 |
 | `rls.test.ts` 「활성 신청이 있는 상대는 숨길 수 없다」     | 되돌릴 수 없는 「숨김 + 연결」 방지  |

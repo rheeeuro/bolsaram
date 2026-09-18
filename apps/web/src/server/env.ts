@@ -7,6 +7,18 @@ import { validateStorageConfig } from "@bolsaram/db/r2";
 import type { OAuthProvider } from "@bolsaram/schemas";
 import { z } from "zod";
 
+/**
+ * 「비워 두면 없는 것」인 값.
+ *
+ * `.env` 는 자리표시자를 빈 값으로 적어 두는 파일이라 `KEY=` 가 그대로 빈 문자열로
+ * 들어온다. `.optional()` 은 키가 **없을 때만** 통과시키므로, 빈 문자열을 먼저
+ * undefined 로 바꾸지 않으면 자리만 만들어 둔 설정이 기동을 막는다.
+ */
+const blankAsAbsent = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  z.string().min(1).optional(),
+);
+
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   APP_DATABASE_URL: z.string().min(1),
@@ -56,10 +68,10 @@ const envSchema = z.object({
    * 카카오는 「REST API 키」가 client_id 이고 client_secret 은 콘솔에서 켤 때만 생긴다.
    * 구글은 둘 다 필수다.
    */
-  KAKAO_CLIENT_ID: z.string().min(1).optional(),
-  KAKAO_CLIENT_SECRET: z.string().min(1).optional(),
-  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
-  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  KAKAO_CLIENT_ID: blankAsAbsent,
+  KAKAO_CLIENT_SECRET: blankAsAbsent,
+  GOOGLE_CLIENT_ID: blankAsAbsent,
+  GOOGLE_CLIENT_SECRET: blankAsAbsent,
 
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /**
