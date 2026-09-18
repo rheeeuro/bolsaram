@@ -82,17 +82,31 @@ export type TelegramIdentity = {
   groupName: string | null;
 };
 
+export type TelegramLinkResult = {
+  identity: TelegramIdentity;
+  /**
+   * 이 텔레그램 계정을 쓰고 있던 **다른** 주선자 계정. 옮겨왔을 때만 채워진다.
+   * 봇 응답과 감사 기록이 「옮겨왔다」를 말하는 데 쓴다.
+   */
+  replacedUserId: string | null;
+};
+
 /**
  * 코드를 소비하고 텔레그램 계정을 주선자 계정에 연결한다.
  *
  * `consumed_at IS NULL` 을 UPDATE 조건에 넣어 같은 코드를 두 번 쓸 수 없게 한다.
  * 같은 텔레그램 계정이 다시 연결하면 chat_id 만 갱신한다(재시도 안전).
+ *
+ * **다른 주선자 계정에 연결돼 있던 텔레그램 계정은 새 코드를 쓴 쪽으로 옮겨온다.**
+ * 코드를 가진 사람이 그 텔레그램 계정을 실제로 쓰고 있음을 방금 증명했으므로 —
+ * 코드는 15분짜리 1회용이고 봇 대화창에서 보내야 한다 — 막을 이유가 없다. 카카오와
+ * 구글로 각각 계정을 만든 뒤 한쪽에만 봇이 붙어 있는 경우가 이 경로로 풀린다.
  */
 export async function consumeTelegramLinkCode(input: {
   code: string;
   telegramUserId: number;
   telegramChatId: number;
-}): Promise<TelegramIdentity> {
+}): Promise<TelegramLinkResult> {
   return withOwnerTx(async (sql) => {
     const claimed = await sql.query<{ user_id: string; role: "ADMIN" | "MEMBER" }>(
       `UPDATE telegram_link_codes c
@@ -113,14 +127,25 @@ export async function consumeTelegramLinkCode(input: {
       throw new DomainError("FORBIDDEN", "주선자 계정만 봇을 연결할 수 있습니다.");
     }
 
-    // 텔레그램 계정 하나 ↔ 주선자 하나. 어느 쪽으로 충돌해도 이유를 알려준다.
-    const other = await sql.query<{ user_id: string }>(
-      `SELECT user_id FROM telegram_connections WHERE telegram_user_id = $1`,
-      [input.telegramUserId],
+    // 텔레그램 계정 하나 ↔ 주선자 하나. 다른 계정에 붙어 있었으면 떼어 온다.
+    const released = await sql.query<{ user_id: string }>(
+      `DELETE FROM telegram_connections
+        WHERE telegram_user_id = $1 AND user_id <> $2
+        RETURNING user_id`,
+      [input.telegramUserId, row.user_id],
     );
-    const existing = other.rows[0];
-    if (existing && existing.user_id !== row.user_id) {
-      throw new DomainError("CONFLICT", "이 텔레그램 계정은 다른 주선자에게 연결되어 있습니다.");
+    const replacedUserId = released.rows[0]?.user_id ?? null;
+
+    // 이전 계정에서 진행 중이던 대화는 닫는다. 새 주인은 그 대화를 볼 수도 이어갈
+    // 수도 없고(정책이 남의 Import 를 막는다), 살아 있는 대화가 남아 있으면
+    // `telegram_import_sessions_one_active` 가 새 대화를 만들지 못하게 한다.
+    if (replacedUserId) {
+      await sql.query(
+        `UPDATE telegram_import_sessions SET state = 'CANCELED'
+          WHERE telegram_user_id = $1
+            AND state IN ('WAITING_MEDIA', 'WAITING_TEXT', 'READY')`,
+        [input.telegramUserId],
+      );
     }
 
     // 담을 곳의 첫 값은 연결 시점에 보고 있는 채널로 둔다 — 방금 그 방에서 코드를
@@ -158,12 +183,15 @@ export async function consumeTelegramLinkCode(input: {
     );
 
     return {
-      userId: row.user_id,
-      role: row.role,
-      telegramUserId: input.telegramUserId,
-      telegramChatId: input.telegramChatId,
-      groupId: linked.rows[0]?.group_id ?? null,
-      groupName: linked.rows[0]?.name ?? null,
+      identity: {
+        userId: row.user_id,
+        role: row.role,
+        telegramUserId: input.telegramUserId,
+        telegramChatId: input.telegramChatId,
+        groupId: linked.rows[0]?.group_id ?? null,
+        groupName: linked.rows[0]?.name ?? null,
+      },
+      replacedUserId,
     };
   });
 }

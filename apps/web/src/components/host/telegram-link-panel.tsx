@@ -169,6 +169,10 @@ export function TelegramLinkPanel({
           <p className="text-[11.5px] text-[var(--surface-text-muted)]">
             {new Date(issued.expiresAt).toLocaleTimeString("ko-KR")} 까지 유효
           </p>
+          <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+            이 텔레그램 계정이 다른 주선자 계정에 연결돼 있었다면 <b>이 계정으로 옮겨옵니다</b>
+            — 그쪽 연결은 풀리고 거기서 진행 중이던 등록은 취소됩니다.
+          </p>
         </div>
       ) : (
         <div className="space-y-2.5">

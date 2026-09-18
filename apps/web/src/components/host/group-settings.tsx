@@ -361,7 +361,7 @@ function ChatNotify({ group }: { group: Group }) {
           이 모임의 새 채팅을 텔레그램으로도 받기
           <span className="mt-1 block text-[11.5px] text-[var(--surface-text-muted)]">
             내용은 보내지 않고 새 글이 있다는 것만 알립니다. 봇을 연결해야 도착합니다 —
-            가져오기 화면의 「텔레그램 연결」에서 연결합니다.
+            계정 설정의 「텔레그램 연결」에서 연결합니다.
           </span>
         </span>
       </label>

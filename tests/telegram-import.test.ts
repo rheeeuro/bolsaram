@@ -6,6 +6,7 @@
  *   * 같은 webhook update 가 두 번 와도 한 번만 처리된다.
  *   * 연결되지 않은 텔레그램 계정은 아무것도 못 한다.
  *   * 연결 코드는 한 번만 쓰이고 만료된다.
+ *   * 다른 주선자 계정에 붙어 있던 텔레그램 계정은 새로 연결한 쪽으로 옮겨온다.
  *   * 사진 여러 장이 하나의 ImportSession 에 순서대로 묶인다.
  *   * 모임 없는 주선자도 봇으로 Import 를 만든다(그 결과는 전체공개).
  *   * 봇이 담는 모임은 연결 설정에 붙어 있고 웹 채널을 따라 움직이지 않는다.
@@ -52,6 +53,8 @@ const TG_ADMIN = UPDATE_BASE + 1;
 const TG_MEMBER = UPDATE_BASE + 2;
 const TG_STRANGER = UPDATE_BASE + 3;
 const TG_SOLO = UPDATE_BASE + 4;
+/** 연결을 옮기는 테스트 전용. 공용 계정의 연결을 건드리면 뒤 테스트가 흔들린다. */
+const TG_MOVE = UPDATE_BASE + 5;
 
 let adminId: string;
 let memberId: string;
@@ -158,12 +161,14 @@ describe("계정 연결", () => {
     const issued = await issueTelegramLinkCode(adminId, "BolsaramTestBot");
     expect(issued.deepLink).toContain(issued.code);
 
-    const identity = await consumeTelegramLinkCode({
+    const { identity, replacedUserId } = await consumeTelegramLinkCode({
       code: issued.code,
       telegramUserId: TG_ADMIN,
       telegramChatId: TG_ADMIN,
     });
     expect(identity).toMatchObject({ userId: adminId, role: "ADMIN" });
+    // 처음 연결이다 — 누구에게서 옮겨온 것이 아니다.
+    expect(replacedUserId).toBeNull();
     expect(await findTelegramIdentity(TG_ADMIN)).toMatchObject({ userId: adminId });
   });
 
@@ -253,23 +258,67 @@ describe("계정 연결", () => {
     expect(await findTelegramIdentity(TG_ADMIN)).not.toBeNull();
   });
 
-  it("다른 주선자에게 연결된 텔레그램 계정은 빼앗을 수 없다", async () => {
-    const otherId = await withOwner(async (sql) => {
+  it("다른 주선자 계정에 붙어 있던 텔레그램 계정은 새로 연결한 쪽으로 옮겨온다", async () => {
+    // 코드를 가진 사람이 그 텔레그램 계정을 쓰고 있음을 방금 증명했다(15분·1회용
+    // 코드를 봇 대화창에서 보냈다). 카카오·구글로 계정이 둘로 갈린 경우가 이 경로로
+    // 풀리므로 막지 않고 옮긴다.
+    const [fromId, toId] = await withOwner(async (sql) => {
       const r = await sql.query<{ id: string }>(
-        `INSERT INTO users (role, email, display_name)
-         VALUES ('ADMIN', $1, $2) RETURNING id`,
-        [`${TAG}-admin2@test.local`, `${TAG}-admin2`],
+        `INSERT INTO users (role, email, display_name) VALUES
+           ('ADMIN', $1, $2), ('ADMIN', $3, $4)
+         RETURNING id`,
+        [
+          `${TAG}-from@test.local`,
+          `${TAG}-from`,
+          `${TAG}-to@test.local`,
+          `${TAG}-to`,
+        ],
       );
-      return r.rows[0]!.id;
+      return [r.rows[0]!.id, r.rows[1]!.id] as const;
     });
-    const issued = await issueTelegramLinkCode(otherId);
-    await expect(
-      consumeTelegramLinkCode({
-        code: issued.code,
-        telegramUserId: TG_ADMIN,
-        telegramChatId: TG_ADMIN,
-      }),
-    ).rejects.toThrow(/다른 주선자/);
+    const fromCtx: RlsContext = { userId: fromId, role: "ADMIN" };
+
+    const first = await issueTelegramLinkCode(fromId);
+    await consumeTelegramLinkCode({
+      code: first.code,
+      telegramUserId: TG_MOVE,
+      telegramChatId: TG_MOVE,
+    });
+    // 이전 주인 쪽에 진행 중인 대화를 하나 만들어 둔다.
+    const conversation = await withRls(fromCtx, async (sql) => {
+      const session = await createSession(sql, {
+        groupId: null,
+        createdBy: fromId,
+        source: "TELEGRAM",
+      });
+      return createConversation(sql, {
+        importSessionId: session.id,
+        telegramUserId: TG_MOVE,
+        telegramChatId: TG_MOVE,
+      });
+    });
+
+    const issued = await issueTelegramLinkCode(toId);
+    const moved = await consumeTelegramLinkCode({
+      code: issued.code,
+      telegramUserId: TG_MOVE,
+      telegramChatId: TG_MOVE,
+    });
+
+    expect(moved.replacedUserId).toBe(fromId);
+    expect(moved.identity).toMatchObject({ userId: toId, role: "ADMIN" });
+    expect(await findTelegramIdentity(TG_MOVE)).toMatchObject({ userId: toId });
+
+    // 이전 주인은 연결을 잃는다. 화면에도 「연결 안 됨」으로 보인다.
+    expect(await withRls(fromCtx, (sql) => findConnectionForUser(sql, fromId))).toBeNull();
+
+    // 이전 주인의 대화는 닫힌다 — 살아 있으면 one_active 인덱스가 새 주인의 대화를
+    // 막고, 새 주인은 남의 Import 를 볼 수도 취소할 수도 없어 봇이 영구히 멈춘다.
+    const previous = await withRls(fromCtx, (sql) =>
+      findConversationByImportSession(sql, conversation.importSessionId),
+    );
+    expect(previous?.state).toBe("CANCELED");
+    expect(await withRls(fromCtx, (sql) => findActiveConversation(sql, TG_MOVE))).toBeNull();
   });
 });
 

@@ -118,7 +118,7 @@ server/
 │   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 연결된 계정 조회)
 │   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·1회용)
 │   ├── group-invite.ts       모임 만들기·소속·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
-│   ├── telegram.ts           봇 계정 연결(해시 코드) + webhook 재전송 차단
+│   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)

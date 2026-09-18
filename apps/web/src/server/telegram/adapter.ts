@@ -168,21 +168,24 @@ async function handleStart(
     return;
   }
 
-  const identity = await consumeTelegramLinkCode({
+  const { identity, replacedUserId } = await consumeTelegramLinkCode({
     code,
     telegramUserId,
     telegramChatId: chatId,
   });
   // 연결은 감사 대상이다. 텔레그램 식별값은 남기지 않는다.
+  // 다른 계정에서 옮겨왔으면 어디서 왔는지도 남긴다 — 그쪽 봇이 왜 멈췄는지 찾을
+  // 유일한 단서다.
   await withRls(rlsContextOfTelegram(identity), (sql) =>
     writeAudit(sql, {
       actorUserId: identity.userId,
       action: "telegram.link",
       entityType: "user",
       entityId: identity.userId,
+      ...(replacedUserId ? { metadata: { replacedUserId } } : {}),
     }),
   );
-  await sendMessage(chatId, messages.linked);
+  await sendMessage(chatId, replacedUserId ? messages.linkedMoved : messages.linked);
 }
 
 // ── 명령 ──────────────────────────────────────────────────────
