@@ -46,10 +46,15 @@ pnpm dev          # http://127.0.0.1:3020
 `KAKAO_CLIENT_ID` 또는 `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` 를 설정하세요
 (등록할 Redirect URI 와 절차는 `.env.example` 에 적혀 있습니다).
 
-시드가 만드는 주선자 계정으로 직접 들어가 보려면 `SEED_ADMIN_EMAIL` 에 **본인 소셜
-계정 이메일**을 넣고 시드하세요 — 첫 로그인에서 같은 이메일의 계정에 이어붙습니다.
-화면 동작만 확인할 때는 `pnpm dev:session` 이 점검용 주선자 세션 쿠키를 발급합니다
-(개발 전용, `APP_ENV=production` 에서는 거절).
+`pnpm db:seed` 는 **주선자 두 명**(`SEED_ADMIN_EMAIL1` · `SEED_ADMIN_EMAIL2`)과 모임
+하나(「애니메이션 모임」 — 1번이 모임장, 2번이 합류)를 만들고, `db/sample/` 의 프로필을
+번호로 갈라 각자 명의로 등록합니다. **본인 소셜 계정 이메일**을 넣으면 첫 로그인에서 그
+계정에 이어붙습니다. 화면 동작만 확인할 때는 `pnpm dev:session` 이 점검용 주선자 세션
+쿠키를 발급합니다(개발 전용, `APP_ENV=production` 에서는 거절).
+
+샘플은 사람 하나당 디렉터리 하나(`profile.txt` + 사진)이며 **git 에 올라가지 않습니다**.
+없으면 시드가 이유를 말하고 멈춥니다(위치는 `SEED_SAMPLE_DIR`).
+**멤버 계정은 만들지 않습니다** — 프로필 상세에서 초대 링크를 발급해 들어갑니다.
 
 시드의 이름·사진·연락처는 **전부 합성 데이터**이며 실존 인물과 무관합니다.
 

@@ -17,6 +17,10 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 > 이 README 는 현재 스키마의 소스 오브 트루스다. 마이그레이션을 추가하면 함께 갱신한다.
 > 작업 규칙은 [`.ai-harness/project.md`](../.ai-harness/project.md) 를 따른다.
 
+이 디렉터리에는 마이그레이션 외에 `sample/` 이 있다 — 시드가 읽는 샘플 프로필
+(사람 하나당 디렉터리 하나, `profile.txt` + 사진)이며 **git 에 올라가지 않는다.**
+읽는 쪽은 `packages/db/src/cli/seed.ts` 다.
+
 ---
 
 ## 마이그레이션
