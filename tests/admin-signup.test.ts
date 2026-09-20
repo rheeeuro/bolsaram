@@ -12,6 +12,7 @@
  */
 import { afterAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
+import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
 import {
   closeGroup,
   consumeGroupInvite,
@@ -332,6 +333,40 @@ describe("모임 참여 (초대 코드)", () => {
     const mine = await readMyGroups(other.userId);
     expect(mine.map((g) => g.groupId).sort()).toEqual([a.groupId, b.groupId].sort());
     expect(await readActiveGroupId(other.userId)).toBe(a.groupId);
+  });
+
+  it(`모임은 ${MAX_GROUPS_PER_ADMIN}개까지만 만들 수 있다`, async () => {
+    const admin = await newAdmin("모임수집가");
+    for (let i = 0; i < MAX_GROUPS_PER_ADMIN; i += 1) {
+      await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-상한${i}` });
+    }
+    await expect(
+      createGroupForAdmin({ userId: admin.userId, name: `${TAG}-상한초과` }),
+    ).rejects.toThrow(new RegExp(`최대 ${MAX_GROUPS_PER_ADMIN}개`));
+    expect(await readMyGroups(admin.userId)).toHaveLength(MAX_GROUPS_PER_ADMIN);
+  });
+
+  it("상한에 닿으면 초대 코드로도 더 들어가지 못한다", async () => {
+    // 만들기만 막으면 초대 코드로 넘어간다. 두 문이 같은 상한을 본다.
+    const admin = await newAdmin("코드로넘기");
+    for (let i = 0; i < MAX_GROUPS_PER_ADMIN; i += 1) {
+      await createGroupForAdmin({ userId: admin.userId, name: `${TAG}-코드상한${i}` });
+    }
+    const owner = await newAdmin("초대하는이");
+    const { groupId } = await createGroupForAdmin({
+      userId: owner.userId,
+      name: `${TAG}-못들어갈모임`,
+    });
+    const issued = await issueGroupInvite({ groupId, createdBy: owner.userId });
+
+    await expect(
+      consumeGroupInvite({ code: issued.code, userId: admin.userId }),
+    ).rejects.toThrow(new RegExp(`최대 ${MAX_GROUPS_PER_ADMIN}개`));
+    // 거절된 시도가 코드를 태우지 않는다 — 자리를 비우고 다시 쓸 수 있어야 한다.
+    expect(await readMyGroups(admin.userId)).toHaveLength(MAX_GROUPS_PER_ADMIN);
+    const other = await newAdmin("자리있는이");
+    await consumeGroupInvite({ code: issued.code, userId: other.userId });
+    expect(await readMyGroups(other.userId)).toHaveLength(1);
   });
 
   it("같은 모임에 다시 합류해도 소속이 늘지 않는다", async () => {

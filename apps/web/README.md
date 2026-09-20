@@ -66,11 +66,11 @@ apps/web/src/
 │   │   ├── profiles/[id]/edit/  내용 편집 — 등록한 주선자만
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
-│   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용)
+│   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용, 오른쪽 아래 버튼으로 연다)
 │   │   └── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·global-progress)
 │   ├── member/               멤버 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
@@ -85,6 +85,8 @@ apps/web/src/
 
 모든 페이지가 `force-dynamic` 이고 요청마다 DB 를 읽는다. 그래서 멤버 화면 다섯 곳과
 주선자 영역에 `loading.tsx` 를 둔다 — 모임 내비게이션은 바로 뜨고 본문만 스켈레톤이 된다.
+화면을 통째로 바꾸지 않는 왕복(모임 전환 등)은 `GlobalProgressProvider` 가 루트에서
+받는다. 표시가 화면 흐름 밖에 떠 있어야 기다리는 동안 눌린 자리가 밀리지 않는다.
 스켈레톤은 `aria-hidden` 이라 `LoadingLabel` 을 같이 놓아야 화면을 보지 않는 사용자에게도
 「불러오는 중」이 전달된다.
 

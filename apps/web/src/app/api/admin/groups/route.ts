@@ -2,7 +2,7 @@
  * 내 모임들.
  *
  *   GET   속한 모임 전부 + 지금 보고 있는 채널
- *   POST  모임 만들기 (몇 개든 만들 수 있다)
+ *   POST  모임 만들기 (`MAX_GROUPS_PER_ADMIN` 까지)
  */
 import { groupCreateSchema } from "@bolsaram/schemas";
 import { requireAdmin } from "@/server/auth/guard";

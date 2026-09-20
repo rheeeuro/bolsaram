@@ -30,6 +30,15 @@ export const oauthProviderSchema = z
   .transform((v) => v.toUpperCase())
   .pipe(z.enum(OAUTH_PROVIDERS));
 
+/**
+ * 한 주선자가 동시에 속할 수 있는 모임 수.
+ *
+ * 모임은 화면 왼쪽에 전부 펼쳐 놓고 눈으로 고르는 목록이다. 수가 늘면 그 목록이
+ * 스크롤 영역이 되고 「어디에 등록하는 중인지」가 화면에서 사라진다. 만들기와
+ * 합류 양쪽에 같은 상한을 건다 — 한쪽만 막으면 초대 코드로 넘어간다.
+ */
+export const MAX_GROUPS_PER_ADMIN = 5;
+
 /** 모임 이름·설명. `groups` 의 CHECK 와 같은 범위를 쓴다. */
 export const groupNameSchema = z.string().trim().min(1).max(80);
 export const groupDescriptionSchema = z.string().trim().max(500);

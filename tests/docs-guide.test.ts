@@ -21,6 +21,7 @@ import {
 import {
   HASHTAG_MAX_COUNT,
   LOW_CONFIDENCE_THRESHOLD,
+  MAX_GROUPS_PER_ADMIN,
   OAUTH_PROVIDER_LABELS,
   MATCH_REQUEST_STATUS_LABELS,
   PROFILE_STATUS_LABELS,
@@ -165,6 +166,12 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
   it("해시태그 개수 상한을 가이드와 같게 안내한다", () => {
     expect(HASHTAG_MAX_COUNT).toBe(10);
     expect(guide("admin.md")).toMatch(new RegExp(`최대 ${HASHTAG_MAX_COUNT}개`));
+  });
+
+  it("한 주선자가 속할 수 있는 모임 수를 가이드와 같게 안내한다", () => {
+    // 만들기와 초대 코드 참여가 같은 상한을 본다(tests/admin-signup.test.ts).
+    expect(MAX_GROUPS_PER_ADMIN).toBe(5);
+    expect(guide("admin.md")).toMatch(new RegExp(`최대 ${MAX_GROUPS_PER_ADMIN}개`));
   });
 
   it("낮은 신뢰도 기준 65%", () => {

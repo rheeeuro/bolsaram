@@ -15,17 +15,39 @@
  * 활성 채널(`users.active_group_id`)도 앱 롤의 UPDATE 권한에서 빼 두었다.
  */
 import "server-only";
-import { withOwner, withOwnerTx } from "@bolsaram/db";
+import { withOwner, withOwnerTx, type Sql } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
+import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
 import { env } from "../env";
 import { peppered, randomToken } from "../crypto";
 
 /**
+ * 모임 수 상한을 지킨다. 넘으면 던진다.
+ *
+ * **만들기와 합류가 같은 문을 지난다** — 한쪽만 막으면 초대 코드로 넘어간다.
+ * 세기 전에 `users` 행을 잠가 둔다: 같은 계정으로 두 요청이 동시에 들어와도
+ * 한쪽이 끝난 뒤에 세므로 상한을 한 칸 넘겨 통과하는 일이 없다.
+ */
+async function assertGroupCapacity(sql: Sql, userId: string): Promise<void> {
+  await sql.query(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+  const counted = await sql.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM group_admins WHERE user_id = $1`,
+    [userId],
+  );
+  if ((counted.rows[0]?.count ?? 0) >= MAX_GROUPS_PER_ADMIN) {
+    throw new DomainError(
+      "CONFLICT",
+      `모임은 최대 ${MAX_GROUPS_PER_ADMIN}개까지입니다. 쓰지 않는 모임에서 나간 뒤 다시 시도하세요.`,
+    );
+  }
+}
+
+/**
  * 이미 있는 주선자 계정에 모임을 만들어 준다.
  *
- * 가입은 계정만 만들므로 모임이 필요하면 여기를 지난다. **몇 개든 만들 수 있다** —
- * 한 주선자가 여러 모임에서 일하고 화면에서 채널처럼 오간다(0036). 만든 모임을 바로
- * 활성 채널로 만들어 준다.
+ * 가입은 계정만 만들므로 모임이 필요하면 여기를 지난다. 한 주선자가 여러 모임에서
+ * 일하고 화면에서 채널처럼 오가되(0036) 동시에 속하는 수는 `MAX_GROUPS_PER_ADMIN`
+ * 까지다. 만든 모임을 바로 활성 채널로 만들어 준다.
  *
  * `groups` INSERT 정책을 앱 롤에 주지 않았으므로 owner 커넥션으로만 가능하다 —
  * 모임 소속은 데이터가 아니라 신원에 가깝다는 판단이다.
@@ -36,6 +58,7 @@ export async function createGroupForAdmin(input: {
   description?: string;
 }): Promise<{ groupId: string }> {
   return withOwnerTx(async (sql) => {
+    await assertGroupCapacity(sql, input.userId);
     const group = await sql.query<{ id: string }>(
       `INSERT INTO groups (name, description, created_by) VALUES ($1, $2, $3) RETURNING id`,
       [input.name, input.description?.trim() || null, input.userId],
@@ -129,6 +152,9 @@ export async function issueGroupInvite(input: {
 /**
  * 코드를 소비하고 그 모임에 합류한다. 이미 속한 모임이 있어도 상관없다 —
  * 여러 모임에 동시에 속할 수 있다. 합류한 모임을 바로 활성 채널로 만든다.
+ *
+ * 상한은 **새로 들어갈 때만** 본다. 이미 속한 모임의 코드를 다시 넣으면 소속이
+ * 늘지 않으므로 상한에 걸릴 이유가 없다.
  */
 export async function consumeGroupInvite(input: {
   code: string;
@@ -156,6 +182,7 @@ export async function consumeGroupInvite(input: {
       [row.group_id, input.userId],
     );
     if ((already.rowCount ?? 0) === 0) {
+      await assertGroupCapacity(sql, input.userId);
       // 합류하는 사람은 OWNER 가 아니다.
       await sql.query(
         `INSERT INTO group_admins (group_id, user_id, is_owner, added_by)

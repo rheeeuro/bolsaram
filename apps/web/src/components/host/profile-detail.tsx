@@ -20,7 +20,7 @@ import { apiPatch, apiPost } from "@/lib/api-client";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 
-/** 어느 칸에서 난 실패인가. 패널이 셋이라 한 곳에 모아 두면 짝을 잃는다. */
+/** 어느 버튼에서 난 실패인가. 한 곳에 모아 두면 무엇이 실패했는지 짝을 잃는다. */
 type Scope = "status" | "acting" | "invite";
 
 function messageFor(
@@ -37,8 +37,12 @@ function messageFor(
  * 열리면 「이 사람이 멤버에게 어떻게 보이나」를 볼 방법이 사라진다. 고치는 일은
  * `/profiles/[id]/edit` 으로 따로 나갔다.
  *
- * 여기 남은 것은 읽기와 **운영 액션**(공개 여부·초대·대행)이다. 둘 다 폼 저장과
+ * 여기 남은 것은 읽기와 **운영 액션**(공개 여부·멤버 화면 열기)이다. 둘 다 폼 저장과
  * 무관하게 그 자리에서 끝나므로 저장하지 않은 변경을 만들지 않는다.
+ *
+ * 초대와 대행은 한 칸에 함께 둔다. 둘은 「이 분에게 멤버 화면을 어떻게 보여줄까」라는
+ * **한 가지 물음의 두 답**이라, 칸을 갈라 놓으면 주선자가 둘을 견주지 못하고 먼저
+ * 눈에 든 쪽을 누른다.
  *
  * 이름과 연락처는 공개 단계가 허락할 때만 `profile` 에 들어온다 — 여기서 다시
  * 판정하지 않는다.
@@ -60,8 +64,7 @@ export function HostProfileDetail({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  // 실패는 누른 칸 옆에서 말해야 한다 — 패널이 셋이라 한 곳에 모으면 무엇이
-  // 실패했는지 알 수 없다.
+  // 실패는 누른 버튼 옆에서 말해야 한다 — 한 곳에 모으면 무엇이 실패했는지 알 수 없다.
   const [error, setError] = useState<{ scope: Scope; message: string } | null>(null);
   // 발급 직후 한 번만 보여줄 값. 링크와 입장코드는 같은 토큰이다.
   const [issued, setIssued] = useState<{ url: string; code: string } | null>(null);
@@ -335,109 +338,123 @@ export function HostProfileDetail({
               <FormError>{messageFor(error, "status")}</FormError>
             </Panel>
 
-            <Panel title="대신 둘러보기">
-              <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                휴대폰 쓰기를 꺼리는 분은 주선자가 자기 폰으로 대신 봅니다. 초대는 소진되지
-                않고 주선자 로그인도 그대로 유지됩니다.
+            <Panel title="멤버 화면 열기">
+              <p className="mb-4 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                이 분이 멤버 화면을 보는 길은 둘입니다. 본인이 직접 보는 것이 기본이고,
+                휴대폰 쓰기를 꺼리는 분은 주선자가 대신 봅니다.
               </p>
-              <Button
-                variant="secondary"
-                className="w-full"
-                disabled={busy}
-                onClick={() => {
-                  void (async () => {
-                    setBusy(true);
-                    setError(null);
-                    const result = await apiPost("/api/admin/acting", {
-                      profileId: profile.id,
-                    });
-                    setBusy(false);
-                    if (!result.ok) {
-                      setError({ scope: "acting", message: result.message });
-                      return;
-                    }
-                    router.push("/discover");
-                  })();
-                }}
-              >
-                이 분으로 둘러보기
-              </Button>
-              <FormError>{messageFor(error, "acting")}</FormError>
-              <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                대행 중에는 화면 아래에 띠가 뜨고, 거기서 언제든 주선자로 돌아옵니다. 끝내지
-                않으면 로그아웃할 때까지 이어집니다.
-              </p>
-              {claimed ? (
-                <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                  본인 계정이 연결된 분입니다. 본인도 같은 화면을 직접 볼 수 있으니, 대신
-                  누르기 전에 확인해 주세요.
-                </p>
-              ) : null}
-            </Panel>
 
-            <Panel title="본인에게 보내기">
-              {claimed ? (
-                <p className="text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                  이미 본인 계정에 연결되어 있습니다. 본인이 직접 들어와 시그널을 확인합니다.
-                </p>
-              ) : (
-                <>
-                  <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                    멤버는 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인입니다.
+              <section>
+                <h3 className="text-[13px] font-semibold text-[var(--surface-text)]">
+                  본인에게 보내기
+                </h3>
+                {claimed ? (
+                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                    이미 본인 계정에 연결되어 있습니다. 본인이 직접 들어와 시그널을
+                    확인합니다.
                   </p>
-                  {invite && !invite.claimed ? (
-                    <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
-                      발급된 초대가 있습니다 (만료{" "}
-                      {new Date(invite.expiresAt).toLocaleString("ko-KR", {
-                        month: "numeric",
-                        day: "numeric",
-                        hour: "2-digit",
-                      })}
-                      ). 새로 발급하면 기존 링크와 입장코드는 무효가 됩니다.
+                ) : (
+                  <>
+                    <p className="mb-3 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                      멤버는 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인입니다.
                     </p>
-                  ) : null}
-
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={() => {
-                      void (async () => {
-                        setBusy(true);
-                        setError(null);
-                        const result = await apiPost<{ url: string; code: string }>(
-                          "/api/admin/invites",
-                          { profileId: profile.id, expiresInHours: 72 },
-                        );
-                        setBusy(false);
-                        if (!result.ok) {
-                          setError({ scope: "invite", message: result.message });
-                          return;
-                        }
-                        setIssued({ url: result.data.url, code: result.data.code });
-                        router.refresh();
-                      })();
-                    }}
-                  >
-                    초대 링크 발급
-                  </Button>
-                  <FormError>{messageFor(error, "invite")}</FormError>
-
-                  {issued ? (
-                    <div className="mt-3.5 flex flex-col gap-2.5 rounded-[12px] bg-[var(--color-ivory-100)] p-3">
-                      <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                        지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요.
+                    {invite && !invite.claimed ? (
+                      <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+                        발급된 초대가 있습니다 (만료{" "}
+                        {new Date(invite.expiresAt).toLocaleString("ko-KR", {
+                          month: "numeric",
+                          day: "numeric",
+                          hour: "2-digit",
+                        })}
+                        ). 새로 발급하면 기존 링크와 입장코드는 무효가 됩니다.
                       </p>
-                      <CopyField label="초대 링크" value={issued.url} />
-                      <CopyField label="입장코드" value={issued.code} />
-                      <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                        둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 멤버는 입장
-                        화면에서 코드를 넣습니다.
-                      </p>
-                    </div>
-                  ) : null}
-                </>
-              )}
+                    ) : null}
+
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      disabled={busy}
+                      onClick={() => {
+                        void (async () => {
+                          setBusy(true);
+                          setError(null);
+                          const result = await apiPost<{ url: string; code: string }>(
+                            "/api/admin/invites",
+                            { profileId: profile.id, expiresInHours: 72 },
+                          );
+                          setBusy(false);
+                          if (!result.ok) {
+                            setError({ scope: "invite", message: result.message });
+                            return;
+                          }
+                          setIssued({ url: result.data.url, code: result.data.code });
+                          router.refresh();
+                        })();
+                      }}
+                    >
+                      초대 링크 발급
+                    </Button>
+                    <FormError>{messageFor(error, "invite")}</FormError>
+
+                    {issued ? (
+                      <div className="mt-3.5 flex flex-col gap-2.5 rounded-[12px] bg-[var(--color-ivory-100)] p-3">
+                        <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                          지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요.
+                        </p>
+                        <CopyField label="초대 링크" value={issued.url} />
+                        <CopyField label="입장코드" value={issued.code} />
+                        <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                          둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 멤버는
+                          입장 화면에서 코드를 넣습니다.
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </section>
+
+              <section className="mt-5 border-t border-[var(--surface-border)] pt-4">
+                <h3 className="text-[13px] font-semibold text-[var(--surface-text)]">
+                  대신 둘러보기
+                </h3>
+                <p className="mb-3 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                  주선자가 자기 폰으로 대신 봅니다. 초대는 소진되지 않고 주선자 로그인도
+                  그대로 유지됩니다.
+                </p>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  disabled={busy}
+                  onClick={() => {
+                    void (async () => {
+                      setBusy(true);
+                      setError(null);
+                      const result = await apiPost("/api/admin/acting", {
+                        profileId: profile.id,
+                      });
+                      setBusy(false);
+                      if (!result.ok) {
+                        setError({ scope: "acting", message: result.message });
+                        return;
+                      }
+                      router.push("/discover");
+                    })();
+                  }}
+                >
+                  이 분으로 둘러보기
+                </Button>
+                <FormError>{messageFor(error, "acting")}</FormError>
+                <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                  대행 중에는 화면 아래에 띠가 뜨고, 거기서 언제든 주선자로 돌아옵니다.
+                  끝내지 않으면 로그아웃할 때까지 이어집니다.
+                </p>
+                {claimed ? (
+                  <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                    본인 계정이 연결된 분입니다. 본인도 같은 화면을 직접 볼 수 있으니, 대신
+                    누르기 전에 확인해 주세요.
+                  </p>
+                ) : null}
+              </section>
             </Panel>
           </aside>
         ) : null}

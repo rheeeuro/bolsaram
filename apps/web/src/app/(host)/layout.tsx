@@ -10,6 +10,7 @@ import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { unreadByGroup } from "@/server/repo/group-chat";
 import { imageUrlFor } from "@/server/views/image-url";
 import { HostNav } from "@/components/host/host-nav";
+import { HostChatFab } from "@/components/host/chat-fab";
 import { ChatStreamProvider } from "@/components/host/chat-stream";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,8 @@ export default async function HostLayout({ children }: { children: React.ReactNo
             {children}
           </main>
         </div>
+        {/* 채팅은 내비게이션 목록이 아니라 어느 화면에서나 같은 자리에 떠 있다. */}
+        <HostChatFab activeGroupId={viewer.groupId} />
       </ChatStreamProvider>
     </div>
   );

@@ -2,8 +2,12 @@
  * 주선자 화면 목록과 그 아이콘 — 데스크톱 사이드바와 모바일 하단 탭이 함께 읽는다.
  *
  * 한 곳에 두는 이유는 두 내비게이션이 **같은 목적지를 다르게 그리기** 때문이다.
- * 모바일 하단 탭에는 다섯 칸만 들어가므로 `primary` 로 앞의 넷을 가르고 나머지는
+ * 모바일 하단 탭에는 다섯 칸까지 들어가므로 `primary` 로 앞쪽을 가르고 나머지는
  * 「더보기」 시트로 내려보낸다. 사이드바는 가르지 않고 전부 세로로 편다.
+ *
+ * **채팅은 이 목록에 없다.** 화면을 오가는 일이 아니라 하던 일 중에 들르는 곳이라
+ * 오른쪽 아래 떠 있는 버튼(`HostChatFab`)이 맡는다. 아이콘은 그 버튼도 여기서
+ * 가져가므로 `/chat` 갈래를 남겨 둔다.
  *
  * 아이콘은 멤버 하단 탭과 같은 얇은 선(1.3)으로 그린다 — 두 화면이 한 제품이다.
  */
@@ -13,7 +17,7 @@ export type HostLink = {
   label: string;
   /** 하위 경로를 활성으로 치지 않는 곳(`/home`)만 켠다. */
   exact?: boolean;
-  /** 모바일 하단 탭에 직접 올라가는 넷. */
+  /** 모바일 하단 탭에 직접 올라가는 것들. */
   primary?: boolean;
 };
 
@@ -23,7 +27,6 @@ export const HOST_LINKS: HostLink[] = [
   { href: "/requests", label: "신청", primary: true },
   { href: "/imports", label: "가져오기" },
   { href: "/members", label: "멤버" },
-  { href: "/chat", label: "채팅", primary: true },
 ];
 
 export function isHostLinkActive(link: HostLink, pathname: string): boolean {

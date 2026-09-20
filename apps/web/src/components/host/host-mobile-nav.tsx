@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { apiPost } from "@/lib/api-client";
+import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -26,8 +26,11 @@ import type { GroupChoice } from "@/components/host/group-switcher";
  * 일은 계속 하므로, 자주 쓰는 쪽을 엄지가 닿는 아래에 놓는다. 둘 다 위에 쌓으면
  * 가로 스크롤 줄이 겹쳐 어느 쪽을 미는 것인지가 사라진다.
  *
- * 하단 탭에는 다섯 칸만 둔다(`primary` 넷 + 더보기). 나머지 화면과 계정·모임 설정은
+ * 하단 탭에는 다섯 칸까지만 둔다(`primary` + 더보기). 나머지 화면과 계정·모임 설정은
  * 「더보기」 시트로 모은다. 목록 자체는 `host-nav-links` 가 사이드바와 공유한다.
+ * 채팅은 이 목록에 없다 — 오른쪽 아래 떠 있는 버튼이 그 자리다.
+ *
+ * 로그아웃도 여기 없다. 계정을 다루는 일은 계정 설정 화면 한 곳에 모은다.
  */
 export function HostMobileNav({
   displayName,
@@ -51,8 +54,8 @@ export function HostMobileNav({
   }, [pathname]);
 
   const activeName = groups.find((group) => group.id === activeGroupId)?.name ?? "전체공개";
-  const hereUnread = activeGroupId ? (unread[activeGroupId] ?? 0) : 0;
-  // 지금 보고 있지 않은 모임에 쌓인 것. 모임 전환 버튼에 붙여 「저쪽에 뭔가 있다」만 알린다.
+  // 지금 보고 있지 않은 모임에 쌓인 것. 모임 전환 버튼에 붙여 「저쪽에 뭔가 있다」만
+  // 알린다. 보고 있는 모임의 수는 오른쪽 아래 채팅 버튼이 단다.
   const elsewhereUnread = Object.entries(unread).reduce(
     (sum, [groupId, count]) => (groupId === activeGroupId ? sum : sum + count),
     0,
@@ -112,12 +115,7 @@ export function HostMobileNav({
                       : "text-[var(--surface-text-muted)]",
                   )}
                 >
-                  <span className="relative">
-                    <HostNavIcon name={link.href} />
-                    {link.href === "/chat" && hereUnread > 0 ? (
-                      <UnreadBadge count={hereUnread} label="개 안 읽음" floating />
-                    ) : null}
-                  </span>
+                  <HostNavIcon name={link.href} />
                   {link.label}
                 </Link>
               </li>
@@ -182,6 +180,7 @@ function GroupSheet({
 }) {
   const { switchTo, busy, error } = useGroupSwitch(activeGroupId);
   const [dialog, setDialog] = useState<"create" | "join" | null>(null);
+  const full = groups.length >= MAX_GROUPS_PER_ADMIN;
 
   return (
     <>
@@ -229,15 +228,19 @@ function GroupSheet({
           })}
 
           <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
-            <SheetItem onSelect={() => setDialog("create")}>새 모임 만들기</SheetItem>
-            <SheetItem onSelect={() => setDialog("join")}>초대 코드로 참여</SheetItem>
+            {full ? (
+              <p className="px-3 py-2 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+                모임 {MAX_GROUPS_PER_ADMIN}개를 모두 쓰고 있습니다. 쓰지 않는 모임에서
+                나가면 자리가 납니다.
+              </p>
+            ) : (
+              <>
+                <SheetItem onSelect={() => setDialog("create")}>새 모임 만들기</SheetItem>
+                <SheetItem onSelect={() => setDialog("join")}>초대 코드로 참여</SheetItem>
+              </>
+            )}
           </div>
 
-          {busy ? (
-            <p role="status" className="px-3 pt-2 text-[12px] text-[var(--surface-text-muted)]">
-              모임으로 이동 중…
-            </p>
-          ) : null}
           {error ? (
             <p role="alert" className="px-3 pt-2 text-[12px] text-[var(--color-rose-600)]">
               {error}
@@ -271,8 +274,6 @@ function MoreSheet({
   activeName: string;
   onClose: () => void;
 }) {
-  const router = useRouter();
-
   return (
     <>
       <Dialog open={open} onClose={onClose} label="더보기" variant="sheet">
@@ -315,20 +316,9 @@ function MoreSheet({
               <span className="min-w-0">
                 <span className="block truncate">{displayName ?? "주선자"} 님</span>
                 <span className="block text-[11.5px] text-[var(--surface-text-muted)]">
-                  계정 설정 — 이름 · 텔레그램 연결
+                  계정 설정 — 이름 · 텔레그램 연결 · 로그아웃
                 </span>
               </span>
-            </SheetItem>
-            <SheetItem
-              danger
-              onSelect={() => {
-                void apiPost("/api/auth/logout").then(() => {
-                  router.replace("/");
-                  router.refresh();
-                });
-              }}
-            >
-              로그아웃
             </SheetItem>
           </div>
         </div>

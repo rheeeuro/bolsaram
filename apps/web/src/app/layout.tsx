@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR, Nanum_Myeongjo } from "next/font/google";
 import { BRAND } from "@bolsaram/ui-tokens";
+import { GlobalProgressProvider } from "@/components/ui/global-progress";
 import "./globals.css";
 
 const sans = Noto_Sans_KR({
@@ -51,7 +52,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" className={`${sans.variable} ${display.variable}`}>
-      <body>{children}</body>
+      {/* 서버 왕복 중에 뜨는 진행 표시는 화면 흐름 밖에 있어야 한다 — 눌린 자리
+          옆에 끼우면 기다리는 동안 그 줄이 밀린다. 그래서 최상위에 둔다. */}
+      <body>
+        <GlobalProgressProvider>{children}</GlobalProgressProvider>
+      </body>
     </html>
   );
 }

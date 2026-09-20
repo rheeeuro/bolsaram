@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { apiPost } from "@/lib/api-client";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { AccountName } from "@/components/host/account-name";
@@ -30,6 +29,9 @@ import { useChatStream } from "@/components/host/chat-stream";
  * 모임을 바꿔도 안 바뀌는 화면이 하나 껴 있게 된다.
  *
  * 전체공개에는 메뉴가 없다. 이름도 주선자도 없는 공용 방이라 다룰 것이 없다.
+ *
+ * 로그아웃은 여기 없다 — 계정을 다루는 일은 「○○ 님」을 눌러 들어가는 계정 설정
+ * 화면 한 곳에 모은다. 내비게이션에 두면 모임을 고르려다 손이 스친다.
  */
 export function HostNav({
   displayName,
@@ -73,10 +75,9 @@ function HostSidebar({
   activeGroupId: string | null;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
-  // 배지는 SSE 가 밀어주는 값이다(`ChatStreamProvider`). 여기서 따로 묻지 않는다.
+  // 모임별 안 읽음은 SSE 가 밀어주는 값이다(`ChatStreamProvider`). 여기서 따로 묻지
+  // 않는다. 지금 방의 수는 목록이 아니라 오른쪽 아래 채팅 버튼이 단다.
   const { unread } = useChatStream();
-  const hereUnread = activeGroupId ? (unread[activeGroupId] ?? 0) : 0;
   const activeName = groups.find((group) => group.id === activeGroupId)?.name ?? "전체공개";
 
   return (
@@ -87,20 +88,8 @@ function HostSidebar({
             <BrandLogo variant="wordmark" height={22} eager />
           </Link>
 
-          <div className="flex w-full min-w-0 items-center justify-between gap-3">
+          <div className="flex w-full min-w-0 items-center gap-3">
             <AccountName displayName={displayName} avatarUrl={avatarUrl} />
-            <button
-              type="button"
-              className="text-[12.5px] text-[var(--surface-text-muted)] transition-colors hover:text-[var(--color-rose-600)]"
-              onClick={() => {
-                void apiPost("/api/auth/logout").then(() => {
-                  router.replace("/");
-                  router.refresh();
-                });
-              }}
-            >
-              로그아웃
-            </button>
           </div>
         </div>
 
@@ -138,20 +127,6 @@ function HostSidebar({
                   <HostNavIcon name={link.href} />
                 </span>
                 {link.label}
-                {link.href === "/chat" && hereUnread > 0 ? (
-                  <span
-                    className={cn(
-                      "ml-auto inline-flex min-w-4 items-center justify-center rounded-[var(--radius-pill)]",
-                      "px-1 py-px text-[11px] leading-4",
-                      active
-                        ? "bg-white/25 text-white"
-                        : "bg-[var(--color-rose-600)] text-white",
-                    )}
-                  >
-                    {hereUnread > 99 ? "99+" : hereUnread}
-                    <span className="sr-only">개 안 읽음</span>
-                  </span>
-                ) : null}
               </Link>
             );
           })}

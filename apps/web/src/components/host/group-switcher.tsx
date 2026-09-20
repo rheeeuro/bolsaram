@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/avatar";
 import { Menu, MenuItem } from "@/components/ui/menu";
@@ -20,6 +21,12 @@ export type GroupChoice = {
  * 여기서 하는 일은 **어느 방을 볼지 고르는 것과 방을 늘리는 것** 둘뿐이다. 고른
  * 모임을 고치는 일은 아래 이름 옆 메뉴에서 그 모임 안으로 들어간다 — 목록에 설정을
  * 섞으면 어느 모임을 건드리는지가 목록 위치에 숨는다.
+ *
+ * 늘리는 데에는 상한이 있다(`MAX_GROUPS_PER_ADMIN`). 서버가 막는 값이지만 여기서도
+ * 미리 잠근다 — 창을 채워 보낸 뒤에 거절당하는 것보다 누르기 전에 아는 편이 낫다.
+ *
+ * 기다리는 동안의 문구를 이 안에 두지 않는다. 목록 아래에 한 줄이 생겼다 사라지면
+ * 모임을 바꿀 때마다 사이드바가 들썩인다 — 전역 진행 표시가 대신 말한다.
  */
 export function GroupSwitcher({
   groups,
@@ -32,6 +39,7 @@ export function GroupSwitcher({
 }) {
   const { switchTo, busy, error } = useGroupSwitch(activeGroupId);
   const [dialog, setDialog] = useState<"create" | "join" | null>(null);
+  const full = groups.length >= MAX_GROUPS_PER_ADMIN;
 
   return (
     <section aria-label="내 모임" aria-busy={busy} className="flex min-h-0 flex-col">
@@ -87,13 +95,18 @@ export function GroupSwitcher({
         })}
         <Menu
           label="모임 추가"
+          disabled={full}
           className="shrink-0"
           panelClassName="min-w-52"
           trigger={(open) => (
             <span
               className={cn(
                 "flex min-h-12 items-center gap-2 rounded-xl px-3 text-[12px] text-[var(--surface-text-muted)] transition-colors",
-                open ? "bg-[var(--color-ivory-200)]" : "hover:bg-[var(--color-ivory-200)]",
+                full
+                  ? "cursor-not-allowed opacity-55"
+                  : open
+                    ? "bg-[var(--color-ivory-200)]"
+                    : "hover:bg-[var(--color-ivory-200)]",
               )}
             >
               <span aria-hidden className="text-xl">
@@ -107,9 +120,10 @@ export function GroupSwitcher({
           <MenuItem onSelect={() => setDialog("join")}>초대 코드로 참여</MenuItem>
         </Menu>
       </div>
-      {busy && (
-        <p role="status" className="px-2 text-xs text-[var(--surface-text-muted)]">
-          모임으로 이동 중…
+      {full && (
+        <p className="px-2 pb-1 text-[11px] leading-relaxed text-[var(--surface-text-muted)]">
+          모임 {MAX_GROUPS_PER_ADMIN}개를 모두 쓰고 있습니다. 쓰지 않는 모임에서 나가면
+          자리가 납니다.
         </p>
       )}
       {error && (
