@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { ImageCropper } from "@/components/ui/image-cropper";
 import { apiDelete, apiPost, uploadFile } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 
@@ -16,6 +17,9 @@ import { cn } from "@/lib/cn";
  *
  * 사람은 동그랗게, 모임은 모서리를 둥글린 네모로 그린다 — 화면 어디서나 둘을 같은
  * 모양으로 두지 않아 한눈에 갈린다.
+ *
+ * 고른 사진은 **바로 올라가지 않는다.** 두 자리 모두 정사각으로 잘려 보이므로, 어디를
+ * 쓸지 먼저 정하고(`ImageCropper`) 잘린 것만 올린다.
  */
 export function ImagePicker({
   endpoint,
@@ -36,6 +40,8 @@ export function ImagePicker({
   const inputId = useId();
   const [busy, setBusy] = useState<"upload" | "remove" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 고른 뒤 아직 영역을 정하지 않은 사진. 정하면 그때 올라간다. */
+  const [picked, setPicked] = useState<File | null>(null);
 
   async function upload(file: File) {
     setBusy("upload");
@@ -129,9 +135,25 @@ export function ImagePicker({
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
-          if (file) void upload(file);
+          if (file) {
+            setError(null);
+            setPicked(file);
+          }
         }}
       />
+
+      {picked ? (
+        <ImageCropper
+          file={picked}
+          aspect={1}
+          shape={shape}
+          onCancel={() => setPicked(null)}
+          onApply={(file) => {
+            setPicked(null);
+            void upload(file);
+          }}
+        />
+      ) : null}
 
       {busy ? (
         <p role="status" className="mt-2 text-[11.5px] text-[var(--surface-text-muted)]">

@@ -46,6 +46,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 검증·리다이렉트 주소  | –    | 11   |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
+| `image-crop.test.ts`           | 사진에서 쓸 영역 — 덮는 배율·밀 수 있는 범위·자를 사각형 | –    | 14   |
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 63   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 

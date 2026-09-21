@@ -70,7 +70,7 @@ apps/web/src/
 │   │   └── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·global-progress)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·global-progress)
 │   ├── member/               멤버 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널
 ├── lib/
@@ -79,6 +79,7 @@ apps/web/src/
 │   ├── invite-code.ts        입장코드 정규화 (링크·공백 섞여 들어온 값에서 코드만)
 │   ├── next-path.ts          `?next=` 검증 — 같은 출처 경로만
 │   ├── markdown.ts           가이드 문서 마크다운 부분집합 → 블록 배열
+│   ├── crop-rect.ts          사진에서 쓸 영역 계산 (덮는 배율·밀 수 있는 범위·자를 사각형)
 │   └── cn.ts                 Tailwind 클래스 병합
 └── server/                   서버 전용 (아래 참고)
 ```
