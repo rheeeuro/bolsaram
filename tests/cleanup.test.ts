@@ -11,8 +11,9 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, type Sql } from "@bolsaram/db";
 import { purgeAbandonedImports, runCleanup } from "../packages/db/src/cleanup";
+import { runTag } from "./tags";
 
-const TAG = `cleanuptest-${Date.now()}`;
+const TAG = runTag("cln");
 const STORAGE = path.resolve(import.meta.dirname, "..", "var", "test-storage", TAG);
 
 let adminId: string;

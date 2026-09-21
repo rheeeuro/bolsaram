@@ -26,8 +26,9 @@ import {
   unreadByGroup,
   updatePrefs,
 } from "../apps/web/src/server/repo/group-chat";
+import { runTag } from "./tags";
 
-const TAG = `chattest-${Date.now()}`;
+const TAG = runTag("cht");
 
 type Party = {
   groupId: string;

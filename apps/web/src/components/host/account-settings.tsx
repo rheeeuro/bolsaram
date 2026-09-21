@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  DISPLAY_NAME_MAX_LENGTH,
   OAUTH_PROVIDER_LABELS,
   displayNameSchema,
   type OAuthProvider,
@@ -91,10 +92,10 @@ export function AccountNamePanel({
           })();
         }}
       >
-        <Field label="이름" hint="40자까지">
+        <Field label="이름" hint={`${DISPLAY_NAME_MAX_LENGTH}자까지`}>
           <Input
             value={value}
-            maxLength={40}
+            maxLength={DISPLAY_NAME_MAX_LENGTH}
             autoComplete="name"
             onChange={(event) => {
               setValue(event.target.value);

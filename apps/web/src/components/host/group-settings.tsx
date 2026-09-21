@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { GROUP_NAME_MAX_LENGTH } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { ImagePicker } from "@/components/host/image-picker";
@@ -134,8 +135,12 @@ function Overview({ group }: { group: Group }) {
           />
         </div>
 
-        <Field label="모임 이름">
-          <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+        <Field label="모임 이름" hint={`${GROUP_NAME_MAX_LENGTH}자까지`}>
+          <Input
+            value={name}
+            maxLength={GROUP_NAME_MAX_LENGTH}
+            onChange={(e) => setName(e.target.value)}
+          />
         </Field>
         <div className="mt-3">
           <Field label="설명" hint="주선자끼리만 봅니다">

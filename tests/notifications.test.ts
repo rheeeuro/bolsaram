@@ -13,8 +13,9 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext, type Sql } from "@bolsaram/db";
+import { runTag } from "./tags";
 
-const TAG = `notiftest-${Date.now()}`;
+const TAG = runTag("ntf");
 
 type Party = {
   groupId: string;

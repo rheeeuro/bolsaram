@@ -39,8 +39,14 @@ export const oauthProviderSchema = z
  */
 export const MAX_GROUPS_PER_ADMIN = 5;
 
-/** 모임 이름·설명. `groups` 의 CHECK 와 같은 범위를 쓴다. */
-export const groupNameSchema = z.string().trim().min(1).max(80);
+/**
+ * 모임 이름·설명. `groups` 의 CHECK 와 같은 범위를 쓴다.
+ *
+ * 이름은 모임 목록·전환기·채팅 헤더에 **줄바꿈 없이** 들어간다. 길면 그 자리에서
+ * 잘려 어느 모임인지 알아볼 수 없으므로, 잘리는 대신 처음부터 짧게 받는다.
+ */
+export const GROUP_NAME_MAX_LENGTH = 20;
+export const groupNameSchema = z.string().trim().min(1).max(GROUP_NAME_MAX_LENGTH);
 export const groupDescriptionSchema = z.string().trim().max(500);
 
 export const groupCreateSchema = z.object({
@@ -122,7 +128,15 @@ export const inviteClaimSchema = z.object({
   token: z.string().trim().min(20).max(200),
 });
 
-export const displayNameSchema = z.string().trim().min(1).max(40);
+/**
+ * 표시 이름의 길이. 사이드바·주선자 목록·채팅 글쓴이처럼 좁은 자리에 들어가므로
+ * 이름만 담을 만큼만 받는다(수식어를 붙인 소셜 닉네임은 여기서 줄인다).
+ *
+ * `users.display_name` 에는 CHECK 를 걸지 않는다 — 소셜 제공자가 준 이름과 멤버의
+ * 실명이 같은 컬럼에 들어가고, 그 값은 본인이 입력한 것이 아니다.
+ */
+export const DISPLAY_NAME_MAX_LENGTH = 8;
+export const displayNameSchema = z.string().trim().min(1).max(DISPLAY_NAME_MAX_LENGTH);
 
 /**
  * 표시 이름 바꾸기.

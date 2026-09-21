@@ -44,8 +44,9 @@ import {
 import { applyExtractionReview } from "../apps/web/src/server/services/import-service";
 import { encodeGenderCallback, parseTelegramCallback } from "@bolsaram/domain";
 import { emptyExtractedFields } from "@bolsaram/schemas";
+import { runTag } from "./tags";
 
-const TAG = `tgtest-${Date.now()}`;
+const TAG = runTag("tg");
 /** 다른 테스트와 겹치지 않도록 높은 대역을 쓴다. */
 const UPDATE_BASE = 900_000_000 + Math.floor(Math.random() * 1_000_000);
 /** 텔레그램 사용자 id 도 합성값이다. 실제 계정과 무관하다. */

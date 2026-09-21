@@ -19,6 +19,8 @@ import {
   HEIGHT_RANGE,
 } from "../apps/web/src/components/member/filter-model";
 import {
+  DISPLAY_NAME_MAX_LENGTH,
+  GROUP_NAME_MAX_LENGTH,
   HASHTAG_MAX_COUNT,
   LOW_CONFIDENCE_THRESHOLD,
   MAX_GROUPS_PER_ADMIN,
@@ -172,6 +174,14 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     // 만들기와 초대 코드 참여가 같은 상한을 본다(tests/admin-signup.test.ts).
     expect(MAX_GROUPS_PER_ADMIN).toBe(5);
     expect(guide("admin.md")).toMatch(new RegExp(`최대 ${MAX_GROUPS_PER_ADMIN}개`));
+  });
+
+  it("이름 길이 상한을 가이드와 같게 안내한다", () => {
+    // 좁은 자리에 들어가는 이름이라 짧게 받는다. 모임 쪽은 DB CHECK 도 같은 값이다(0053).
+    expect(DISPLAY_NAME_MAX_LENGTH).toBe(8);
+    expect(GROUP_NAME_MAX_LENGTH).toBe(20);
+    expect(guide("admin.md")).toMatch(new RegExp(`${DISPLAY_NAME_MAX_LENGTH}자까지`));
+    expect(guide("admin.md")).toMatch(new RegExp(`${GROUP_NAME_MAX_LENGTH}자까지`));
   });
 
   it("낮은 신뢰도 기준 65%", () => {

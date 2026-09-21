@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ANONYMOUS, closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import { discoverQuerySchema } from "@bolsaram/schemas";
 import { findDiscoverProfiles } from "../apps/web/src/server/repo/profiles";
+import { runTag } from "./tags";
 
 type Fixture = {
   adminId: string;
@@ -27,7 +28,7 @@ type Fixture = {
 };
 
 let fx: Fixture;
-const TAG = `rlstest-${Date.now()}`;
+const TAG = runTag("rls");
 
 beforeAll(async () => {
   fx = await withOwner(async (sql) => {

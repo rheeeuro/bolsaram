@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { GROUP_NAME_MAX_LENGTH } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, FormError, Input, Textarea } from "@/components/ui/field";
@@ -114,11 +115,11 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: () => void })
         })()
       }
     >
-      <Field label="모임 이름">
+      <Field label="모임 이름" hint={`${GROUP_NAME_MAX_LENGTH}자까지`}>
         <Input
           placeholder="예) 볼사람 강남"
           value={name}
-          maxLength={80}
+          maxLength={GROUP_NAME_MAX_LENGTH}
           onChange={(e) => setName(e.target.value)}
         />
       </Field>

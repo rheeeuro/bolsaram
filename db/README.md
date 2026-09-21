@@ -79,6 +79,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0050_oauth_login.sql`             | 주선자 인증을 소셜 로그인으로 — `oauth_accounts` 추가, 비밀번호 컬럼·시도 제한 테이블 삭제 |
 | `0051_avatar_images.sql`           | 주선자 프로필 사진(`users.avatar_key`)과 모임 사진(`groups.image_key`)                 |
 | `0052_users_identity_columns_readonly.sql` | 런타임 롤의 `users` UPDATE 에서 `email`·`phone` 제외 — 신원은 인증 레이어만 쓴다 |
+| `0053_group_name_length.sql`       | 모임 이름 CHECK 을 20자로 좁힌다 — 좁은 자리에서 잘리지 않게                            |
 
 ## 테이블
 

@@ -11,8 +11,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import { discoverQuerySchema, adminProfileQuerySchema } from "@bolsaram/schemas";
 import { findAdminProfiles, findDiscoverProfiles } from "../apps/web/src/server/repo/profiles";
+import { runTag } from "./tags";
 
-const TAG = `ordertest-${Date.now()}`;
+const TAG = runTag("ord");
 
 /** 오래된 순으로 넣는다. 사진 유무를 번갈아 둬야 두 축이 섞인 정렬을 검증할 수 있다. */
 const FIXTURES = [

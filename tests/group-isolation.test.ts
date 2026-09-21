@@ -20,8 +20,9 @@ import {
   isOutsidePoolForViewer,
 } from "../apps/web/src/server/repo/profiles";
 import { createSession, setSessionGroup } from "../apps/web/src/server/repo/imports";
+import { runTag } from "./tags";
 
-const TAG = `grouptest-${Date.now()}`;
+const TAG = runTag("grp");
 
 type Party = {
   groupId: string;

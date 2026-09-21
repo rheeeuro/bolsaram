@@ -6,8 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import { commitSession, analyzeSession } from "../apps/web/src/server/services/import-service";
 import { latestExtraction, requireSession } from "../apps/web/src/server/repo/imports";
+import { runTag } from "./tags";
 
-const TAG = `committest-${Date.now()}`;
+const TAG = runTag("cmt");
 let admin: RlsContext;
 
 const SAMPLE_TEXT = [

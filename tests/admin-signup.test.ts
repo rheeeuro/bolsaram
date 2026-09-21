@@ -26,8 +26,9 @@ import {
   updateGroup,
 } from "../apps/web/src/server/auth/group-invite";
 import { loginWithOAuth } from "../apps/web/src/server/auth/oauth";
+import { runTag } from "./tags";
 
-const TAG = `signuptest-${Date.now()}`;
+const TAG = runTag("sgn");
 
 let seq = 0;
 function nextEmail(): string {
@@ -445,6 +446,15 @@ describe("모임 정보", () => {
       description: "계리사·회계사 중심으로 봅니다",
       isOwner: true,
     });
+  });
+
+  it("20자를 넘는 이름은 DB 가 막는다", async () => {
+    // 스키마(`groupNameSchema`)가 먼저 거르지만, 그 밑에서 한 번 더 막는다 —
+    // 서비스 함수는 Route Handler 를 거치지 않는 경로에서도 불린다.
+    const owner = await newAdmin("긴이름등록자");
+    await expect(
+      createGroupForAdmin({ userId: owner.userId, name: "가".repeat(21) }),
+    ).rejects.toThrow(/groups_name_check/);
   });
 
   it("이름과 설명을 고칠 수 있다", async () => {

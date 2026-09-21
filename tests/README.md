@@ -27,31 +27,32 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | 파일                           | 대상                                           | DB   | 개수 |
 | ------------------------------ | ---------------------------------------------- | ---- | ---- |
 | `match-transitions.test.ts`    | 상태 기계·행위자 권한·중복·자기 자신·거절·숨김 | –    | 24   |
-| `visibility.test.ts`           | 단계적 정보 공개·노출 규칙                     | –    | 13   |
+| `visibility.test.ts`           | 단계적 정보 공개·노출 규칙                     | –    | 17   |
 | `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·해시태그 검색·조건 모델 | –    | 27   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·해시태그 정규화·mock 프로바이더 | –    | 22   |
-| `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·표시 이름·프로필 사진·거절·숨김·담당이 갈리는 신청 | 필요 | 58 |
+| `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·표시 이름·프로필 사진·거절·숨김·담당이 갈리는 신청 | 필요 | 59 |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출·해시태그 정규 저장 | 필요 | 10   |
-| `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 4 |
+| `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 5 |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 40   |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기·권한 경계 | 필요 | 32 |
 | `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
 | `group-isolation.test.ts`      | 모임 간 격리·대행 중 풀 경계·claim 가로채기 차단 | 필요 | 21   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·멤버 삭제    | 필요 | 8    |
-| `admin-signup.test.ts`         | 가입(소셜 첫 로그인)·계정 잇기·전체공개 풀·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 47 |
+| `admin-signup.test.ts`         | 가입(소셜 첫 로그인)·계정 잇기·전체공개 풀·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 50 |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 14   |
 | `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 31 |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 검증·리다이렉트 주소  | –    | 11   |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
 | `image-crop.test.ts`           | 사진에서 쓸 영역 — 덮는 배율·밀 수 있는 범위·자를 사각형 | –    | 14   |
-| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 63   |
+| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 65   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
 `setup.ts` 가 리포 루트 `.env` 를 읽어 DB 접속 정보를 채운다.
 `stubs/server-only.ts` 는 `server-only` 표식을 Node 러너에서 무력화한다.
+`tags.ts` 는 실행마다 다른 짧은 태그를 만든다 — 모임 이름 20자 안에 들어가야 한다.
 
 ## 실행
 
