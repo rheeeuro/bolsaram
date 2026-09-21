@@ -123,6 +123,15 @@ export const adminProfileQuerySchema = z.object({
 export type AdminProfileQuery = z.infer<typeof adminProfileQuerySchema>;
 
 /**
+ * 프로필 사진 장수 상한.
+ *
+ * 멤버가 상세에서 넘겨 보는 사진이고, 목록의 원본 보기는 한 묶음으로 보여 준다 —
+ * 장수가 늘수록 판단이 쉬워지는 것이 아니라 고르기만 어려워진다. DB 트리거(0054)와
+ * API, 화면이 같은 값을 쓴다.
+ */
+export const PROFILE_IMAGE_MAX_COUNT = 5;
+
+/**
  * 프로필 사진 추가. 두 단계다 — 슬롯을 받고(uploadUrl), 올린 뒤 확정한다.
  * 확정 시점에만 DB 행이 생기므로 실패한 업로드가 깨진 사진으로 남지 않는다.
  *

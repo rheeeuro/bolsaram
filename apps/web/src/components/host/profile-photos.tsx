@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PROFILE_IMAGE_MAX_COUNT } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { ImageCropper } from "@/components/ui/image-cropper";
 import { apiDelete, apiPatch, apiPost, uploadFile } from "@/lib/api-client";
@@ -19,6 +20,10 @@ type Image = { id: string; url: string; isPrimary: boolean };
  * 고른 사진은 **한 장씩 영역을 정한 뒤** 올라간다(`ImageCropper`). 목록 카드와 상세가
  * 세로 3:4 로 잘라 보여주기 때문에, 자리를 맡기면 얼굴이 잘린 카드가 그대로 남는다.
  * 여러 장을 골랐으면 차례로 묻고, 전부 정한 뒤에 한꺼번에 올린다.
+ *
+ * 사진은 `PROFILE_IMAGE_MAX_COUNT` 장까지다. 남은 자리보다 많이 고르면 **앞에서부터
+ * 남은 만큼만** 받고 그 사실을 바로 알린다 — 영역을 다 정하고 나서 서버가 거절하면
+ * 한 일이 버려진다. 서버도 같은 판정을 하므로 화면의 이 계산은 안내일 뿐이다.
  */
 export function ProfilePhotos({
   profileId,
@@ -35,6 +40,8 @@ export function ProfilePhotos({
   const [queue, setQueue] = useState<File[]>([]);
   /** 영역을 정해 둔 사진들. 큐가 비는 순간 한꺼번에 올라간다. */
   const [cropped, setCropped] = useState<File[]>([]);
+
+  const room = Math.max(0, PROFILE_IMAGE_MAX_COUNT - images.length);
 
   async function upload(files: File[]) {
     setError(null);
@@ -181,20 +188,25 @@ export function ProfilePhotos({
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
         multiple
-        disabled={busy != null}
+        disabled={busy != null || room === 0}
         className="w-full text-[12px] file:mr-2 file:rounded file:border file:border-[var(--surface-border)] file:bg-white file:px-2 file:py-1 file:text-[12px]"
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (files.length > 0) {
-            setError(null);
-            setCropped([]);
-            setQueue(files);
-          }
+          if (files.length === 0) return;
+          setCropped([]);
+          setError(
+            files.length > room
+              ? `남은 자리가 ${room}장이라 앞에서 ${room}장만 올립니다.`
+              : null,
+          );
+          setQueue(files.slice(0, room));
         }}
       />
       <p className="mt-1.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-        고르면 쓸 영역을 정한 뒤 올라갑니다. 첫 사진이 대표가 됩니다. 장당 25MB 까지.
+        {room === 0
+          ? `사진은 최대 ${PROFILE_IMAGE_MAX_COUNT}장입니다. 바꾸려면 먼저 한 장을 지워주세요.`
+          : `고르면 쓸 영역을 정한 뒤 올라갑니다. 첫 사진이 대표가 됩니다. 최대 ${PROFILE_IMAGE_MAX_COUNT}장, 장당 25MB 까지 (${room}장 더 올릴 수 있습니다).`}
       </p>
 
       {queue[0] ? (

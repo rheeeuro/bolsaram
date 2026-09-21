@@ -13,6 +13,7 @@ import {
 } from "@bolsaram/domain";
 import {
   normalizeHashtags,
+  PROFILE_IMAGE_MAX_COUNT,
   type ExtractedFields,
   type ImportStatus,
 } from "@bolsaram/schemas";
@@ -322,6 +323,10 @@ async function updateExistingProfile(
 /**
  * Import 에셋을 프로필 사진으로 연결한다.
  * 파일은 그대로 두고 참조만 추가한다 — 원본 보관/삭제 정책은 별도로 다룬다.
+ *
+ * 프로필 사진은 `PROFILE_IMAGE_MAX_COUNT` 장까지라 **앞에서부터 그만큼만** 붙인다.
+ * 넘는 장은 세션에 원본으로 남고, 주선자가 검토 화면에서 확인한다 — 여기서 막으면
+ * 카카오톡에서 받은 것을 다 올리지도 못한다.
  */
 async function moveImagesToProfile(
   sql: Sql,
@@ -334,18 +339,22 @@ async function moveImagesToProfile(
   );
   if (uploaded.length === 0) return;
 
-  const existing = await sql.query<{ max: number | null }>(
-    `SELECT max(sort_order) AS max FROM profile_images WHERE profile_id = $1`,
+  const counted = await sql.query<{ count: number; max: number | null }>(
+    `SELECT count(*)::int AS count, max(sort_order) AS max
+       FROM profile_images WHERE profile_id = $1`,
     [profileId],
   );
-  let order = (existing.rows[0]?.max ?? -1) + 1;
+  const room = PROFILE_IMAGE_MAX_COUNT - (counted.rows[0]?.count ?? 0);
+  if (room <= 0) return;
+
+  let order = (counted.rows[0]?.max ?? -1) + 1;
   const hasPrimary = await sql.query(
     `SELECT 1 FROM profile_images WHERE profile_id = $1 AND is_primary`,
     [profileId],
   );
   let needsPrimary = (hasPrimary.rowCount ?? 0) === 0;
 
-  for (const asset of uploaded) {
+  for (const asset of uploaded.slice(0, room)) {
     await sql.query(
       `INSERT INTO profile_images
          (profile_id, storage_key, mime_type, byte_size, sort_order, is_primary)

@@ -9,10 +9,12 @@
  *   - 대표 사진은 프로필당 최대 하나 (`profile_images_one_primary`)
  *   - 사진이 하나라도 있으면 대표가 하나 있어야 한다
  *   - `sort_order` 는 프로필 안에서 유일 (`UNIQUE (profile_id, sort_order)`)
+ *   - 한 프로필에 `PROFILE_IMAGE_MAX_COUNT` 장까지 (DB 트리거가 최종 판정, 0054)
  */
 import "server-only";
 import type { Sql } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
+import { PROFILE_IMAGE_MAX_COUNT } from "@bolsaram/schemas";
 
 export type ProfileImageRecord = {
   id: string;
@@ -56,17 +58,35 @@ export async function listImages(sql: Sql, profileId: string): Promise<ProfileIm
   return result.rows.map(toRecord);
 }
 
+/** 지금 몇 장인가. 상한이 남았는지 보는 곳들이 쓴다. */
+export async function countImages(sql: Sql, profileId: string): Promise<number> {
+  const result = await sql.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM profile_images WHERE profile_id = $1`,
+    [profileId],
+  );
+  return result.rows[0]?.count ?? 0;
+}
+
 /**
  * 맨 뒤에 한 장 붙인다. 첫 장이면 대표가 된다 — 사진이 있는데 대표가 없는 상태를
  * 만들지 않는다.
  *
  * `sort_order` 는 최댓값 + 1 이다. 삭제로 생긴 구멍은 메우지 않는다 — 번호를 다시
  * 매기면 남은 사진의 순서가 흔들린다.
+ *
+ * 상한을 여기서 먼저 본다. 넘으면 트리거(0054)가 어차피 막지만 그쪽은 DB 오류라
+ * 사용자에게 보여줄 말이 못 된다 — 같은 판정을 사람이 읽을 문장으로 돌려준다.
  */
 export async function addImage(
   sql: Sql,
   input: { profileId: string; storageKey: string; mimeType: string; byteSize: number },
 ): Promise<ProfileImageRecord> {
+  if ((await countImages(sql, input.profileId)) >= PROFILE_IMAGE_MAX_COUNT) {
+    throw new DomainError(
+      "VALIDATION",
+      `사진은 최대 ${PROFILE_IMAGE_MAX_COUNT}장까지 올릴 수 있습니다. 먼저 한 장을 지워주세요.`,
+    );
+  }
   const result = await sql.query<Row>(
     `INSERT INTO profile_images
        (profile_id, storage_key, mime_type, byte_size, sort_order, is_primary)

@@ -44,10 +44,11 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 14   |
 | `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 31 |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
+| `profile-images.test.ts`       | 프로필 사진 상한 — 서비스와 DB 트리거 양쪽     | 필요 | 2    |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 검증·리다이렉트 주소  | –    | 11   |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
 | `image-crop.test.ts`           | 사진에서 쓸 영역 — 덮는 배율·밀 수 있는 범위·자를 사각형 | –    | 14   |
-| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 65   |
+| `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 66   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
 `setup.ts` 가 리포 루트 `.env` 를 읽어 DB 접속 정보를 채운다.

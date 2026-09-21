@@ -22,6 +22,7 @@ import {
   DISPLAY_NAME_MAX_LENGTH,
   GROUP_NAME_MAX_LENGTH,
   HASHTAG_MAX_COUNT,
+  PROFILE_IMAGE_MAX_COUNT,
   LOW_CONFIDENCE_THRESHOLD,
   MAX_GROUPS_PER_ADMIN,
   OAUTH_PROVIDER_LABELS,
@@ -163,6 +164,12 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     const match = /MAX_IMAGE_BYTES\s*=\s*(\d+)\s*\*\s*1024\s*\*\s*1024/.exec(source);
     expect(match?.[1]).toBe("25");
     expect(ALL).toMatch(/25MB/);
+  });
+
+  it("프로필 사진 장수 상한을 가이드와 같게 안내한다", () => {
+    // DB 트리거(0054)·API·화면이 같은 값을 쓴다(tests/profile-images.test.ts).
+    expect(PROFILE_IMAGE_MAX_COUNT).toBe(5);
+    expect(guide("admin.md")).toMatch(new RegExp(`최대 ${PROFILE_IMAGE_MAX_COUNT}장`));
   });
 
   it("해시태그 개수 상한을 가이드와 같게 안내한다", () => {

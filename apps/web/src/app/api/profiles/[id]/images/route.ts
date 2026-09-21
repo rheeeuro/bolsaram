@@ -9,13 +9,17 @@
  * 않은 파일이 스토리지에 남을 수 있고, 그건 정리 작업이 걷어간다.
  */
 import { z } from "zod";
-import { profileImageConfirmSchema, profileImageSlotSchema } from "@bolsaram/schemas";
+import {
+  PROFILE_IMAGE_MAX_COUNT,
+  profileImageConfirmSchema,
+  profileImageSlotSchema,
+} from "@bolsaram/schemas";
 import { DomainError } from "@bolsaram/domain";
 import { writeAudit } from "@/server/audit";
 import { asAdmin } from "@/server/http/context";
 import { fail, ok, readJson, route } from "@/server/http/respond";
 import { assertCanEditProfile } from "@/server/repo/profiles";
-import { addImage } from "@/server/repo/profile-images";
+import { addImage, countImages } from "@/server/repo/profile-images";
 import {
   MAX_IMAGE_BYTES,
   buildStorageKey,
@@ -69,6 +73,14 @@ export const POST = route(async (request: Request, { params }: Params) => {
       return ok({ ok: true, imageId: image.id, isPrimary: image.isPrimary });
     }
 
+    // 슬롯 단계에서 먼저 막는다. 올린 뒤에 거절하면 쓸모없는 파일만 스토리지에 남는다.
+    if ((await countImages(sql, id)) >= PROFILE_IMAGE_MAX_COUNT) {
+      return fail(
+        "VALIDATION",
+        `사진은 최대 ${PROFILE_IMAGE_MAX_COUNT}장까지 올릴 수 있습니다. 먼저 한 장을 지워주세요.`,
+        409,
+      );
+    }
     if (!isAllowedImageType(body.mimeType)) {
       return fail("VALIDATION", "지원하지 않는 이미지 형식입니다.", 415);
     }

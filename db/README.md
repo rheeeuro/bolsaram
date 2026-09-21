@@ -80,6 +80,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0051_avatar_images.sql`           | 주선자 프로필 사진(`users.avatar_key`)과 모임 사진(`groups.image_key`)                 |
 | `0052_users_identity_columns_readonly.sql` | 런타임 롤의 `users` UPDATE 에서 `email`·`phone` 제외 — 신원은 인증 레이어만 쓴다 |
 | `0053_group_name_length.sql`       | 모임 이름 CHECK 을 20자로 좁힌다 — 좁은 자리에서 잘리지 않게                            |
+| `0054_profile_image_limit.sql`     | 프로필 사진을 5장까지만 받는 트리거 — 장수를 세는 규칙이라 CHECK 로는 못 쓴다           |
 
 ## 테이블
 
@@ -121,6 +122,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `profile_hides_block_active_request_trg`             | 활성 신청이 있는 상대를 숨기기                |
 | `profile_hides_no_self`                              | 자기 자신을 숨기기                            |
 | `profile_images_one_primary` (부분 유니크)           | 대표 사진 두 장                               |
+| `profile_images_limit` 트리거                        | 프로필당 여섯 장째 사진 — 동시 요청도 막힌다  |
 | `profiles.user_id` UNIQUE                            | 한 계정에 프로필 두 개                        |
 | `invites_one_open` (부분 유니크)                     | 프로필당 살아 있는 초대 두 개                 |
 | `import_sessions_idempotency` (부분 유니크)          | 같은 키로 두 번 commit                        |
