@@ -39,6 +39,14 @@ export type ImportSessionRecord = {
   updatedAt: Date;
 };
 
+/** 프로필에 붙은 가져오기 원본 한 건. 목록의 「원본 보기」가 프로필 단위로 읽는다. */
+export type ImportSourceText = {
+  sessionId: string;
+  source: ImportSource;
+  rawText: string | null;
+  committedAt: Date | null;
+};
+
 export type ImportAssetRecord = {
   id: string;
   storageKey: string;
@@ -122,6 +130,48 @@ export async function requireSession(sql: Sql, id: string): Promise<ImportSessio
   const session = await findSession(sql, id);
   if (!session) throw new DomainError("NOT_FOUND", "Import 세션을 찾을 수 없습니다.");
   return session;
+}
+
+/**
+ * 프로필로 등록된 세션의 **가져온 원본**(카카오톡에서 받은 글)을 프로필 단위로 찾는다.
+ * 프로필 → 세션 역방향이다. 목록 화면의 「원본 보기」가 쓴다.
+ *
+ * 경계는 RLS 가 그대로 정한다 — 같은 모임의 세션은 보이고, 전체공개 세션은 가져온
+ * 주선자만 본다(`import_sessions_admin`). 그래서 남이 올린 전체공개 프로필은 원본 없이
+ * 사진만 보인다. 화면에서 더 좁히지 않는 것은 같은 원본을 `/imports/:id` 에서 이미
+ * 같은 기준으로 보여주기 때문이다 — 여기서만 다르게 굴면 경계가 두 개가 된다.
+ *
+ * 한 프로필에 여러 세션이 붙을 수 있다(기존 프로필에 다시 commit). 마지막 것을 쓴다.
+ */
+export async function sourceTextsFor(
+  sql: Sql,
+  profileIds: string[],
+): Promise<Map<string, ImportSourceText>> {
+  const map = new Map<string, ImportSourceText>();
+  if (profileIds.length === 0) return map;
+  const result = await sql.query<{
+    committed_profile_id: string;
+    id: string;
+    source: ImportSource;
+    raw_text: string | null;
+    committed_at: Date | null;
+  }>(
+    `SELECT DISTINCT ON (committed_profile_id)
+            committed_profile_id, id, source, raw_text, committed_at
+       FROM import_sessions
+      WHERE committed_profile_id = ANY($1)
+      ORDER BY committed_profile_id, committed_at DESC NULLS LAST`,
+    [profileIds],
+  );
+  for (const row of result.rows) {
+    map.set(row.committed_profile_id, {
+      sessionId: row.id,
+      source: row.source,
+      rawText: row.raw_text,
+      committedAt: row.committed_at,
+    });
+  }
+  return map;
 }
 
 export async function listInbox(
