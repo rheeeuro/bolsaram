@@ -10,6 +10,9 @@
  *   2) 1번이 모임 하나를 만들고 2번이 같은 모임에 합류한다.
  *   3) 샘플 디렉터리를 번호순으로 반씩 나눠 각자 명의로 등록한다
  *      (앞쪽 = 1번, 뒤쪽 = 2번). 사진은 private 스토리지로 복사한다.
+ *   4) 프로필마다 가져오기 세션을 남긴다 — `profile.txt` 원문과 사진, 그 원문에서
+ *      뽑은 항목까지. 운영에서는 모든 프로필이 이 경로로 들어오고, 주선자 화면의
+ *      「원본 보기」와 가져오기 검토 화면이 그 세션을 읽는다.
  *
  * 샘플 한 사람 = 디렉터리 하나다.
  *
@@ -97,6 +100,8 @@ type SampleProfile = {
   /** 디렉터리 이름 앞의 번호. 담당 주선자와 성별을 가르는 기준이다. */
   number: number;
   dirName: string;
+  /** `profile.txt` 를 손대지 않은 그대로. 가져오기 세션의 원문이 된다. */
+  rawText: string;
   fields: Partial<Record<FieldKey, string>>;
   images: { file: string; mimeType: string }[];
 };
@@ -204,6 +209,69 @@ function parseGender(raw: string | undefined, number: number, where: string): Ge
   return matched[2];
 }
 
+/**
+ * 원문에서 뽑은 항목. **AI 추출 결과와 같은 모양**이다 — 시드가 남기는 가져오기
+ * 세션의 추출 결과가 그대로 이 값이고, 프로필도 같은 값으로 만든다.
+ * 이름·연락처는 여기에 없다 — 추출 대상이 아니라 주선자가 적는 값이다.
+ */
+type SampleFields = {
+  gender: Gender;
+  birthYear: number;
+  height: number | null;
+  jobTitle: string | null;
+  jobCategory: JobCategory | null;
+  company: string | null;
+  education: string | null;
+  residenceRegion: Region;
+  workplaceRegion: null;
+  religion: null;
+  mbti: null;
+  smoking: null;
+  drinking: null;
+  hobbies: string[];
+  hashtags: string[];
+  bio: string | null;
+  idealTypeText: string | null;
+};
+
+function fieldsOf(sample: SampleProfile): SampleFields {
+  const where = `${sample.dirName}/profile.txt`;
+  const jobTitle = sample.fields["하는 일"] ?? null;
+  const hobbies = parseList(sample.fields["취미"]);
+  return {
+    gender: parseGender(sample.fields["성별"], sample.number, where),
+    birthYear: parseBirthYear(sample.fields["나이"], where),
+    height: parseHeight(sample.fields["키"]),
+    jobTitle,
+    jobCategory: parseJobCategory(jobTitle),
+    company: sample.fields["직장"] ?? null,
+    education: sample.fields["학력"] ?? null,
+    residenceRegion: parseRegion(sample.fields["거주지"], where),
+    // 샘플 글에 없는 항목. 운영에서는 AI 가 뽑거나 주선자가 검토 화면에서 채운다.
+    workplaceRegion: null,
+    religion: null,
+    mbti: null,
+    smoking: null,
+    drinking: null,
+    hobbies,
+    // 글에 해시태그가 없으면 취미를 태그 형태로 옮긴다 — 검색이 실제처럼 걸린다.
+    hashtags: normalizeHashtags(
+      sample.fields["해시태그"] ? parseList(sample.fields["해시태그"]) : hobbies,
+    ),
+    bio: sample.fields["자기소개"] ?? null,
+    idealTypeText: sample.fields["원하는 이성상"] ?? null,
+  };
+}
+
+/** 값이 있는 항목만 확신한다고 본다 — 검토 화면의 「확인 필요」가 이 값으로 갈린다. */
+function confidenceOf(fields: SampleFields): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(fields)
+      .filter(([, value]) => (Array.isArray(value) ? value.length > 0 : value != null))
+      .map(([key]) => [key, 1]),
+  );
+}
+
 /** 샘플 디렉터리를 번호순으로 읽는다. 사진이나 글이 없는 디렉터리는 건너뛴다. */
 async function readSamples(): Promise<SampleProfile[]> {
   let entries;
@@ -228,10 +296,12 @@ async function readSamples(): Promise<SampleProfile[]> {
       .sort((a, b) => a.localeCompare(b))
       .map((file) => ({ file, mimeType: IMAGE_TYPES[path.extname(file).toLowerCase()]! }));
 
+    const rawText = await readFile(path.join(dir, "profile.txt"), "utf8");
     samples.push({
       number: Number(entry.name.match(/^\d+/u)?.[0] ?? samples.length + 1),
       dirName: entry.name,
-      fields: parseProfileText(await readFile(path.join(dir, "profile.txt"), "utf8")),
+      rawText,
+      fields: parseProfileText(rawText),
       images,
     });
   }
@@ -319,14 +389,13 @@ async function main(): Promise<void> {
 
     // ── 프로필 ──────────────────────────────────────────────
     let imageCount = 0;
+    let sessionCount = 0;
     const perAdmin = [0, 0];
 
     for (const sample of samples) {
-      const where = `${sample.dirName}/profile.txt`;
       const owner = sample.number <= FIRST_ADMIN_UNTIL ? 0 : 1;
       const createdBy = adminIds[owner]!;
-      const jobTitle = sample.fields["하는 일"] ?? null;
-      const hobbies = parseList(sample.fields["취미"]);
+      const fields = fieldsOf(sample);
 
       const inserted = await sql.query<{ id: string }>(
         `INSERT INTO profiles (
@@ -340,21 +409,18 @@ async function main(): Promise<void> {
          RETURNING id`,
         [
           groupId,
-          parseGender(sample.fields["성별"], sample.number, where),
-          parseBirthYear(sample.fields["나이"], where),
-          parseHeight(sample.fields["키"]),
-          jobTitle,
-          parseJobCategory(jobTitle),
-          sample.fields["직장"] ?? null,
-          sample.fields["학력"] ?? null,
-          parseRegion(sample.fields["거주지"], where),
-          hobbies,
-          // 글에 해시태그가 없으면 취미를 태그 형태로 옮긴다 — 검색이 실제처럼 걸린다.
-          normalizeHashtags(
-            sample.fields["해시태그"] ? parseList(sample.fields["해시태그"]) : hobbies,
-          ),
-          sample.fields["자기소개"] ?? null,
-          sample.fields["원하는 이성상"] ?? null,
+          fields.gender,
+          fields.birthYear,
+          fields.height,
+          fields.jobTitle,
+          fields.jobCategory,
+          fields.company,
+          fields.education,
+          fields.residenceRegion,
+          fields.hobbies,
+          fields.hashtags,
+          fields.bio,
+          fields.idealTypeText,
           sample.fields["이름"] ?? null,
           // 연락처는 연결된 뒤에만 보인다. 샘플에 없으면 합성 값을 넣어 그 화면을 확인할 수 있게 한다.
           sample.fields["연락처"] ?? `카카오톡 ID: sample_${String(1000 + sample.number)}`,
@@ -364,6 +430,7 @@ async function main(): Promise<void> {
       const profileId = inserted.rows[0]!.id;
       perAdmin[owner] = perAdmin[owner]! + 1;
 
+      const stored: { key: string; file: string; mimeType: string; byteSize: number }[] = [];
       for (const [order, image] of sample.images.entries()) {
         const key = storageKeyFor(profileId, image.mimeType);
         const bytes = await readFile(path.join(SAMPLE_DIR, sample.dirName, image.file));
@@ -376,8 +443,48 @@ async function main(): Promise<void> {
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [profileId, key, image.mimeType, bytes.byteLength, order, order === 0],
         );
+        stored.push({ key, file: image.file, mimeType: image.mimeType, byteSize: bytes.byteLength });
         imageCount += 1;
       }
+
+      // ── 가져오기 원본 ─────────────────────────────────────
+      // 운영에서 프로필은 언제나 가져오기 세션을 거쳐 만들어진다. 시드도 같은 자취를
+      // 남긴다 — 「원본 보기」와 검토 화면은 프로필이 아니라 이 세션의 원문을 읽는다.
+      // 사진은 주선자가 웹에서 올린 것과 같은 자리(MANUAL_UPLOAD)에 둔다.
+      const session = await sql.query<{ id: string }>(
+        `INSERT INTO import_sessions
+           (group_id, created_by, source, status, raw_text,
+            committed_profile_id, committed_at, idempotency_key)
+         VALUES ($1, $2, 'MANUAL_UPLOAD', 'IMPORTED', $3, $4, now(), $5)
+         RETURNING id`,
+        [groupId, createdBy, sample.rawText, profileId, `seed:${profileId}`],
+      );
+      const sessionId = session.rows[0]!.id;
+      sessionCount += 1;
+
+      for (const [order, image] of stored.entries()) {
+        // 프로필 사진과 **같은 저장 키**를 가리킨다. 실제 commit 경로도 파일을
+        // 복사하지 않고 키를 물려준다(`moveImagesToProfile`).
+        await sql.query(
+          `INSERT INTO import_assets
+             (import_session_id, type, storage_key, original_filename, mime_type,
+              byte_size, sort_order, uploaded_at)
+           VALUES ($1, 'IMAGE', $2, $3, $4, $5, $6, now())`,
+          [sessionId, image.key, image.file, image.mimeType, image.byteSize, order],
+        );
+      }
+
+      // 추출 결과도 함께 남긴다 — 등록된 세션에 추출이 없는 상태는 운영에서 나오지
+      // 않는다(게시 게이트가 항목을 요구한다). 모델을 부르지 않았으므로 모델 이름은
+      // `seed` 이고, 주선자가 검토를 마친 값으로 곧장 넣는다.
+      const fieldsJson = JSON.stringify(fields);
+      await sql.query(
+        `INSERT INTO import_extractions
+           (import_session_id, fields_json, confidence_json, model, prompt_version,
+            reviewed_fields_json, reviewed_by, reviewed_at)
+         VALUES ($1, $2, $3, 'seed', 'seed', $2, $4, now())`,
+        [sessionId, fieldsJson, JSON.stringify(confidenceOf(fields)), createdBy],
+      );
     }
 
     console.info(
@@ -387,6 +494,7 @@ async function main(): Promise<void> {
         `    ${adminEmails[0]} (모임장) — 프로필 ${perAdmin[0]}개`,
         `    ${adminEmails[1]} — 프로필 ${perAdmin[1]}개`,
         `  프로필 ${samples.length}개 전부 공개(ACTIVE·LISTED), 사진 ${imageCount}장`,
+        `  가져오기 원본 ${sessionCount}건 — 프로필마다 원문과 사진이 세션으로 남습니다`,
         `  샘플 원본: ${path.relative(ROOT, SAMPLE_DIR)}`,
         "",
         "  두 주선자 모두 비밀번호가 없습니다 — 같은 이메일의 카카오·구글 계정으로 로그인합니다.",

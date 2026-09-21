@@ -12,7 +12,8 @@
  * `is_seed = true` 다(마이그레이션 0020). 주선자가 등록한 프로필에는 이 값이 붙지
  * 않으므로 잘못 지울 수 없다.
  *
- * 지우는 것: 합성 프로필, 그 사진 파일, 그 프로필에 연결된 멤버 계정.
+ * 지우는 것: 합성 프로필, 그 사진 파일, 그 프로필을 만든 가져오기 세션(원문·에셋·추출),
+ * 그 프로필에 연결된 멤버 계정.
  * 신청·관심·초대는 FK CASCADE 로 함께 사라진다.
  * **주선자 계정과 모임은 건드리지 않는다** — 사람이 쓰는 계정이다.
  */
@@ -50,12 +51,24 @@ async function main(): Promise<void> {
       return;
     }
 
+    // 프로필을 만든 가져오기 세션. **프로필보다 먼저** 지워야 한다 —
+    // `committed_profile_id` 가 SET NULL 로 풀리면 `import_sessions_commit_pair`
+    // (등록 시각과 프로필이 짝이어야 한다)에 걸려 삭제 자체가 실패한다.
+    const sessions = await sql.query<{ id: string }>(
+      `SELECT id FROM import_sessions WHERE committed_profile_id = ANY($1)`,
+      [profileIds],
+    );
+    const sessionIds = sessions.rows.map((r) => r.id);
+
     // 남는 것도 함께 보여준다 — "다 지웠는데 왜 아직 있지"를 없앤다.
     const rest = await sql.query<{ count: number }>(
       `SELECT count(*)::int AS count FROM profiles WHERE NOT is_seed`,
     );
 
-    console.info(`합성 프로필 ${profileIds.length}건, 사진 ${keys.length}장, 멤버 계정 ${userIds.length}개`);
+    console.info(
+      `합성 프로필 ${profileIds.length}건, 사진 ${keys.length}장, ` +
+        `가져오기 세션 ${sessionIds.length}건, 멤버 계정 ${userIds.length}개`,
+    );
     console.info(`  번호: ${found.rows.map((r) => r.public_code).filter((v, i, a) => a.indexOf(v) === i).join(", ")}`);
     console.info(`남는 프로필: ${rest.rows[0]?.count ?? 0}건`);
 
@@ -77,6 +90,13 @@ async function main(): Promise<void> {
       files += 1;
     }
 
+    // 가져오기 세션이 먼저다. 에셋·추출은 CASCADE 로 함께 사라지고, 사진 파일은
+    // 프로필 사진과 같은 키를 가리키므로 위에서 이미 지웠다.
+    const imports =
+      sessionIds.length > 0
+        ? await sql.query(`DELETE FROM import_sessions WHERE id = ANY($1)`, [sessionIds])
+        : { rowCount: 0 };
+
     // profile_images·match_requests·favorites·invites 는 CASCADE 로 함께 사라진다.
     const profiles = await sql.query(`DELETE FROM profiles WHERE id = ANY($1)`, [profileIds]);
     const users =
@@ -85,7 +105,8 @@ async function main(): Promise<void> {
         : { rowCount: 0 };
 
     console.info(
-      `\n지웠습니다 — 프로필 ${profiles.rowCount ?? 0}건, 사진 ${files}장, 멤버 계정 ${users.rowCount ?? 0}개`,
+      `\n지웠습니다 — 프로필 ${profiles.rowCount ?? 0}건, 사진 ${files}장, ` +
+        `가져오기 세션 ${imports.rowCount ?? 0}건, 멤버 계정 ${users.rowCount ?? 0}개`,
     );
   });
 }
