@@ -21,7 +21,6 @@ export type HostProfileData = {
    * `view` 에서 빠지므로 레코드에서 직접 싣는다.
    */
   status: string;
-  visibility: string;
   claimed: boolean;
   /** 담당일 때만 읽는다. 초대는 등록한 주선자만 발급한다. */
   invite: { expiresAt: string; claimed: boolean } | null;
@@ -59,7 +58,6 @@ export async function loadHostProfile(
       canEdit,
       view: toDetailView(profile, level),
       status: profile.status,
-      visibility: profile.visibility,
       claimed: profile.userId != null,
       invite: latest
         ? { expiresAt: latest.expires_at.toISOString(), claimed: latest.claimed_at != null }

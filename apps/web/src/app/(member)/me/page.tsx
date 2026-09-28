@@ -63,9 +63,6 @@ export default async function MePage() {
                   <Badge tone={toneForStatus(profile.status ?? "")}>
                     {label.profileStatus(profile.status)}
                   </Badge>
-                  <span className="text-[12px] text-[var(--color-ink-600)]">
-                    {label.visibility(profile.visibility)}
-                  </span>
                 </div>
               </div>
             </div>

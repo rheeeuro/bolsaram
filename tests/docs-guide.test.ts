@@ -28,7 +28,6 @@ import {
   OAUTH_PROVIDER_LABELS,
   MATCH_REQUEST_STATUS_LABELS,
   PROFILE_STATUS_LABELS,
-  VISIBILITY_LABELS,
   REQUIRED_FIELDS_FOR_COMMIT,
 } from "@bolsaram/schemas";
 import { TELEGRAM_COMMANDS, TELEGRAM_SESSION_TTL_HOURS } from "@bolsaram/domain";
@@ -249,13 +248,6 @@ describe("가이드가 설명하는 상태가 코드의 상태와 같다", () =>
     const admin = guide("admin.md");
     for (const label of Object.values(PROFILE_STATUS_LABELS)) {
       expect(admin, `프로필 상태 "${label}" 설명 없음`).toContain(label);
-    }
-  });
-
-  it("노출 설정 라벨이 모두 관리자 가이드에 있다", () => {
-    const admin = guide("admin.md");
-    for (const label of Object.values(VISIBILITY_LABELS)) {
-      expect(admin, `노출 설정 "${label}" 설명 없음`).toContain(label);
     }
   });
 

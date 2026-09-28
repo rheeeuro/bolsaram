@@ -73,8 +73,8 @@ async function makeParty(sql: Sql, key: string): Promise<Party> {
   const memberId = m.rows[0]!.id;
   await sql.query(
     `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
-                           status, visibility, real_name, created_by)
-     VALUES ($1, $2, 'FEMALE', 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4)`,
+                           status, real_name, created_by)
+     VALUES ($1, $2, 'FEMALE', 1993, 'SEOUL', 'ACTIVE', $3, $4)`,
     [groupId, memberId, `${TAG}-${key}-이름`, ownerId],
   );
 
@@ -455,8 +455,8 @@ describe("시스템 메시지", () => {
         );
         const p = await sql.query<{ id: string }>(
           `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
-                                 status, visibility, real_name, created_by)
-           VALUES ($1, $2, $3, 1990, 'SEOUL', 'ACTIVE', 'LISTED', $4, $5) RETURNING id`,
+                                 status, real_name, created_by)
+           VALUES ($1, $2, $3, 1990, 'SEOUL', 'ACTIVE', $4, $5) RETURNING id`,
           [party.groupId, u.rows[0]!.id, gender, `${TAG}-${key}-이름`, party.ownerId],
         );
         return p.rows[0]!.id;

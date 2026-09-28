@@ -66,8 +66,8 @@ beforeAll(async () => {
     ) => {
       const r = await sql.query<{ id: string }>(
         `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
-                               status, visibility, real_name, created_by, created_at)
-         VALUES ($1, $2, $6, 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4,
+                               status, real_name, created_by, created_at)
+         VALUES ($1, $2, $6, 1993, 'SEOUL', 'ACTIVE', $3, $4,
                  now() - make_interval(days => $5))
          RETURNING id`,
         [gid, userId, name, adminId, days, gender],

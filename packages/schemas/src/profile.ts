@@ -9,7 +9,6 @@ import {
   REGIONS,
   RELIGIONS,
   SMOKING_LEVELS,
-  VISIBILITIES,
 } from "./enums";
 import { BIRTH_YEAR_MAX, BIRTH_YEAR_MIN, HEIGHT_MAX, HEIGHT_MIN } from "./extraction";
 import { HASHTAG_MAX_COUNT, hashtagListSchema, normalizeHashtags } from "./hashtag";
@@ -58,7 +57,6 @@ export type ProfileUpdate = z.infer<typeof profileUpdateSchema>;
 
 export const profileStatusUpdateSchema = z.object({
   status: z.enum(PROFILE_STATUSES),
-  visibility: z.enum(VISIBILITIES).optional(),
   reason: z.string().trim().max(300).optional(),
 });
 
@@ -110,7 +108,7 @@ export const discoverQuerySchema = z.object({
 });
 export type DiscoverQuery = z.infer<typeof discoverQuerySchema>;
 
-/** 관리자 프로필 목록 필터. 멤버 필터와 달리 status/visibility 를 직접 다룬다. */
+/** 관리자 프로필 목록 필터. 멤버 필터와 달리 status 를 직접 다룬다. */
 export const adminProfileQuerySchema = z.object({
   q: z.string().trim().max(60).optional(),
   tags: tagCsv,

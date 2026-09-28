@@ -1,5 +1,5 @@
 /** GET /api/profiles/:id — 상세, PATCH — 관리자 수정 */
-import { DomainError, isDetailAccessible } from "@bolsaram/domain";
+import { DomainError, isDiscoverable } from "@bolsaram/domain";
 import { profileUpdateSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
 import { asAdmin, asUser } from "@/server/http/context";
@@ -30,7 +30,7 @@ export const GET = route(async (_request: Request, { params }: Params) => {
     if (
       viewer.role !== "ADMIN" &&
       profile.userId !== viewer.userId &&
-      !isDetailAccessible(profile)
+      !isDiscoverable(profile)
     ) {
       throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     }

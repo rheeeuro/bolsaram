@@ -18,38 +18,19 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   MEMBER: "멤버",
 };
 
-/** 설계문서 §9 Profile status */
-export const PROFILE_STATUSES = [
-  "ACTIVE",
-  "MATCHING",
-  "PAUSED",
-  "INACTIVE",
-  "ARCHIVED",
-] as const;
+/**
+ * 프로필 상태는 **활성/비활성** 둘뿐이다 (마이그레이션 0055).
+ * ACTIVE  — 같은 쪽 멤버의 목록·상세에 보인다
+ * INACTIVE— 멤버에게 보이지 않는다 (주선자·본인만)
+ *
+ * 소개가 어디까지 왔는지는 사람이 아니라 관계의 상태다 — `MATCH_REQUEST_STATUSES`.
+ * 한 사람이 여러 명과 동시에 신청을 주고받으므로 프로필에 진행 상태를 두지 않는다.
+ */
+export const PROFILE_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 export type ProfileStatus = (typeof PROFILE_STATUSES)[number];
 export const PROFILE_STATUS_LABELS: Record<ProfileStatus, string> = {
-  ACTIVE: "공개",
-  MATCHING: "매칭 진행",
-  PAUSED: "일시중지",
+  ACTIVE: "활성",
   INACTIVE: "비활성",
-  ARCHIVED: "보관",
-};
-
-/** Discover 리스트에 노출되는 상태. 그 외는 멤버에게 보이지 않는다. */
-export const DISCOVERABLE_PROFILE_STATUSES = ["ACTIVE", "MATCHING"] as const;
-
-/**
- * visibility: status 와 직교하는 노출 축.
- * LISTED  — Discover 리스트/상세 모두 노출
- * UNLISTED— 리스트에서 감추고 직접 링크(관리자 공유)로만 상세 접근
- * PRIVATE — 관리자 외 접근 불가
- */
-export const VISIBILITIES = ["LISTED", "UNLISTED", "PRIVATE"] as const;
-export type Visibility = (typeof VISIBILITIES)[number];
-export const VISIBILITY_LABELS: Record<Visibility, string> = {
-  LISTED: "리스트 노출",
-  UNLISTED: "링크 전용",
-  PRIVATE: "비공개",
 };
 
 export const JOB_CATEGORIES = [

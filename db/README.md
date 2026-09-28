@@ -82,6 +82,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0052_users_identity_columns_readonly.sql` | 런타임 롤의 `users` UPDATE 에서 `email`·`phone` 제외 — 신원은 인증 레이어만 쓴다 |
 | `0053_group_name_length.sql`       | 모임 이름 CHECK 을 20자로 좁힌다 — 좁은 자리에서 잘리지 않게                            |
 | `0054_profile_image_limit.sql`     | 프로필 사진을 5장까지만 받는 트리거 — 장수를 세는 규칙이라 CHECK 로는 못 쓴다           |
+| `0055_profile_active_only.sql`     | 프로필 상태를 활성/비활성 둘로, 노출 축(`visibility`) 제거. 진행 상태는 관계(`match_requests`)만 가진다 |
 
 ## 테이블
 
@@ -92,9 +93,9 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `group_messages`                               | 모임 채팅방의 글과 사건(`system_kind`). 고칠 수 없고 사람의 글만 지워진다 | 같은 모임 주선자 중 **들어온 뒤의 것만** (쓰기는 본인 명의·사람의 글만) |
 | `group_chat_prefs`                             | 주선자별 방 상태 — 읽은 위치·텔레그램 알림 여부    | 본인 것만                           |
 | `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임, `avatar_key` 는 프로필 사진 | 본인 + 같은 모임 관계자 |
-| `profiles`                                     | 프로필. `public_code` 가 화면의 `#17`, `is_seed` 는 합성 표식 | 공개분 + 본인 + 관리자   |
+| `profiles`                                     | 프로필. `status` 는 활성/비활성뿐, `public_code` 가 화면의 `17번`, `is_seed` 는 합성 표식 | 활성분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
-| `match_requests`                               | 소개 신청과 상태                                   | 당사자 + 관리자                     |
+| `match_requests`                               | 소개 신청 — **프로필 × 프로필** 관계와 그 상태. 한 사람이 여러 행을 동시에 가진다 | 당사자 + 관리자                     |
 | `favorites`                                    | 관심                                               | 본인만                              |
 | `profile_hides`                                | 숨긴 상대. 양방향으로 목록·신청을 막는다           | **숨긴 사람만** (상대·관리자 불가)  |
 | `match_intents`                                | 멤버가 낸 요청. 승인 전까지 **상대는 못 읽는다**   | 본인 + 담당 주선자                  |
@@ -115,7 +116,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 
 | 제약                                                 | 막는 것                                       |
 | ---------------------------------------------------- | --------------------------------------------- |
-| `match_requests_one_active` (부분 유니크)            | 같은 방향 활성 신청 중복 — 동시 요청도 막힌다 |
+| `match_requests_one_active` (부분 유니크)            | 같은 방향 활성 신청 중복 — 동시 요청도 막힌다. **다른 상대에게는 동시에 여러 건이 된다** |
 | `match_requests_no_self`                             | 자기 자신에게 신청                            |
 | `match_intents_one_pending_send` (부분 유니크)       | 같은 상대에게 확인 대기 요청 중복             |
 | `match_intents_one_pending_answer` (부분 유니크)     | 한 신청에 수락·거절이 동시에 대기             |
@@ -144,6 +145,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `group_messages_read` 의 `app_group_chat_visible_from()` | 합류 전 대화를 뒤늦게 읽는 것 (목록·스트림·배지 모두) |
 | `group_messages_body_sane` (CHECK)                  | 본문 있는 시스템 메시지 · 본문 없는 사람의 글  |
 | `profiles.group_id` · `import_sessions.group_id` NOT NULL | 소속 없는 데이터 — 격리를 우회하는 구멍 |
+| `profile_status` enum (`ACTIVE`·`INACTIVE` 뿐)         | 프로필에 소개 진행 상태를 두는 것 — 진행은 `match_requests` 의 몫 |
 | `profiles_hashtags_shape` · `profiles_hashtags_len` (CHECK) | `#`·공백이 섞인 태그, 11개째 태그 — 같은 태그가 둘로 갈리는 것 |
 
 `match_requests_stamp` 트리거가 상태 전이 시각(`responded_at` · `introduced_at` · `closed_at`)을

@@ -15,7 +15,6 @@ import {
   REGION_LABELS,
   RELIGION_LABELS,
   SMOKING_LABELS,
-  VISIBILITY_LABELS,
 } from "@bolsaram/schemas";
 
 function lookup(map: Record<string, string>, value: string | null | undefined): string | null {
@@ -31,7 +30,6 @@ export const label = {
   smoking: (v: string | null | undefined) => lookup(SMOKING_LABELS, v),
   drinking: (v: string | null | undefined) => lookup(DRINKING_LABELS, v),
   profileStatus: (v: string | null | undefined) => lookup(PROFILE_STATUS_LABELS, v),
-  visibility: (v: string | null | undefined) => lookup(VISIBILITY_LABELS, v),
   matchStatus: (v: string | null | undefined) => lookup(MATCH_REQUEST_STATUS_LABELS, v),
   importStatus: (v: string | null | undefined) => lookup(IMPORT_STATUS_LABELS, v),
   importSource: (v: string | null | undefined) => lookup(IMPORT_SOURCE_LABELS, v),

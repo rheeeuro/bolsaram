@@ -41,11 +41,9 @@ export default async function HostHomePage() {
     const stats = await sql.query<Kpi>(
       `
       SELECT
-        -- 멤버가 실제로 보는 조건과 같아야 한다. 상태만 세면 「공개인데 안 보이는」
-        -- 프로필까지 들어가 숫자가 부풀려진다(isDiscoverable · filters.ts).
+        -- 멤버가 실제로 보는 조건과 같아야 한다(isDiscoverable · filters.ts).
         (SELECT count(*) FROM profiles
-          WHERE group_id IS NOT DISTINCT FROM $1
-            AND status IN ('ACTIVE','MATCHING') AND visibility = 'LISTED')::int AS "profilesActive",
+          WHERE group_id IS NOT DISTINCT FROM $1 AND status = 'ACTIVE')::int AS "profilesActive",
         (SELECT count(*) FROM profiles
           WHERE group_id IS NOT DISTINCT FROM $1)::int AS "profilesTotal",
         (SELECT count(*) FROM profiles

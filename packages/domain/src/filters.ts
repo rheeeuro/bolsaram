@@ -43,7 +43,7 @@ export function buildDiscoverWhere(
   ctx: FilterContext,
   startIndex = 1,
 ): SqlFragment {
-  const clauses: string[] = ["p.status IN ('ACTIVE','MATCHING')", "p.visibility = 'LISTED'"];
+  const clauses: string[] = ["p.status = 'ACTIVE'"];
   const values: unknown[] = [];
   let i = startIndex;
   const push = (value: unknown) => {

@@ -35,10 +35,9 @@ describe("birthYearRange", () => {
 });
 
 describe("buildDiscoverWhere", () => {
-  it("공개 상태 조건은 항상 붙는다", () => {
+  it("활성 조건은 항상 붙는다", () => {
     const where = buildDiscoverWhere(parse({}), CTX);
-    expect(where.text).toContain("p.status IN ('ACTIVE','MATCHING')");
-    expect(where.text).toContain("p.visibility = 'LISTED'");
+    expect(where.text).toContain("p.status = 'ACTIVE'");
   });
 
   it("자기 자신을 제외한다", () => {

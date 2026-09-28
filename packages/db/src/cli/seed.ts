@@ -401,8 +401,8 @@ async function main(): Promise<void> {
         `INSERT INTO profiles (
            group_id, gender, birth_year, height, job_title, job_category, company, education,
            residence_region, hobbies, hashtags, bio, ideal_type_text, real_name, contact_note,
-           status, visibility, created_by, is_seed)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'ACTIVE','LISTED',$16,
+           status, created_by, is_seed)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'ACTIVE',$16,
                  -- 합성 데이터라는 표식. 실데이터와 섞였을 때
                  -- pnpm db:purge-seed 가 이걸 보고 걷어낸다.
                  true)

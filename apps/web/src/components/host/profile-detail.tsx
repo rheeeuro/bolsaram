@@ -3,20 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  PROFILE_STATUSES,
-  PROFILE_STATUS_LABELS,
-  VISIBILITIES,
-  VISIBILITY_LABELS,
-} from "@bolsaram/schemas";
+import { PROFILE_STATUSES, PROFILE_STATUS_LABELS, type ProfileStatus } from "@bolsaram/schemas";
 import { isDiscoverable } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { CopyField } from "@/components/ui/copy-field";
-import { Field, FormError, Select } from "@/components/ui/field";
+import { FormError } from "@/components/ui/field";
 import { HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { Panel } from "@/components/host/surface";
 import { apiPatch, apiPost } from "@/lib/api-client";
+import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 
@@ -37,7 +33,7 @@ function messageFor(
  * 열리면 「이 사람이 멤버에게 어떻게 보이나」를 볼 방법이 사라진다. 고치는 일은
  * `/profiles/[id]/edit` 으로 따로 나갔다.
  *
- * 여기 남은 것은 읽기와 **운영 액션**(공개 여부·멤버 화면 열기)이다. 둘 다 폼 저장과
+ * 여기 남은 것은 읽기와 **운영 액션**(활성·비활성·멤버 화면 열기)이다. 둘 다 폼 저장과
  * 무관하게 그 자리에서 끝나므로 저장하지 않은 변경을 만들지 않는다.
  *
  * 초대와 대행은 한 칸에 함께 둔다. 둘은 「이 분에게 멤버 화면을 어떻게 보여줄까」라는
@@ -51,14 +47,12 @@ export function HostProfileDetail({
   profile,
   canEdit,
   status,
-  visibility,
   claimed,
   invite,
 }: {
   profile: ProfileDetailView;
   canEdit: boolean;
   status: string;
-  visibility: string;
   claimed: boolean;
   invite: { expiresAt: string; claimed: boolean } | null;
 }) {
@@ -69,13 +63,11 @@ export function HostProfileDetail({
   // 발급 직후 한 번만 보여줄 값. 링크와 입장코드는 같은 토큰이다.
   const [issued, setIssued] = useState<{ url: string; code: string } | null>(null);
 
-  async function changeStatus(next: string, nextVisibility?: string) {
+  async function changeStatus(next: ProfileStatus) {
+    if (next === status) return;
     setBusy(true);
     setError(null);
-    const result = await apiPatch(`/api/profiles/${profile.id}/status`, {
-      status: next,
-      ...(nextVisibility ? { visibility: nextVisibility } : {}),
-    });
+    const result = await apiPatch(`/api/profiles/${profile.id}/status`, { status: next });
     setBusy(false);
     if (!result.ok) {
       setError({ scope: "status", message: result.message });
@@ -84,12 +76,7 @@ export function HostProfileDetail({
     router.refresh();
   }
 
-  // 상태와 노출은 직교한다 — 「공개」인데 노출이 「비공개」면 아무도 못 본다.
-  // 두 값을 나란히 두기만 하면 그 조합을 사람이 머릿속에서 계산해야 한다.
-  const visible = isDiscoverable({
-    status: status as Parameters<typeof isDiscoverable>[0]["status"],
-    visibility: visibility as Parameters<typeof isDiscoverable>[0]["visibility"],
-  });
+  const visible = isDiscoverable({ status: status as ProfileStatus });
 
   const summary = [
     label.gender(profile.gender),
@@ -144,11 +131,8 @@ export function HostProfileDetail({
           <p className="mt-2.5 text-[13.5px] text-[var(--surface-text-muted)]">{summary}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={toneForStatus(status)}>{label.profileStatus(status)}</Badge>
-            <Badge tone={visible ? "active" : "neutral"}>
-              {visible ? "멤버에게 보임" : "멤버에게 안 보임"}
-            </Badge>
             <span className="text-[12.5px] text-[var(--surface-text-muted)]">
-              {label.visibility(visibility)}
+              {visible ? "멤버에게 보임" : "멤버에게 안 보임"}
             </span>
             {canEdit ? (
               <span className="text-[12.5px] text-[var(--surface-text-muted)]">
@@ -160,21 +144,21 @@ export function HostProfileDetail({
 
         {canEdit ? (
           <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
-            {/* 아직 공개 전이면 가장 자주 누르는 버튼이 「공개」다. 편집보다 앞에 둔다. */}
-            {status !== "ACTIVE" ? (
+            {/* 비활성이면 가장 자주 누르는 버튼이 「활성」이다. 편집보다 앞에 둔다. */}
+            {!visible ? (
               <Button
                 size="lg"
                 disabled={busy}
                 className="flex-1 sm:flex-none"
-                onClick={() => void changeStatus("ACTIVE", "LISTED")}
+                onClick={() => void changeStatus("ACTIVE")}
               >
-                지금 공개하기
+                활성으로 바꾸기
               </Button>
             ) : null}
             <Link
               href={`/profiles/${profile.id}/edit`}
               className={buttonClasses({
-                variant: status !== "ACTIVE" ? "secondary" : "primary",
+                variant: !visible ? "secondary" : "primary",
                 size: "lg",
                 className: "flex-1 sm:flex-none",
               })}
@@ -294,47 +278,39 @@ export function HostProfileDetail({
 
         {canEdit ? (
           <aside className="flex flex-col gap-5">
-            <Panel title="공개 설정">
-              <p
-                className={
-                  visible
-                    ? "mb-3.5 rounded-[10px] bg-[var(--color-success)]/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--color-success)]"
-                    : "mb-3.5 rounded-[10px] bg-[var(--color-ivory-100)] px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]"
-                }
+            <Panel title="상태">
+              {/* 두 값뿐이라 선택 상자 대신 한 번에 눌러 바꾼다. 바꾸자마자 서버로 간다. */}
+              <div
+                role="radiogroup"
+                aria-label="프로필 상태"
+                className="grid grid-cols-2 gap-1 rounded-[12px] bg-[var(--color-ivory-100)] p-1"
               >
-                {visible
-                  ? "지금 멤버 목록에 보입니다."
-                  : `지금 멤버 목록에 보이지 않습니다 — ${reasonHidden(status, visibility)}.`}
-              </p>
-              <div className="flex flex-col gap-3.5">
-                <Field label="상태">
-                  <Select
-                    value={status}
-                    onChange={(e) => void changeStatus(e.target.value)}
+                {PROFILE_STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    role="radio"
+                    aria-checked={status === s}
                     disabled={busy}
+                    onClick={() => void changeStatus(s)}
+                    className={cn(
+                      "h-10 rounded-[9px] text-[13.5px] transition-colors duration-[var(--duration-quick)]",
+                      "disabled:cursor-not-allowed disabled:opacity-60",
+                      status === s
+                        ? "bg-white font-medium text-[var(--surface-text)] shadow-sm"
+                        : "text-[var(--surface-text-muted)] hover:text-[var(--surface-text)]",
+                    )}
                   >
-                    {PROFILE_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {PROFILE_STATUS_LABELS[s]}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="노출">
-                  <Select
-                    value={visibility}
-                    onChange={(e) => void changeStatus(status, e.target.value)}
-                    disabled={busy}
-                  >
-                    {VISIBILITIES.map((v) => (
-                      <option key={v} value={v}>
-                        {VISIBILITY_LABELS[v]}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
+                    {PROFILE_STATUS_LABELS[s]}
+                  </button>
+                ))}
               </div>
-              {/* 바꾸자마자 서버로 간다 — 실패를 말해주지 않으면 값이 되돌아간 이유를 알 수 없다. */}
+              <p className="mt-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                {visible
+                  ? "같은 쪽 멤버의 목록에 보이고 마음을 받을 수 있습니다. 여러 분과 동시에 신청을 주고받을 수 있습니다."
+                  : "멤버에게 보이지 않습니다. 이미 주고받은 신청은 그대로 남습니다."}
+              </p>
+              {/* 실패를 말해주지 않으면 값이 되돌아간 이유를 알 수 없다. */}
               <FormError>{messageFor(error, "status")}</FormError>
             </Panel>
 
@@ -461,17 +437,4 @@ export function HostProfileDetail({
       </div>
     </div>
   );
-}
-
-/**
- * 왜 안 보이는지 한 마디로 말한다.
- *
- * 「상태를 공개로 바꿨는데 왜 안 보이지」가 가장 흔한 막힘이다 — 노출이 따로 남아
- * 있기 때문인데 화면이 말해주지 않으면 알 길이 없다.
- */
-function reasonHidden(status: string, visibility: string): string {
-  if (status !== "ACTIVE" && status !== "MATCHING") {
-    return `상태가 「${label.profileStatus(status) ?? status}」입니다`;
-  }
-  return `노출이 「${label.visibility(visibility) ?? visibility}」입니다`;
 }

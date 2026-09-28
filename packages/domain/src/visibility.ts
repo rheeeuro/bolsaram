@@ -6,7 +6,7 @@
  *
  * 이 파일은 순수 함수만 둔다. 실제 차단은 SQL(RLS) + API 권한 검사가 함께 담당한다.
  */
-import type { Gender, ProfileStatus, Visibility } from "@bolsaram/schemas";
+import type { Gender, ProfileStatus } from "@bolsaram/schemas";
 import { DomainError } from "./errors";
 
 export type DisclosureLevel = "LIST" | "DETAIL" | "INTRODUCED" | "OWNER" | "ADMIN";
@@ -34,7 +34,6 @@ export type FullProfile = {
   realName: string | null;
   contactNote: string | null;
   status: ProfileStatus;
-  visibility: Visibility;
   images: { id: string; storageKey: string; sortOrder: number; isPrimary: boolean }[];
 };
 
@@ -106,15 +105,12 @@ function primaryImageOnly(profile: FullProfile): FullProfile["images"] {
   return primary ? [primary] : [];
 }
 
-/** 멤버가 Discover 에서 볼 수 있는 프로필인지. */
-export function isDiscoverable(profile: {
-  status: ProfileStatus;
-  visibility: Visibility;
-}): boolean {
-  return (
-    (profile.status === "ACTIVE" || profile.status === "MATCHING") &&
-    profile.visibility === "LISTED"
-  );
+/**
+ * 멤버에게 보이는 프로필인지 — 목록과 상세가 같은 기준이다.
+ * 활성이면 보이고 비활성이면 보이지 않는다. 신청이 몇 건 걸려 있든 상관없다.
+ */
+export function isDiscoverable(profile: { status: ProfileStatus }): boolean {
+  return profile.status === "ACTIVE";
 }
 
 /**
@@ -142,17 +138,6 @@ export function assertOppositeGender(viewerGender: Gender, targetGender: Gender)
 /** 성별이 둘뿐이므로 「이성」은 곧 나머지 하나다. 목록 쿼리가 이 값으로 좁힌다. */
 export function oppositeGender(gender: Gender): Gender {
   return gender === "MALE" ? "FEMALE" : "MALE";
-}
-
-/** 상세 페이지 직접 접근 허용 여부. UNLISTED 는 링크가 있으면 볼 수 있다. */
-export function isDetailAccessible(profile: {
-  status: ProfileStatus;
-  visibility: Visibility;
-}): boolean {
-  return (
-    (profile.status === "ACTIVE" || profile.status === "MATCHING") &&
-    profile.visibility !== "PRIVATE"
-  );
 }
 
 /**

@@ -42,9 +42,12 @@ packages/schemas/src/
 각 열거형은 `as const` 배열 + `Record<T, string>` 라벨 쌍으로 정의한다.
 UI 는 라벨 맵을 직접 인덱싱하지 않고 `apps/web/src/lib/labels.ts` 를 거친다.
 
-`DISCOVERABLE_PROFILE_STATUSES` 와 `ACTIVE_MATCH_REQUEST_STATUSES` 는 "어떤 상태가
-목록에 보이는가 / 어떤 상태가 중복을 막는가"를 값으로 고정한 것이다. 조건문에 상태를
-직접 나열하지 말고 이 배열을 쓴다.
+프로필 상태(`PROFILE_STATUSES`)는 **활성/비활성 둘뿐**이다. 소개 진행 상태는 사람이
+아니라 관계(`MATCH_REQUEST_STATUSES`)가 가진다 — 한 사람이 여러 명과 동시에 신청을
+주고받기 때문이다.
+
+`ACTIVE_MATCH_REQUEST_STATUSES` 는 "어떤 상태가 같은 두 사람 사이의 중복을 막는가"를
+값으로 고정한 것이다. 조건문에 상태를 직접 나열하지 말고 이 배열을 쓴다.
 
 ### `extraction.ts` — 모델용과 검증용을 분리
 

@@ -218,12 +218,12 @@ describe("commit idempotency", () => {
     });
 
     const row = await withRls(admin, (sql) =>
-      sql.query<{ status: string; visibility: string }>(
-        `SELECT status::text, visibility::text FROM profiles WHERE id = $1`,
+      sql.query<{ status: string }>(
+        `SELECT status::text FROM profiles WHERE id = $1`,
         [result.profileId],
       ),
     );
-    expect(row.rows[0]).toEqual({ status: "INACTIVE", visibility: "PRIVATE" });
+    expect(row.rows[0]).toEqual({ status: "INACTIVE" });
   });
 
   it("확인이 필요한 상태에서는 공개 등록을 막는다", async () => {

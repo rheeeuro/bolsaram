@@ -237,8 +237,8 @@ async function insertProfile(
     `INSERT INTO profiles (
        group_id, gender, birth_year, height, job_title, job_category, company, education,
        residence_region, workplace_region, religion, mbti, smoking, drinking,
-       hobbies, hashtags, bio, ideal_type_text, status, visibility, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+       hobbies, hashtags, bio, ideal_type_text, status, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      RETURNING id`,
     [
       groupId,
@@ -261,7 +261,6 @@ async function insertProfile(
       fields.bio,
       fields.idealTypeText,
       publish ? "ACTIVE" : "INACTIVE",
-      publish ? "LISTED" : "PRIVATE",
       createdBy,
     ],
   );

@@ -1,6 +1,6 @@
 /** 프로필 상세 (UI 컨셉 04). 큰 사진 + 여백 + serif display. */
 import { notFound } from "next/navigation";
-import { isDetailAccessible } from "@bolsaram/domain";
+import { isDiscoverable } from "@bolsaram/domain";
 import { withRls } from "@bolsaram/db";
 import { isMemberView, requireUserPage, rlsContextOf } from "@/server/auth/guard";
 import { isFavorited } from "@/server/repo/favorites";
@@ -56,7 +56,7 @@ export default async function ProfileDetailPage({
     if (
       viewer.role !== "ADMIN" &&
       profile.userId !== viewer.userId &&
-      !isDetailAccessible(profile)
+      !isDiscoverable(profile)
     ) {
       return null;
     }

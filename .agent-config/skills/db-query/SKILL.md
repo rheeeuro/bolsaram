@@ -26,7 +26,7 @@ owner psql 로 판단하지 말 것.** RLS 동작은 `tests/rls.test.ts` 나 실
 
 ```sql
 -- 프로필 상태 분포
-SELECT status, visibility, count(*) FROM profiles GROUP BY 1,2 ORDER BY 1,2;
+SELECT status, count(*) FROM profiles GROUP BY 1 ORDER BY 1;
 
 -- 신청 상태 분포
 SELECT status, count(*) FROM match_requests GROUP BY 1;

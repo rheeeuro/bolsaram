@@ -27,11 +27,11 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | 파일                           | 대상                                           | DB   | 개수 |
 | ------------------------------ | ---------------------------------------------- | ---- | ---- |
 | `match-transitions.test.ts`    | 상태 기계·행위자 권한·중복·자기 자신·거절·숨김 | –    | 24   |
-| `visibility.test.ts`           | 단계적 정보 공개·노출 규칙                     | –    | 17   |
+| `visibility.test.ts`           | 단계적 정보 공개·활성/비활성 노출 규칙         | –    | 16   |
 | `filters.test.ts`              | 필터 → SQL·파라미터 바인딩·커서·해시태그 검색·조건 모델 | –    | 27   |
 | `import-normalization.test.ts` | 원문 정규화·Import 상태 기계·게시 게이트       | –    | 23   |
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·해시태그 정규화·mock 프로바이더 | –    | 22   |
-| `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·표시 이름·프로필 사진·거절·숨김·담당이 갈리는 신청 | 필요 | 59 |
+| `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·표시 이름·프로필 사진·거절·숨김·담당이 갈리는 신청·여러 명에게 동시 신청 | 필요 | 62 |
 | `import-commit.test.ts`        | 분석·commit 멱등성·동시 호출·해시태그 정규 저장 | 필요 | 10   |
 | `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 5 |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
@@ -80,6 +80,7 @@ DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: fals
 | `rls.test.ts` 「숨긴 사실은 숨긴 사람만 읽는다」           | 숨기기가 상대·주선자에게 통보되지 않음 |
 | `rls.test.ts` 「활성 신청이 있는 상대는 숨길 수 없다」     | 되돌릴 수 없는 「숨김 + 연결」 방지  |
 | `rls.test.ts` 「상대의 수락을 기록할 수 없다」             | 연결 동의를 남의 담당이 대신 내지 못함 |
+| `rls.test.ts` 「한 관계가 연결돼도 다른 관계와 노출은 그대로다」 | 진행 상태는 관계에만 — 여러 명과 동시 신청 |
 | `match-transitions.test.ts` 「거절·숨김·둘 다에 같은 문구」 | 막힌 이유가 숨김을 드러내지 않음    |
 | `visibility.test.ts` 「INTRODUCED 에서만 이름·연락처」     | 연결 전 개인정보 비공개             |
 | `import-normalization.test.ts` 「확인이 남으면 공개 불가」 | AI 자동 게시 차단                   |

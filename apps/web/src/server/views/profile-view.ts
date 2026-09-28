@@ -47,7 +47,6 @@ export type ProfileDetailView = ProfileCardView & {
   realName?: string | null;
   contactNote?: string | null;
   status?: string;
-  visibility?: string;
 };
 
 function toImageView(image: {
@@ -118,7 +117,6 @@ export function toDetailView(
   }
   if (level === "ADMIN" || level === "OWNER") {
     base.status = profile.status;
-    base.visibility = profile.visibility;
   }
   return base;
 }

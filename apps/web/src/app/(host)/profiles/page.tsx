@@ -71,7 +71,7 @@ export default async function HostProfilesPage({
         status: profile.status,
         // 상태와 노출은 직교한다 — 「공개」인데 안 보이는 조합이 있으므로
         // 두 값을 따로 읽게 두지 않고 결론을 낸다.
-        visible: isDiscoverable({ status: profile.status, visibility: profile.visibility }),
+        visible: isDiscoverable({ status: profile.status }),
         source: sources?.get(profile.id) ?? null,
       })),
     };

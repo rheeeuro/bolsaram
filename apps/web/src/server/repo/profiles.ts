@@ -21,7 +21,6 @@ import type {
   Gender,
   ProfileStatus,
   ProfileUpdate,
-  Visibility,
 } from "@bolsaram/schemas";
 
 const PROFILE_COLUMNS = `
@@ -29,7 +28,7 @@ const PROFILE_COLUMNS = `
   p.job_title, p.job_category, p.company, p.education,
   p.residence_region, p.workplace_region, p.religion, p.mbti,
   p.smoking, p.drinking, p.hobbies, p.hashtags, p.bio, p.ideal_type_text,
-  p.real_name, p.contact_note, p.status, p.visibility,
+  p.real_name, p.contact_note, p.status,
   p.created_at, p.updated_at`;
 
 type ProfileRow = {
@@ -56,7 +55,6 @@ type ProfileRow = {
   real_name: string | null;
   contact_note: string | null;
   status: ProfileStatus;
-  visibility: Visibility;
   created_at: Date;
   updated_at: Date;
 };
@@ -107,7 +105,6 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     realName: row.real_name,
     contactNote: row.contact_note,
     status: row.status,
-    visibility: row.visibility,
     images,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -371,15 +368,8 @@ export async function updateProfileStatus(
   sql: Sql,
   id: string,
   status: ProfileStatus,
-  visibility?: Visibility,
 ): Promise<boolean> {
-  const result = visibility
-    ? await sql.query(`UPDATE profiles SET status = $2, visibility = $3 WHERE id = $1`, [
-        id,
-        status,
-        visibility,
-      ])
-    : await sql.query(`UPDATE profiles SET status = $2 WHERE id = $1`, [id, status]);
+  const result = await sql.query(`UPDATE profiles SET status = $2 WHERE id = $1`, [id, status]);
   return (result.rowCount ?? 0) > 0;
 }
 

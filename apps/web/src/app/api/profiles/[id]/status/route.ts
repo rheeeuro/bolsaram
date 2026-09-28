@@ -1,4 +1,4 @@
-/** PATCH /api/profiles/:id/status — 게시/중지 등 상태 전환 (관리자) */
+/** PATCH /api/profiles/:id/status — 활성·비활성 전환 (관리자) */
 import { DomainError } from "@bolsaram/domain";
 import { profileStatusUpdateSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
@@ -16,14 +16,14 @@ export const PATCH = route(async (request: Request, { params }: Params) => {
   return asAdmin(async (sql, viewer) => {
     // RLS 와 별개로 한 번 더 막는다 — 공개 여부를 바꾸는 경로라 더 그렇다.
     await assertCanEditProfile(sql, id);
-    const updated = await updateProfileStatus(sql, id, input.status, input.visibility);
+    const updated = await updateProfileStatus(sql, id, input.status);
     if (!updated) throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
     await writeAudit(sql, {
       actorUserId: viewer.userId,
       action: "profile.status",
       entityType: "profile",
       entityId: id,
-      metadata: { status: input.status, visibility: input.visibility ?? null },
+      metadata: { status: input.status },
     });
     return ok({ ok: true });
   });

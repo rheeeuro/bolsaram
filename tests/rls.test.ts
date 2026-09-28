@@ -50,13 +50,12 @@ beforeAll(async () => {
     const profile = async (
       userId: string | null,
       status: string,
-      visibility: string,
       gender: "MALE" | "FEMALE",
     ) => {
       const result = await sql.query<{ id: string }>(
-        `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status, visibility, real_name)
-         VALUES ($1,$2,$3,1993,'SEOUL',$4,$5,$6) RETURNING id`,
-        [groupId, userId, gender, status, visibility, `${TAG}-이름`],
+        `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status, real_name)
+         VALUES ($1,$2,$3,1993,'SEOUL',$4,$5) RETURNING id`,
+        [groupId, userId, gender, status, `${TAG}-이름`],
       );
       return result.rows[0]!.id;
     };
@@ -91,12 +90,12 @@ beforeAll(async () => {
       outsider: { userId: u3, role: "MEMBER" as const },
       // p1·p4 가 여성, p2·pOutsider 가 남성이다. 신청이 오가는 쌍(p1↔p2 · p1↔pOutsider ·
       // p4↔pOutsider)이 모두 이성이 되도록 짝지었다.
-      p1: await profile(u1, "ACTIVE", "LISTED", "FEMALE"),
-      p2: await profile(u2, "ACTIVE", "LISTED", "MALE"),
-      pOutsider: await profile(u3, "ACTIVE", "LISTED", "MALE"),
-      pHidden: await profile(null, "INACTIVE", "PRIVATE", "FEMALE"),
+      p1: await profile(u1, "ACTIVE", "FEMALE"),
+      p2: await profile(u2, "ACTIVE", "MALE"),
+      pOutsider: await profile(u3, "ACTIVE", "MALE"),
+      pHidden: await profile(null, "INACTIVE", "FEMALE"),
       member4: { userId: u4, role: "MEMBER" as const },
-      p4: await profile(u4, "ACTIVE", "LISTED", "FEMALE"),
+      p4: await profile(u4, "ACTIVE", "FEMALE"),
     };
   });
 });
@@ -106,7 +105,7 @@ afterAll(async () => {
   await withOwner(async (sql) => {
     await sql.query(`DELETE FROM profiles WHERE real_name = $1`, [`${TAG}-이름`]);
     await sql.query(
-      `DELETE FROM users WHERE display_name IN ('admin','admin2','admin3','admin4','m1','m2','m3','m4','m5','m6') AND (email LIKE $1 OR phone LIKE $2)`,
+      `DELETE FROM users WHERE display_name IN ('admin','admin2','admin3','admin4','m1','m2','m3','m4','m5','m6','m7','m8') AND (email LIKE $1 OR phone LIKE $2)`,
       [`${TAG}-%`, `${phonePrefix()}%`],
     );
     await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
@@ -151,14 +150,14 @@ describe("profiles 읽기 정책", () => {
     expect(result.rowCount).toBe(2);
   });
 
-  it("멤버는 비공개(PRIVATE) 프로필을 보지 못한다", async () => {
+  it("멤버는 비활성(INACTIVE) 프로필을 보지 못한다", async () => {
     const result = await withRls(fx.member1, (sql) =>
       sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.pHidden]),
     );
     expect(result.rowCount).toBe(0);
   });
 
-  it("관리자는 비공개 프로필도 본다", async () => {
+  it("관리자는 비활성 프로필도 본다", async () => {
     const result = await withRls(fx.admin, (sql) =>
       sql.query(`SELECT id FROM profiles WHERE id = $1`, [fx.pHidden]),
     );
@@ -602,7 +601,7 @@ function phonePrefix(): string {
   return "0109";
 }
 function phoneFor(key: string): string {
-  const n = { admin: 1, m1: 2, m2: 3, m3: 4 }[key] ?? 9;
+  const n = { admin: 1, m1: 2, m2: 3, m3: 4, m5: 5, m6: 6, m7: 7, m8: 8 }[key] ?? 9;
   return `${phonePrefix()}${String(Date.now()).slice(-6)}${n}`;
 }
 
@@ -827,8 +826,8 @@ describe("담당이 갈리는 신청 (전체공개 풀)", () => {
       const publicProfile = async (createdBy: string, gender: string) => {
         const r = await sql.query<{ id: string }>(
           `INSERT INTO profiles (group_id, user_id, created_by, gender, birth_year,
-                                 residence_region, status, visibility, real_name)
-           VALUES (NULL, NULL, $1, $2, 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3) RETURNING id`,
+                                 residence_region, status, real_name)
+           VALUES (NULL, NULL, $1, $2, 1993, 'SEOUL', 'ACTIVE', $3) RETURNING id`,
           [createdBy, gender, `${TAG}-이름`],
         );
         return r.rows[0]!.id;
@@ -932,5 +931,117 @@ describe("담당이 갈리는 신청 (전체공개 풀)", () => {
     );
     expect(result.rows[0]?.one).toBe(false);
     expect(result.rows[0]?.two).toBe(true);
+  });
+});
+
+/**
+ * 한 사람이 여러 명과 동시에 신청을 주고받는다.
+ *
+ * 소개 진행 상태는 사람이 아니라 관계(`match_requests` 한 행)가 가진다 — 프로필 상태는
+ * 활성/비활성뿐이다(0055). 중복을 막는 것은 **같은 두 사람 사이**뿐이고, 한 관계가
+ * 연결돼도 다른 관계와 그 사람의 노출은 그대로다.
+ */
+describe("여러 명에게 동시에 신청", () => {
+  let woman: RlsContext;
+  let man2: RlsContext;
+  let pw: string;
+  let pm1: string;
+  let pm2: string;
+  let pm3: string;
+
+  beforeAll(async () => {
+    await withOwner(async (sql) => {
+      const member = async (key: string, gender: "MALE" | "FEMALE") => {
+        const u = await sql.query<{ id: string }>(
+          `INSERT INTO users (role, phone, display_name) VALUES ('MEMBER', $1, $2) RETURNING id`,
+          [phoneFor(key), key],
+        );
+        const userId = u.rows[0]!.id;
+        // 전체공개 풀이다. 같은 풀의 이성끼리는 서로 보인다.
+        const p = await sql.query<{ id: string }>(
+          `INSERT INTO profiles (group_id, user_id, created_by, gender, birth_year,
+                                 residence_region, status, real_name)
+           VALUES (NULL, $1, $2, $3, 1993, 'SEOUL', 'ACTIVE', $4) RETURNING id`,
+          [userId, fx.adminId, gender, `${TAG}-이름`],
+        );
+        return { ctx: { userId, role: "MEMBER" as const }, profileId: p.rows[0]!.id };
+      };
+      const w = await member("m5", "FEMALE");
+      const m1 = await member("m6", "MALE");
+      const m2 = await member("m7", "MALE");
+      const m3 = await member("m8", "MALE");
+      woman = w.ctx;
+      man2 = m2.ctx;
+      pw = w.profileId;
+      pm1 = m1.profileId;
+      pm2 = m2.profileId;
+      pm3 = m3.profileId;
+    });
+  });
+
+  const send = (target: string) =>
+    withRls(woman, (sql) =>
+      sql.query<{ id: string }>(
+        `INSERT INTO match_requests (requester_profile_id, target_profile_id)
+         VALUES ($1, $2) RETURNING id`,
+        [pw, target],
+      ),
+    );
+
+  it("서로 다른 상대에게는 동시에 여러 건을 보낼 수 있다", async () => {
+    expect((await send(pm1)).rowCount).toBe(1);
+    expect((await send(pm2)).rowCount).toBe(1);
+
+    const mine = await withRls(woman, (sql) =>
+      sql.query(
+        `SELECT id FROM match_requests WHERE requester_profile_id = $1 AND status = 'REQUESTED'`,
+        [pw],
+      ),
+    );
+    expect(mine.rowCount).toBe(2);
+  });
+
+  it("한 관계가 연결돼도 다른 관계와 노출은 그대로다", async () => {
+    await withOwner((sql) =>
+      sql.query(
+        `UPDATE match_requests SET status = 'INTRODUCED'
+          WHERE requester_profile_id = $1 AND target_profile_id = $2`,
+        [pw, pm1],
+      ),
+    );
+
+    // 연결된 뒤에도 새 상대에게 보낼 수 있다.
+    expect((await send(pm3)).rowCount).toBe(1);
+
+    const rows = await withOwner((sql) =>
+      sql.query<{ target: string; status: string }>(
+        `SELECT target_profile_id AS target, status::text FROM match_requests
+          WHERE requester_profile_id = $1`,
+        [pw],
+      ),
+    );
+    const byTarget = Object.fromEntries(rows.rows.map((r) => [r.target, r.status]));
+    expect(byTarget).toEqual({ [pm1]: "INTRODUCED", [pm2]: "REQUESTED", [pm3]: "REQUESTED" });
+
+    // 프로필에는 진행 상태가 없다 — 연결 뒤에도 활성이고, 다른 상대에게 계속 보인다.
+    const profile = await withRls(man2, (sql) =>
+      sql.query<{ status: string }>(`SELECT status::text FROM profiles WHERE id = $1`, [pw]),
+    );
+    expect(profile.rows[0]?.status).toBe("ACTIVE");
+  });
+
+  it("비활성으로 바꾸면 멤버에게 보이지 않지만 관계는 남는다", async () => {
+    await withOwner((sql) =>
+      sql.query(`UPDATE profiles SET status = 'INACTIVE' WHERE id = $1`, [pw]),
+    );
+    const seen = await withRls(man2, (sql) =>
+      sql.query(`SELECT id FROM profiles WHERE id = $1`, [pw]),
+    );
+    expect(seen.rowCount).toBe(0);
+
+    const kept = await withOwner((sql) =>
+      sql.query(`SELECT id FROM match_requests WHERE requester_profile_id = $1`, [pw]),
+    );
+    expect(kept.rowCount).toBe(3);
   });
 });

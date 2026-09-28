@@ -7,7 +7,7 @@
  * 응답에 상대의 숨김 여부를 싣지 않는다. 내가 숨긴 것만 알려주면 되고, 상대가 나를
  * 숨겼는지까지 돌려주면 숨기기가 통보가 된다.
  */
-import { DomainError, assertCanHide, isDetailAccessible } from "@bolsaram/domain";
+import { DomainError, assertCanHide, isDiscoverable } from "@bolsaram/domain";
 import { profileHideSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
 import { asMember } from "@/server/http/context";
@@ -39,7 +39,7 @@ export const POST = route(async (request: Request) => {
     // 대상이 실제로 열람 가능한 프로필인지 먼저 본다. 없는 id 를 그대로 넣으면 FK
     // 위반이 500 으로 새고, 200/500 의 차이가 「그 프로필이 있는가」를 알려준다.
     const target = await findProfileById(sql, input.profileId);
-    if (!target || !isDetailAccessible(target)) {
+    if (!target || !isDiscoverable(target)) {
       throw new DomainError("NOT_FOUND", "그 프로필을 찾을 수 없습니다.");
     }
 

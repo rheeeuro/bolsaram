@@ -61,8 +61,8 @@ async function makeParty(sql: Parameters<Parameters<typeof withOwner>[0]>[0], ke
 
   const p = await sql.query<{ id: string }>(
     `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region,
-                           status, visibility, real_name, created_by)
-     VALUES ($1, $2, 'FEMALE', 1993, 'SEOUL', 'ACTIVE', 'LISTED', $3, $4) RETURNING id`,
+                           status, real_name, created_by)
+     VALUES ($1, $2, 'FEMALE', 1993, 'SEOUL', 'ACTIVE', $3, $4) RETURNING id`,
     [groupId, memberId, `${TAG}-${key}-이름`, adminId],
   );
 
@@ -279,8 +279,8 @@ describe("모임에 속하지 않은 주선자", () => {
     const publicId = await withOwner(async (sql) => {
       const r = await sql.query<{ id: string }>(
         `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
-                               status, visibility, real_name)
-         VALUES (NULL,'FEMALE',1996,'SEOUL','ACTIVE','LISTED',$1) RETURNING id`,
+                               status, real_name)
+         VALUES (NULL,'FEMALE',1996,'SEOUL','ACTIVE',$1) RETURNING id`,
         [`${TAG}-전체공개`],
       );
       return r.rows[0]!.id;
@@ -370,16 +370,16 @@ describe("대행 중에도 풀 경계는 그 멤버의 것이다", () => {
     await withOwner(async (sql) => {
       const same = await sql.query<{ id: string }>(
         `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
-                               status, visibility, real_name, created_by)
-         VALUES ($1, 'MALE', 1990, 'SEOUL', 'ACTIVE', 'LISTED', $2, $3) RETURNING id`,
+                               status, real_name, created_by)
+         VALUES ($1, 'MALE', 1990, 'SEOUL', 'ACTIVE', $2, $3) RETURNING id`,
         [A.groupId, `${TAG}-a-같은모임남성`, A.adminId],
       );
       sameGroupTarget = same.rows[0]!.id;
 
       const pub = await sql.query<{ id: string }>(
         `INSERT INTO profiles (group_id, gender, birth_year, residence_region,
-                               status, visibility, real_name, created_by)
-         VALUES (NULL, 'MALE', 1991, 'SEOUL', 'ACTIVE', 'LISTED', $1, $2) RETURNING id`,
+                               status, real_name, created_by)
+         VALUES (NULL, 'MALE', 1991, 'SEOUL', 'ACTIVE', $1, $2) RETURNING id`,
         [`${TAG}-a-전체공개남성`, A.adminId],
       );
       publicTarget = pub.rows[0]!.id;

@@ -29,7 +29,6 @@ export default async function HostProfileDetailPage({
         profile={data.view}
         canEdit={data.canEdit}
         status={data.status}
-        visibility={data.visibility}
         claimed={data.claimed}
         invite={data.invite}
       />

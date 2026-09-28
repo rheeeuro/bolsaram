@@ -187,7 +187,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/claim`                              | POST                | **초대 토큰**     | 멤버 로그인 (매직 링크) + 최초 계정 생성 |
 | `/api/profiles`                           | GET                 | 멤버              | Discover 목록 (필터·커서)            |
 | `/api/profiles/[id]`                      | GET / PATCH         | 멤버 / 주선자     | 상세 조회 / 내용 수정                |
-| `/api/profiles/[id]/status`               | PATCH               | 주선자            | 상태·노출 변경                       |
+| `/api/profiles/[id]/status`               | PATCH               | 주선자            | 활성·비활성 전환                     |
 | `/api/match-requests`                     | GET / POST          | 멤버(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |

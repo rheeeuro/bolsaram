@@ -4,7 +4,6 @@ import {
   ageFromBirthYear,
   assertOppositeGender,
   formatPublicCode,
-  isDetailAccessible,
   isDiscoverable,
   isOppositeGender,
   oppositeGender,
@@ -36,7 +35,6 @@ const profile: FullProfile = {
   realName: "가상이름",
   contactNote: "카카오톡 ID: sample",
   status: "ACTIVE",
-  visibility: "LISTED",
   images: [
     { id: "i2", storageKey: "k2", sortOrder: 1, isPrimary: false },
     { id: "i1", storageKey: "k1", sortOrder: 0, isPrimary: true },
@@ -100,16 +98,9 @@ describe("projectProfile", () => {
 });
 
 describe("노출 규칙", () => {
-  it("공개 + LISTED 만 Discover 에 나온다", () => {
+  it("활성만 멤버에게 보이고 비활성은 보이지 않는다", () => {
     expect(isDiscoverable(profile)).toBe(true);
-    expect(isDiscoverable({ ...profile, visibility: "UNLISTED" })).toBe(false);
-    expect(isDiscoverable({ ...profile, status: "PAUSED" })).toBe(false);
-  });
-
-  it("UNLISTED 는 링크로 상세 접근이 가능하다", () => {
-    expect(isDetailAccessible({ ...profile, visibility: "UNLISTED" })).toBe(true);
-    expect(isDetailAccessible({ ...profile, visibility: "PRIVATE" })).toBe(false);
-    expect(isDetailAccessible({ ...profile, status: "ARCHIVED" })).toBe(false);
+    expect(isDiscoverable({ ...profile, status: "INACTIVE" })).toBe(false);
   });
 });
 

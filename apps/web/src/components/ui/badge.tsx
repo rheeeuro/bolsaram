@@ -31,12 +31,10 @@ export function toneForStatus(status: string): Tone {
     case "READY":
     case "IMPORTED":
       return "active";
-    case "MATCHING":
     case "INTRODUCED":
       return "info";
     case "REVIEW_REQUIRED":
     case "REQUESTED":
-    case "PAUSED":
     case "ANALYZING":
       return "warning";
     case "FAILED":
