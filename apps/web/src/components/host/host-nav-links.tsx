@@ -24,8 +24,9 @@ export type HostLink = {
 export const HOST_LINKS: HostLink[] = [
   { href: "/home", label: "홈", exact: true, primary: true },
   { href: "/profiles", label: "프로필", primary: true },
+  // 카카오톡에서 받자마자 폰으로 올리는 일이 가장 잦다 — 하단 탭 가운데, 엄지 자리에 둔다.
+  { href: "/imports", label: "가져오기", primary: true },
   { href: "/requests", label: "신청", primary: true },
-  { href: "/imports", label: "가져오기" },
   { href: "/members", label: "멤버" },
 ];
 

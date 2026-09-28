@@ -24,13 +24,14 @@ export default async function HostProfileDetailPage({
 
   return (
     <>
-      <Breadcrumb items={[{ label: "프로필", href: "/profiles" }, { code: data.view.code }]} />
+      <Breadcrumb items={[{ label: "프로필", href: "profiles" }, { code: data.view.code }]} />
       <HostProfileDetail
         profile={data.view}
         canEdit={data.canEdit}
         status={data.status}
         claimed={data.claimed}
         invite={data.invite}
+        source={data.source}
       />
     </>
   );

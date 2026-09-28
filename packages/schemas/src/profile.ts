@@ -89,8 +89,11 @@ const intParam = (min: number, max: number) =>
 
 export const DISCOVER_PAGE_SIZE = 24;
 
-export const discoverQuerySchema = z.object({
-  // 성별은 필터가 아니다 — 멤버는 이성만 보고, 그 값은 자기 프로필이 정한다.
+/**
+ * 인적 조건. 멤버 탐색과 주선자 목록이 같은 모양을 받는다 — 주소에 담긴 조건을 한쪽에서
+ * 다른 쪽으로 옮겨도 뜻이 같다. SQL 로 바꾸는 것은 domain 의 `buildAttributeClauses` 다.
+ */
+const attributeFilterShape = {
   ageMin: intParam(18, 99),
   ageMax: intParam(18, 99),
   heightMin: intParam(HEIGHT_MIN, HEIGHT_MAX),
@@ -102,16 +105,24 @@ export const discoverQuerySchema = z.object({
   drinking: csv(DRINKING_LEVELS),
   /** 해시태그. 여러 개를 주면 **전부 가진** 프로필만 남는다. */
   tags: tagCsv,
+};
+
+export const discoverQuerySchema = z.object({
+  // 성별은 필터가 아니다 — 멤버는 이성만 보고, 그 값은 자기 프로필이 정한다.
+  ...attributeFilterShape,
   q: z.string().trim().max(60).optional(),
   cursor: z.string().trim().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(60).default(DISCOVER_PAGE_SIZE),
 });
 export type DiscoverQuery = z.infer<typeof discoverQuerySchema>;
 
-/** 관리자 프로필 목록 필터. 멤버 필터와 달리 status 를 직접 다룬다. */
+/**
+ * 주선자 프로필 목록 필터. 멤버 필터와 달리 상태·성별·초대 여부를 직접 다룬다 —
+ * 주선자는 양쪽 성별을 모두 맡는다.
+ */
 export const adminProfileQuerySchema = z.object({
+  ...attributeFilterShape,
   q: z.string().trim().max(60).optional(),
-  tags: tagCsv,
   status: csv(PROFILE_STATUSES),
   gender: z.enum(GENDERS).optional(),
   claimed: z.enum(["yes", "no"]).optional(),

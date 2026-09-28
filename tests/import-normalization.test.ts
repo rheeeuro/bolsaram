@@ -6,6 +6,7 @@ import {
   assertImportTransition,
   missingRequiredFields,
   normalizeRawText,
+  pickRealName,
   resequence,
   reviewFields,
   statusAfterExtraction,
@@ -173,3 +174,31 @@ function catchError(fn: () => unknown): unknown {
     return error;
   }
 }
+
+/**
+ * 원문의 「이름:」 줄. 이름은 AI 에 맡기지 않고 주선자가 적어 둔 양식만 읽는다 —
+ * 줄머리가 없으면 추측하지 않는다.
+ */
+describe("pickRealName", () => {
+  it("카카오톡 프로필 양식의 이름 줄을 읽는다", () => {
+    expect(pickRealName("이름: 김볼사\n나이: 93년생")).toBe("김볼사");
+    expect(pickRealName("나이 93\n성함 : 이볼사")).toBe("이볼사");
+    expect(pickRealName("- 이름) 박볼사")).toBe("박볼사");
+    expect(pickRealName("Name: Kim")).toBe("Kim");
+  });
+
+  it("괄호 덧붙임은 떼어 낸다", () => {
+    expect(pickRealName("이름: 최볼사 (93, 여)")).toBe("최볼사");
+  });
+
+  it("카카오톡 말머리가 붙어 있어도 읽는다", () => {
+    expect(pickRealName("[주선자] [오후 3:14] 이름: 정볼사")).toBe("정볼사");
+  });
+
+  it("줄머리가 없으면 추측하지 않는다", () => {
+    expect(pickRealName("김볼사 93년생 여자")).toBeNull();
+    expect(pickRealName("이름이 예쁜 분을 찾습니다")).toBeNull();
+    expect(pickRealName(null)).toBeNull();
+    expect(pickRealName("이름: ")).toBeNull();
+  });
+});

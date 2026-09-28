@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProfileCode } from "@/components/ui/marks";
+import { ProfilesListLink } from "@/components/host/profiles-list-link";
 import { cn } from "@/lib/cn";
 import type { ReactNode } from "react";
 
@@ -20,6 +21,10 @@ import type { ReactNode } from "react";
 export function Breadcrumb({
   items,
 }: {
+  /**
+   * `href: "profiles"` 는 특별하다 — 마지막으로 본 조건의 프로필 목록으로 돌아간다
+   * (`ProfilesListLink`). 상세에서 목록으로 돌아올 때 걸어 둔 조건을 잃지 않게 한다.
+   */
   items: { label?: string; code?: string; href?: string }[];
 }) {
   return (
@@ -39,7 +44,11 @@ export function Breadcrumb({
             className="flex items-center gap-2"
           >
             {index > 0 ? <span aria-hidden>·</span> : null}
-            {item.href ? (
+            {item.href === "profiles" ? (
+              <ProfilesListLink className="hover:text-[var(--color-rose-600)]">
+                {body}
+              </ProfilesListLink>
+            ) : item.href ? (
               <Link href={item.href} className="hover:text-[var(--color-rose-600)]">
                 {body}
               </Link>

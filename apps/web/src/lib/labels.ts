@@ -33,6 +33,9 @@ export const label = {
   matchStatus: (v: string | null | undefined) => lookup(MATCH_REQUEST_STATUS_LABELS, v),
   importStatus: (v: string | null | undefined) => lookup(IMPORT_STATUS_LABELS, v),
   importSource: (v: string | null | undefined) => lookup(IMPORT_SOURCE_LABELS, v),
+  /** 카카오톡 프로필이 쓰는 두 자리 표기(「96년생」). 주선자 화면은 모두 이 표기로 맞춘다. */
+  birthYear: (v: number | null | undefined) =>
+    v == null ? null : `${String(v % 100).padStart(2, "0")}년생`,
 };
 
 /** AI 추출 필드 키 → 검토 화면에 쓸 한글 이름. */

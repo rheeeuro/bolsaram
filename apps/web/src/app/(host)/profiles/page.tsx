@@ -6,6 +6,7 @@ import { isDiscoverable } from "@bolsaram/domain";
 import { adminProfileQuerySchema, PROFILE_STATUSES } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge } from "@/components/ui/badge";
+import { buttonClasses } from "@/components/ui/button";
 import { ProfileCode } from "@/components/ui/marks";
 import { Count, PageHeader, Panel } from "@/components/host/surface";
 import { introducedWithManaged } from "@/server/repo/matches";
@@ -32,6 +33,10 @@ export default async function HostProfilesPage({
   // 보기 모드는 필터가 아니라 화면의 것이라 조회 스키마에 넣지 않는다.
   // 값이 이상하면 카드로 떨어뜨린다 — 목록이 안 뜨는 것보다 낫다.
   const mode = raw.view === "raw" ? "raw" : "card";
+  // 빈 목록이 「조건 때문」인지 「아직 아무도 없어서」인지 가른다. 보기·커서는 조건이 아니다.
+  const filtered = Object.entries(raw).some(
+    ([key, value]) => key !== "view" && key !== "cursor" && typeof value === "string" && value !== "",
+  );
 
   const page = await withRls(rlsContextOf(viewer), async (sql) => {
     const result = await findAdminProfiles(sql, query, { groupId: viewer.groupId });
@@ -66,6 +71,8 @@ export default async function HostProfilesPage({
           }),
         ),
         claimed: profile.userId != null,
+        // 초대는 담당만 보낼 수 있다 — 「초대 전」은 담당에게만 할 일로 보인다.
+        canEdit: editable.has(profile.id),
         // 운영 상태는 개인정보가 아니라 담당이 아니어도 보인다. 공개 단계가 낮아지면
         // view 에서 빠지므로 레코드에서 직접 싣는다.
         status: profile.status,
@@ -128,15 +135,27 @@ export default async function HostProfilesPage({
 
       {page.items.length === 0 ? (
         <Panel className="mt-5">
-          <p className="py-12 text-center text-[13.5px] text-[var(--surface-text-muted)]">
-            조건에 맞는 프로필이 없습니다.
-          </p>
+          {filtered ? (
+            <p className="py-12 text-center text-[13.5px] text-[var(--surface-text-muted)]">
+              조건에 맞는 프로필이 없습니다. 조건을 넓혀 보세요.
+            </p>
+          ) : (
+            // 조건 없이 비어 있으면 이 방에 아직 아무도 없는 것이다 — 할 일은 가져오기다.
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <p className="text-[13.5px] text-[var(--surface-text-muted)]">
+                이 방에는 아직 등록한 프로필이 없습니다.
+              </p>
+              <Link href="/imports" className={buttonClasses({ variant: "secondary" })}>
+                카카오톡 프로필 가져오기
+              </Link>
+            </div>
+          )}
         </Panel>
       ) : mode === "raw" ? (
         <ProfileRawList items={page.items.map(toRawItem)} />
       ) : (
         <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-          {page.items.map(({ view, claimed, visible, status }) => (
+          {page.items.map(({ view, claimed, canEdit, visible }) => (
             <li key={view.id}>
               <Link href={`/profiles/${view.id}`} className="group block">
                 <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
@@ -156,25 +175,34 @@ export default async function HostProfilesPage({
                     </div>
                   )}
 
-                  <span className="absolute left-2.5 top-2.5 rounded-[var(--radius-pill)] bg-white/90 px-2.5 py-1 text-[11.5px] font-medium text-[var(--color-ink-800)] backdrop-blur">
-                    {label.profileStatus(status)}
-                  </span>
-                  {!claimed ? (
-                    <span className="absolute right-2.5 top-2.5 rounded-[var(--radius-pill)] bg-[var(--color-burgundy-800)]/85 px-2.5 py-1 text-[11.5px] text-white">
-                      초대 전
+                  {/* 상태는 둘뿐이고 활성이 평소 모습이다 — 예외인 비활성만 사진 위에 띄운다. */}
+                  {!visible ? (
+                    <span className="absolute left-2.5 top-2.5 rounded-[var(--radius-pill)] bg-[var(--color-ink-900)]/70 px-2.5 py-1 text-[11.5px] text-white backdrop-blur">
+                      비활성 · 멤버에게 안 보임
                     </span>
                   ) : null}
                 </div>
 
                 <div className="mt-2.5">
-                  <p className="display text-[15px] text-[var(--color-ink-900)]">
-                    <ProfileCode code={view.code} />
-                    <span className="ml-2 font-sans text-[12px] text-[var(--color-ink-500)]">
-                      {label.gender(view.gender)}
-                    </span>
-                  </p>
+                  {/* 주선자는 번호가 아니라 이름으로 기억한다. 이름은 담당일 때만 온다. */}
+                  {view.realName ? (
+                    <p className="display truncate text-[15px] text-[var(--color-ink-900)]">
+                      {view.realName}
+                      <span className="ml-2 font-sans text-[12px] text-[var(--color-ink-500)]">
+                        {view.code} · {label.gender(view.gender)}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="display text-[15px] text-[var(--color-ink-900)]">
+                      <ProfileCode code={view.code} />
+                      <span className="ml-2 font-sans text-[12px] text-[var(--color-ink-500)]">
+                        {label.gender(view.gender)}
+                      </span>
+                    </p>
+                  )}
                   <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">
-                    {view.birthYear}년생{view.height ? ` · ${view.height}cm` : ""}
+                    {label.birthYear(view.birthYear)}
+                    {view.height ? ` · ${view.height}cm` : ""}
                   </p>
                   <p className="text-[12.5px] text-[var(--color-ink-600)]">
                     {[
@@ -184,12 +212,11 @@ export default async function HostProfilesPage({
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
-                  <p className="mt-1.5">
-                    {/* 사진 위 칩이 상태를, 여기가 결론을 말한다. */}
-                    <Badge tone={visible ? "active" : "neutral"}>
-                      {visible ? "멤버에게 보임" : "멤버에게 안 보임"}
-                    </Badge>
-                  </p>
+                  {canEdit && !claimed ? (
+                    <p className="mt-1.5">
+                      <Badge tone="neutral">초대 전</Badge>
+                    </p>
+                  ) : null}
                 </div>
               </Link>
             </li>
@@ -253,21 +280,30 @@ function ViewTab({
  * 사진은 공개 단계가 이미 걸러 준 것만 쓴다 — 담당이 아닌 프로필은 대표 한 장이다.
  */
 function toRawItem(item: {
-  view: { id: string; code: string; gender: string; age: number; images?: { id: string; url: string }[]; primaryImage: { id: string; url: string } | null };
+  view: {
+    id: string;
+    code: string;
+    gender: string;
+    birthYear: number;
+    realName?: string | null;
+    images?: { id: string; url: string }[];
+    primaryImage: { id: string; url: string } | null;
+  };
   claimed: boolean;
+  canEdit: boolean;
   visible: boolean;
-  status: string;
   source: { source: string; rawText: string | null; committedAt: Date | null } | null;
 }): RawListItem {
   const images = item.view.images ?? (item.view.primaryImage ? [item.view.primaryImage] : []);
   return {
     id: item.view.id,
     code: item.view.code,
+    name: item.view.realName ?? null,
     gender: item.view.gender,
-    age: item.view.age,
-    status: item.status,
+    birthYear: item.view.birthYear,
     visible: item.visible,
-    claimed: item.claimed,
+    // 초대는 담당만 보낸다 — 담당이 아니면 초대 여부를 할 일로 보여주지 않는다.
+    awaitingInvite: item.canEdit && !item.claimed,
     images: images.map((image) => ({ id: image.id, url: image.url })),
     rawText: item.source?.rawText ?? null,
     source: item.source?.source ?? null,

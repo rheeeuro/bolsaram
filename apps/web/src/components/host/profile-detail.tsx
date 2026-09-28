@@ -49,12 +49,15 @@ export function HostProfileDetail({
   status,
   claimed,
   invite,
+  source,
 }: {
   profile: ProfileDetailView;
   canEdit: boolean;
   status: string;
   claimed: boolean;
   invite: { expiresAt: string; claimed: boolean } | null;
+  /** 가져올 때 받은 카카오톡 원문. 담당일 때만 온다. */
+  source: { sessionId: string; rawText: string } | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -80,7 +83,7 @@ export function HostProfileDetail({
 
   const summary = [
     label.gender(profile.gender),
-    `${profile.birthYear}년생`,
+    label.birthYear(profile.birthYear),
     profile.height ? `${profile.height}cm` : null,
     profile.jobTitle ?? label.jobCategory(profile.jobCategory),
     label.region(profile.residenceRegion),
@@ -125,9 +128,15 @@ export function HostProfileDetail({
         </div>
 
         <div className="min-w-48 flex-1">
+          {/* 이름은 담당일 때만 온다. 주선자는 번호보다 이름으로 기억한다. */}
           <h1 className="display text-[28px] leading-none text-[var(--color-ink-900)]">
-            <ProfileCode code={profile.code} />
+            {profile.realName ?? <ProfileCode code={profile.code} />}
           </h1>
+          {profile.realName ? (
+            <p className="mt-2 text-[13px] text-[var(--surface-text-muted)]">
+              <ProfileCode code={profile.code} /> · 멤버에게는 번호로만 보입니다
+            </p>
+          ) : null}
           <p className="mt-2.5 text-[13.5px] text-[var(--surface-text-muted)]">{summary}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={toneForStatus(status)}>{label.profileStatus(status)}</Badge>
@@ -272,6 +281,25 @@ export function HostProfileDetail({
                     </div>
                   ))}
               </dl>
+            </Panel>
+          ) : null}
+
+          {source ? (
+            <Panel title="카카오톡 원문">
+              <details>
+                <summary className="cursor-pointer text-[12.5px] text-[var(--surface-text-muted)] hover:text-[var(--color-rose-600)]">
+                  가져올 때 받은 글 그대로 보기
+                </summary>
+                <p className="mt-3 max-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--color-ivory-100)] px-3.5 py-3 text-[13px] leading-relaxed text-[var(--color-ink-800)]">
+                  {source.rawText}
+                </p>
+                <Link
+                  href={`/imports/${source.sessionId}`}
+                  className="mt-2.5 inline-block text-[12.5px] text-[var(--color-rose-600)] hover:underline"
+                >
+                  받은 사진까지 모두 보기
+                </Link>
+              </details>
             </Panel>
           ) : null}
         </div>

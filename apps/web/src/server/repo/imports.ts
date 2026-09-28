@@ -174,33 +174,71 @@ export async function sourceTextsFor(
   return map;
 }
 
+/** 가져오기 목록 한 줄. 원문 대신 사람을 알아볼 요약과 등록된 프로필 번호를 함께 싣는다. */
+export type InboxItem = ImportSessionRecord & {
+  assetCount: number;
+  /** 최신 추출 결과(주선자 수정본 반영). 아직 분석 전이면 null. */
+  summary: Partial<ExtractedFields> | null;
+  /** 등록된 프로필의 공개 번호. 등록 전이거나 프로필이 지워졌으면 null. */
+  profileCode: number | null;
+};
+
+/**
+ * 가져오기 목록. **할 일(등록 전)과 끝난 일(등록됨)을 나눠 읽는다** — 섞어 두면 끝난
+ * 건이 쌓여 검토할 것이 묻힌다.
+ */
 export async function listInbox(
   sql: Sql,
   /** `groupId` 는 지금 보고 있는 채널이다. null 이면 전체공개 세션만 본다. */
-  filter: { status?: ImportStatus[]; groupId: string | null },
-): Promise<(ImportSessionRecord & { assetCount: number })[]> {
-  const values: unknown[] = [filter.groupId];
-  let clause = "s.group_id IS NOT DISTINCT FROM $1";
-  if (filter.status?.length) {
-    values.push(filter.status);
-    clause += ` AND s.status = ANY($2)`;
-  }
-  const result = await sql.query<SessionRow & { asset_count: number }>(
+  filter: { groupId: string | null; done: boolean },
+): Promise<InboxItem[]> {
+  const doneClause = filter.done ? "s.status = 'IMPORTED'" : "s.status <> 'IMPORTED'";
+  const result = await sql.query<
+    SessionRow & {
+      asset_count: number;
+      summary_json: Partial<ExtractedFields> | null;
+      profile_code: number | null;
+    }
+  >(
     `SELECT ${SESSION_COLUMNS.split(", ")
       .map((c) => `s.${c.trim()}`)
       .join(", ")},
-            (SELECT count(*)::int FROM import_assets a WHERE a.import_session_id = s.id) AS asset_count
+            (SELECT count(*)::int FROM import_assets a WHERE a.import_session_id = s.id) AS asset_count,
+            (SELECT e.fields_json || COALESCE(e.reviewed_fields_json, '{}'::jsonb)
+               FROM import_extractions e
+              WHERE e.import_session_id = s.id
+              ORDER BY e.created_at DESC LIMIT 1) AS summary_json,
+            (SELECT p.public_code FROM profiles p WHERE p.id = s.committed_profile_id) AS profile_code
        FROM import_sessions s
-      WHERE ${clause}
+      WHERE s.group_id IS NOT DISTINCT FROM $1 AND ${doneClause}
       ORDER BY
         CASE s.status
           WHEN 'REVIEW_REQUIRED' THEN 0 WHEN 'READY' THEN 1
           WHEN 'ANALYZING' THEN 2 WHEN 'FAILED' THEN 3 ELSE 4 END,
-        s.created_at DESC
+        COALESCE(s.committed_at, s.created_at) DESC
       LIMIT 100`,
-    values,
+    [filter.groupId],
   );
-  return result.rows.map((row) => ({ ...toSession(row), assetCount: row.asset_count }));
+  return result.rows.map((row) => ({
+    ...toSession(row),
+    assetCount: row.asset_count,
+    summary: row.summary_json,
+    profileCode: row.profile_code,
+  }));
+}
+
+/** 두 칸의 건수. 탭에 숫자를 달아 할 일이 남았는지 한눈에 보이게 한다. */
+export async function countInbox(
+  sql: Sql,
+  groupId: string | null,
+): Promise<{ pending: number; done: number }> {
+  const result = await sql.query<{ pending: number; done: number }>(
+    `SELECT count(*) FILTER (WHERE status <> 'IMPORTED')::int AS pending,
+            count(*) FILTER (WHERE status = 'IMPORTED')::int AS done
+       FROM import_sessions WHERE group_id IS NOT DISTINCT FROM $1`,
+    [groupId],
+  );
+  return result.rows[0] ?? { pending: 0, done: 0 };
 }
 
 /**

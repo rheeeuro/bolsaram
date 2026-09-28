@@ -217,8 +217,8 @@ export default async function HostHomePage() {
             />
             <QuickLink
               href="/profiles?status=INACTIVE"
-              title="게시를 기다리는 프로필"
-              description="검토가 끝난 프로필을 공개합니다."
+              title="비활성 프로필"
+              description="멤버에게 안 보이는 분을 확인하고 활성으로 바꿉니다."
             />
             <QuickLink
               href="/members"

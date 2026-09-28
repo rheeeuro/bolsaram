@@ -12,7 +12,7 @@
  */
 import { afterAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
-import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
+import { MAX_GROUPS_PER_ADMIN, adminProfileQuerySchema } from "@bolsaram/schemas";
 import {
   closeGroup,
   consumeGroupInvite,
@@ -26,6 +26,7 @@ import {
   updateGroup,
 } from "../apps/web/src/server/auth/group-invite";
 import { loginWithOAuth } from "../apps/web/src/server/auth/oauth";
+import { countAdminProfiles, findAdminProfiles } from "../apps/web/src/server/repo/profiles";
 import { runTag } from "./tags";
 
 const TAG = runTag("sgn");
@@ -115,6 +116,8 @@ async function seedProfile(input: {
 
 afterAll(async () => {
   await withOwner(async (sql) => {
+    // 등록된 가져오기는 프로필보다 먼저 지운다 — 프로필이 사라지면 commit 짝이 깨진다.
+    await sql.query(`DELETE FROM import_sessions WHERE raw_text LIKE $1`, [`${TAG}%`]);
     await sql.query(`DELETE FROM profiles WHERE real_name LIKE $1`, [`${TAG}%`]);
     await sql.query(`DELETE FROM users WHERE display_name LIKE $1`, [`${TAG}%`]);
     await sql.query(`DELETE FROM groups WHERE name LIKE $1`, [`${TAG}%`]);
@@ -245,6 +248,82 @@ describe("전체공개 풀", () => {
       return r.rowCount ?? 0;
     });
     expect(updated).toBe(1);
+  });
+});
+
+/**
+ * 주선자 목록 찾기. 카카오톡에서 Ctrl+F 로 찾던 말이 가져올 때 받은 원문에서도 걸려야
+ * 한다. 다만 **이름은 담당일 때만** 찾아진다 — 아니면 남이 등록한 전체공개 프로필의
+ * 이름을 검색 결과로 확인할 수 있다.
+ */
+describe("주선자 목록 찾기", () => {
+  /** 등록된 가져오기 원문 하나를 프로필에 붙인다. */
+  async function attachRawText(profileId: string, createdBy: string, rawText: string) {
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO import_sessions (created_by, group_id, status, raw_text,
+                                      committed_profile_id, committed_at)
+         VALUES ($1, NULL, 'IMPORTED', $2, $3, now())`,
+        [createdBy, rawText, profileId],
+      ),
+    );
+  }
+
+  const search = (viewer: RlsContext, raw: Record<string, unknown>) =>
+    withRls(viewer, async (sql) => {
+      const query = adminProfileQuerySchema.parse(raw);
+      const page = await findAdminProfiles(sql, query, { groupId: null });
+      const total = await countAdminProfiles(sql, query, { groupId: null });
+      return { ids: page.items.map((p) => p.id), total };
+    });
+
+  it("가져올 때 받은 원문 속 말로 찾는다", async () => {
+    const owner = await newAdmin("원문등록자");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "원문멤버" });
+    await attachRawText(id, owner.userId, `${TAG}-동네 송파구 잠실 거주, 치과위생사`);
+
+    const found = await search(owner, { q: `${TAG}-동네` });
+    expect(found.ids).toEqual([id]);
+    // 조건 시트의 「N명 보기」와 목록 수가 같다.
+    expect(found.total).toBe(1);
+  });
+
+  it("이름은 담당일 때만 찾아진다", async () => {
+    const owner = await newAdmin("이름등록자");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "이름검색" });
+
+    expect((await search(owner, { q: `${TAG}-이름검색` })).ids).toEqual([id]);
+
+    // 같은 전체공개 풀을 보는 다른 주선자 — 프로필은 보이지만 이름으로는 찾을 수 없다.
+    const other = await newAdmin("이름남");
+    expect((await search(other, { q: `${TAG}-이름검색` })).ids).toEqual([]);
+  });
+
+  it("남이 올린 원문은 검색에도 걸리지 않는다", async () => {
+    const owner = await newAdmin("원문주인");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "원문남" });
+    await attachRawText(id, owner.userId, `${TAG}-비밀원문 010-0000-0000`);
+
+    const other = await newAdmin("원문남의");
+    expect((await search(other, { q: `${TAG}-비밀원문` })).ids).toEqual([]);
+  });
+
+  it("나이·키 조건이 목록과 개수에 똑같이 걸린다", async () => {
+    const owner = await newAdmin("조건등록자");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "조건멤버" });
+    await withOwner((sql) =>
+      sql.query(`UPDATE profiles SET height = 168, bio = $2 WHERE id = $1`, [
+        id,
+        `${TAG}-조건소개`,
+      ]),
+    );
+    const age = new Date().getFullYear() - 1993;
+
+    const hit = await search(owner, { q: `${TAG}-조건소개`, ageMin: age, heightMin: 165 });
+    expect(hit).toEqual({ ids: [id], total: 1 });
+
+    const miss = await search(owner, { q: `${TAG}-조건소개`, heightMin: 170 });
+    expect(miss).toEqual({ ids: [], total: 0 });
   });
 });
 

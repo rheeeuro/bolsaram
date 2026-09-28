@@ -2,18 +2,23 @@
 import { describe, expect, it } from "vitest";
 import {
   birthYearRange,
+  buildAttributeClauses,
   buildDiscoverWhere,
   HAS_PHOTO_SQL,
   PROFILE_ORDER_BY,
   decodeCursor,
   encodeCursor,
 } from "@bolsaram/domain";
-import { discoverQuerySchema } from "@bolsaram/schemas";
+import { adminProfileQuerySchema, discoverQuerySchema } from "@bolsaram/schemas";
 import {
   AGE_RANGE,
   DEFAULT_FILTERS,
   HEIGHT_RANGE,
   activeFilterCount,
+  birthYearLabel,
+  clearFilter,
+  filterSummary,
+  filtersFromParams,
   filtersToParams,
   rangeLabel,
   type Filters,
@@ -246,5 +251,109 @@ describe("filtersToParams", () => {
     expect(
       rangeLabel({ ...HEIGHT_RANGE, valueMin: 160, valueMax: 175, unit: "cm" }),
     ).toBe("160cm – 175cm");
+  });
+});
+
+/**
+ * 주선자 목록도 멤버 탐색과 같은 인적 조건을 받는다. 한쪽만 고치면 주선자가 고른
+ * 「91~96년생·서울」과 멤버가 보는 결과가 어긋난다.
+ */
+describe("주선자 목록 조건", () => {
+  const collect = (raw: Record<string, unknown>) => {
+    const values: unknown[] = [];
+    const push = (value: unknown) => {
+      values.push(value);
+      return `$${values.length}`;
+    };
+    const clauses = buildAttributeClauses(adminProfileQuerySchema.parse(raw), 2026, push);
+    return { clauses, values };
+  };
+
+  it("주선자 쿼리가 나이·키·지역·직업군을 받아 같은 절로 바꾼다", () => {
+    const { clauses, values } = collect({
+      ageMin: "30",
+      ageMax: "35",
+      heightMin: "165",
+      regions: "SEOUL,GYEONGGI",
+      jobCategories: "IT",
+    });
+    expect(clauses).toEqual([
+      "p.birth_year >= $1",
+      "p.birth_year <= $2",
+      "p.height >= $3",
+      "p.residence_region = ANY($4)",
+      "p.job_category = ANY($5)",
+    ]);
+    expect(values).toEqual([1991, 1996, 165, ["SEOUL", "GYEONGGI"], ["IT"]]);
+  });
+
+  it("같은 조건이면 멤버 탐색과 같은 절이 나온다", () => {
+    const raw = { ageMin: "30", regions: "BUSAN", tags: "#등산" };
+    const admin = collect(raw).clauses;
+    const discover = buildDiscoverWhere(parse(raw), {
+      viewerProfileId: null,
+      viewerGender: null,
+      currentYear: 2026,
+    }).text;
+    for (const clause of admin) expect(discover).toContain(clause);
+  });
+
+  it("주선자는 성별을 직접 고른다 — 멤버 쿼리에는 그 자리가 없다", () => {
+    expect(adminProfileQuerySchema.parse({ gender: "FEMALE" }).gender).toBe("FEMALE");
+    expect(discoverQuerySchema.parse({ gender: "FEMALE" })).not.toHaveProperty("gender");
+  });
+});
+
+describe("조건 모델 — 주소와 칩", () => {
+  it("주소 → 조건 → 주소가 같은 값으로 돌아온다", () => {
+    const filters: Filters = {
+      ...DEFAULT_FILTERS,
+      ageMin: 28,
+      heightMax: 175,
+      regions: ["SEOUL"],
+      tags: ["등산"],
+    };
+    const back = filtersFromParams(filtersToParams(filters));
+    expect(back).toEqual(filters);
+  });
+
+  it("범위를 벗어난 주소 값은 끝으로 붙인다", () => {
+    const filters = filtersFromParams(new URLSearchParams("ageMin=5&heightMax=999&ageMax=abc"));
+    expect(filters.ageMin).toBe(AGE_RANGE.min);
+    expect(filters.heightMax).toBe(HEIGHT_RANGE.max);
+    expect(filters.ageMax).toBe(AGE_RANGE.max);
+    expect(activeFilterCount(filters)).toBe(0);
+  });
+
+  it("나이를 출생연도로 읽어준다 — 서버의 변환과 같은 계산이다", () => {
+    expect(birthYearLabel(30, 35, 2026)).toBe("91~96년생");
+    expect(birthYearLabel(30, AGE_RANGE.max, 2026)).toBe("96년생 이전");
+    expect(birthYearLabel(AGE_RANGE.min, 35, 2026)).toBe("91년생 이후");
+    expect(birthYearLabel(AGE_RANGE.min, AGE_RANGE.max, 2026)).toBeNull();
+    // 칩 문구와 실제로 걸리는 출생연도 범위가 같아야 한다.
+    expect(birthYearRange({ ageMin: 30, ageMax: 35 }, 2026)).toEqual({ min: 1991, max: 1996 });
+  });
+
+  it("칩 개수와 배지 숫자가 같고, 칩 하나를 지우면 그 조건만 빠진다", () => {
+    const filters: Filters = {
+      ...DEFAULT_FILTERS,
+      ageMin: 30,
+      heightMin: 165,
+      regions: ["SEOUL", "GYEONGGI"],
+      tags: ["등산"],
+    };
+    const summary = filterSummary(filters, 2026);
+    expect(summary).toHaveLength(activeFilterCount(filters));
+    expect(summary.map((item) => item.label)).toEqual([
+      "96년생 이전",
+      "키 165cm 이상",
+      "서울·경기",
+      "#등산",
+    ]);
+
+    const without = clearFilter(filters, "regions");
+    expect(without.regions).toEqual([]);
+    expect(without.ageMin).toBe(30);
+    expect(activeFilterCount(without)).toBe(3);
   });
 });

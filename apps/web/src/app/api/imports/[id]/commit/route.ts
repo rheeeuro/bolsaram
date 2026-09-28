@@ -18,6 +18,8 @@ export const POST = route(async (request: Request, { params }: Params) => {
     idempotencyKey: input.idempotencyKey,
     ...(input.targetProfileId ? { targetProfileId: input.targetProfileId } : {}),
     publish: input.publish,
+    realName: input.realName,
+    contactNote: input.contactNote,
   });
   // 같은 키로 다시 호출하면 200 + reused:true 로 같은 프로필을 돌려준다.
   return ok(result, { status: result.reused ? 200 : 201 });

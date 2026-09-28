@@ -4,6 +4,7 @@ import {
   BIRTH_YEAR_MAX,
   BIRTH_YEAR_MIN,
   EXTRACTED_FIELD_KEYS,
+  EXTRACTED_FIELD_REVIEW_ORDER,
   HASHTAG_MAX_COUNT,
   emptyExtractedFields,
   extractedFieldsSchema,
@@ -13,6 +14,7 @@ import {
   parseHashtagInput,
   toStrictJsonSchema,
 } from "@bolsaram/schemas";
+import { reviewFields } from "@bolsaram/domain";
 import { MockExtractionProvider } from "../apps/web/src/server/ai/mock";
 
 const provider = new MockExtractionProvider();
@@ -203,5 +205,27 @@ describe("MockExtractionProvider", () => {
     const a = await provider.extract({ text });
     const b = await provider.extract({ text });
     expect(a.fields).toEqual(b.fields);
+  });
+});
+
+/**
+ * 검토 화면의 항목 순서. 저장된 JSONB 는 키를 길이순으로 다시 정렬하므로 저장값의 키
+ * 순서를 따르면 자기소개가 맨 앞에 오고 필수 항목이 흩어진다.
+ */
+describe("검토 순서", () => {
+  it("모든 추출 필드를 한 번씩 담는다 — 필드를 추가하면 여기서 잡힌다", () => {
+    expect([...EXTRACTED_FIELD_REVIEW_ORDER].sort()).toEqual([...EXTRACTED_FIELD_KEYS].sort());
+  });
+
+  it("저장값의 키 순서와 무관하게 정해 둔 순서로 늘어놓는다", () => {
+    // JSONB 가 돌려주는 순서를 흉내 낸다: 짧은 키가 먼저다.
+    const shuffled = Object.fromEntries(
+      [...EXTRACTED_FIELD_KEYS]
+        .sort((a, b) => a.length - b.length || a.localeCompare(b))
+        .map((key) => [key, null]),
+    ) as ReturnType<typeof emptyExtractedFields>;
+    const keys = reviewFields(shuffled, {}).map((field) => field.key);
+    expect(keys).toEqual([...EXTRACTED_FIELD_REVIEW_ORDER]);
+    expect(keys.slice(0, 4)).toEqual(["gender", "birthYear", "height", "residenceRegion"]);
   });
 });

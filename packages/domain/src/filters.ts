@@ -34,6 +34,65 @@ export function birthYearRange(
   return out;
 }
 
+/** 멤버 탐색과 주선자 목록이 함께 거는 인적 조건. 쿼리스트링에서 온 값 그대로다. */
+export type ProfileAttributeFilter = Pick<
+  DiscoverQuery,
+  | "ageMin"
+  | "ageMax"
+  | "heightMin"
+  | "heightMax"
+  | "regions"
+  | "jobCategories"
+  | "religions"
+  | "smoking"
+  | "drinking"
+  | "tags"
+>;
+
+/**
+ * 인적 조건 → WHERE 절 목록. 멤버 탐색과 주선자 목록이 **같은 절**을 쓴다 —
+ * 한쪽만 고치면 주선자가 고른 조건과 멤버가 보는 결과가 어긋난다.
+ * 자리표시자 번호는 부르는 쪽의 `push` 가 매긴다.
+ */
+export function buildAttributeClauses(
+  query: ProfileAttributeFilter,
+  currentYear: number,
+  push: (value: unknown) => string,
+): string[] {
+  const clauses: string[] = [];
+
+  const years = birthYearRange(query, currentYear);
+  if (years.min != null) clauses.push(`p.birth_year >= ${push(years.min)}`);
+  if (years.max != null) clauses.push(`p.birth_year <= ${push(years.max)}`);
+
+  if (query.heightMin != null) clauses.push(`p.height >= ${push(query.heightMin)}`);
+  if (query.heightMax != null) clauses.push(`p.height <= ${push(query.heightMax)}`);
+
+  if (query.regions?.length) {
+    clauses.push(`p.residence_region = ANY(${push(query.regions)})`);
+  }
+  if (query.jobCategories?.length) {
+    clauses.push(`p.job_category = ANY(${push(query.jobCategories)})`);
+  }
+  if (query.religions?.length) {
+    clauses.push(`p.religion = ANY(${push(query.religions)})`);
+  }
+  if (query.smoking?.length) {
+    clauses.push(`p.smoking = ANY(${push(query.smoking)})`);
+  }
+  if (query.drinking?.length) {
+    clauses.push(`p.drinking = ANY(${push(query.drinking)})`);
+  }
+
+  // 해시태그는 여러 개를 주면 좁힌다 — 「#여행 #운동」 은 둘 다 가진 사람이다.
+  // 저장값도 쿼리값도 normalizeHashtags 를 지나므로 배열 포함 연산으로 바로 맞는다.
+  if (query.tags?.length) {
+    clauses.push(`p.hashtags @> ${push(query.tags)}`);
+  }
+
+  return clauses;
+}
+
 /**
  * WHERE 절을 만든다. `$1` 부터 시작하는 자리표시자 번호를 `startIndex` 로 이어붙일 수 있다.
  * 반환 text 는 항상 `TRUE` 로 시작해 빈 필터에서도 유효한 SQL 이 된다.
@@ -68,34 +127,7 @@ export function buildDiscoverWhere(
     clauses.push(`p.gender = ${push(oppositeGender(ctx.viewerGender))}`);
   }
 
-  const years = birthYearRange(query, ctx.currentYear);
-  if (years.min != null) clauses.push(`p.birth_year >= ${push(years.min)}`);
-  if (years.max != null) clauses.push(`p.birth_year <= ${push(years.max)}`);
-
-  if (query.heightMin != null) clauses.push(`p.height >= ${push(query.heightMin)}`);
-  if (query.heightMax != null) clauses.push(`p.height <= ${push(query.heightMax)}`);
-
-  if (query.regions?.length) {
-    clauses.push(`p.residence_region = ANY(${push(query.regions)})`);
-  }
-  if (query.jobCategories?.length) {
-    clauses.push(`p.job_category = ANY(${push(query.jobCategories)})`);
-  }
-  if (query.religions?.length) {
-    clauses.push(`p.religion = ANY(${push(query.religions)})`);
-  }
-  if (query.smoking?.length) {
-    clauses.push(`p.smoking = ANY(${push(query.smoking)})`);
-  }
-  if (query.drinking?.length) {
-    clauses.push(`p.drinking = ANY(${push(query.drinking)})`);
-  }
-
-  // 해시태그는 여러 개를 주면 좁힌다 — 「#여행 #운동」 은 둘 다 가진 사람이다.
-  // 저장값도 쿼리값도 normalizeHashtags 를 지나므로 배열 포함 연산으로 바로 맞는다.
-  if (query.tags?.length) {
-    clauses.push(`p.hashtags @> ${push(query.tags)}`);
-  }
+  clauses.push(...buildAttributeClauses(query, ctx.currentYear, push));
 
   // 앞의 `#` 은 태그 표기일 뿐 저장값에는 없다. 떼고 찾는다.
   const needle = query.q?.replace(/^#+/u, "").trim();

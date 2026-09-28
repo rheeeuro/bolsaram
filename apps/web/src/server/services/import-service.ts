@@ -169,6 +169,9 @@ export async function commitSession(
     idempotencyKey: string;
     targetProfileId?: string;
     publish: boolean;
+    /** 연결 뒤에만 보이는 값. 빈 문자열은 적지 않은 것으로 본다. */
+    realName?: string | undefined;
+    contactNote?: string | undefined;
   },
 ): Promise<CommitResult> {
   return withRls(ctx, async (sql) => {
@@ -202,7 +205,10 @@ export async function commitSession(
         // 아니라 세션의 모임을 쓴다 — 세션을 볼 수 있다는 것 자체가 RLS 로 이미
         // 그 모임의 주선자임을 뜻하고, 여러 모임에 속한 주선자가 엉뚱한 모임에
         // 등록하는 일을 막는다.
-        await insertProfile(sql, session.groupId, fields, ctx.userId, input.publish);
+        await insertProfile(sql, session.groupId, fields, ctx.userId, input.publish, {
+          realName: input.realName?.trim() || null,
+          contactNote: input.contactNote?.trim() || null,
+        });
 
     await moveImagesToProfile(sql, input.sessionId, profileId);
 
@@ -231,14 +237,15 @@ async function insertProfile(
   fields: ExtractedFields,
   createdBy: string | null,
   publish: boolean,
+  hidden: { realName: string | null; contactNote: string | null },
 ): Promise<string> {
   // assertCommittable 이 필수 필드를 이미 확인했다.
   const result = await sql.query<{ id: string }>(
     `INSERT INTO profiles (
        group_id, gender, birth_year, height, job_title, job_category, company, education,
        residence_region, workplace_region, religion, mbti, smoking, drinking,
-       hobbies, hashtags, bio, ideal_type_text, status, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       hobbies, hashtags, bio, ideal_type_text, status, created_by, real_name, contact_note)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
      RETURNING id`,
     [
       groupId,
@@ -262,6 +269,8 @@ async function insertProfile(
       fields.idealTypeText,
       publish ? "ACTIVE" : "INACTIVE",
       createdBy,
+      hidden.realName,
+      hidden.contactNote,
     ],
   );
   return result.rows[0]!.id;

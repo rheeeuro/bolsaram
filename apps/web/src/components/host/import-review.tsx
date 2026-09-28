@@ -20,6 +20,7 @@ import {
   formatHashtag,
   parseHashtagInput,
 } from "@bolsaram/schemas";
+import { pickRealName } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
@@ -102,9 +103,9 @@ export function ImportReview({
   groups: GroupChoice[];
 }) {
   const router = useRouter();
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    toStringMap(extraction?.fields),
-  );
+  // 분석이 낸 값. 고치지 않고 「맞아요」만 누른 칸을 「수정함」과 가르는 기준이다.
+  const [original] = useState<Record<string, string>>(() => toStringMap(extraction?.fields));
+  const [values, setValues] = useState<Record<string, string>>(original);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [text, setText] = useState(session.rawText ?? "");
   const [busy, setBusy] = useState<string | null>(null);
@@ -112,6 +113,10 @@ export function ImportReview({
   const [message, setMessage] = useState<string | null>(null);
 
   const committed = session.committedProfileId != null;
+  // 연결된 뒤에만 보이는 값. AI 가 아니라 원문의 「이름:」 줄에서 미리 채우고, 등록할 때
+  // 함께 보낸다 — 초대 전에 채워야 하는 칸이라 편집 화면에서 다시 치게 하지 않는다.
+  const [realName, setRealName] = useState(() => pickRealName(session.rawText) ?? "");
+  const [contactNote, setContactNote] = useState("");
   const [groupId, setGroupId] = useState<string | null>(session.groupId);
 
   /**
@@ -170,21 +175,37 @@ export function ImportReview({
     router.refresh();
   }
 
-  async function saveReview() {
-    if (dirty.size === 0) return;
-    setBusy("review");
-    setError(null);
+  /**
+   * 「맞아요」 — 값은 그대로 두고 사람이 확인했다는 것만 남긴다. 저장할 때 같은 값을
+   * 검토 결과로 보내면 서버가 그 칸을 확인된 것으로 친다(`applyExtractionReview`).
+   */
+  function confirm(key: string) {
+    setMessage(null);
+    setDirty((prev) => new Set(prev).add(key));
+  }
+
+  /** 고친 칸과 확인한 칸을 서버에 남긴다. 실패하면 false — 부른 쪽이 멈춘다. */
+  async function persistReview(): Promise<boolean> {
+    if (dirty.size === 0) return true;
     const patch: Record<string, unknown> = {};
     for (const key of dirty) {
       patch[key] = parseFieldValue(key, values[key] ?? "");
     }
     const result = await apiPatch(`/api/imports/${session.id}/extraction`, { fields: patch });
-    setBusy(null);
     if (!result.ok) {
       setError(result.message);
-      return;
+      return false;
     }
     setDirty(new Set());
+    return true;
+  }
+
+  async function saveReview() {
+    setBusy("review");
+    setError(null);
+    const saved = await persistReview();
+    setBusy(null);
+    if (!saved) return;
     setMessage("검토 내용을 저장했습니다.");
     router.refresh();
   }
@@ -192,20 +213,39 @@ export function ImportReview({
   async function commit(publish: boolean) {
     setBusy("commit");
     setError(null);
+    // 고친 것을 먼저 남기고 등록한다 — 「저장」을 따로 누르게 하면 누르지 않고 나가는
+    // 사람이 생기고, 등록 버튼이 왜 잠겼는지 찾아야 한다.
+    if (!(await persistReview())) {
+      setBusy(null);
+      return;
+    }
     // 같은 세션의 commit 은 같은 키를 쓴다 — 중복 클릭이 프로필을 두 개 만들지 않는다.
     const result = await apiPost<{ profileId: string; reused: boolean }>(
       `/api/imports/${session.id}/commit`,
-      { idempotencyKey: `import-${session.id}`, publish },
+      {
+        idempotencyKey: `import-${session.id}`,
+        publish,
+        ...(realName.trim() ? { realName: realName.trim() } : {}),
+        ...(contactNote.trim() ? { contactNote: contactNote.trim() } : {}),
+      },
     );
     setBusy(null);
     if (!result.ok) {
       setError(result.message);
       return;
     }
-    router.push(`/profiles/${result.data.profileId}`);
+    // 가져오기로 돌아가 결과를 알리고 다음 사람을 바로 올리게 한다. 프로필·초대 링크는
+    // 그 알림에서 한 번에 연다.
+    router.push(`/imports?registered=${result.data.profileId}`);
   }
 
-  const attention = extraction?.review.filter((f) => f.needsAttention) ?? [];
+  // 아직 남은 확인거리. 손댄 칸은 사람이 본 것이므로 빼되, 필수 칸을 비워 두었다면 남긴다.
+  const attention =
+    extraction?.review.filter((f) =>
+      dirty.has(f.key)
+        ? f.required && (values[f.key] ?? "").trim() === ""
+        : f.needsAttention,
+    ) ?? [];
 
   return (
     <div className="grid gap-5 lg:grid-cols-[400px_1fr]">
@@ -340,14 +380,18 @@ export function ImportReview({
               tight
               title="추출 결과"
               action={
-                <span className="text-[11.5px] text-[var(--surface-text-muted)]">
-                  {extraction.model} · {extraction.promptVersion}
-                </span>
+                attention.length > 0 ? (
+                  <span className="text-[12px] text-[var(--color-warning)]">
+                    확인할 칸 {attention.length}개
+                  </span>
+                ) : (
+                  <span className="text-[12px] text-[var(--color-success)]">모두 확인됨</span>
+                )
               }
             >
               <p className="mb-3 text-[12px] text-[var(--surface-text-muted)]">
-                신뢰도 {Math.round(LOW_CONFIDENCE_THRESHOLD * 100)}% 미만이거나 비어 있는 필수
-                항목은 강조됩니다. 값을 고치면 검토 완료로 표시됩니다.
+                AI가 자신 없어 한 칸({Math.round(LOW_CONFIDENCE_THRESHOLD * 100)}% 미만)과 비어
+                있는 필수 칸(*)이 강조됩니다. 값이 틀리면 고치고, 맞으면 「맞아요」를 누르세요.
               </p>
 
               <div className="grid gap-2.5 sm:grid-cols-2">
@@ -356,13 +400,51 @@ export function ImportReview({
                     key={field.key}
                     field={field}
                     value={values[field.key] ?? ""}
-                    dirty={dirty.has(field.key)}
+                    touched={
+                      !dirty.has(field.key)
+                        ? null
+                        : (values[field.key] ?? "") === (original[field.key] ?? "")
+                          ? "confirmed"
+                          : "edited"
+                    }
                     disabled={committed}
                     onChange={(v) => edit(field.key, v)}
+                    onConfirm={() => confirm(field.key)}
                   />
                 ))}
               </div>
             </Panel>
+
+            {!committed ? (
+              <Panel tight title="연결된 뒤에만 보이는 내용">
+                <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+                  서로 마음이 닿아 연결되기 전까지 상대에게 보이지 않습니다. AI에게 맡기지 않고,
+                  원문의 「이름:」 줄이 있으면 미리 채워 둡니다.
+                </p>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[12px] font-medium">이름</span>
+                    <Input
+                      value={realName}
+                      maxLength={60}
+                      placeholder="예) 김볼사"
+                      onChange={(e) => setRealName(e.target.value)}
+                      className="h-8 text-[12.5px]"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[12px] font-medium">연락 방법</span>
+                    <Input
+                      value={contactNote}
+                      maxLength={200}
+                      placeholder="예) 카카오톡 ID, 전화번호"
+                      onChange={(e) => setContactNote(e.target.value)}
+                      className="h-8 text-[12.5px]"
+                    />
+                  </label>
+                </div>
+              </Panel>
+            ) : null}
 
             {error ? <p className="text-[13px] text-[var(--color-danger)]">{error}</p> : null}
             {message ? (
@@ -376,35 +458,33 @@ export function ImportReview({
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 <Button
-                  variant="secondary"
-                  disabled={busy != null || dirty.size === 0}
-                  onClick={() => void saveReview()}
+                  disabled={busy != null || attention.length > 0}
+                  onClick={() => void commit(true)}
                 >
-                  {busy === "review"
-                    ? "저장 중…"
-                    : `검토 저장${dirty.size > 0 ? ` (${dirty.size})` : ""}`}
+                  {busy === "commit" ? "등록 중…" : "등록하고 공개"}
                 </Button>
                 <Button
                   variant="secondary"
-                  disabled={busy != null || dirty.size > 0}
+                  disabled={busy != null}
                   onClick={() => void commit(false)}
                 >
                   비공개로 등록
                 </Button>
                 <Button
-                  disabled={busy != null || dirty.size > 0 || attention.length > 0}
-                  onClick={() => void commit(true)}
+                  variant="ghost"
+                  disabled={busy != null || dirty.size === 0}
+                  onClick={() => void saveReview()}
                 >
-                  {busy === "commit" ? "등록 중…" : "등록하고 공개"}
+                  {busy === "review" ? "저장 중…" : "저장만 하기"}
                 </Button>
 
-                {dirty.size > 0 ? (
-                  <span className="text-[12px] text-[var(--surface-text-muted)]">
-                    수정한 내용을 먼저 저장해 주세요.
-                  </span>
-                ) : attention.length > 0 ? (
+                {attention.length > 0 ? (
                   <span className="text-[12px] text-[var(--color-warning)]">
-                    확인이 필요한 항목이 {attention.length}개 있어 바로 공개할 수 없습니다.
+                    강조된 칸 {attention.length}개를 확인하면 바로 공개할 수 있습니다.
+                  </span>
+                ) : dirty.size > 0 ? (
+                  <span className="text-[12px] text-[var(--surface-text-muted)]">
+                    고친 내용은 등록할 때 함께 저장됩니다.
                   </span>
                 ) : null}
               </div>
@@ -419,18 +499,23 @@ export function ImportReview({
 function FieldRow({
   field,
   value,
-  dirty,
+  touched,
   disabled,
   onChange,
+  onConfirm,
 }: {
   field: FieldReview;
   value: string;
-  dirty: boolean;
+  /** 손댄 칸이면 어떻게 손댔는지. 값을 바꿨는지, 그대로 두고 확인만 했는지. */
+  touched: "edited" | "confirmed" | null;
   disabled: boolean;
   onChange: (value: string) => void;
+  onConfirm: () => void;
 }) {
   const enumOptions = ENUM_OPTIONS[field.key];
-  const percent = Math.round(field.confidence * 100);
+  const dirty = touched != null;
+  // 값이 있는데 AI 가 자신 없어 한 칸만 「맞아요」로 넘길 수 있다. 빈 필수 칸은 채워야 한다.
+  const canConfirm = !disabled && !dirty && field.needsAttention && value !== "";
 
   return (
     <div
@@ -448,16 +533,36 @@ function FieldRow({
           {FIELD_LABELS[field.key] ?? field.key}
           {field.required ? <span className="ml-1 text-[var(--color-danger)]">*</span> : null}
         </span>
-        <span
-          className={cn(
-            "text-[11px]",
-            field.needsAttention
-              ? "text-[var(--color-warning)]"
-              : "text-[var(--surface-text-muted)]",
-          )}
-        >
-          {dirty ? "수정함" : value === "" ? "비어 있음" : `${percent}%`}
-        </span>
+        {canConfirm ? (
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-full border border-[var(--color-warning)]/50 bg-white px-2 py-0.5 text-[11px] text-[var(--color-warning)] transition-colors hover:border-[var(--surface-accent)] hover:text-[var(--surface-accent)]"
+          >
+            맞아요
+          </button>
+        ) : (
+          <span
+            className={cn(
+              "text-[11px]",
+              field.needsAttention && !dirty
+                ? "text-[var(--color-warning)]"
+                : "text-[var(--surface-text-muted)]",
+            )}
+          >
+            {touched === "edited"
+              ? "수정함"
+              : touched === "confirmed"
+                ? "확인함"
+                : value === ""
+                  ? field.required
+                    ? "채워 주세요"
+                    : "비어 있음"
+                  : field.needsAttention
+                    ? "확인 필요"
+                    : null}
+          </span>
+        )}
       </div>
 
       {enumOptions ? (

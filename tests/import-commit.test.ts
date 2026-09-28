@@ -5,7 +5,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import { commitSession, analyzeSession } from "../apps/web/src/server/services/import-service";
-import { latestExtraction, requireSession } from "../apps/web/src/server/repo/imports";
+import {
+  countInbox,
+  latestExtraction,
+  listInbox,
+  requireSession,
+} from "../apps/web/src/server/repo/imports";
 import { runTag } from "./tags";
 
 const TAG = runTag("cmt");
@@ -233,5 +238,72 @@ describe("commit idempotency", () => {
     await expect(
       commitSession(admin, { sessionId: id, idempotencyKey: `pub-${id}`, publish: true }),
     ).rejects.toThrow(/필수 항목|바로 공개할 수 없습니다/);
+  });
+});
+
+/**
+ * 이름·연락 방법은 추출 결과가 아니라 주선자가 검토 화면에서 확인한 값으로 받는다.
+ * 초대 전에 채워야 하는 칸이라 등록과 함께 들어가야 편집 화면에서 다시 치지 않는다.
+ */
+describe("등록과 함께 받는 이름·연락 방법", () => {
+  it("검토 화면에서 확인한 값으로 프로필을 만든다", async () => {
+    const id = await newSession(SAMPLE_TEXT);
+    await analyzeSession(admin, id);
+    const result = await commitSession(admin, {
+      sessionId: id,
+      idempotencyKey: `hidden-${id}`,
+      publish: false,
+      realName: "  김볼사 ",
+      contactNote: "카카오톡 ID bolsa",
+    });
+
+    const row = await withRls(admin, (sql) =>
+      sql.query<{ real_name: string | null; contact_note: string | null }>(
+        `SELECT real_name, contact_note FROM profiles WHERE id = $1`,
+        [result.profileId],
+      ),
+    );
+    expect(row.rows[0]).toEqual({ real_name: "김볼사", contact_note: "카카오톡 ID bolsa" });
+  });
+
+  it("비워 두면 적지 않은 것으로 둔다", async () => {
+    const id = await newSession(SAMPLE_TEXT);
+    await analyzeSession(admin, id);
+    const result = await commitSession(admin, {
+      sessionId: id,
+      idempotencyKey: `blank-${id}`,
+      publish: false,
+      realName: "   ",
+    });
+    const row = await withRls(admin, (sql) =>
+      sql.query<{ real_name: string | null }>(`SELECT real_name FROM profiles WHERE id = $1`, [
+        result.profileId,
+      ]),
+    );
+    expect(row.rows[0]).toEqual({ real_name: null });
+  });
+});
+
+/** 가져오기 목록은 할 일과 끝난 일을 나눠 읽는다 — 끝난 건이 할 일을 묻지 않게. */
+describe("가져오기 목록 칸", () => {
+  it("등록하면 검토 대기에서 빠지고 등록됨에 번호와 요약이 붙어 나온다", async () => {
+    const id = await newSession(SAMPLE_TEXT);
+    await analyzeSession(admin, id);
+
+    const before = await withRls(admin, (sql) => listInbox(sql, { groupId, done: false }));
+    const pending = before.find((item) => item.id === id);
+    expect(pending?.summary?.birthYear).toBe(1993);
+
+    await commitSession(admin, { sessionId: id, idempotencyKey: `inbox-${id}`, publish: false });
+
+    const { pendingIds, doneItem, counts } = await withRls(admin, async (sql) => ({
+      pendingIds: (await listInbox(sql, { groupId, done: false })).map((item) => item.id),
+      doneItem: (await listInbox(sql, { groupId, done: true })).find((item) => item.id === id),
+      counts: await countInbox(sql, groupId),
+    }));
+    expect(pendingIds).not.toContain(id);
+    expect(doneItem?.profileCode).toEqual(expect.any(Number));
+    expect(counts.done).toBeGreaterThan(0);
+    expect(counts.pending).toBe(pendingIds.length);
   });
 });

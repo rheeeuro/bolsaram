@@ -6,6 +6,7 @@
  *                                  └────────── FAILED ←──────────┘
  */
 import {
+  EXTRACTED_FIELD_REVIEW_ORDER,
   LOW_CONFIDENCE_THRESHOLD,
   REQUIRED_FIELDS_FOR_COMMIT,
   type ExtractedFields,
@@ -52,7 +53,8 @@ export function reviewFields(
   fields: ExtractedFields,
   confidence: ExtractionConfidence,
 ): FieldReview[] {
-  return (Object.keys(fields) as (keyof ExtractedFields)[]).map((key) => {
+  // 저장값의 키 순서가 아니라 정해 둔 순서로 늘어놓는다 — JSONB 는 키를 길이순으로 섞는다.
+  return EXTRACTED_FIELD_REVIEW_ORDER.map((key) => {
     const value = fields[key];
     const score = confidence[key] ?? 0;
     const isEmpty = value == null || (Array.isArray(value) && value.length === 0);
@@ -133,6 +135,28 @@ export function normalizeRawText(input: string): string {
       .replace(/\n{3,}/g, "\n\n")
       .trim()
   );
+}
+
+/** 이름으로 읽을 줄머리. 카카오톡 프로필 양식에서 실제로 쓰는 표기만 둔다. */
+const NAME_LINE = /^\s*[-*·•]?\s*(?:이름|성함|name)\s*[:：=\-)]\s*(.+?)\s*$/iu;
+
+/**
+ * 원문의 「이름: ○○○」 줄에서 이름을 꺼낸다. 검토 화면이 이 값으로 이름 칸을 미리 채운다.
+ *
+ * **AI 에 맡기지 않는다.** 이름은 연결 전까지 가려 두는 값이라 추출 스키마에 넣지 않고,
+ * 주선자가 원문에 적어 둔 양식을 규칙으로만 읽는다. 줄머리가 없으면 추측하지 않고 null 이다.
+ * 괄호 뒤 덧붙임(`홍길동 (93)`)은 떼고, 60자(저장 상한)를 넘으면 버린다.
+ */
+export function pickRealName(rawText: string | null | undefined): string | null {
+  if (!rawText) return null;
+  for (const line of normalizeRawText(rawText).split("\n")) {
+    const match = NAME_LINE.exec(line);
+    if (!match) continue;
+    const name = match[1]!.replace(/\s*[([].*$/u, "").trim();
+    if (name.length === 0 || name.length > 60) return null;
+    return name;
+  }
+  return null;
 }
 
 /** 업로드 순서를 0부터 빈틈없이 다시 매긴다. 재시도로 구멍이 생겨도 순서를 보존한다. */

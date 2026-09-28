@@ -1,5 +1,15 @@
+import {
+  DRINKING_LABELS,
+  JOB_CATEGORY_LABELS,
+  REGION_LABELS,
+  RELIGION_LABELS,
+  SMOKING_LABELS,
+  formatHashtag,
+  normalizeHashtags,
+} from "@bolsaram/schemas";
+
 /**
- * Discover 조건의 순수 모델. 화면과 떨어뜨려 테스트 가능하게 둔다.
+ * 조건의 순수 모델. 멤버 탐색과 주선자 프로필 목록이 함께 쓴다. 화면과 떨어뜨려 테스트 가능하게 둔다.
  *
  * 핵심 규약: **경계가 슬라이더 끝에 붙어 있으면 제한이 아니다.**
  * 기본값이 곧 양끝이므로 손대지 않으면 아무 조건도 걸리지 않고,
@@ -100,4 +110,112 @@ export function rangeLabel({
   if (openLow) return `${valueMax}${unit} 이하`;
   if (openHigh) return `${valueMin}${unit} 이상`;
   return `${valueMin}${unit} – ${valueMax}${unit}`;
+}
+
+/**
+ * 주소의 조건 → 화면 모델. `filtersToParams` 의 역이다.
+ * 이상한 값은 버리고 기본값(끝)으로 둔다 — 서버도 같은 값을 스키마로 걸러낸다.
+ */
+export function filtersFromParams(params: URLSearchParams): Filters {
+  const bound = (key: string, fallback: number, range: { min: number; max: number }) => {
+    const value = Number(params.get(key));
+    if (!params.has(key) || !Number.isInteger(value)) return fallback;
+    return Math.min(range.max, Math.max(range.min, value));
+  };
+  const list = (key: string) =>
+    (params.get(key) ?? "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+
+  return {
+    ageMin: bound("ageMin", AGE_RANGE.min, AGE_RANGE),
+    ageMax: bound("ageMax", AGE_RANGE.max, AGE_RANGE),
+    heightMin: bound("heightMin", HEIGHT_RANGE.min, HEIGHT_RANGE),
+    heightMax: bound("heightMax", HEIGHT_RANGE.max, HEIGHT_RANGE),
+    regions: list("regions"),
+    jobCategories: list("jobCategories"),
+    religions: list("religions"),
+    smoking: list("smoking"),
+    drinking: list("drinking"),
+    tags: normalizeHashtags(list("tags")),
+  };
+}
+
+/** 두 자리 연도. 카카오톡 프로필이 쓰는 「96년생」 표기다. */
+const yy = (year: number) => String(year % 100).padStart(2, "0");
+
+/**
+ * 나이 범위를 출생연도로 읽어준다 — 주선자는 「93~96년생」으로 생각한다.
+ * 서버가 나이를 출생연도로 바꾸는 식(`birthYearRange`)과 같은 계산이다.
+ * 끝에 붙은 쪽은 제한이 아니므로 「이전」·「이후」로 말하고, 양쪽이 열려 있으면 null 이다.
+ */
+export function birthYearLabel(
+  ageMin: number,
+  ageMax: number,
+  currentYear: number,
+): string | null {
+  const openLow = ageMin <= AGE_RANGE.min;
+  const openHigh = ageMax >= AGE_RANGE.max;
+  const oldest = currentYear - ageMax;
+  const youngest = currentYear - ageMin;
+  if (openLow && openHigh) return null;
+  if (openLow) return `${yy(oldest)}년생 이후`;
+  if (openHigh) return `${yy(youngest)}년생 이전`;
+  return oldest === youngest ? `${yy(oldest)}년생` : `${yy(oldest)}~${yy(youngest)}년생`;
+}
+
+/** 걸린 조건 하나. 목록 위에 지울 수 있는 칩으로 늘어놓는다. */
+export type FilterSummaryItem = {
+  key: "age" | "height" | (typeof CHIP_KEYS)[number];
+  label: string;
+};
+
+const CHIP_LABELS: Record<Exclude<(typeof CHIP_KEYS)[number], "tags">, Record<string, string>> = {
+  regions: REGION_LABELS,
+  jobCategories: JOB_CATEGORY_LABELS,
+  religions: RELIGION_LABELS,
+  smoking: SMOKING_LABELS,
+  drinking: DRINKING_LABELS,
+};
+
+/**
+ * 지금 걸린 조건을 칩 문구로. 배지 숫자(`activeFilterCount`)와 같은 단위로 센다 —
+ * 칩이 셋인데 배지가 넷이면 어느 조건이 걸렸는지 찾을 수 없다.
+ */
+export function filterSummary(filters: Filters, currentYear: number): FilterSummaryItem[] {
+  const items: FilterSummaryItem[] = [];
+  if (filters.ageMin > AGE_RANGE.min || filters.ageMax < AGE_RANGE.max) {
+    items.push({
+      key: "age",
+      label:
+        birthYearLabel(filters.ageMin, filters.ageMax, currentYear) ??
+        rangeLabel({ ...AGE_RANGE, valueMin: filters.ageMin, valueMax: filters.ageMax, unit: "세" }),
+    });
+  }
+  if (filters.heightMin > HEIGHT_RANGE.min || filters.heightMax < HEIGHT_RANGE.max) {
+    items.push({
+      key: "height",
+      label: `키 ${rangeLabel({ ...HEIGHT_RANGE, valueMin: filters.heightMin, valueMax: filters.heightMax, unit: "cm" })}`,
+    });
+  }
+  for (const key of CHIP_KEYS) {
+    const values = filters[key];
+    if (values.length === 0) continue;
+    const label =
+      key === "tags"
+        ? values.map(formatHashtag).join(" ")
+        : values.map((v) => CHIP_LABELS[key][v] ?? v).join("·");
+    items.push({ key, label });
+  }
+  return items;
+}
+
+/** 조건 하나를 지운다. 칩의 ✕ 가 부른다. */
+export function clearFilter(filters: Filters, key: FilterSummaryItem["key"]): Filters {
+  if (key === "age") return { ...filters, ageMin: AGE_RANGE.min, ageMax: AGE_RANGE.max };
+  if (key === "height") {
+    return { ...filters, heightMin: HEIGHT_RANGE.min, heightMax: HEIGHT_RANGE.max };
+  }
+  return { ...filters, [key]: [] };
 }

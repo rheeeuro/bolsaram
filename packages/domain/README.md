@@ -26,7 +26,7 @@ packages/domain/src/
 ├── match.ts        소개 신청 상태 기계 (누가·언제·무엇으로)
 ├── visibility.ts   단계적 정보 공개 (LIST / DETAIL / INTRODUCED / OWNER / ADMIN)
 ├── import.ts       Import 상태 기계 · 원문 정규화 · 검토 판정 · 게시 게이트
-├── filters.ts      Discover 필터 → SQL 조각 · 커서 페이지네이션
+├── filters.ts      Discover·주선자 목록 필터 → SQL 조각 · 커서 페이지네이션
 ├── telegram.ts     봇 대화 상태 기계 · 메시지 분류 · 원문 합치기 · 앨범 판정
 ├── notify.ts       알림 재시도 창·시도 상한 (발송과 정리가 같은 값을 본다)
 └── index.ts        위 전부 재수출
@@ -102,6 +102,13 @@ REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
 `normalizeRawText()` 는 카카오톡 말머리(`[이름] [오후 3:12]`)와 제로폭 문자를 정리한다.
 원문 자체는 DB 에 그대로 보관하고, 이 결과는 프롬프트 입력에만 쓴다.
 
+`reviewFields()` 는 검토 화면의 항목을 `EXTRACTED_FIELD_REVIEW_ORDER` 순서로 늘어놓는다.
+저장된 JSONB 의 키 순서는 쓰지 않는다.
+
+`pickRealName()` 은 원문의 「이름: ○○○」 줄에서 이름을 꺼내 검토 화면의 이름 칸을 미리
+채운다. **AI 에 맡기지 않는다** — 이름은 추출 스키마에 없고, 줄머리가 없으면 추측하지
+않고 null 이다.
+
 ### `telegram.ts` — 봇 대화 판정
 
 ```
@@ -126,6 +133,11 @@ Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가",
 
 `buildDiscoverWhere()` 는 값을 **항상 파라미터로만** 넘긴다. 문자열 보간으로 SQL 에 값을
 끼워 넣지 않는다. 반환 텍스트는 자리표시자 번호를 `startIndex` 로 이어붙일 수 있다.
+
+인적 조건(나이·키·지역·직업군·종교·흡연·음주·해시태그)은 `buildAttributeClauses()` 한 곳에서
+만든다. 멤버 탐색(`buildDiscoverWhere`)과 주선자 목록(`findAdminProfiles`)이 같은 절을 쓰므로
+주선자가 고른 조건과 멤버가 보는 결과가 어긋나지 않는다. 자리표시자 번호는 부르는 쪽의
+`push` 가 매긴다.
 
 나이는 출생연도로 뒤집어 계산한다(`ageMin` 이 클수록 `birthYear` 는 작아진다).
 

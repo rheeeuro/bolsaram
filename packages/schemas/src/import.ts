@@ -93,5 +93,11 @@ export const commitImportSchema = z.object({
   targetProfileId: uuidSchema.optional(),
   /** 게시 여부. 기본은 비공개로 만들고 관리자가 따로 공개한다(자동 게시 금지). */
   publish: z.boolean().default(false),
+  /**
+   * 연결된 뒤에만 보이는 값. AI 추출 결과가 아니라 주선자가 검토 화면에서 적거나
+   * 확인한 값이라 추출 스키마와 따로 받는다. 새 프로필을 만들 때만 쓴다.
+   */
+  realName: z.string().trim().max(60).optional(),
+  contactNote: z.string().trim().max(200).optional(),
 });
 export type CommitImportInput = z.infer<typeof commitImportSchema>;

@@ -55,6 +55,31 @@ export const EXTRACTED_FIELD_KEYS = Object.keys(
   extractedFieldsSchema.shape,
 ) as (keyof ExtractedFields)[];
 
+/**
+ * 검토 화면에 늘어놓는 순서. 저장된 JSONB 는 키를 길이순으로 다시 정렬하므로
+ * 저장값의 키 순서를 쓰면 자기소개가 맨 앞에 오고 필수 항목이 흩어진다.
+ * 기본 정보(필수 셋 포함) → 일 → 생활 → 긴 글 순으로, 카카오톡 프로필을 읽는 순서와 같다.
+ */
+export const EXTRACTED_FIELD_REVIEW_ORDER = [
+  "gender",
+  "birthYear",
+  "height",
+  "residenceRegion",
+  "jobTitle",
+  "jobCategory",
+  "company",
+  "workplaceRegion",
+  "education",
+  "religion",
+  "smoking",
+  "drinking",
+  "mbti",
+  "hobbies",
+  "hashtags",
+  "bio",
+  "idealTypeText",
+] as const satisfies readonly (keyof ExtractedFields)[];
+
 /** 필드별 신뢰도 0..1. 값이 null 인 필드는 0 에 가깝게 온다. */
 export const extractionConfidenceSchema = z.partialRecord(
   z.enum(EXTRACTED_FIELD_KEYS as [string, ...string[]]),

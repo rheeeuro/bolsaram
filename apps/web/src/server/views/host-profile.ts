@@ -9,6 +9,7 @@ import "server-only";
 import { withRls } from "@bolsaram/db";
 import { rlsContextOf, type Viewer } from "../auth/guard";
 import { introducedWithManaged } from "../repo/matches";
+import { sourceTextsFor } from "../repo/imports";
 import { canEditProfiles, findProfileById } from "../repo/profiles";
 import { disclosureFor, toDetailView, type ProfileDetailView } from "./profile-view";
 
@@ -24,6 +25,11 @@ export type HostProfileData = {
   claimed: boolean;
   /** 담당일 때만 읽는다. 초대는 등록한 주선자만 발급한다. */
   invite: { expiresAt: string; claimed: boolean } | null;
+  /**
+   * 가져올 때 받은 카카오톡 원문. 담당일 때만 읽는다 — 원문에는 이름·연락처가 섞여
+   * 있을 수 있고, RLS 도 남의 전체공개 세션은 보여주지 않는다.
+   */
+  source: { sessionId: string; rawText: string } | null;
 };
 
 export async function loadHostProfile(
@@ -53,6 +59,7 @@ export async function loadHostProfile(
         )
       : null;
     const latest = invite?.rows[0];
+    const source = canEdit ? (await sourceTextsFor(sql, [profile.id])).get(profile.id) : null;
 
     return {
       canEdit,
@@ -62,6 +69,7 @@ export async function loadHostProfile(
       invite: latest
         ? { expiresAt: latest.expires_at.toISOString(), claimed: latest.claimed_at != null }
         : null,
+      source: source?.rawText ? { sessionId: source.sessionId, rawText: source.rawText } : null,
     };
   });
 }

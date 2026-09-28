@@ -190,6 +190,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/profiles/[id]/status`               | PATCH               | 주선자            | 활성·비활성 전환                     |
 | `/api/match-requests`                     | GET / POST          | 멤버(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
+| `/api/admin/profiles`                     | GET                 | 주선자            | 목록 조건에 맞는 사람 수 (조건 시트의 「N명 보기」) |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |
 | `/api/admin/me`                           | PATCH               | 주선자            | 내 표시 이름 바꾸기                  |
 | `/api/admin/me/avatar`                    | POST / DELETE       | 주선자            | 내 프로필 사진 올리기(슬롯·확정) / 지우기 |
@@ -198,7 +199,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/favorites`                          | GET / POST / DELETE | 멤버              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 멤버(프로필 필요) | 숨긴 사람 목록·토글                  |
 | `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
-| `/api/imports`                            | GET / POST          | 주선자            | 가져오기 목록(현재 방) / 세션 생성 + 업로드 슬롯 (`groupId` 필수) |
+| `/api/imports`                            | GET / POST          | 주선자            | 가져오기 목록(현재 방, 기본 등록 전 · `done=1` 등록됨) / 세션 생성 + 업로드 슬롯 (`groupId` 필수) |
 | `/api/imports/[id]`                       | GET / DELETE        | 주선자            | 원본·추출 결과 / 세션 삭제           |
 | `/api/imports/[id]/assets`                | POST / DELETE       | 주선자            | 업로드 확정·슬롯 추가 / 제거         |
 | `/api/imports/[id]/text`                  | PATCH               | 주선자            | 원문 저장                            |

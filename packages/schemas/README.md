@@ -24,7 +24,7 @@ packages/schemas/src/
 ├── extraction.ts   AI 추출 스키마 · strict JSON Schema 생성 · 신뢰도 기준
 ├── hashtag.ts      해시태그 정규화·상한·표기 (저장과 검색이 같은 형태를 쓴다)
 ├── image.ts        이미지 업로드 두 단계(슬롯·확정) — 프로필·주선자·모임 사진이 함께 쓴다
-├── profile.ts      프로필 읽기/쓰기 · Discover 필터 · 관리자 목록 쿼리
+├── profile.ts      프로필 읽기/쓰기 · Discover 필터 · 관리자 목록 쿼리 (인적 조건 공유)
 ├── match.ts        소개 신청 생성·거절·연결, 관심 토글
 ├── import.ts       Import 세션·에셋·원문·검토·commit
 ├── auth.ts         전화번호 정규화, 주선자 로그인, 초대 링크·모임 코드
@@ -61,6 +61,9 @@ UI 는 라벨 맵을 직접 인덱싱하지 않고 `apps/web/src/lib/labels.ts` 
 - 모든 필드가 nullable 이다. 모델이 모르면 **추론하지 않고 null** 을 넣는다.
 - `REQUIRED_FIELDS_FOR_COMMIT` 가 비어 있으면 프로필로 등록할 수 없다.
 - `LOW_CONFIDENCE_THRESHOLD` 미만이면 관리자 검토 화면에서 강조된다.
+- 검토 화면의 항목 순서는 `EXTRACTED_FIELD_REVIEW_ORDER` 다. 저장된 JSONB 의 키 순서는
+  길이순으로 섞이므로 그 순서를 쓰지 않는다. 필드를 추가하면 여기에도 넣는다
+  (`extraction.test.ts` 가 빠진 필드를 잡는다).
 
 ### `telegram.ts` — 외부에서 들어오는 입력
 
@@ -88,6 +91,10 @@ validate 한 뒤에만** 쓴다. 우리가 실제로 읽는 필드만 선언하�
 배열 형태를 모두 받아 배열로 정규화한다. 자유 검색(`q`)은 공개 범위 안의 텍스트만 훑는다 —
 이름·연락처는 검색 대상이 아니다. `tags` 는 해시태그 목록이며, 값 검사 대신 정규화를 건다
 (열거형이 아니라 프로필에서 올라온 자유 태그다).
+
+인적 조건(나이·키·지역·직업군·종교·흡연·음주·태그)은 `attributeFilterShape` 하나를
+`discoverQuerySchema` 와 `adminProfileQuerySchema` 가 함께 펼친다 — 같은 주소 조건이 양쪽에서
+같은 뜻이다. 주선자 쪽은 여기에 상태·성별·초대 여부를 더 받는다(주선자는 양쪽 성별을 맡는다).
 
 ---
 

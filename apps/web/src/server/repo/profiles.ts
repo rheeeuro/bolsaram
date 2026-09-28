@@ -9,6 +9,7 @@ import {
   DomainError,
   HAS_PHOTO_SQL,
   PROFILE_ORDER_BY,
+  buildAttributeClauses,
   buildDiscoverWhere,
   decodeCursor,
   encodeCursor,
@@ -375,12 +376,14 @@ export async function updateProfileStatus(
 
 // ── 관리자 목록 ───────────────────────────────────────────────
 
-export async function findAdminProfiles(
-  sql: Sql,
+/**
+ * 주선자 목록의 WHERE 절. 목록과 조건 설정 시트의 「N명 보기」가 같은 절을 써야
+ * 미리 본 숫자와 눌렀을 때 나오는 사람 수가 같다.
+ */
+function adminProfileWhere(
   query: AdminProfileQuery,
-  /** 지금 보고 있는 채널. null 이면 전체공개 풀만 본다. */
   scope: { groupId: string | null },
-): Promise<{ items: ProfileRecord[]; nextCursor: string | null; total: number }> {
+): { where: string; values: unknown[] } {
   const clauses: string[] = [];
   const values: unknown[] = [];
   const push = (v: unknown) => {
@@ -397,8 +400,8 @@ export async function findAdminProfiles(
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
   if (query.claimed === "yes") clauses.push("p.user_id IS NOT NULL");
   if (query.claimed === "no") clauses.push("p.user_id IS NULL");
-  // 태그는 여러 개를 주면 좁힌다. 멤버 탐색과 같은 규칙이다.
-  if (query.tags?.length) clauses.push(`p.hashtags @> ${push(query.tags)}`);
+  // 나이·키·지역·직업군·태그는 멤버 탐색과 같은 절이다.
+  clauses.push(...buildAttributeClauses(query, new Date().getFullYear(), push));
   if (query.q) {
     // `17번` 은 공개 번호, `#여행` 은 해시태그다. 숫자인지로 가른다.
     // 적는 방식을 따지지 않는다 — `17` · `17번` · 예전 표기 `#17` 을 모두 번호로 받는다.
@@ -406,12 +409,44 @@ export async function findAdminProfiles(
     const needle = query.q.replace(/^[@#]+/u, "").trim();
     const term = push(`%${needle.length > 0 ? needle : query.q}%`);
     const codeClause = codeMatch ? ` OR p.public_code = ${push(Number(codeMatch[1]))}` : "";
+    // 카카오톡에서 Ctrl+F 로 찾던 말(「송파」 「치과」 「교회」)이 걸리도록 정리된 글과
+    // 가져올 때 받은 원문까지 훑는다. 원문은 RLS 가 다룰 수 있는 세션만 보여준다.
+    // 이름은 담당일 때만 검색에 건다 — 아니면 검색 결과가 이름을 확인해 주는 통로가 된다.
     clauses.push(
-      `(p.real_name ILIKE ${term} OR p.job_title ILIKE ${term} OR p.company ILIKE ${term} OR array_to_string(p.hashtags, ' ') ILIKE ${term}${codeClause})`,
+      `((p.real_name ILIKE ${term} AND app_can_edit_profile(p.id))
+        OR p.job_title ILIKE ${term} OR p.company ILIKE ${term} OR p.education ILIKE ${term}
+        OR p.bio ILIKE ${term} OR p.ideal_type_text ILIKE ${term}
+        OR array_to_string(p.hobbies, ' ') ILIKE ${term}
+        OR array_to_string(p.hashtags, ' ') ILIKE ${term}
+        OR EXISTS (SELECT 1 FROM import_sessions s
+                    WHERE s.committed_profile_id = p.id AND s.raw_text ILIKE ${term})${codeClause})`,
     );
   }
 
-  const where = clauses.join(" AND ");
+  return { where: clauses.join(" AND "), values };
+}
+
+/** 조건에 맞는 사람 수만. 조건 설정 시트가 고르는 동안 미리 보여준다. */
+export async function countAdminProfiles(
+  sql: Sql,
+  query: AdminProfileQuery,
+  scope: { groupId: string | null },
+): Promise<number> {
+  const { where, values } = adminProfileWhere(query, scope);
+  const result = await sql.query<{ total: number }>(
+    `SELECT count(*)::int AS total FROM profiles p WHERE ${where}`,
+    values,
+  );
+  return result.rows[0]?.total ?? 0;
+}
+
+export async function findAdminProfiles(
+  sql: Sql,
+  query: AdminProfileQuery,
+  /** 지금 보고 있는 채널. null 이면 전체공개 풀만 본다. */
+  scope: { groupId: string | null },
+): Promise<{ items: ProfileRecord[]; nextCursor: string | null; total: number }> {
+  const { where, values } = adminProfileWhere(query, scope);
   const countResult = await sql.query<{ total: number }>(
     `SELECT count(*)::int AS total FROM profiles p WHERE ${where}`,
     values,

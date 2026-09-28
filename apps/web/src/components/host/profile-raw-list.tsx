@@ -17,11 +17,13 @@ import { cn } from "@/lib/cn";
 export type RawListItem = {
   id: string;
   code: string;
+  /** 담당일 때만 온다. 주선자는 번호보다 이름으로 기억한다. */
+  name: string | null;
   gender: string;
-  age: number;
-  status: string;
+  birthYear: number;
   visible: boolean;
-  claimed: boolean;
+  /** 담당인데 아직 초대하지 않았다 — 주선자가 할 일이 남은 분. */
+  awaitingInvite: boolean;
   images: { id: string; url: string }[];
   /** 가져오기로 받은 원문. 세션이 없거나(시드) 남의 전체공개 건이면 null 이다. */
   rawText: string | null;
@@ -45,15 +47,14 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
               href={`/profiles/${item.id}`}
               className="display text-[15px] text-[var(--color-ink-900)] hover:underline"
             >
-              <ProfileCode code={item.code} />
+              {item.name ?? <ProfileCode code={item.code} />}
             </Link>
             <span className="text-[12.5px] text-[var(--color-ink-500)]">
-              {label.gender(item.gender)} · {item.age}세
+              {item.name ? `${item.code} · ` : ""}
+              {label.gender(item.gender)} · {label.birthYear(item.birthYear)}
             </span>
-            <Badge tone={item.visible ? "active" : "neutral"}>
-              {item.visible ? "멤버에게 보임" : "멤버에게 안 보임"}
-            </Badge>
-            {!item.claimed ? <Badge tone="neutral">초대 전</Badge> : null}
+            {!item.visible ? <Badge tone="neutral">비활성 · 멤버에게 안 보임</Badge> : null}
+            {item.awaitingInvite ? <Badge tone="neutral">초대 전</Badge> : null}
 
             <span className="ml-auto text-[11.5px] text-[var(--surface-text-muted)]">
               {[item.source ? label.importSource(item.source) : null, item.at ? formatWhen(item.at) : null]

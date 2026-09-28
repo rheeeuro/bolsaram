@@ -27,7 +27,7 @@ export default async function HostProfileEditPage({
     <>
       <Breadcrumb
         items={[
-          { label: "프로필", href: "/profiles" },
+          { label: "프로필", href: "profiles" },
           { code: data.view.code, href: `/profiles/${id}` },
           { label: "내용 고치기" },
         ]}

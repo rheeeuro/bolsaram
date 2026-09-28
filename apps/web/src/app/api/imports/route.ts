@@ -14,9 +14,11 @@ import { buildStorageKey, isAllowedImageType, signUploadToken } from "@/server/s
 
 export const dynamic = "force-dynamic";
 
-export const GET = route(async () =>
+/** 기본은 할 일(등록 전)이고 `?done=1` 이면 등록된 것이다 — 화면의 두 칸과 같다. */
+export const GET = route(async (request: Request) =>
   asAdmin(async (sql, viewer) => {
-    const items = await listInbox(sql, { groupId: viewer.groupId });
+    const done = new URL(request.url).searchParams.get("done") === "1";
+    const items = await listInbox(sql, { groupId: viewer.groupId, done });
     return ok({ items });
   }),
 );

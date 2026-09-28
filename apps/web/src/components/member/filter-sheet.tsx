@@ -24,13 +24,17 @@ import {
   AGE_RANGE,
   DEFAULT_FILTERS,
   HEIGHT_RANGE,
+  birthYearLabel,
   filtersToParams,
   rangeLabel,
   type Filters,
 } from "./filter-model";
 
+/** 멤버 탐색의 개수 미리보기. 주선자 목록은 자기 경로를 넘긴다. */
+const discoverCountUrl = (query: string) => `/api/profiles?${query}&limit=1`;
+
 /**
- * 조건 설정 bottom sheet (UI 컨셉 03).
+ * 조건 설정 bottom sheet (UI 컨셉 03). 멤버 탐색과 주선자 프로필 목록이 함께 쓴다.
  * 값이 바뀔 때마다 결과 개수를 미리 조회해 "N명 보기" 로 보여준다.
  * 조건 판정은 전부 filter-model 에 있다 — 여기서는 그리는 일만 한다.
  */
@@ -39,11 +43,14 @@ export function FilterSheet({
   initial,
   onClose,
   onApply,
+  countUrl = discoverCountUrl,
 }: {
   open: boolean;
   initial: Filters;
   onClose: () => void;
   onApply: (filters: Filters) => void;
+  /** 조건 쿼리스트링 → `{ total }` 을 돌려주는 주소. 시트 밖의 조건(성별·상태)도 여기서 붙인다. */
+  countUrl?: (query: string) => string;
 }) {
   const [draft, setDraft] = useState<Filters>(initial);
   const [count, setCount] = useState<number | null>(null);
@@ -60,7 +67,7 @@ export function FilterSheet({
     if (!open) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      void apiGet<{ total: number }>(`/api/profiles?${query}&limit=1`).then((result) => {
+      void apiGet<{ total: number }>(countUrl(query)).then((result) => {
         if (cancelled) return;
         setCount(result.ok ? result.data.total : null);
       });
@@ -69,7 +76,7 @@ export function FilterSheet({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [open, query]);
+  }, [open, query, countUrl]);
 
   const toggle = (key: keyof Filters, value: string) => {
     setDraft((prev) => {
@@ -97,6 +104,7 @@ export function FilterSheet({
           valueMin={draft.ageMin}
           valueMax={draft.ageMax}
           onChange={(lo, hi) => setDraft((p) => ({ ...p, ageMin: lo, ageMax: hi }))}
+          detail={birthYearLabel(draft.ageMin, draft.ageMax, new Date().getFullYear())}
         />
         <RangeGroup
           title="키"
@@ -278,6 +286,7 @@ function RangeGroup({
   valueMax,
   onChange,
   note,
+  detail,
 }: {
   title: string;
   unit: string;
@@ -287,6 +296,8 @@ function RangeGroup({
   valueMax: number;
   onChange: (lo: number, hi: number) => void;
   note?: string;
+  /** 범위 옆에 덧붙이는 다른 표기. 나이에는 출생연도(「93~96년생」)를 단다. */
+  detail?: string | null;
 }) {
   const narrowed = valueMin > min || valueMax < max;
   const pct = (value: number) => ((value - min) / (max - min)) * 100;
@@ -296,6 +307,7 @@ function RangeGroup({
         <h3 className="text-[13px] font-medium text-[var(--color-ink-800)]">{title}</h3>
         <span className="text-[13px] text-[var(--color-ink-600)]">
           {rangeLabel({ min, max, valueMin, valueMax, unit })}
+          {detail ? <span className="ml-1.5 text-[var(--color-ink-500)]">· {detail}</span> : null}
         </span>
       </div>
       {/* 두 손잡이를 같은 트랙 위에 겹친다. 값이 교차하면 서로를 밀어낸다. */}
