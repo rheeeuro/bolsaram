@@ -53,9 +53,10 @@ beforeAll(async () => {
       gender: "MALE" | "FEMALE",
     ) => {
       const result = await sql.query<{ id: string }>(
-        `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status, real_name)
-         VALUES ($1,$2,$3,1993,'SEOUL',$4,$5) RETURNING id`,
-        [groupId, userId, gender, status, `${TAG}-이름`],
+        `INSERT INTO profiles (group_id, user_id, gender, birth_year, residence_region, status,
+                               real_name, created_by)
+         VALUES ($1,$2,$3,1993,'SEOUL',$4,$5,$6) RETURNING id`,
+        [groupId, userId, gender, status, `${TAG}-이름`, adminId],
       );
       return result.rows[0]!.id;
     };
@@ -105,10 +106,10 @@ afterAll(async () => {
   await withOwner(async (sql) => {
     await sql.query(`DELETE FROM profiles WHERE real_name = $1`, [`${TAG}-이름`]);
     await sql.query(
-      `DELETE FROM users WHERE display_name IN ('admin','admin2','admin3','admin4','m1','m2','m3','m4','m5','m6','m7','m8') AND (email LIKE $1 OR phone LIKE $2)`,
+      `DELETE FROM users WHERE display_name IN ('admin','admin2','admin3','admin4','admin5','admin6','m1','m2','m3','m4','m5','m6','m7','m8') AND (email LIKE $1 OR phone LIKE $2)`,
       [`${TAG}-%`, `${phonePrefix()}%`],
     );
-    await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
+    await sql.query(`DELETE FROM groups WHERE name IN ($1, $2)`, [TAG, `${TAG}-공동`]);
   });
   await closePools();
 });
@@ -1043,5 +1044,157 @@ describe("여러 명에게 동시에 신청", () => {
       sql.query(`SELECT id FROM match_requests WHERE requester_profile_id = $1`, [pw]),
     );
     expect(kept.rowCount).toBe(3);
+  });
+});
+
+describe("모임 안에서도 등록한 주선자만 다룬다 (0056)", () => {
+  let groupId: string;
+  let ownerA: RlsContext;
+  let peerB: RlsContext;
+  let pA: string;
+  let pB: string;
+  let importA: string;
+
+  beforeAll(async () => {
+    await withOwner(async (sql) => {
+      const admin = async (key: string) => {
+        const r = await sql.query<{ id: string }>(
+          `INSERT INTO users (role, email, display_name)
+           VALUES ('ADMIN', $1, $2) RETURNING id`,
+          [`${TAG}-${key}@test.local`, key],
+        );
+        return r.rows[0]!.id;
+      };
+      const a = await admin("admin5");
+      const b = await admin("admin6");
+      ownerA = { userId: a, role: "ADMIN" };
+      peerB = { userId: b, role: "ADMIN" };
+
+      const g = await sql.query<{ id: string }>(
+        `INSERT INTO groups (name) VALUES ($1) RETURNING id`,
+        [`${TAG}-공동`],
+      );
+      groupId = g.rows[0]!.id;
+      await sql.query(
+        `INSERT INTO group_admins (group_id, user_id, is_owner) VALUES ($1, $2, true), ($1, $3, false)`,
+        [groupId, a, b],
+      );
+
+      const profile = async (createdBy: string, gender: string) => {
+        const r = await sql.query<{ id: string }>(
+          `INSERT INTO profiles (group_id, created_by, gender, birth_year, residence_region,
+                                 status, real_name)
+           VALUES ($1, $2, $3, 1993, 'SEOUL', 'ACTIVE', $4) RETURNING id`,
+          [groupId, createdBy, gender, `${TAG}-이름`],
+        );
+        return r.rows[0]!.id;
+      };
+      pA = await profile(a, "FEMALE");
+      pB = await profile(b, "MALE");
+
+      const s = await sql.query<{ id: string }>(
+        `INSERT INTO import_sessions (group_id, created_by, source, raw_text)
+         VALUES ($1, $2, 'MANUAL_UPLOAD', $3) RETURNING id`,
+        [groupId, a, `${TAG}-원문`],
+      );
+      importA = s.rows[0]!.id;
+    });
+  });
+
+  it("같은 모임 동료의 프로필은 보지만 고치지 못한다", async () => {
+    const seen = await withRls(peerB, (sql) =>
+      sql.query(`SELECT id FROM profiles WHERE id = $1`, [pA]),
+    );
+    expect(seen.rowCount).toBe(1);
+    const updated = await withRls(peerB, (sql) =>
+      sql.query(`UPDATE profiles SET bio = 'by peer' WHERE id = $1`, [pA]),
+    );
+    expect(updated.rowCount).toBe(0);
+    const mine = await withRls(ownerA, (sql) =>
+      sql.query(`UPDATE profiles SET bio = 'by owner' WHERE id = $1`, [pA]),
+    );
+    expect(mine.rowCount).toBe(1);
+  });
+
+  it("동료의 프로필로 대신 둘러보지 못한다", async () => {
+    const result = await withRls({ ...peerB, actingProfileId: pA }, (sql) =>
+      sql.query<{ id: string | null }>(`SELECT app_current_profile_id() AS id`),
+    );
+    expect(result.rows[0]?.id ?? null).toBeNull();
+  });
+
+  it("동료의 프로필에 초대 링크를 만들지 못한다", async () => {
+    await expect(
+      withRls(peerB, (sql) =>
+        sql.query(
+          `INSERT INTO invites (profile_id, token_hash, expires_at, created_by)
+           VALUES ($1, $2, now() + interval '1 hour', $3)`,
+          [pA, `${TAG}-hash`, peerB.userId],
+        ),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("동료가 올린 가져오기는 보이지 않는다", async () => {
+    const peer = await withRls(peerB, (sql) =>
+      sql.query(`SELECT id FROM import_sessions WHERE id = $1`, [importA]),
+    );
+    expect(peer.rowCount).toBe(0);
+    const owner = await withRls(ownerA, (sql) =>
+      sql.query(`SELECT id FROM import_sessions WHERE id = $1`, [importA]),
+    );
+    expect(owner.rowCount).toBe(1);
+  });
+
+  it("등록자를 남의 이름으로 쓰거나 바꾸지 못한다", async () => {
+    await expect(
+      withRls(peerB, (sql) =>
+        sql.query(
+          `INSERT INTO profiles (group_id, created_by, gender, birth_year, residence_region, real_name)
+           VALUES ($1, $2, 'MALE', 1990, 'SEOUL', $3)`,
+          [groupId, ownerA.userId, `${TAG}-이름`],
+        ),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      withRls(peerB, (sql) =>
+        sql.query(`UPDATE profiles SET created_by = $2 WHERE id = $1`, [pB, ownerA.userId]),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("알림은 등록한 주선자에게만 간다", async () => {
+    const result = await withOwner((sql) =>
+      sql.query<{ id: string }>(`SELECT app_profile_admins($1) AS id`, [pA]),
+    );
+    expect(result.rows.map((r) => r.id)).toEqual([ownerA.userId]);
+  });
+
+  it("모임에서 나가면 그 주선자가 올린 프로필만 비활성이 된다", async () => {
+    await withOwner((sql) =>
+      sql.query(`DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2`, [
+        groupId,
+        peerB.userId,
+      ]),
+    );
+    const rows = await withOwner((sql) =>
+      sql.query<{ id: string; status: string }>(
+        `SELECT id, status FROM profiles WHERE id = ANY($1)`,
+        [[pA, pB]],
+      ),
+    );
+    const status = new Map(rows.rows.map((r) => [r.id, r.status]));
+    expect(status.get(pB)).toBe("INACTIVE");
+    expect(status.get(pA)).toBe("ACTIVE");
+
+    // 나간 사람은 자기가 올린 것도 더는 다루지 못하고, 알림도 받지 않는다.
+    const updated = await withRls(peerB, (sql) =>
+      sql.query(`UPDATE profiles SET status = 'ACTIVE' WHERE id = $1`, [pB]),
+    );
+    expect(updated.rowCount).toBe(0);
+    const admins = await withOwner((sql) =>
+      sql.query(`SELECT app_profile_admins($1) AS id`, [pB]),
+    );
+    expect(admins.rowCount).toBe(0);
   });
 });

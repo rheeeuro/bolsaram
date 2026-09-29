@@ -41,6 +41,8 @@ export type Group = {
   isOwner: boolean;
   memberCount: number;
   importCount: number;
+  /** 내가 등록한 활성 프로필 수. 나가면 모두 비활성이 된다. */
+  myActiveCount: number;
   admins: Admin[];
   /** 이 방의 새 채팅을 텔레그램으로도 받는 중인가. 사람마다 따로다. */
   chatNotify: boolean;
@@ -325,7 +327,7 @@ function AdminRow({ group, admin, isMe }: { group: Group; admin: Admin; isMe: bo
               variant="danger"
               label="내보내기"
               confirmLabel="내보내기"
-              message={`${name} 님은 이 모임의 멤버를 더 이상 볼 수 없습니다. 다시 들어오려면 초대 코드가 필요합니다.`}
+              message={`${name} 님은 이 모임의 멤버를 더 이상 볼 수 없고, ${name} 님이 등록한 프로필은 모두 비활성이 됩니다. 다시 들어오려면 초대 코드가 필요합니다.`}
               disabled={busy}
               onConfirm={() =>
                 void send(() =>
@@ -410,14 +412,18 @@ function LeaveGroup({ group }: { group: Group }) {
   return (
     <DangerPanel
       title="모임 나가기"
-      description="나가면 이 모임의 멤버가 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다. 마지막 주선자라면 멤버가 남아 있는 동안 나갈 수 없습니다."
+      description="나가면 이 모임의 멤버가 보이지 않고, 내가 등록한 프로필은 모두 비활성이 됩니다. 다시 들어오면 직접 활성으로 되돌립니다. 마지막 주선자라면 멤버가 남아 있는 동안 나갈 수 없습니다."
       error={error}
     >
       <ConfirmButton
         variant="danger"
         label={busy ? "나가는 중…" : "모임 나가기"}
         confirmLabel="나가기"
-        message={`「${group.name}」 의 멤버가 더 이상 보이지 않습니다. 다시 들어오려면 초대 코드가 필요합니다.`}
+        message={`「${group.name}」 의 멤버가 더 이상 보이지 않습니다.${
+          group.myActiveCount > 0
+            ? ` 내가 등록한 ${group.myActiveCount}명은 비활성이 되어 멤버 목록에서 빠집니다.`
+            : ""
+        } 다시 들어오려면 초대 코드가 필요합니다.`}
         disabled={busy}
         onConfirm={() =>
           void (async () => {

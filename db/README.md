@@ -83,6 +83,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0053_group_name_length.sql`       | 모임 이름 CHECK 을 20자로 좁힌다 — 좁은 자리에서 잘리지 않게                            |
 | `0054_profile_image_limit.sql`     | 프로필 사진을 5장까지만 받는 트리거 — 장수를 세는 규칙이라 CHECK 로는 못 쓴다           |
 | `0055_profile_active_only.sql`     | 프로필 상태를 활성/비활성 둘로, 노출 축(`visibility`) 제거. 진행 상태는 관계(`match_requests`)만 가진다 |
+| `0056_profile_owner_only.sql`      | 모임에서도 프로필·Import 는 **등록한 주선자만** 다룬다. 나가거나 내보내지면 그 사람이 올린 프로필은 비활성 |
 
 ## 테이블
 
@@ -204,6 +205,9 @@ UPDATE 는 통과시킨다(0041) — 그 경로까지 막으면 주선자 계정
 를 비운다. 소속이 끊겼는데 그 모임을 보고 있는 상태를 남기지 않는다.
 `group_admins_clear_telegram_upload_group` 이 `telegram_connections.upload_group_id` 에
 같은 일을 한다 — 나간 모임으로 봇 업로드가 계속 향하지 않게 한다.
+`group_admins_deactivate_profiles` 는 그 주선자가 **그 모임에 등록한 프로필**을 비활성으로
+돌린다(0056). 다룰 수 있는 사람이 등록자뿐이라, 남겨 두면 아무도 답하지 못하는 신청을
+받는다. 나가기·내보내기가 모두 이 행 삭제라 트리거 하나로 둘 다 잡는다.
 
 ## RLS 요약
 
@@ -213,12 +217,16 @@ UPDATE 는 통과시킨다(0041) — 그 경로까지 막으면 주선자 계정
 **소속 여부가 곧 공개 여부다.**
 
 ```
-group_id IS NULL      → 전체공개. 모든 주선자가 본다(고치는 건 등록한 주선자만).
+group_id IS NULL      → 전체공개. 모든 주선자가 본다.
 group_id IS NOT NULL  → 그 모임 주선자만 본다.
+어느 쪽이든 고치는 것은 등록한 주선자(created_by)만이다.
 ```
 
 주선자 가입이 자유롭게 열려 있으므로 관리자 조건은 `app_is_admin()` 이 될 수 없다.
-**읽기와 쓰기를 다르게 준다** — 전체공개 프로필은 누구나 보지만 남이 고칠 수 없다.
+**읽기와 쓰기를 다르게 준다** — 전체공개 프로필은 누구나, 모임 프로필은 그 모임
+주선자가 보지만, 다루는 것(고치기·사진·초대·대행·신청 처리·Import 검토)은 등록한
+주선자뿐이다. 모임 프로필이면 등록자가 **지금도 그 모임에 있어야** 한다.
+`created_by` 가 곧 담당이므로 정책의 WITH CHECK 가 남의 이름으로 쓰거나 바꾸는 것을 막는다.
 
 `group_admins` 는 다대다다 — 한 주선자가 여러 모임에 속하고, 정책은 속한 **모든** 모임을
 통과시킨다. `users.active_group_id` 는 그중 지금 화면이 보여줄 하나를 가리킬 뿐이며
@@ -237,11 +245,11 @@ group_id IS NOT NULL  → 그 모임 주선자만 본다.
 | -------------------------------------- | --------------------------------------------------- |
 | `app_is_group_admin(uuid)`             | 그 모임의 주선자인가                                |
 | `app_can_view_profile_as_admin(uuid)`  | 전체공개이거나 자기 모임인가 (읽기)                 |
-| `app_can_edit_profile(uuid)`           | 자기 모임이거나, 전체공개인데 자기가 등록했는가     |
+| `app_can_edit_profile(uuid)`           | 자기가 등록했고, 모임 프로필이면 지금도 그 모임인가 |
 | `app_can_edit_import(uuid)`            | 위와 같은 판정을 Import 세션에                      |
 | `app_current_member_group()`           | 현재 멤버가 속한 풀 (전체공개 멤버는 NULL)          |
 | `app_current_member_gender()`          | 현재 멤버(대행 중이면 그 프로필)의 성별             |
-| `app_profile_admins(uuid)`             | 그 프로필의 담당 주선자 집합 (알림 수신자)          |
+| `app_profile_admins(uuid)`             | 그 프로필의 담당(= 등록한 주선자, 알림 수신자)      |
 | `app_is_rejected_between(uuid[, uuid])` | 어느 방향이든 거절 이력이 있는가                   |
 | `app_is_hidden_between(uuid[, uuid])`  | 어느 방향이든 숨긴 관계인가                         |
 

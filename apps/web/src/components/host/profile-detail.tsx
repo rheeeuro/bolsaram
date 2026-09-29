@@ -109,7 +109,7 @@ export function HostProfileDetail({
     <div className="flex flex-col gap-5">
       {!canEdit ? (
         <p className="rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-3 text-[13px] leading-relaxed text-[var(--surface-text-muted)]">
-          다른 주선자가 등록한 분입니다. 내용을 고치거나 초대를 보낼 수는 없습니다.
+          다른 주선자가 등록한 분입니다. 내용 고치기·초대·대신 둘러보기는 등록한 주선자만 합니다.
         </p>
       ) : null}
 

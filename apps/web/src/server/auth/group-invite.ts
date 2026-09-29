@@ -211,6 +211,8 @@ export type GroupSummary = {
   memberCount: number;
   /** 이 모임으로 가져온 Import 건수. 폐쇄를 막는 것이 무엇인지 화면에 적을 때 쓴다. */
   importCount: number;
+  /** 내가 이 모임에 등록한 활성 프로필 수. 나가면 모두 비활성이 된다(0056). */
+  myActiveCount: number;
   admins: { userId: string; displayName: string | null; isOwner: boolean }[];
   /** 이 방의 새 채팅을 텔레그램으로도 받을 것인가(0040). 사람마다 따로 켠다. */
   chatNotify: boolean;
@@ -232,11 +234,15 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       is_owner: boolean;
       member_count: number;
       import_count: number;
+      my_active_count: number;
       chat_notify: boolean;
     }>(
       `SELECT g.id AS group_id, g.name, g.description, g.image_key, ga.is_owner,
               (SELECT count(*)::int FROM profiles p WHERE p.group_id = g.id) AS member_count,
               (SELECT count(*)::int FROM import_sessions i WHERE i.group_id = g.id) AS import_count,
+              (SELECT count(*)::int FROM profiles p
+                WHERE p.group_id = g.id AND p.created_by = ga.user_id
+                  AND p.status = 'ACTIVE') AS my_active_count,
               COALESCE(pref.telegram_notify, false) AS chat_notify
          FROM group_admins ga
          JOIN groups g ON g.id = ga.group_id
@@ -267,6 +273,7 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       isOwner: group.is_owner,
       memberCount: group.member_count,
       importCount: group.import_count,
+      myActiveCount: group.my_active_count,
       chatNotify: group.chat_notify,
       admins: admins.rows
         .filter((a) => a.group_id === group.group_id)
@@ -396,6 +403,7 @@ export async function transferGroupOwnership(input: {
  * 주선자에게 모임장을 넘기거나 빈 모임을 지우는 일까지 함께 한다.
  *
  * 내보내진 사람의 활성 채널·봇 업로드 대상은 트리거가 정리한다(0036·0039).
+ * 그 사람이 이 모임에 등록한 프로필도 트리거가 비활성으로 돌린다(0056).
  * 방에는 「내보냈습니다」 한 줄이 남는다(0046) — 트리거가 아래 GUC 로 자진 탈퇴와
  * 가른다.
  */
@@ -434,6 +442,9 @@ export async function removeGroupAdmin(input: {
  *
  * 나간 모임을 보고 있었다면 활성 채널은 남아 있는 다른 모임으로 옮기고, 없으면
  * 전체공개가 된다.
+ *
+ * 내가 이 모임에 등록한 프로필은 비활성이 된다 — 다룰 수 있는 사람이 등록자뿐이라
+ * 남겨 두면 아무도 답하지 못하는 신청을 받는다. `group_admins` 삭제 트리거가 한다(0056).
  */
 export async function leaveGroup(
   userId: string,

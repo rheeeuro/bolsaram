@@ -130,7 +130,8 @@ export async function readSession(): Promise<SessionUser | null> {
       // 주선자의 활성 채널은 **지금도 그 모임에 속해 있을 때만** 살린다 — 나간 모임을
       // 가리키고 있으면 전체공개(null)로 떨어진다. 소속 판정은 group_admins 가 하고
       // active_group_id 는 그중 어디를 보고 있는지만 말한다(0036).
-      // 대행(ap)은 주선자에게만, 그리고 **지금도 고칠 수 있는 프로필일 때만** 붙는다.
+      // 대행(ap)은 주선자에게만, 그리고 **지금도 고칠 수 있는 프로필일 때만** 붙는다 —
+      // 자기가 등록했고, 모임 프로필이면 지금도 그 모임에 있을 때다(0056).
       // 본인 계정이 연결된 프로필도 대상이다(0035) — 연결은 초대를 한 번 열었다는
       // 뜻일 뿐 직접 쓰고 있다는 뜻이 아니다. 대행을 시작한 뒤 모임에서 나가는 것처럼
       // 권한이 사라질 수 있으므로 세션을 읽을 때마다 다시 본다. 조건은
@@ -156,11 +157,12 @@ export async function readSession(): Promise<SessionUser | null> {
          LEFT JOIN profiles p ON p.user_id = u.id
          LEFT JOIN profiles ap ON ap.id = s.acting_profile_id
                               AND u.role = 'ADMIN'
+                              AND ap.created_by = u.id
                               AND (
-                                EXISTS (SELECT 1 FROM group_admins ga
-                                         WHERE ga.user_id = u.id
-                                           AND ga.group_id = ap.group_id)
-                                OR (ap.group_id IS NULL AND ap.created_by = u.id)
+                                ap.group_id IS NULL
+                                OR EXISTS (SELECT 1 FROM group_admins ga
+                                            WHERE ga.user_id = u.id
+                                              AND ga.group_id = ap.group_id)
                               )
         WHERE s.id = $1
           AND s.revoked_at IS NULL
