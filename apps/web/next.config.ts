@@ -25,8 +25,9 @@ const config: NextConfig = {
       {
         // 첫 화면(`/`)과 처리방침(`/privacy`)을 뺀 전부에 색인 금지를 건다.
         // 헤더와 메타가 다르면 구글은 엄격한 쪽을 따르므로 여기서 빼야 열린다.
-        // 여는 목록은 app/robots.ts · app/sitemap.ts 와 같다.
-        source: "/((?!privacy$).+)",
+        // 여는 목록은 app/robots.ts · app/sitemap.ts 와 같다. 파비콘·로고·매니페스트
+        // (public/ 의 브랜드 파일)도 뺀다 — 막혀 있으면 검색 결과에 아이콘이 뜨지 않는다.
+        source: "/((?!privacy$|favicon|bolsaram-|site\\.webmanifest$).+)",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, noimageindex" }],
       },
       {
