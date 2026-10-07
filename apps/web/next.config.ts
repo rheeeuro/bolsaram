@@ -23,10 +23,15 @@ const config: NextConfig = {
   async headers() {
     return [
       {
+        // 첫 화면(`/`)과 처리방침(`/privacy`)을 뺀 전부에 색인 금지를 건다.
+        // 헤더와 메타가 다르면 구글은 엄격한 쪽을 따르므로 여기서 빼야 열린다.
+        // 여는 목록은 app/robots.ts · app/sitemap.ts 와 같다.
+        source: "/((?!privacy$).+)",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, noimageindex" }],
+      },
+      {
         source: "/:path*",
         headers: [
-          // 비공개 서비스다. 검색엔진 색인을 금지한다(설계문서 §12).
-          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, noimageindex" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "same-origin" },
           { key: "X-Frame-Options", value: "DENY" },

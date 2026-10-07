@@ -16,8 +16,11 @@ import { readGuide } from "@/server/docs/guide";
 
 export const dynamic = "force-static";
 
+// 검색에 노출하는 화면이다 — 들어오기 전에 찾아 읽을 수 있어야 한다.
 export const metadata: Metadata = {
   title: `개인정보 처리방침 · ${BRAND.nameKo}`,
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

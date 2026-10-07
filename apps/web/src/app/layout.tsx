@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR, Nanum_Myeongjo } from "next/font/google";
 import { BRAND } from "@bolsaram/ui-tokens";
 import { GlobalProgressProvider } from "@/components/ui/global-progress";
+import { env } from "@/server/env";
 import "./globals.css";
 
 const sans = Noto_Sans_KR({
@@ -18,10 +19,19 @@ const display = Nanum_Myeongjo({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...baseMetadata,
+    // canonical 이 공개 도메인 기준 절대 주소가 되게 한다.
+    metadataBase: new URL(env().APP_ORIGIN),
+  };
+}
+
+const baseMetadata: Metadata = {
   title: `${BRAND.nameKo} · ${BRAND.nameEn}`,
-  description: BRAND.tagline,
-  // 비공개 서비스다. 검색엔진에 노출하지 않는다(설계문서 §12).
+  description: `${BRAND.tagline} ${BRAND.subTagline}`,
+  // 기본은 색인 금지다. 비공개인 것은 모임과 그 안의 사람이라, 사람 정보가 없는
+  // 첫 화면과 처리방침만 페이지에서 따로 연다(robots.ts · next.config.ts 와 같은 목록).
   robots: { index: false, follow: false, nocache: true },
   // 파일 규약(app/icon.png) 대신 여기서 명시한다 — 크기별 파일이 여러 개고
   // manifest 가 같은 경로를 가리키므로 한곳에 모아 두는 편이 맞다.

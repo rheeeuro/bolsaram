@@ -3,12 +3,19 @@
  * 로그인 상태면 역할에 맞는 화면으로 바로 보낸다.
  */
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BRAND } from "@bolsaram/ui-tokens";
 import { readSession } from "@/server/auth/session";
 import { BrandLogo } from "@/components/ui/brand-logo";
 
 export const dynamic = "force-dynamic";
+
+// 검색에 노출하는 화면이다 — 사람 정보가 없고, 비로그인 방문자만 이 내용을 본다.
+export const metadata: Metadata = {
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/" },
+};
 
 export default async function IntroPage() {
   const user = await readSession();
@@ -60,7 +67,7 @@ export default async function IntroPage() {
             입장코드로 들어가기
           </Link>
           <p className="mt-3 text-center text-[12px] leading-relaxed text-[var(--color-ink-600)]">
-            볼사람은 주선자가 검증한 분만 참여하는 비공개 서비스입니다.
+            볼사람은 주선자가 검증한 분만 참여하는 소개팅 서비스입니다.
             <br />
             주선자는 카카오·구글로 들어오고, 멤버는 초대 링크를 열면 바로 들어갑니다.
           </p>

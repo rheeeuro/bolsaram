@@ -46,7 +46,9 @@ apps/web/src/
 ├── startup-node.ts           Node 기동 작업 — 환경변수 검증 + 해외 API 연결 대기시간
 ├── app/
 │   ├── page.tsx              인트로 (로그인 상태면 역할별 리다이렉트)
-│   ├── layout.tsx            폰트·메타데이터·noindex
+│   ├── layout.tsx            폰트·메타데이터·기본 noindex
+│   ├── robots.ts             크롤링 범위 — `/`·`/privacy` 만 열고 나머지 차단
+│   ├── sitemap.ts            검색 노출 페이지 목록 (`/`·`/privacy`)
 │   ├── globals.css           Tailwind + 디자인 토큰 + 전역 스타일
 │   ├── login/                주선자 로그인 = 가입 (카카오·구글)
 │   ├── enter/                멤버 입장 — 입장코드 하나만 묻는다

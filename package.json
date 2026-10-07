@@ -2,7 +2,7 @@
   "name": "bolsaram",
   "version": "0.0.0",
   "private": true,
-  "description": "볼사람(Bolsaram): 주선자가 검증한 사람만 참여하는 비공개 소개팅 서비스",
+  "description": "볼사람(Bolsaram): 주선자가 검증한 사람만 참여하는 소개팅 서비스 (모임 단위 비공개)",
   "type": "module",
   "packageManager": "pnpm@9.15.4",
   "engines": {
