@@ -84,6 +84,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0054_profile_image_limit.sql`     | 프로필 사진을 5장까지만 받는 트리거 — 장수를 세는 규칙이라 CHECK 로는 못 쓴다           |
 | `0055_profile_active_only.sql`     | 프로필 상태를 활성/비활성 둘로, 노출 축(`visibility`) 제거. 진행 상태는 관계(`match_requests`)만 가진다 |
 | `0056_profile_owner_only.sql`      | 모임에서도 프로필·Import 는 **등록한 주선자만** 다룬다. 나가거나 내보내지면 그 사람이 올린 프로필은 비활성 |
+| `0057_drop_orphan_default_group.sql` | 빈 DB 설치 때 0010 이 남기는, 주선자·프로필 없는 「기본 모임」 제거          |
 
 ## 테이블
 
