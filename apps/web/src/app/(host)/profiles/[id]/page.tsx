@@ -30,6 +30,7 @@ export default async function HostProfileDetailPage({
         canEdit={data.canEdit}
         status={data.status}
         claimed={data.claimed}
+        createdAt={data.createdAt}
         invite={data.invite}
         source={data.source}
         memo={data.memo}

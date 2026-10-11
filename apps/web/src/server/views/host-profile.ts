@@ -28,6 +28,8 @@ export type HostProfileData = {
    */
   status: string;
   claimed: boolean;
+  /** 등록 시각. 운영 정보라 담당이 아니어도 보인다. */
+  createdAt: string;
   /** 담당일 때만 읽는다. 초대는 등록한 주선자만 발급한다. */
   invite: { expiresAt: string; claimed: boolean } | null;
   /**
@@ -74,6 +76,7 @@ export async function loadHostProfile(
       view: toDetailView(profile, level),
       status: profile.status,
       claimed: profile.userId != null,
+      createdAt: profile.createdAt.toISOString(),
       invite: latest
         ? { expiresAt: latest.expires_at.toISOString(), claimed: latest.claimed_at != null }
         : null,

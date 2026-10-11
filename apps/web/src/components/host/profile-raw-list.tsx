@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ProfileCode } from "@/components/ui/marks";
+import { formatWhen } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import { cn } from "@/lib/cn";
 
@@ -151,19 +152,4 @@ function PhotoAlbum({
       ))}
     </div>
   );
-}
-
-/** 오늘이면 시각만, 다른 날이면 날짜까지. 대화 화면과 같은 규칙이다. */
-function formatWhen(iso: string): string {
-  const at = new Date(iso);
-  const today = new Date();
-  const sameDay =
-    at.getFullYear() === today.getFullYear() &&
-    at.getMonth() === today.getMonth() &&
-    at.getDate() === today.getDate();
-  return at.toLocaleString("ko-KR", {
-    ...(sameDay ? {} : { year: "2-digit", month: "numeric", day: "numeric" }),
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

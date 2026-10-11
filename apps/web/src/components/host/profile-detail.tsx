@@ -14,6 +14,7 @@ import { ProfileMemo } from "@/components/host/profile-memo";
 import { Panel } from "@/components/host/surface";
 import { apiPatch, apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { formatDateTime } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 
@@ -49,6 +50,7 @@ export function HostProfileDetail({
   canEdit,
   status,
   claimed,
+  createdAt,
   invite,
   source,
   memo,
@@ -57,6 +59,8 @@ export function HostProfileDetail({
   canEdit: boolean;
   status: string;
   claimed: boolean;
+  /** 등록 시각(ISO). */
+  createdAt: string;
   invite: { expiresAt: string; claimed: boolean } | null;
   /** 가져올 때 받은 카카오톡 원문. 담당일 때만 온다. */
   source: { sessionId: string; rawText: string } | null;
@@ -153,6 +157,9 @@ export function HostProfileDetail({
               </span>
             ) : null}
           </div>
+          <p className="mt-2 text-[12px] text-[var(--color-ink-500)]">
+            <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> 등록
+          </p>
         </div>
 
         {canEdit ? (

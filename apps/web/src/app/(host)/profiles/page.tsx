@@ -13,6 +13,7 @@ import { introducedWithManaged } from "@/server/repo/matches";
 import { canEditProfiles, findAdminProfiles } from "@/server/repo/profiles";
 import { sourceTextsFor } from "@/server/repo/imports";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
+import { formatDay } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import { HostProfileFilters } from "@/components/host/profile-filters";
 import { ProfileRawList, type RawListItem } from "@/components/host/profile-raw-list";
@@ -80,6 +81,8 @@ export default async function HostProfilesPage({
         // 두 값을 따로 읽게 두지 않고 결론을 낸다.
         visible: isDiscoverable({ status: profile.status }),
         source: sources?.get(profile.id) ?? null,
+        // 등록 시각은 개인정보가 아니라 담당이 아니어도 보인다.
+        createdAt: profile.createdAt.toISOString(),
       })),
     };
   });
@@ -155,7 +158,7 @@ export default async function HostProfilesPage({
         <ProfileRawList items={page.items.map(toRawItem)} />
       ) : (
         <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-          {page.items.map(({ view, claimed, canEdit, visible }) => (
+          {page.items.map(({ view, claimed, canEdit, visible, createdAt }) => (
             <li key={view.id}>
               <Link href={`/profiles/${view.id}`} className="group block">
                 <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
@@ -211,6 +214,9 @@ export default async function HostProfilesPage({
                     ]
                       .filter(Boolean)
                       .join(" · ")}
+                  </p>
+                  <p className="mt-1 text-[11.5px] text-[var(--color-ink-500)]">
+                    <time dateTime={createdAt}>{formatDay(createdAt)}</time> 등록
                   </p>
                   {canEdit && !claimed ? (
                     <p className="mt-1.5">

@@ -79,6 +79,7 @@ apps/web/src/
 ├── lib/
 │   ├── api-client.ts         fetch 래퍼 — 오류를 판별 가능한 결과로 변환
 │   ├── labels.ts             열거형 → 한글 라벨
+│   ├── dates.ts              시각 표기 (서울 시간대 고정 — 서버·클라이언트가 같은 글자)
 │   ├── invite-code.ts        입장코드 정규화 (링크·공백 섞여 들어온 값에서 코드만)
 │   ├── next-path.ts          `?next=` 검증 — 같은 출처 경로만
 │   ├── markdown.ts           가이드 문서 마크다운 부분집합 → 블록 배열
