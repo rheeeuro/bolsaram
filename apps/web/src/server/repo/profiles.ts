@@ -29,7 +29,7 @@ const PROFILE_COLUMNS = `
   p.job_title, p.job_category, p.company, p.education,
   p.residence_region, p.workplace_region, p.religion, p.mbti,
   p.smoking, p.drinking, p.hobbies, p.hashtags, p.bio, p.ideal_type_text,
-  p.real_name, p.contact_note, p.status,
+  p.host_comment, p.real_name, p.contact_note, p.status,
   p.created_at, p.updated_at`;
 
 type ProfileRow = {
@@ -53,6 +53,7 @@ type ProfileRow = {
   hashtags: string[];
   bio: string | null;
   ideal_type_text: string | null;
+  host_comment: string | null;
   real_name: string | null;
   contact_note: string | null;
   status: ProfileStatus;
@@ -103,6 +104,7 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     hashtags: row.hashtags ?? [],
     bio: row.bio,
     idealTypeText: row.ideal_type_text,
+    hostComment: row.host_comment,
     realName: row.real_name,
     contactNote: row.contact_note,
     status: row.status,
@@ -304,6 +306,7 @@ const UPDATABLE_COLUMNS: Record<keyof ProfileUpdate, string> = {
   hashtags: "hashtags",
   bio: "bio",
   idealTypeText: "ideal_type_text",
+  hostComment: "host_comment",
   realName: "real_name",
   contactNote: "contact_note",
 };

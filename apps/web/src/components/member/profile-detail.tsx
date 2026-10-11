@@ -132,6 +132,17 @@ export function ProfileDetail({
           </p>
         </header>
 
+        {/* 주선자가 직접 쓴 한마디. 본인 소개와 섞이지 않게 맨 위에 따로 둔다. */}
+        {profile.hostComment ? (
+          <Section title="주선자 코멘트">
+            <blockquote className="rounded-xl border-l-2 border-[var(--color-rose-300)] bg-[var(--color-rose-100)]/60 px-4 py-3.5">
+              <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--color-ink-800)]">
+                {profile.hostComment}
+              </p>
+            </blockquote>
+          </Section>
+        ) : null}
+
         <Section title="ABOUT">
           <Rows
             rows={[

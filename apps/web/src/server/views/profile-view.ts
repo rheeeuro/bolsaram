@@ -43,6 +43,8 @@ export type ProfileDetailView = ProfileCardView & {
   hashtags: string[];
   bio: string | null;
   idealTypeText: string | null;
+  /** 주선자가 쓴 소개 한마디. 공개 단계는 소개·이상형과 같다. */
+  hostComment: string | null;
   /** INTRODUCED 이후에만 채워진다. */
   realName?: string | null;
   contactNote?: string | null;
@@ -109,6 +111,7 @@ export function toDetailView(
     hashtags: view.hashtags ?? [],
     bio: view.bio ?? null,
     idealTypeText: view.idealTypeText ?? null,
+    hostComment: view.hostComment ?? null,
   };
 
   if (level === "INTRODUCED" || level === "ADMIN" || level === "OWNER") {

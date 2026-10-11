@@ -87,6 +87,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0057_drop_orphan_default_group.sql` | 빈 DB 설치 때 0010 이 남기는, 주선자·프로필 없는 「기본 모임」 제거          |
 | `0058_telegram_session_completed.sql` | 봇 대화 상태 `COMPLETED` — 한 사람이 끝나면 대화를 닫고 다음 사람은 새 대화로 받는다 |
 | `0059_profile_memos.sql`           | `profile_memos` — 등록한 주선자만 읽고 쓰는 프로필 메모                       |
+| `0060_profile_host_comment.sql`    | `profiles.host_comment` — 주선자가 쓰고 멤버 상세에 보이는 소개 한마디(500자) |
 
 ## 테이블
 

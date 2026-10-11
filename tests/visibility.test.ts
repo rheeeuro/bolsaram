@@ -32,6 +32,7 @@ const profile: FullProfile = {
   hobbies: ["러닝", "전시"],
   bio: "소개 문장",
   idealTypeText: "이상형 문장",
+  hostComment: "주선자 코멘트 문장",
   realName: "가상이름",
   contactNote: "카카오톡 ID: sample",
   status: "ACTIVE",
@@ -48,7 +49,15 @@ describe("projectProfile", () => {
     expect(view.height).toBe(167);
     expect(view.jobCategory).toBe("MARKETING");
     // 상세 전용 필드는 키 자체가 없어야 한다.
-    for (const key of ["bio", "company", "mbti", "idealTypeText", "realName", "contactNote"]) {
+    for (const key of [
+      "bio",
+      "company",
+      "mbti",
+      "idealTypeText",
+      "hostComment",
+      "realName",
+      "contactNote",
+    ]) {
       expect(view).not.toHaveProperty(key);
     }
   });
@@ -62,6 +71,7 @@ describe("projectProfile", () => {
   it("DETAIL 단계는 소개까지 열되 이름·연락처는 감춘다", () => {
     const view = projectProfile(profile, "DETAIL");
     expect(view.bio).toBe("소개 문장");
+    expect(view.hostComment).toBe("주선자 코멘트 문장");
     expect(view.mbti).toBe("ENFP");
     expect(view.images).toHaveLength(2);
     expect(view).not.toHaveProperty("realName");

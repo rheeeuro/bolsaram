@@ -27,6 +27,9 @@ const nullableTrimmed = (max: number) =>
     .transform((v) => (v.length === 0 ? null : v))
     .nullable();
 
+/** 주선자 코멘트 길이 상한. DB 제약 `profiles_host_comment_len` 과 같은 값이다. */
+export const PROFILE_HOST_COMMENT_MAX = 500;
+
 export const profileWritableSchema = z.object({
   gender: z.enum(GENDERS),
   birthYear: z.number().int().min(BIRTH_YEAR_MIN).max(BIRTH_YEAR_MAX),
@@ -46,6 +49,8 @@ export const profileWritableSchema = z.object({
   hashtags: hashtagListSchema.default([]),
   bio: nullableTrimmed(2000),
   idealTypeText: nullableTrimmed(2000),
+  /** 주선자가 이 분을 소개하는 한마디. 멤버 상세에 그대로 보인다. */
+  hostComment: nullableTrimmed(PROFILE_HOST_COMMENT_MAX),
   /** 이름/연락처는 INTRODUCED 이후에만 공개된다(설계문서 §5). */
   realName: nullableTrimmed(60),
   contactNote: nullableTrimmed(200),

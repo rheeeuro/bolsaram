@@ -254,6 +254,15 @@ export function HostProfileDetail({
                 </p>
               </div>
             ) : null}
+
+            {profile.hostComment ? (
+              <div className="mt-4">
+                <p className="text-[12.5px] text-[var(--surface-text-muted)]">주선자 코멘트</p>
+                <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[var(--surface-text)]">
+                  {profile.hostComment}
+                </p>
+              </div>
+            ) : null}
           </Panel>
 
           {/* 담당이면 비어 있어도 보여준다 — 초대를 보내기 전에 채워야 하는 칸이다. */}

@@ -12,6 +12,7 @@ import {
   JOB_CATEGORIES,
   JOB_CATEGORY_LABELS,
   MBTI_TYPES,
+  PROFILE_HOST_COMMENT_MAX,
   REGIONS,
   REGION_LABELS,
   RELIGIONS,
@@ -52,6 +53,7 @@ function initialDraft(profile: ProfileDetailView): Draft {
     hashtags: profile.hashtags.map(formatHashtag).join(" "),
     bio: profile.bio ?? "",
     idealTypeText: profile.idealTypeText ?? "",
+    hostComment: profile.hostComment ?? "",
     realName: profile.realName ?? "",
     contactNote: profile.contactNote ?? "",
   };
@@ -110,6 +112,7 @@ export function HostProfileEditor({ profile }: { profile: ProfileDetailView }) {
       hashtags: parseHashtagInput(draft.hashtags ?? ""),
       bio: draft.bio,
       idealTypeText: draft.idealTypeText,
+      hostComment: draft.hostComment,
       realName: draft.realName,
       contactNote: draft.contactNote,
     });
@@ -322,6 +325,23 @@ export function HostProfileEditor({ profile }: { profile: ProfileDetailView }) {
                 />
               </Field>
             </div>
+          </Panel>
+
+          <Panel title="주선자 코멘트">
+            <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+              이 분을 소개하는 한마디입니다. 멤버 화면 프로필에 그대로 보입니다.
+            </p>
+            <Field
+              label="코멘트"
+              hint={`${(draft.hostComment ?? "").length} / ${PROFILE_HOST_COMMENT_MAX}자`}
+            >
+              <Textarea
+                value={draft.hostComment}
+                maxLength={PROFILE_HOST_COMMENT_MAX}
+                placeholder="직접 만나 본 인상, 이런 분과 잘 맞을 것 같다는 생각"
+                onChange={(e) => set("hostComment")(e.target.value)}
+              />
+            </Field>
           </Panel>
 
           <Panel title="연결된 뒤에만 보이는 내용">
