@@ -474,7 +474,7 @@ function CloseGroup({ group }: { group: Group }) {
     return (
       <DangerPanel
         title="모임 폐쇄"
-        description={`${left.join(" · ")}이 남아 있어 폐쇄할 수 없습니다. 전체공개로 옮기거나 정리한 뒤 다시 시도해 주세요.`}
+        description={`${left.join(" · ")}이 남아 있어 폐쇄할 수 없습니다. 남은 프로필과 가져오기를 정리한 뒤 다시 시도해 주세요.`}
         error={null}
       />
     );
