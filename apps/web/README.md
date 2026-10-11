@@ -191,6 +191,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/profiles`                           | GET                 | 멤버              | Discover 목록 (필터·커서)            |
 | `/api/profiles/[id]`                      | GET / PATCH         | 멤버 / 주선자     | 상세 조회 / 내용 수정                |
 | `/api/profiles/[id]/status`               | PATCH               | 주선자            | 활성·비활성 전환                     |
+| `/api/profiles/[id]/memo`                 | PUT                 | 등록한 주선자     | 나만 보는 메모 저장 (빈 글이면 삭제) |
 | `/api/match-requests`                     | GET / POST          | 멤버(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/profiles`                     | GET                 | 주선자            | 목록 조건에 맞는 사람 수 (조건 시트의 「N명 보기」) |
@@ -275,6 +276,11 @@ webhook
 
 **입력 채널만 추가한 것이며 Import 도메인은 그대로다.** 봇으로 들어온 세션도 같은
 목록·검토·commit 을 거치고, 게시 게이트(`assertCommittable`)를 우회하지 않는다.
+분석 결과 메시지의 버튼(성별 · 등록)도 웹과 같은 `applyExtractionReview` · `commitSession` 을
+부른다. 등록 버튼은 세션에서 만든 idempotency 키를 쓰므로 두 번 눌러도 프로필은 하나다.
+
+대화 하나는 프로필 하나다. 글을 받은 뒤 오는 사진이나 등록된 Import 에 들어오는 입력은
+이전 대화를 `COMPLETED` 로 닫고 새 대화로 받는다(domain 의 `conversationRollover`).
 
 owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세션 쿠키가 없어 RLS 컨텍스트를
 만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 주선자 요청과 완전히 같다.

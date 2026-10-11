@@ -60,6 +60,14 @@ export const profileStatusUpdateSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 });
 
+/** 주선자 메모 길이 상한. DB 제약 `profile_memos_body_len` 과 같은 값이다. */
+export const PROFILE_MEMO_MAX = 2000;
+
+/** 등록한 주선자만 보는 메모. 빈 문자열은 메모를 지운다. */
+export const profileMemoUpdateSchema = z.object({
+  body: z.string().trim().max(PROFILE_MEMO_MAX),
+});
+
 /** Discover 필터 (설계문서 §4 탐색). 쿼리스트링에서 오므로 문자열을 강제 변환한다. */
 const csv = <T extends readonly [string, ...string[]]>(values: T) =>
   z

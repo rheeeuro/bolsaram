@@ -248,6 +248,8 @@ export const TELEGRAM_SESSION_STATES = [
   "WAITING_MEDIA",
   "WAITING_TEXT",
   "READY",
+  /** 등록을 마쳤거나 다음 사람이 시작돼 닫힌 대화(0058). */
+  "COMPLETED",
   "CANCELED",
   "EXPIRED",
 ] as const;
@@ -256,6 +258,7 @@ export const TELEGRAM_SESSION_STATE_LABELS: Record<TelegramSessionState, string>
   WAITING_MEDIA: "사진 대기",
   WAITING_TEXT: "프로필 글 대기",
   READY: "분석 대기",
+  COMPLETED: "완료",
   CANCELED: "취소됨",
   EXPIRED: "만료됨",
 };

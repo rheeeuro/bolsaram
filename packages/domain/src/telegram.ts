@@ -2,7 +2,8 @@
  * 텔레그램 봇 대화 로직 (설계 변경 문서 TELEGRAM v1 §5·§6·§11).
  *
  *   WAITING_MEDIA → WAITING_TEXT → READY → (분석은 Import 상태 기계가 이어받는다)
- *                        └──────── CANCELED / EXPIRED ────────┘
+ *                        ├──────── CANCELED / EXPIRED ────────┤
+ *                        └──── COMPLETED (다음 사람 시작) ────┘
  *
  * 이 파일은 순수 함수만 둔다. 네트워크·DB·Bot API 타입을 모른다.
  * "어떤 메시지를 무엇으로 해석하는가"의 단일 판정 지점이며, webhook 라우트는
@@ -13,6 +14,7 @@ import {
   TELEGRAM_CALLBACK_DATA_LIMIT,
   TELEGRAM_MAX_ASSETS_PER_SESSION,
   type Gender,
+  type ImportStatus,
   type TelegramMessage,
   type TelegramSessionState,
 } from "@bolsaram/schemas";
@@ -39,12 +41,13 @@ const ALLOWED_TELEGRAM_TRANSITIONS: Record<
   readonly TelegramSessionState[]
 > = {
   // 사진을 기다리는 중에도 글이 먼저 올 수 있다.
-  WAITING_MEDIA: ["WAITING_TEXT", "READY", "CANCELED", "EXPIRED"],
+  WAITING_MEDIA: ["WAITING_TEXT", "READY", "COMPLETED", "CANCELED", "EXPIRED"],
   // 글을 기다리는 중에 사진을 더 보낼 수 있다.
-  WAITING_TEXT: ["WAITING_MEDIA", "READY", "CANCELED", "EXPIRED"],
-  // 분석 대기 상태에서도 사진·글을 덧붙일 수 있다.
-  READY: ["WAITING_MEDIA", "WAITING_TEXT", "CANCELED", "EXPIRED"],
-  // 종착점. 다시 등록하려면 새 대화를 시작한다(/new).
+  WAITING_TEXT: ["WAITING_MEDIA", "READY", "COMPLETED", "CANCELED", "EXPIRED"],
+  // 글은 더 덧붙일 수 있다. 사진이 오면 다음 사람으로 보고 닫는다(conversationRollover).
+  READY: ["WAITING_MEDIA", "WAITING_TEXT", "COMPLETED", "CANCELED", "EXPIRED"],
+  // 종착점. 다음 입력은 새 대화로 받는다.
+  COMPLETED: [],
   CANCELED: [],
   EXPIRED: [],
 };
@@ -84,6 +87,27 @@ export function nextTelegramState(input: {
   if (input.hasText) return "READY";
   if (input.assetCount > 0) return "WAITING_TEXT";
   return "WAITING_MEDIA";
+}
+
+/**
+ * 열린 대화에 새 입력이 왔을 때 이 대화를 닫고 새 대화로 받아야 하는지.
+ *
+ * 대화 하나가 프로필 하나다. 운영 경로는 「사진들 → 프로필 글」이고 글을 받으면
+ * 바로 분석하므로, **글을 받은 뒤(READY) 들어오는 사진은 다음 사람의 시작**이다.
+ * 이어 붙이면 두 사람의 사진이 섞이고, 뒤따르는 글이 앞사람 원문에 합쳐져
+ * 조용히 잘못 분석된다. 글은 여러 메시지로 쪼개져 오므로 READY 에서도 이어 받는다.
+ *
+ * 이미 등록된 Import 는 무엇이 와도 더 받을 수 없다 — 원문·사진을 고치면
+ * 등록된 프로필과 원본이 어긋나고, 재분석은 CONFLICT 로 막힌다.
+ */
+export function conversationRollover(input: {
+  state: TelegramSessionState;
+  importStatus: ImportStatus;
+  incoming: "photo" | "text";
+}): boolean {
+  if (!isTelegramSessionOpen(input.state)) return false;
+  if (input.importStatus === "IMPORTED") return true;
+  return input.incoming === "photo" && input.state === "READY";
 }
 
 export function isTelegramSessionStale(
@@ -288,13 +312,13 @@ export function parseRoomChoice(
  *
  * 값은 64바이트를 넘을 수 없으므로 식별자만 싣는다(`g:<세션 UUID>:M`, 40바이트).
  */
-export type TelegramCallbackAction = {
-  kind: "gender";
-  sessionId: string;
-  gender: Gender;
-};
+export type TelegramCallbackAction =
+  | { kind: "gender"; sessionId: string; gender: Gender }
+  /** 분석 결과를 그대로 등록·공개한다. 게시 조건은 commit 경로가 다시 판정한다. */
+  | { kind: "commit"; sessionId: string };
 
 const GENDER_CALLBACK_PREFIX = "g";
+const COMMIT_CALLBACK_PREFIX = "c";
 /** 성별 한 글자 ↔ enum. 값을 그대로 실으면 64바이트 안에서 여유가 줄어든다. */
 const GENDER_CALLBACK_CODES: Record<Gender, string> = { MALE: "M", FEMALE: "F" };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -307,6 +331,10 @@ export function encodeGenderCallback(sessionId: string, gender: Gender): string 
   return data;
 }
 
+export function encodeCommitCallback(sessionId: string): string {
+  return `${COMMIT_CALLBACK_PREFIX}:${sessionId}`;
+}
+
 /**
  * 돌아온 버튼 값을 해석한다. **텔레그램이 준 값이므로 신뢰하지 않는다** —
  * 형태가 조금이라도 다르면 null 이고, 어댑터는 아무것도 하지 않는다.
@@ -315,10 +343,13 @@ export function encodeGenderCallback(sessionId: string, gender: Gender): string 
 export function parseTelegramCallback(data: string | null | undefined): TelegramCallbackAction | null {
   if (!data || data.length > TELEGRAM_CALLBACK_DATA_LIMIT) return null;
   const parts = data.split(":");
-  if (parts.length !== 3) return null;
-  const [prefix, sessionId, code] = parts as [string, string, string];
-  if (prefix !== GENDER_CALLBACK_PREFIX) return null;
-  if (!UUID_PATTERN.test(sessionId)) return null;
+  const [prefix, sessionId] = parts;
+  if (!sessionId || !UUID_PATTERN.test(sessionId)) return null;
+  if (prefix === COMMIT_CALLBACK_PREFIX) {
+    return parts.length === 2 ? { kind: "commit", sessionId } : null;
+  }
+  if (prefix !== GENDER_CALLBACK_PREFIX || parts.length !== 3) return null;
+  const code = parts[2];
   const gender = GENDERS.find((value) => GENDER_CALLBACK_CODES[value] === code);
   if (!gender) return null;
   return { kind: "gender", sessionId, gender };

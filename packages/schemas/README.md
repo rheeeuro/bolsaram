@@ -24,7 +24,7 @@ packages/schemas/src/
 ├── extraction.ts   AI 추출 스키마 · strict JSON Schema 생성 · 신뢰도 기준
 ├── hashtag.ts      해시태그 정규화·상한·표기 (저장과 검색이 같은 형태를 쓴다)
 ├── image.ts        이미지 업로드 두 단계(슬롯·확정) — 프로필·주선자·모임 사진이 함께 쓴다
-├── profile.ts      프로필 읽기/쓰기 · Discover 필터 · 관리자 목록 쿼리 (인적 조건 공유)
+├── profile.ts      프로필 읽기/쓰기 · 주선자 메모 · Discover 필터 · 관리자 목록 쿼리 (인적 조건 공유)
 ├── match.ts        소개 신청 생성·거절·연결, 관심 토글
 ├── import.ts       Import 세션·에셋·원문·검토·commit
 ├── auth.ts         전화번호 정규화, 주선자 로그인, 초대 링크·모임 코드

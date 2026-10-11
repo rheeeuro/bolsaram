@@ -7,6 +7,7 @@
  *   * 직접 보낸 글이 사진 설명(caption)보다 항상 우선한다.
  *   * 이미지가 아닌 것은 받지 않는다.
  *   * 끝난 대화는 되살아나지 않는다.
+ *   * 한 사람이 끝나면 다음 사람은 새 대화로 받는다(앞 Import 에 섞이지 않는다).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -15,6 +16,8 @@ import {
   assertAssetCapacity,
   assertTelegramTransition,
   classifyTelegramMessage,
+  conversationRollover,
+  encodeCommitCallback,
   encodeGenderCallback,
   isTelegramSessionOpen,
   isTelegramSessionStale,
@@ -254,13 +257,14 @@ describe("대화 상태", () => {
   });
 
   it("끝난 대화는 무엇이 들어와도 되살아나지 않는다", () => {
-    for (const current of ["CANCELED", "EXPIRED"] as const) {
+    for (const current of ["COMPLETED", "CANCELED", "EXPIRED"] as const) {
       expect(nextTelegramState({ current, assetCount: 5, hasText: true })).toBe(current);
     }
   });
 
   it("열린 상태만 입력을 받는다", () => {
     expect(["WAITING_MEDIA", "WAITING_TEXT", "READY"].every(isTelegramSessionOpen)).toBe(true);
+    expect(isTelegramSessionOpen("COMPLETED")).toBe(false);
     expect(isTelegramSessionOpen("CANCELED")).toBe(false);
     expect(isTelegramSessionOpen("EXPIRED")).toBe(false);
   });
@@ -277,6 +281,51 @@ describe("대화 상태", () => {
 
   it("같은 상태로의 전이는 통과한다", () => {
     expect(() => assertTelegramTransition("CANCELED", "CANCELED")).not.toThrow();
+  });
+});
+
+describe("다음 사람으로 넘어가기", () => {
+  it("글을 받은 뒤 들어온 사진은 다음 사람의 시작이다", () => {
+    // 사진 3장 → 글 → (분석) → 다음 사람 사진. 이어 붙이면 사진이 섞이고
+    // 뒤따르는 글이 앞사람 원문에 합쳐진다.
+    for (const importStatus of ["ANALYZING", "REVIEW_REQUIRED", "READY", "FAILED"] as const) {
+      expect(conversationRollover({ state: "READY", importStatus, incoming: "photo" })).toBe(true);
+    }
+  });
+
+  it("글이 오기 전의 사진은 같은 사람으로 묶는다", () => {
+    for (const state of ["WAITING_MEDIA", "WAITING_TEXT"] as const) {
+      expect(
+        conversationRollover({ state, importStatus: "RECEIVED", incoming: "photo" }),
+      ).toBe(false);
+    }
+  });
+
+  it("쪼개져 오는 글은 같은 사람으로 이어 받는다", () => {
+    expect(
+      conversationRollover({ state: "READY", importStatus: "REVIEW_REQUIRED", incoming: "text" }),
+    ).toBe(false);
+  });
+
+  it("등록을 마친 Import 에는 무엇도 붙이지 않는다", () => {
+    for (const state of ["WAITING_MEDIA", "WAITING_TEXT", "READY"] as const) {
+      for (const incoming of ["photo", "text"] as const) {
+        expect(conversationRollover({ state, importStatus: "IMPORTED", incoming })).toBe(true);
+      }
+    }
+  });
+
+  it("닫힌 대화는 넘길 것이 없다", () => {
+    expect(
+      conversationRollover({ state: "COMPLETED", importStatus: "IMPORTED", incoming: "photo" }),
+    ).toBe(false);
+  });
+
+  it("열린 대화는 완료로 닫을 수 있고 완료는 종착점이다", () => {
+    for (const from of ["WAITING_MEDIA", "WAITING_TEXT", "READY"] as const) {
+      expect(() => assertTelegramTransition(from, "COMPLETED")).not.toThrow();
+    }
+    expect(() => assertTelegramTransition("COMPLETED", "WAITING_MEDIA")).toThrow(/바꿀 수 없/);
   });
 });
 
@@ -369,5 +418,19 @@ describe("성별 버튼", () => {
     expect(parseTelegramCallback("g:not-a-uuid:M")).toBeNull();
     expect(parseTelegramCallback(`g:${SESSION_ID}:M:extra`)).toBeNull();
     expect(parseTelegramCallback(`g:${"a".repeat(TELEGRAM_CALLBACK_DATA_LIMIT)}:M`)).toBeNull();
+  });
+});
+
+describe("등록 버튼", () => {
+  it("버튼 값은 어떤 세션인지 담고 Bot API 상한 안에 들어간다", () => {
+    const data = encodeCommitCallback(SESSION_ID);
+    expect(data.length).toBeLessThanOrEqual(TELEGRAM_CALLBACK_DATA_LIMIT);
+    expect(parseTelegramCallback(data)).toEqual({ kind: "commit", sessionId: SESSION_ID });
+  });
+
+  it("형태가 다른 값은 해석하지 않는다", () => {
+    expect(parseTelegramCallback(`c:${SESSION_ID}:M`)).toBeNull();
+    expect(parseTelegramCallback("c:not-a-uuid")).toBeNull();
+    expect(parseTelegramCallback("c:")).toBeNull();
   });
 });

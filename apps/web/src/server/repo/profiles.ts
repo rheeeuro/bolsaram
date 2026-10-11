@@ -374,6 +374,42 @@ export async function updateProfileStatus(
   return (result.rowCount ?? 0) > 0;
 }
 
+// ── 주선자 메모 ───────────────────────────────────────────────
+
+export type ProfileMemo = { body: string; updatedAt: string };
+
+/**
+ * 등록한 주선자의 메모. 남이 부르면 RLS 가 행을 가려 메모가 없는 것과 같다(0059).
+ */
+export async function findProfileMemo(sql: Sql, profileId: string): Promise<ProfileMemo | null> {
+  const result = await sql.query<{ body: string; updated_at: Date }>(
+    `SELECT body, updated_at FROM profile_memos WHERE profile_id = $1`,
+    [profileId],
+  );
+  const row = result.rows[0];
+  return row ? { body: row.body, updatedAt: row.updated_at.toISOString() } : null;
+}
+
+/** 메모를 덮어쓴다. 빈 글은 지운다 — 빈 메모 행을 남기지 않는다. */
+export async function saveProfileMemo(
+  sql: Sql,
+  profileId: string,
+  body: string,
+): Promise<ProfileMemo | null> {
+  if (body === "") {
+    await sql.query(`DELETE FROM profile_memos WHERE profile_id = $1`, [profileId]);
+    return null;
+  }
+  const result = await sql.query<{ body: string; updated_at: Date }>(
+    `INSERT INTO profile_memos (profile_id, body) VALUES ($1, $2)
+     ON CONFLICT (profile_id) DO UPDATE SET body = EXCLUDED.body
+     RETURNING body, updated_at`,
+    [profileId, body],
+  );
+  const row = result.rows[0]!;
+  return { body: row.body, updatedAt: row.updated_at.toISOString() };
+}
+
 // ── 관리자 목록 ───────────────────────────────────────────────
 
 /**
@@ -410,7 +446,7 @@ function adminProfileWhere(
     const term = push(`%${needle.length > 0 ? needle : query.q}%`);
     const codeClause = codeMatch ? ` OR p.public_code = ${push(Number(codeMatch[1]))}` : "";
     // 카카오톡에서 Ctrl+F 로 찾던 말(「송파」 「치과」 「교회」)이 걸리도록 정리된 글과
-    // 가져올 때 받은 원문까지 훑는다. 원문은 RLS 가 다룰 수 있는 세션만 보여준다.
+    // 가져올 때 받은 원문·내 메모까지 훑는다. 둘 다 RLS 가 담당인 것만 보여준다.
     // 이름은 담당일 때만 검색에 건다 — 아니면 검색 결과가 이름을 확인해 주는 통로가 된다.
     clauses.push(
       `((p.real_name ILIKE ${term} AND app_can_edit_profile(p.id))
@@ -419,7 +455,9 @@ function adminProfileWhere(
         OR array_to_string(p.hobbies, ' ') ILIKE ${term}
         OR array_to_string(p.hashtags, ' ') ILIKE ${term}
         OR EXISTS (SELECT 1 FROM import_sessions s
-                    WHERE s.committed_profile_id = p.id AND s.raw_text ILIKE ${term})${codeClause})`,
+                    WHERE s.committed_profile_id = p.id AND s.raw_text ILIKE ${term})
+        OR EXISTS (SELECT 1 FROM profile_memos m
+                    WHERE m.profile_id = p.id AND m.body ILIKE ${term})${codeClause})`,
     );
   }
 

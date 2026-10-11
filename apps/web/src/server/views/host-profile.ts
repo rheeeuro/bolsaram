@@ -10,7 +10,12 @@ import { withRls } from "@bolsaram/db";
 import { rlsContextOf, type Viewer } from "../auth/guard";
 import { introducedWithManaged } from "../repo/matches";
 import { sourceTextsFor } from "../repo/imports";
-import { canEditProfiles, findProfileById } from "../repo/profiles";
+import {
+  canEditProfiles,
+  findProfileById,
+  findProfileMemo,
+  type ProfileMemo,
+} from "../repo/profiles";
 import { disclosureFor, toDetailView, type ProfileDetailView } from "./profile-view";
 
 export type HostProfileData = {
@@ -30,6 +35,8 @@ export type HostProfileData = {
    * 있을 수 있고, RLS 도 남의 전체공개 세션은 보여주지 않는다.
    */
   source: { sessionId: string; rawText: string } | null;
+  /** 등록한 주선자만 보는 메모. 담당일 때만 읽는다 — RLS 도 남에게는 행을 주지 않는다. */
+  memo: ProfileMemo | null;
 };
 
 export async function loadHostProfile(
@@ -60,6 +67,7 @@ export async function loadHostProfile(
       : null;
     const latest = invite?.rows[0];
     const source = canEdit ? (await sourceTextsFor(sql, [profile.id])).get(profile.id) : null;
+    const memo = canEdit ? await findProfileMemo(sql, profile.id) : null;
 
     return {
       canEdit,
@@ -70,6 +78,7 @@ export async function loadHostProfile(
         ? { expiresAt: latest.expires_at.toISOString(), claimed: latest.claimed_at != null }
         : null,
       source: source?.rawText ? { sessionId: source.sessionId, rawText: source.rawText } : null,
+      memo,
     };
   });
 }

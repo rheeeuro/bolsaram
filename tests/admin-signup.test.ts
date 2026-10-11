@@ -26,7 +26,12 @@ import {
   updateGroup,
 } from "../apps/web/src/server/auth/group-invite";
 import { loginWithOAuth } from "../apps/web/src/server/auth/oauth";
-import { countAdminProfiles, findAdminProfiles } from "../apps/web/src/server/repo/profiles";
+import {
+  countAdminProfiles,
+  findAdminProfiles,
+  findProfileMemo,
+  saveProfileMemo,
+} from "../apps/web/src/server/repo/profiles";
 import { runTag } from "./tags";
 
 const TAG = runTag("sgn");
@@ -324,6 +329,111 @@ describe("주선자 목록 찾기", () => {
 
     const miss = await search(owner, { q: `${TAG}-조건소개`, heightMin: 170 });
     expect(miss).toEqual({ ids: [], total: 0 });
+  });
+
+  it("메모는 쓴 사람의 검색에만 걸린다", async () => {
+    const owner = await newAdmin("메모검색");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "메모검색멤버" });
+    await withRls(owner, (sql) => saveProfileMemo(sql, id, `${TAG}-메모속말 이직 준비 중`));
+
+    expect((await search(owner, { q: `${TAG}-메모속말` })).ids).toEqual([id]);
+    // 프로필은 보이지만 메모로는 찾을 수 없다 — 검색 결과가 메모 내용을 확인해 주면 안 된다.
+    const other = await newAdmin("메모검색남");
+    expect((await search(other, { q: `${TAG}-메모속말` })).ids).toEqual([]);
+  });
+});
+
+/**
+ * 주선자 메모(0059). **등록한 주선자만** 읽고 쓴다 — 프로필을 볼 수 있는 같은 모임
+ * 주선자도, 본인 계정이 연결된 멤버도 보지 못한다. 막히는 쪽을 주로 본다.
+ */
+describe("주선자 메모", () => {
+  const readMemo = (viewer: RlsContext, profileId: string) =>
+    withRls(viewer, (sql) => findProfileMemo(sql, profileId));
+
+  it("등록한 주선자는 쓰고 고치고 지운다", async () => {
+    const owner = await newAdmin("메모주인");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "메모멤버" });
+
+    await withRls(owner, (sql) => saveProfileMemo(sql, id, "처음 메모"));
+    await withRls(owner, (sql) => saveProfileMemo(sql, id, "고친 메모"));
+    expect((await readMemo(owner, id))?.body).toBe("고친 메모");
+
+    // 빈 글은 행을 남기지 않는다.
+    await withRls(owner, (sql) => saveProfileMemo(sql, id, ""));
+    expect(await readMemo(owner, id)).toBeNull();
+  });
+
+  it("같은 모임 주선자는 메모를 읽지도 쓰지도 못한다", async () => {
+    const owner = await newAdmin("메모모임장");
+    const { groupId } = await createGroupForAdmin({ userId: owner.userId, name: `${TAG}-메모모임` });
+    const colleague = await addColleague(owner, groupId, "메모동료");
+    const id = await seedProfile({ groupId, createdBy: owner.userId, name: "모임메모멤버" });
+    await withRls(owner, (sql) => saveProfileMemo(sql, id, "모임장만 보는 메모"));
+
+    // 프로필은 보인다 — 막히는 것은 메모뿐이다.
+    const seesProfile = await withRls(colleague, async (sql) => {
+      const r = await sql.query(`SELECT 1 FROM profiles WHERE id = $1`, [id]);
+      return r.rowCount ?? 0;
+    });
+    expect(seesProfile).toBe(1);
+    expect(await readMemo(colleague, id)).toBeNull();
+
+    const changed = await withRls(colleague, async (sql) => {
+      const r = await sql.query(`UPDATE profile_memos SET body = 'hacked' WHERE profile_id = $1`, [
+        id,
+      ]);
+      return r.rowCount ?? 0;
+    });
+    expect(changed).toBe(0);
+    const removed = await withRls(colleague, async (sql) => {
+      const r = await sql.query(`DELETE FROM profile_memos WHERE profile_id = $1`, [id]);
+      return r.rowCount ?? 0;
+    });
+    expect(removed).toBe(0);
+    expect((await readMemo(owner, id))?.body).toBe("모임장만 보는 메모");
+  });
+
+  it("남의 프로필에는 메모를 새로 만들 수 없다", async () => {
+    const owner = await newAdmin("메모원주인");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "남메모멤버" });
+    const other = await newAdmin("메모남");
+
+    await expect(withRls(other, (sql) => saveProfileMemo(sql, id, "끼어든 메모"))).rejects.toThrow(
+      /row-level security/,
+    );
+    expect(await readMemo(owner, id)).toBeNull();
+  });
+
+  it("본인 계정이 연결된 멤버도 메모를 보지 못한다", async () => {
+    const owner = await newAdmin("메모연결");
+    const id = await seedProfile({ groupId: null, createdBy: owner.userId, name: "연결메모멤버" });
+    const memberId = await withOwner(async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `INSERT INTO users (role, phone, display_name) VALUES ('MEMBER', $1, $2) RETURNING id`,
+        [`0108${String(Date.now()).slice(-7)}`, `${TAG}-메모멤버계정`],
+      );
+      const userId = r.rows[0]!.id;
+      await sql.query(`UPDATE profiles SET user_id = $2 WHERE id = $1`, [id, userId]);
+      return userId;
+    });
+    await withRls(owner, (sql) => saveProfileMemo(sql, id, "본인은 모르는 메모"));
+
+    expect(await readMemo({ userId: memberId, role: "MEMBER" }, id)).toBeNull();
+  });
+
+  it("모임에서 나가면 그 모임 프로필의 메모도 닫힌다", async () => {
+    const owner = await newAdmin("메모남는모임장");
+    const { groupId } = await createGroupForAdmin({ userId: owner.userId, name: `${TAG}-메모나감` });
+    const leaver = await addColleague(owner, groupId, "메모나갈동료");
+    const id = await seedProfile({ groupId, createdBy: leaver.userId, name: "나간메모멤버" });
+    await withRls(leaver, (sql) => saveProfileMemo(sql, id, "나가기 전 메모"));
+
+    await removeGroupAdmin({ actorId: owner.userId, groupId, targetUserId: leaver.userId });
+
+    expect(await readMemo(leaver, id)).toBeNull();
+    // 남은 모임장도 등록한 사람이 아니므로 여전히 보지 못한다.
+    expect(await readMemo(owner, id)).toBeNull();
   });
 });
 

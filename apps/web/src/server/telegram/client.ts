@@ -127,10 +127,13 @@ export async function sendMessage(
 export async function answerCallbackQuery(
   callbackQueryId: string,
   text?: string,
+  /** true 면 잠깐 뜨는 알림 대신 확인을 눌러야 닫히는 창으로 띄운다. 이유가 긴 거절에 쓴다. */
+  showAlert = false,
 ): Promise<void> {
   await callBotApi("answerCallbackQuery", {
     callback_query_id: callbackQueryId,
     ...(text ? { text } : {}),
+    ...(showAlert ? { show_alert: true } : {}),
   });
 }
 

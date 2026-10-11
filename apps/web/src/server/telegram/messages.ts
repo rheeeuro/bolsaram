@@ -84,8 +84,9 @@ export const messages = {
    * **어느 방에 담고 있는지 여기서 말한다.** 봇에는 방을 고르는 화면이 없고 웹에서
    * 보고 있는 방을 그대로 쓰므로, 잘못 담기고 있다면 이 첫 응답에서 알아채야 한다.
    */
-  mediaReceiving: (groupName: string | null) =>
+  mediaReceiving: (groupName: string | null, startedNew = false) =>
     [
+      ...(startedNew ? ["앞 프로필은 마감하고 새 프로필로 받습니다."] : []),
       "사진을 받고 있습니다.",
       `담는 곳 — ${roomName(groupName)}`,
       "",
@@ -139,8 +140,8 @@ export const messages = {
     lines.push("");
     lines.push(
       needsReview
-        ? "확인이 필요한 항목이 있습니다. 볼사람에서 검토해 주세요."
-        : "볼사람에서 확인하고 등록해 주세요.",
+        ? "확인이 필요한 항목이 있습니다. 성별을 고른 뒤에도 등록이 안 되면 볼사람에서 검토해 주세요."
+        : "내용이 맞으면 「등록」을 누르세요. 바로 공개됩니다.",
     );
     // 성별은 게시 전에 반드시 채워야 하고 AI 가 이름·말투로 추측하지 않는다.
     // 검토 화면까지 가지 않고 여기서 누르면 끝나도록 버튼을 함께 보낸다.
@@ -205,6 +206,15 @@ export const messages = {
   failed: "처리 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.",
 
   reviewButton: "볼사람에서 검토",
+  commitButton: "등록",
+  committedButton: "✓ 등록됨 · 프로필 보기",
+
+  /** 등록 버튼 결과. 누른 사람에게만 뜬다. */
+  committed: (reused: boolean) =>
+    reused ? "이미 등록된 프로필입니다." : "등록했습니다. 프로필이 공개됐습니다.",
+  /** 게시 조건에 걸렸을 때. 어디서 마무리하면 되는지까지 말한다. */
+  commitMissing: "성별 같은 필수 항목이 비어 있어 등록할 수 없습니다. 위 버튼에서 고르거나 볼사람에서 채워 주세요.",
+  commitNeedsReview: "AI 가 확신하지 못한 항목이 있어 바로 등록할 수 없습니다. 볼사람에서 검토해 주세요.",
 
   /**
    * 신청 알림 (마이그레이션 0017 의 아웃박스가 보낸다).

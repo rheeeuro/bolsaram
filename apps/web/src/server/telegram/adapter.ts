@@ -20,11 +20,14 @@ import {
   DomainError,
   assertAssetCapacity,
   classifyTelegramMessage,
+  conversationRollover,
+  encodeCommitCallback,
   encodeGenderCallback,
   mergeRawText,
   nextTelegramState,
   parseRoomChoice,
   parseTelegramCallback,
+  pickRealName,
   shouldAnnounceMedia,
   type TelegramCallbackAction,
   type TelegramIntent,
@@ -51,7 +54,11 @@ import { assertGroupAdmin, readMyGroups } from "../auth/group-invite";
 import { env } from "../env";
 import * as imports from "../repo/imports";
 import * as conversations from "../repo/telegram";
-import { analyzeSession, applyExtractionReview } from "../services/import-service";
+import {
+  analyzeSession,
+  applyExtractionReview,
+  commitSession,
+} from "../services/import-service";
 import { buildStorageKey, putObject } from "../storage/local";
 import {
   answerCallbackQuery,
@@ -250,6 +257,8 @@ async function handleCommand(
         const active = await conversations.findActiveConversation(sql, identity.telegramUserId);
         if (!active) return null;
         const session = await imports.requireSession(sql, active.importSessionId);
+        // 등록을 마친 세션은 다시 분석할 수 없다. 다음 입력이 새 대화를 연다.
+        if (session.status === "IMPORTED") return null;
         // 사진은 모델에 보내지 않으므로 원문이 없으면 분석할 것이 없다.
         const hasText = (session.rawText?.trim().length ?? 0) > 0;
         return hasText ? active.importSessionId : null;
@@ -336,7 +345,15 @@ async function routeCallback(callback: TelegramCallbackQuery): Promise<void> {
   }
   await touchTelegramConnection(callback.from.id);
 
-  await applyGenderChoice(rlsContextOfTelegram(identity), identity, callback, action);
+  const ctx = rlsContextOfTelegram(identity);
+  switch (action.kind) {
+    case "gender":
+      await applyGenderChoice(ctx, identity, callback, action);
+      return;
+    case "commit":
+      await applyCommit(ctx, callback, action);
+      return;
+  }
 }
 
 /**
@@ -374,6 +391,60 @@ async function applyGenderChoice(
 }
 
 /**
+ * 분석 결과를 그대로 등록·공개한다.
+ *
+ * 웹 검토 화면의 「등록」과 **같은 서비스**를 통과한다 — 게시 조건(`assertCommittable`)이
+ * 채널과 무관하게 판정하므로, 성별이 비었거나 AI 가 확신하지 못한 항목이 남았으면
+ * 여기서도 막힌다. 사람이 요약을 보고 누르는 것이라 자동 게시가 아니다.
+ *
+ * 실명은 웹과 같이 원문의 「이름:」 줄에서만 채운다. 연락 메모는 비워 두고
+ * 프로필 수정 화면에서 채운다. 키를 세션에서 만들므로 두 번 눌러도 프로필은 하나다.
+ */
+async function applyCommit(
+  ctx: RlsContext,
+  callback: TelegramCallbackQuery,
+  action: Extract<TelegramCallbackAction, { kind: "commit" }>,
+): Promise<void> {
+  const rawText = await withRls(ctx, async (sql) => {
+    const session = await imports.requireSession(sql, action.sessionId);
+    return session.rawText;
+  });
+  const realName = pickRealName(rawText);
+
+  let result;
+  try {
+    result = await commitSession(ctx, {
+      sessionId: action.sessionId,
+      idempotencyKey: `telegram:${action.sessionId}`,
+      publish: true,
+      ...(realName ? { realName } : {}),
+    });
+  } catch (error) {
+    if (error instanceof DomainError && (error.code === "VALIDATION" || error.code === "INVALID_STATE")) {
+      console.info(`텔레그램 응답: 등록 거절 · ${error.code}`);
+      await answerCallbackQuery(
+        callback.id,
+        error.code === "VALIDATION" ? messages.commitMissing : messages.commitNeedsReview,
+        true,
+      );
+      return;
+    }
+    throw error;
+  }
+  console.info(`텔레그램 응답: 등록 ${result.reused ? "재사용" : "완료"}`);
+
+  await answerCallbackQuery(callback.id, messages.committed(result.reused));
+  // 등록한 뒤에는 고칠 버튼을 걷고 프로필로 가는 길만 남긴다.
+  if (callback.message) {
+    await editMessageReplyMarkup(callback.message.chat.id, callback.message.message_id, [
+      [{ text: messages.committedButton, url: `${env().APP_ORIGIN}/profiles/${result.profileId}` }],
+    ]).catch(() => {
+      console.warn("텔레그램 버튼 갱신 실패 (등록은 완료)");
+    });
+  }
+}
+
+/**
  * 분석 완료 메시지에 붙는 버튼.
  *
  * 성별은 게시 전에 반드시 채워야 하는데 AI 는 이름·말투로 추측하지 않으므로
@@ -386,7 +457,10 @@ function analyzedKeyboard(sessionId: string, gender: Gender | null): TelegramInl
       text: messages.genderButton(value, value === gender),
       data: encodeGenderCallback(sessionId, value),
     })),
-    [{ text: messages.reviewButton, url: `${env().APP_ORIGIN}/imports/${sessionId}` }],
+    [
+      { text: messages.commitButton, data: encodeCommitCallback(sessionId) },
+      { text: messages.reviewButton, url: `${env().APP_ORIGIN}/imports/${sessionId}` },
+    ],
   ];
 }
 
@@ -399,10 +473,10 @@ async function handlePhoto(
 ): Promise<void> {
   // 1) 대화를 확보하고 여유가 있는지 본다. 여기서 트랜잭션을 닫는다.
   const prepared = await withRls(ctx, async (sql) => {
-    const conversation = await ensureConversation(sql, ctx, identity);
+    const { conversation, rolledOver } = await ensureConversation(sql, ctx, identity, "photo");
     const assets = await imports.listAssets(sql, conversation.importSessionId);
     const uploaded = assets.filter((a) => a.uploadedAt != null);
-    return { conversation, uploadedCount: uploaded.length };
+    return { conversation, rolledOver, uploadedCount: uploaded.length };
   });
 
   try {
@@ -482,10 +556,14 @@ async function handlePhoto(
   // 봇이 무엇을 답했는지 남긴다. 안내가 장수만큼 나가는 회귀를 데이터로 잡을 수 있어야 한다
   // (문구·프로필 내용은 남기지 않는다).
   console.info(
-    `텔레그램 응답: 사진 ${result.uploadedCount}장째 · 안내 ${result.announce ? "전송" : "생략"}`,
+    `텔레그램 응답: 사진 ${result.uploadedCount}장째 · 안내 ${result.announce ? "전송" : "생략"}` +
+      (prepared.rolledOver ? " · 새 대화" : ""),
   );
   if (result.announce) {
-    await sendMessage(identity.telegramChatId, messages.mediaReceiving(identity.groupName));
+    await sendMessage(
+      identity.telegramChatId,
+      messages.mediaReceiving(identity.groupName, prepared.rolledOver),
+    );
     if (result.captionStored) {
       await sendMessage(identity.telegramChatId, messages.captionStored);
     }
@@ -500,7 +578,7 @@ async function handleText(
   text: string,
 ): Promise<void> {
   const result = await withRls(ctx, async (sql) => {
-    const conversation = await ensureConversation(sql, ctx, identity);
+    const { conversation } = await ensureConversation(sql, ctx, identity, "text");
     const session = await imports.requireSession(sql, conversation.importSessionId);
     // 직접 보낸 글은 누적한다. 카카오톡 프로필이 여러 메시지로 쪼개져 오는 일이 흔하다.
     const merged = mergeRawText(session.rawText, { source: "text", value: text });
@@ -537,15 +615,26 @@ async function handleText(
 /**
  * 진행 중인 대화가 있으면 쓰고, 없으면 새로 만든다.
  * `/new` 없이 바로 사진을 보내도 동작해야 한다(§4.1 의 예시가 그렇다).
+ *
+ * 진행 중인 대화가 이미 끝난 사람의 것이면(`conversationRollover`) 완료로 닫고
+ * 새 대화를 연다 — 다음 사람을 보낼 때마다 `/new` 를 누르게 하지 않는다.
  */
 async function ensureConversation(
   sql: Sql,
   ctx: RlsContext,
   identity: TelegramIdentity,
-): Promise<conversations.TelegramConversationRecord> {
+  incoming: "photo" | "text",
+): Promise<{ conversation: conversations.TelegramConversationRecord; rolledOver: boolean }> {
   const active = await conversations.findActiveConversation(sql, identity.telegramUserId);
-  if (active) return active;
-  return startConversation(sql, ctx, identity);
+  if (!active) {
+    return { conversation: await startConversation(sql, ctx, identity), rolledOver: false };
+  }
+  const session = await imports.requireSession(sql, active.importSessionId);
+  if (!conversationRollover({ state: active.state, importStatus: session.status, incoming })) {
+    return { conversation: active, rolledOver: false };
+  }
+  await conversations.updateConversation(sql, active, { state: "COMPLETED" });
+  return { conversation: await startConversation(sql, ctx, identity), rolledOver: true };
 }
 
 async function startConversation(

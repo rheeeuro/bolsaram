@@ -85,6 +85,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0055_profile_active_only.sql`     | 프로필 상태를 활성/비활성 둘로, 노출 축(`visibility`) 제거. 진행 상태는 관계(`match_requests`)만 가진다 |
 | `0056_profile_owner_only.sql`      | 모임에서도 프로필·Import 는 **등록한 주선자만** 다룬다. 나가거나 내보내지면 그 사람이 올린 프로필은 비활성 |
 | `0057_drop_orphan_default_group.sql` | 빈 DB 설치 때 0010 이 남기는, 주선자·프로필 없는 「기본 모임」 제거          |
+| `0058_telegram_session_completed.sql` | 봇 대화 상태 `COMPLETED` — 한 사람이 끝나면 대화를 닫고 다음 사람은 새 대화로 받는다 |
+| `0059_profile_memos.sql`           | `profile_memos` — 등록한 주선자만 읽고 쓰는 프로필 메모                       |
 
 ## 테이블
 
@@ -97,6 +99,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임, `avatar_key` 는 프로필 사진 | 본인 + 같은 모임 관계자 |
 | `profiles`                                     | 프로필. `status` 는 활성/비활성뿐, `public_code` 가 화면의 `17번`, `is_seed` 는 합성 표식 | 활성분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
+| `profile_memos`                                | 주선자 메모. 프로필당 하나, 멤버 화면에 안 나간다  | **등록한 주선자만** (같은 모임 주선자·본인 멤버 불가) |
 | `match_requests`                               | 소개 신청 — **프로필 × 프로필** 관계와 그 상태. 한 사람이 여러 행을 동시에 가진다 | 당사자 + 관리자                     |
 | `favorites`                                    | 관심                                               | 본인만                              |
 | `profile_hides`                                | 숨긴 상대. 양방향으로 목록·신청을 막는다           | **숨긴 사람만** (상대·관리자 불가)  |
@@ -128,6 +131,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `profile_images_one_primary` (부분 유니크)           | 대표 사진 두 장                               |
 | `profile_images_limit` 트리거                        | 프로필당 여섯 장째 사진 — 동시 요청도 막힌다  |
 | `profiles.user_id` UNIQUE                            | 한 계정에 프로필 두 개                        |
+| `profile_memos_body_len`                             | 빈 메모·2000자 넘는 메모                      |
 | `invites_one_open` (부분 유니크)                     | 프로필당 살아 있는 초대 두 개                 |
 | `import_sessions_idempotency` (부분 유니크)          | 같은 키로 두 번 commit                        |
 | `import_sessions_commit_pair`                       | 짝이 안 맞는 commit 상태                      |

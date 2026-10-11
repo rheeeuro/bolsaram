@@ -113,7 +113,8 @@ REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
 
 ```
 WAITING_MEDIA → WAITING_TEXT → READY → (분석은 Import 상태 기계가 이어받는다)
-                     └──────── CANCELED / EXPIRED ────────┘
+                     ├──────── CANCELED / EXPIRED ────────┤
+                     └──── COMPLETED (다음 사람 시작) ────┘
 ```
 
 Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가", `import.ts` 의 것은
@@ -125,6 +126,11 @@ Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가",
 
 `mergeRawText` 가 §5.4 의 우선순위를 고정한다 — **직접 보낸 글이 사진 설명보다 항상
 이긴다.** 직접 보낸 글은 누적한다(카카오톡 프로필이 여러 메시지로 쪼개져 온다).
+
+`conversationRollover` 가 "대화 하나 = 프로필 하나"를 지킨다. 글을 받은 뒤(READY)
+들어오는 사진은 다음 사람의 시작으로 보고, 이미 등록된(IMPORTED) Import 에는 무엇도
+붙이지 않는다. 둘 다 이전 대화를 `COMPLETED` 로 닫고 새 대화를 연다. 글은 READY 에서도
+이어 받는다.
 
 `shouldAnnounceMedia` 는 앨범 안내를 한 번만 보내기 위한 것이다. 사진을 하나로 묶는
 일은 대화 세션이 하므로 앨범 버퍼링·debounce 가 필요 없다.

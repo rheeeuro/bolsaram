@@ -10,6 +10,7 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { CopyField } from "@/components/ui/copy-field";
 import { FormError } from "@/components/ui/field";
 import { HashtagChip, ProfileCode } from "@/components/ui/marks";
+import { ProfileMemo } from "@/components/host/profile-memo";
 import { Panel } from "@/components/host/surface";
 import { apiPatch, apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
@@ -50,6 +51,7 @@ export function HostProfileDetail({
   claimed,
   invite,
   source,
+  memo,
 }: {
   profile: ProfileDetailView;
   canEdit: boolean;
@@ -58,6 +60,8 @@ export function HostProfileDetail({
   invite: { expiresAt: string; claimed: boolean } | null;
   /** 가져올 때 받은 카카오톡 원문. 담당일 때만 온다. */
   source: { sessionId: string; rawText: string } | null;
+  /** 등록한 주선자만 보는 메모. 담당일 때만 온다. */
+  memo: { body: string; updatedAt: string } | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -306,6 +310,9 @@ export function HostProfileDetail({
 
         {canEdit ? (
           <aside className="flex flex-col gap-5">
+            {/* 이 분을 다시 열 때 가장 먼저 찾는 것이라 운영 액션보다 위에 둔다. */}
+            <ProfileMemo profileId={profile.id} memo={memo} />
+
             <Panel title="상태">
               {/* 두 값뿐이라 선택 상자 대신 한 번에 눌러 바꾼다. 바꾸자마자 서버로 간다. */}
               <div

@@ -32,6 +32,7 @@ export default async function HostProfileDetailPage({
         claimed={data.claimed}
         invite={data.invite}
         source={data.source}
+        memo={data.memo}
       />
     </>
   );
