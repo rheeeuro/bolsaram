@@ -7,19 +7,20 @@ import { PROFILE_STATUSES, PROFILE_STATUS_LABELS, type ProfileStatus } from "@bo
 import { isDiscoverable } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { CopyField } from "@/components/ui/copy-field";
 import { FormError } from "@/components/ui/field";
 import { HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { ProfileMemo } from "@/components/host/profile-memo";
 import { Panel } from "@/components/host/surface";
-import { apiPatch, apiPost } from "@/lib/api-client";
+import { apiDelete, apiPatch, apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 
 /** 어느 버튼에서 난 실패인가. 한 곳에 모아 두면 무엇이 실패했는지 짝을 잃는다. */
-type Scope = "status" | "acting" | "invite";
+type Scope = "status" | "acting" | "invite" | "delete";
 
 function messageFor(
   error: { scope: Scope; message: string } | null,
@@ -35,7 +36,7 @@ function messageFor(
  * 열리면 「이 사람이 멤버에게 어떻게 보이나」를 볼 방법이 사라진다. 고치는 일은
  * `/profiles/[id]/edit` 으로 따로 나갔다.
  *
- * 여기 남은 것은 읽기와 **운영 액션**(활성·비활성·멤버 화면 열기)이다. 둘 다 폼 저장과
+ * 여기 남은 것은 읽기와 **운영 액션**(활성·비활성·멤버 화면 열기·삭제)이다. 둘 다 폼 저장과
  * 무관하게 그 자리에서 끝나므로 저장하지 않은 변경을 만들지 않는다.
  *
  * 초대와 대행은 한 칸에 함께 둔다. 둘은 「이 분에게 멤버 화면을 어떻게 보여줄까」라는
@@ -482,6 +483,38 @@ export function HostProfileDetail({
                   </p>
                 ) : null}
               </section>
+            </Panel>
+
+            {/* 맨 아래에 둔다. 쉬고 싶은 분은 비활성이면 충분하다는 것을 먼저 읽게 한다. */}
+            <Panel title="삭제">
+              <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                본인이 내려 달라고 하면 지웁니다. 잠시 쉬는 분은 위에서 비활성으로 두세요.
+                이미 연결된 상대가 받아 둔 이름과 연락처는 되돌릴 수 없습니다.
+              </p>
+              <ConfirmButton
+                variant="danger"
+                label={busy ? "처리 중…" : "프로필 삭제"}
+                confirmLabel="삭제"
+                message={`프로필·사진·카카오톡 원문${
+                  claimed ? "·본인 계정" : ""
+                }과 주고받은 신청이 모두 지워집니다. 되돌릴 수 없습니다.`}
+                disabled={busy}
+                onConfirm={() =>
+                  void (async () => {
+                    setBusy(true);
+                    setError(null);
+                    const result = await apiDelete(`/api/profiles/${profile.id}`);
+                    if (!result.ok) {
+                      setBusy(false);
+                      setError({ scope: "delete", message: result.message });
+                      return;
+                    }
+                    router.replace("/profiles");
+                    router.refresh();
+                  })()
+                }
+              />
+              <FormError>{messageFor(error, "delete")}</FormError>
             </Panel>
           </aside>
         ) : null}

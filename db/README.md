@@ -88,6 +88,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0058_telegram_session_completed.sql` | 봇 대화 상태 `COMPLETED` — 한 사람이 끝나면 대화를 닫고 다음 사람은 새 대화로 받는다 |
 | `0059_profile_memos.sql`           | `profile_memos` — 등록한 주선자만 읽고 쓰는 프로필 메모                       |
 | `0060_profile_host_comment.sql`    | `profiles.host_comment` — 주선자가 쓰고 멤버 상세에 보이는 소개 한마디(500자) |
+| `0061_member_account_delete.sql`   | 등록한 주선자가 그 프로필에 연결된 **멤버** 계정을 지운다 — 프로필 삭제가 계정까지 지우게 |
 
 ## 테이블
 
@@ -97,7 +98,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `group_admins`                                 | 모임 ↔ 주선자 (**다대다**, 모임마다 OWNER 한 명)   | 같은 모임 주선자만 조회             |
 | `group_messages`                               | 모임 채팅방의 글과 사건(`system_kind`). 고칠 수 없고 사람의 글만 지워진다 | 같은 모임 주선자 중 **들어온 뒤의 것만** (쓰기는 본인 명의·사람의 글만) |
 | `group_chat_prefs`                             | 주선자별 방 상태 — 읽은 위치·텔레그램 알림 여부    | 본인 것만                           |
-| `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임, `avatar_key` 는 프로필 사진 | 본인 + 같은 모임 관계자 |
+| `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임, `avatar_key` 는 프로필 사진 | 본인 + 같은 모임 관계자 (삭제는 내가 고칠 수 있는 프로필의 멤버만) |
 | `profiles`                                     | 프로필. `status` 는 활성/비활성뿐, `public_code` 가 화면의 `17번`, `is_seed` 는 합성 표식 | 활성분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `profile_memos`                                | 주선자 메모. 프로필당 하나, 멤버 화면에 안 나간다  | **등록한 주선자만** (같은 모임 주선자·본인 멤버 불가) |

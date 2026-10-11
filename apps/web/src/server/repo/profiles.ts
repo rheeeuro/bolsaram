@@ -377,6 +377,77 @@ export async function updateProfileStatus(
   return (result.rowCount ?? 0) > 0;
 }
 
+// ── 삭제 ──────────────────────────────────────────────────────
+
+export type DeletedProfile = {
+  /** 지워야 할 저장소 파일. 행이 사라진 뒤 호출하는 쪽이 지운다. */
+  storageKeys: string[];
+  memberDeleted: boolean;
+};
+
+/**
+ * 프로필과 그 사람에 관한 것을 한 번에 지운다 — 처리방침의 「내리고 싶다」.
+ *
+ * 순서가 정해져 있다.
+ * 1. 가져오기 세션(원문·사진·추출). 프로필보다 먼저다 — `committed_profile_id` 가
+ *    SET NULL 로 풀리면 `import_sessions_commit_pair` 에 걸려 삭제가 실패한다.
+ * 2. 연결된 멤버 계정. 정책(0061)이 「내가 고칠 수 있는 프로필에 연결된 계정」으로
+ *    판정하므로 프로필이 남아 있을 때 지워야 한다. 세션도 함께 끊긴다.
+ * 3. 프로필. 사진·신청·관심·숨김·초대·메모는 FK CASCADE 로 따라간다.
+ *
+ * 어느 단계든 0건이면 조용히 넘어가지 않고 실패한다. 계정만 남거나 원문만 남으면
+ * 지웠다고 말한 것과 실제가 어긋난다.
+ */
+export async function deleteProfile(sql: Sql, profileId: string): Promise<DeletedProfile> {
+  const found = await sql.query<{ user_id: string | null }>(
+    `SELECT user_id FROM profiles WHERE id = $1`,
+    [profileId],
+  );
+  const profile = found.rows[0];
+  if (!profile) throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
+
+  // 가져오기 사진과 프로필 사진은 같은 키를 가리키는 경우가 많아 한 번만 센다.
+  const keys = await sql.query<{ storage_key: string }>(
+    `SELECT storage_key FROM profile_images WHERE profile_id = $1
+     UNION
+     SELECT a.storage_key FROM import_assets a
+       JOIN import_sessions s ON s.id = a.import_session_id
+      WHERE s.committed_profile_id = $1`,
+    [profileId],
+  );
+
+  const sessions = await sql.query<{ id: string }>(
+    `SELECT id FROM import_sessions WHERE committed_profile_id = $1`,
+    [profileId],
+  );
+  if (sessions.rows.length > 0) {
+    const removed = await sql.query(`DELETE FROM import_sessions WHERE id = ANY($1)`, [
+      sessions.rows.map((r) => r.id),
+    ]);
+    if ((removed.rowCount ?? 0) !== sessions.rows.length) {
+      throw new DomainError("FORBIDDEN", "가져오기 원본을 지울 권한이 없습니다.");
+    }
+  }
+
+  let memberDeleted = false;
+  if (profile.user_id) {
+    const removed = await sql.query(`DELETE FROM users WHERE id = $1 AND role = 'MEMBER'`, [
+      profile.user_id,
+    ]);
+    if ((removed.rowCount ?? 0) === 0) {
+      throw new DomainError("FORBIDDEN", "연결된 멤버 계정을 지울 권한이 없습니다.");
+    }
+    memberDeleted = true;
+  }
+
+  const removed = await sql.query(`DELETE FROM profiles WHERE id = $1`, [profileId]);
+  if ((removed.rowCount ?? 0) === 0) {
+    throw new DomainError("FORBIDDEN", "이 프로필을 관리할 권한이 없습니다.");
+  }
+
+  return { storageKeys: keys.rows.map((r) => r.storage_key), memberDeleted };
+}
+
 // ── 주선자 메모 ───────────────────────────────────────────────
 
 export type ProfileMemo = { body: string; updatedAt: string };

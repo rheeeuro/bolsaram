@@ -1,4 +1,4 @@
-/** GET /api/profiles/:id — 상세, PATCH — 관리자 수정 */
+/** GET /api/profiles/:id — 상세, PATCH — 관리자 수정, DELETE — 프로필·사진·원본·멤버 계정 삭제 */
 import { DomainError, isDiscoverable } from "@bolsaram/domain";
 import { profileUpdateSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
@@ -9,12 +9,14 @@ import { introducedPartnerIds, introducedWithManaged } from "@/server/repo/match
 import {
   assertCanEditProfile,
   canEditProfiles,
+  deleteProfile,
   findProfileById,
   isOutsidePoolForViewer,
   isSameGenderForViewer,
   updateProfile,
 } from "@/server/repo/profiles";
 import { isMemberView } from "@/server/auth/guard";
+import { deleteObject } from "@/server/storage/local";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 
 export const dynamic = "force-dynamic";
@@ -89,4 +91,28 @@ export const PATCH = route(async (request: Request, { params }: Params) => {
     });
     return ok({ ok: true });
   });
+});
+
+export const DELETE = route(async (_request: Request, { params }: Params) => {
+  const { id } = await params;
+  const { storageKeys } = await asAdmin(async (sql, viewer) => {
+    await assertCanEditProfile(sql, id);
+    const deleted = await deleteProfile(sql, id);
+    await writeAudit(sql, {
+      actorUserId: viewer.userId,
+      action: "profile.delete",
+      entityType: "profile",
+      entityId: id,
+      metadata: { photos: deleted.storageKeys.length, memberDeleted: deleted.memberDeleted },
+    });
+    return deleted;
+  });
+
+  // 파일은 행이 확정된 뒤에 지운다. 트랜잭션이 되돌려지면 사진이 남아 있어야 한다.
+  // 파일 삭제가 실패해도 화면에서는 이미 사라졌으므로 응답은 성공이고, 남은 수만 남긴다.
+  const results = await Promise.allSettled(storageKeys.map((key) => deleteObject(key)));
+  const failed = results.filter((r) => r.status === "rejected").length;
+  if (failed > 0) console.error(`profile.delete: 저장소 파일 ${failed}개를 지우지 못했습니다`);
+
+  return ok({ ok: true });
 });

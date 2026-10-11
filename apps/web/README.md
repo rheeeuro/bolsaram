@@ -190,7 +190,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/auth/logout`                        | POST                | –                 | 세션 폐기                            |
 | `/api/claim`                              | POST                | **초대 토큰**     | 멤버 로그인 (매직 링크) + 최초 계정 생성 |
 | `/api/profiles`                           | GET                 | 멤버              | Discover 목록 (필터·커서)            |
-| `/api/profiles/[id]`                      | GET / PATCH         | 멤버 / 주선자     | 상세 조회 / 내용 수정                |
+| `/api/profiles/[id]`                      | GET / PATCH / DELETE | 멤버 / 주선자 / 등록한 주선자 | 상세 조회 / 내용 수정 / 삭제(원본·멤버 계정·파일 포함) |
 | `/api/profiles/[id]/status`               | PATCH               | 주선자            | 활성·비활성 전환                     |
 | `/api/profiles/[id]/memo`                 | PUT                 | 등록한 주선자     | 나만 보는 메모 저장 (빈 글이면 삭제) |
 | `/api/match-requests`                     | GET / POST          | 멤버(프로필 필요) | 시그널 목록 / 소개 신청              |
