@@ -93,37 +93,38 @@ export function GroupSwitcher({
             </button>
           );
         })}
-        <Menu
-          label="모임 추가"
-          disabled={full}
-          className="shrink-0"
-          panelClassName="min-w-52"
-          trigger={(open) => (
-            <span
-              className={cn(
-                "flex min-h-12 items-center gap-2 rounded-xl px-3 text-[12px] text-[var(--surface-text-muted)] transition-colors",
-                full
-                  ? "cursor-not-allowed opacity-55"
-                  : open
-                    ? "bg-[var(--color-ivory-200)]"
-                    : "hover:bg-[var(--color-ivory-200)]",
-              )}
-            >
-              <span aria-hidden className="text-xl">
-                ＋
-              </span>{" "}
-              모임 만들기 · 참여하기
-            </span>
-          )}
-        >
-          <MenuItem onSelect={() => setDialog("create")}>새 모임 만들기</MenuItem>
-          <MenuItem onSelect={() => setDialog("join")}>초대 코드로 참여</MenuItem>
-        </Menu>
       </div>
+      {/* 스크롤 목록 밖에 둔다. 안에 두면 펼친 메뉴가 목록 높이에 잘리고 스크롤바가 생긴다. */}
+      <Menu
+        label="모임 추가"
+        disabled={full}
+        className="mt-1 shrink-0"
+        panelClassName="min-w-52"
+        trigger={(open) => (
+          <span
+            className={cn(
+              "flex min-h-12 items-center gap-2 rounded-xl px-3 text-[12px] text-[var(--surface-text-muted)] transition-colors",
+              full
+                ? "cursor-not-allowed opacity-55"
+                : open
+                  ? "bg-[var(--color-ivory-200)]"
+                  : "hover:bg-[var(--color-ivory-200)]",
+            )}
+          >
+            <span aria-hidden className="text-xl">
+              ＋
+            </span>{" "}
+            모임 만들기 · 참여하기
+          </span>
+        )}
+      >
+        <MenuItem onSelect={() => setDialog("create")}>새 모임 만들기</MenuItem>
+        <MenuItem onSelect={() => setDialog("join")}>초대 코드로 참여</MenuItem>
+      </Menu>
       {full && (
         <p className="px-2 pb-1 text-[11px] leading-relaxed text-[var(--surface-text-muted)]">
-          모임 {MAX_GROUPS_PER_ADMIN}개를 모두 쓰고 있습니다. 쓰지 않는 모임에서 나가면
-          자리가 납니다.
+          모임 {MAX_GROUPS_PER_ADMIN}개를 모두 쓰고 있습니다. 쓰지 않는 모임에서 나가면 자리가
+          납니다.
         </p>
       )}
       {error && (
