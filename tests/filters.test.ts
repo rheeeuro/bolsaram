@@ -5,6 +5,7 @@ import {
   buildAttributeClauses,
   buildDiscoverWhere,
   HAS_PHOTO_SQL,
+  PROFILE_LISTED_AT_SQL,
   PROFILE_ORDER_BY,
   decodeCursor,
   encodeCursor,
@@ -152,11 +153,11 @@ describe("buildDiscoverWhere", () => {
 describe("커서", () => {
   it("왕복 인코딩이 값을 보존한다", () => {
     for (const hasPhoto of [true, false]) {
-      const row = { hasPhoto, createdAt: new Date("2026-09-07T01:02:03.456Z"), id: "abc-123" };
+      const row = { hasPhoto, listedAt: new Date("2026-09-07T01:02:03.456Z"), id: "abc-123" };
       const decoded = decodeCursor(encodeCursor(row));
       expect(decoded?.id).toBe("abc-123");
       expect(decoded?.hasPhoto).toBe(hasPhoto);
-      expect(decoded?.createdAt.toISOString()).toBe(row.createdAt.toISOString());
+      expect(decoded?.listedAt.toISOString()).toBe(row.listedAt.toISOString());
     }
   });
 
@@ -175,9 +176,12 @@ describe("커서", () => {
     }
   });
 
-  it("정렬은 사진 있는 쪽을 먼저, 그 안에서 최신순으로 놓는다", () => {
+  it("정렬은 사진 있는 쪽을 먼저, 그 안에서 올라온 순(끌어올림 포함)으로 놓는다", () => {
     // 커서 튜플 비교가 성립하려면 세 키가 모두 DESC 여야 한다.
-    expect(PROFILE_ORDER_BY).toBe(`${HAS_PHOTO_SQL} DESC, p.created_at DESC, p.id DESC`);
+    expect(PROFILE_LISTED_AT_SQL).toBe("COALESCE(p.bumped_at, p.created_at)");
+    expect(PROFILE_ORDER_BY).toBe(
+      `${HAS_PHOTO_SQL} DESC, ${PROFILE_LISTED_AT_SQL} DESC, p.id DESC`,
+    );
   });
 });
 

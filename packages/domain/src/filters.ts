@@ -150,20 +150,31 @@ export const HAS_PHOTO_SQL =
   "EXISTS (SELECT 1 FROM profile_images pi WHERE pi.profile_id = p.id)";
 
 /**
+ * 목록에 올라온 시각. 끌어올렸으면 그 시각, 아니면 등록 시각이다(0062).
+ * 정렬·커서·인덱스가 모두 이 식을 봐야 페이지 경계에서 행이 새거나 겹치지 않는다.
+ */
+export const PROFILE_LISTED_AT_SQL = "COALESCE(p.bumped_at, p.created_at)";
+
+/**
  * 목록 정렬. 사진 없는 프로필을 뒤로 민다 — 카드 그리드가 빈 회색으로 시작하면
- * 첫 화면이 못 쓰게 된다. 사진 유무 안에서는 최신순이 그대로 유지된다.
+ * 첫 화면이 못 쓰게 된다. 사진 유무 안에서는 올라온 순(끌어올림 포함)이다.
  * 세 키 모두 DESC 라 커서는 튜플 비교 하나로 이어진다(boolean 은 false < true).
  */
-export const PROFILE_ORDER_BY = `${HAS_PHOTO_SQL} DESC, p.created_at DESC, p.id DESC`;
+export const PROFILE_ORDER_BY = `${HAS_PHOTO_SQL} DESC, ${PROFILE_LISTED_AT_SQL} DESC, p.id DESC`;
 
-export type ProfileCursor = { hasPhoto: boolean; createdAt: Date; id: string };
+/** 커서가 정렬 키와 같은 튜플을 보는 비교식. 값 자리 셋을 받는다. */
+export function profileCursorClause(hasPhoto: string, listedAt: string, id: string): string {
+  return `(${HAS_PHOTO_SQL}, ${PROFILE_LISTED_AT_SQL}, p.id) < (${hasPhoto}, ${listedAt}, ${id})`;
+}
+
+export type ProfileCursor = { hasPhoto: boolean; listedAt: Date; id: string };
 
 /**
  * 커서 페이지네이션. 정렬 키와 같은 순서로 `<0|1>|<iso8601>|<uuid>` 를 싣는다.
  * 잘못된 값은 무시하고 첫 페이지를 준다.
  */
 export function encodeCursor(row: ProfileCursor): string {
-  return `${row.hasPhoto ? "1" : "0"}|${row.createdAt.toISOString()}|${row.id}`;
+  return `${row.hasPhoto ? "1" : "0"}|${row.listedAt.toISOString()}|${row.id}`;
 }
 
 export function decodeCursor(cursor: string | undefined): ProfileCursor | null {
@@ -172,7 +183,7 @@ export function decodeCursor(cursor: string | undefined): ProfileCursor | null {
   if (parts.length !== 3) return null;
   const [flag, iso, id] = parts as [string, string, string];
   if (flag !== "0" && flag !== "1") return null;
-  const createdAt = new Date(iso);
-  if (Number.isNaN(createdAt.getTime()) || id.length === 0) return null;
-  return { hasPhoto: flag === "1", createdAt, id };
+  const listedAt = new Date(iso);
+  if (Number.isNaN(listedAt.getTime()) || id.length === 0) return null;
+  return { hasPhoto: flag === "1", listedAt, id };
 }

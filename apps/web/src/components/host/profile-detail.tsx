@@ -20,7 +20,7 @@ import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
 
 /** 어느 버튼에서 난 실패인가. 한 곳에 모아 두면 무엇이 실패했는지 짝을 잃는다. */
-type Scope = "status" | "acting" | "invite" | "delete";
+type Scope = "status" | "bump" | "acting" | "invite" | "delete";
 
 function messageFor(
   error: { scope: Scope; message: string } | null,
@@ -36,7 +36,7 @@ function messageFor(
  * 열리면 「이 사람이 멤버에게 어떻게 보이나」를 볼 방법이 사라진다. 고치는 일은
  * `/profiles/[id]/edit` 으로 따로 나갔다.
  *
- * 여기 남은 것은 읽기와 **운영 액션**(활성·비활성·멤버 화면 열기·삭제)이다. 둘 다 폼 저장과
+ * 여기 남은 것은 읽기와 **운영 액션**(활성·비활성·끌어올리기·멤버 화면 열기·삭제)이다. 둘 다 폼 저장과
  * 무관하게 그 자리에서 끝나므로 저장하지 않은 변경을 만들지 않는다.
  *
  * 초대와 대행은 한 칸에 함께 둔다. 둘은 「이 분에게 멤버 화면을 어떻게 보여줄까」라는
@@ -52,6 +52,7 @@ export function HostProfileDetail({
   status,
   claimed,
   createdAt,
+  bump,
   invite,
   source,
   memo,
@@ -62,6 +63,8 @@ export function HostProfileDetail({
   claimed: boolean;
   /** 등록 시각(ISO). */
   createdAt: string;
+  /** 마지막 끌어올림·다음 가능 시각(ISO)과 지금 못 하는 이유. */
+  bump: { lastAt: string | null; nextAt: string | null; blockedReason: string | null };
   invite: { expiresAt: string; claimed: boolean } | null;
   /** 가져올 때 받은 카카오톡 원문. 담당일 때만 온다. */
   source: { sessionId: string; rawText: string } | null;
@@ -74,6 +77,8 @@ export function HostProfileDetail({
   const [error, setError] = useState<{ scope: Scope; message: string } | null>(null);
   // 발급 직후 한 번만 보여줄 값. 링크와 입장코드는 같은 토큰이다.
   const [issued, setIssued] = useState<{ url: string; code: string } | null>(null);
+  // 끌어올린 직후 한 번 말해준다. 새로고침으로 버튼이 잠기는 것만으로는 됐는지 알기 어렵다.
+  const [bumped, setBumped] = useState(false);
 
   async function changeStatus(next: ProfileStatus) {
     if (next === status) return;
@@ -85,6 +90,19 @@ export function HostProfileDetail({
       setError({ scope: "status", message: result.message });
       return;
     }
+    router.refresh();
+  }
+
+  async function bumpToTop() {
+    setBusy(true);
+    setError(null);
+    const result = await apiPost(`/api/profiles/${profile.id}/bump`, {});
+    setBusy(false);
+    if (!result.ok) {
+      setError({ scope: "bump", message: result.message });
+      return;
+    }
+    setBumped(true);
     router.refresh();
   }
 
@@ -160,7 +178,27 @@ export function HostProfileDetail({
           </div>
           <p className="mt-2 text-[12px] text-[var(--color-ink-500)]">
             <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> 등록
+            {bump.lastAt ? (
+              <>
+                {" · "}
+                <time dateTime={bump.lastAt}>{formatDateTime(bump.lastAt)}</time> 끌어올림
+              </>
+            ) : null}
           </p>
+          {canEdit && visible ? (
+            bumped ? (
+              <p className="mt-1.5 text-[12px] text-[var(--color-rose-600)]" role="status">
+                목록 맨 앞으로 올렸습니다.
+              </p>
+            ) : bump.blockedReason && bump.nextAt ? (
+              // 기다리는 중이면 언제 다시 되는지가 이유보다 쓸모 있다.
+              <p className="mt-1.5 text-[12px] text-[var(--surface-text-muted)]">
+                <time dateTime={bump.nextAt}>{formatDateTime(bump.nextAt)}</time>부터 다시
+                끌어올릴 수 있습니다.
+              </p>
+            ) : null
+          ) : null}
+          <FormError>{messageFor(error, "bump")}</FormError>
         </div>
 
         {canEdit ? (
@@ -175,7 +213,19 @@ export function HostProfileDetail({
               >
                 활성으로 바꾸기
               </Button>
-            ) : null}
+            ) : (
+              // 활성일 때만 둔다 — 멤버에게 안 보이는 분은 올려도 보이는 곳이 없다.
+              <Button
+                size="lg"
+                variant="secondary"
+                disabled={busy || bump.blockedReason != null}
+                className="flex-1 sm:flex-none"
+                title="멤버·주선자 목록 맨 앞으로 올리고 모임 채팅방에 알립니다"
+                onClick={() => void bumpToTop()}
+              >
+                끌어올리기
+              </Button>
+            )}
             <Link
               href={`/profiles/${profile.id}/edit`}
               className={buttonClasses({

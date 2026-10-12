@@ -83,6 +83,8 @@ export default async function HostProfilesPage({
         source: sources?.get(profile.id) ?? null,
         // 등록 시각은 개인정보가 아니라 담당이 아니어도 보인다.
         createdAt: profile.createdAt.toISOString(),
+        // 목록은 끌어올린 순서로 선다. 날짜가 순서와 어긋나 보이지 않게 함께 싣는다.
+        bumpedAt: profile.bumpedAt?.toISOString() ?? null,
       })),
     };
   });
@@ -158,7 +160,7 @@ export default async function HostProfilesPage({
         <ProfileRawList items={page.items.map(toRawItem)} />
       ) : (
         <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-          {page.items.map(({ view, claimed, canEdit, visible, createdAt }) => (
+          {page.items.map(({ view, claimed, canEdit, visible, createdAt, bumpedAt }) => (
             <li key={view.id}>
               <Link href={`/profiles/${view.id}`} className="group block">
                 <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
@@ -216,7 +218,15 @@ export default async function HostProfilesPage({
                       .join(" · ")}
                   </p>
                   <p className="mt-1 text-[11.5px] text-[var(--color-ink-500)]">
-                    <time dateTime={createdAt}>{formatDay(createdAt)}</time> 등록
+                    {bumpedAt ? (
+                      <>
+                        <time dateTime={bumpedAt}>{formatDay(bumpedAt)}</time> 끌어올림
+                      </>
+                    ) : (
+                      <>
+                        <time dateTime={createdAt}>{formatDay(createdAt)}</time> 등록
+                      </>
+                    )}
                   </p>
                   {canEdit && !claimed ? (
                     <p className="mt-1.5">

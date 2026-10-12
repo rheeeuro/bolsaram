@@ -7,6 +7,7 @@
  */
 import "server-only";
 import { withRls } from "@bolsaram/db";
+import { bumpBlockedReason, nextBumpAt } from "@bolsaram/domain";
 import { rlsContextOf, type Viewer } from "../auth/guard";
 import { introducedWithManaged } from "../repo/matches";
 import { sourceTextsFor } from "../repo/imports";
@@ -30,6 +31,11 @@ export type HostProfileData = {
   claimed: boolean;
   /** 등록 시각. 운영 정보라 담당이 아니어도 보인다. */
   createdAt: string;
+  /**
+   * 끌어올리기. 마지막 시각은 목록 순서를 설명하는 운영 정보라 담당이 아니어도 보인다.
+   * 할 수 있는지(`blockedReason`·`nextAt`)는 담당일 때만 뜻이 있다.
+   */
+  bump: { lastAt: string | null; nextAt: string | null; blockedReason: string | null };
   /** 담당일 때만 읽는다. 초대는 등록한 주선자만 발급한다. */
   invite: { expiresAt: string; claimed: boolean } | null;
   /**
@@ -77,6 +83,11 @@ export async function loadHostProfile(
       status: profile.status,
       claimed: profile.userId != null,
       createdAt: profile.createdAt.toISOString(),
+      bump: {
+        lastAt: profile.bumpedAt?.toISOString() ?? null,
+        nextAt: nextBumpAt(profile.bumpedAt)?.toISOString() ?? null,
+        blockedReason: bumpBlockedReason(profile, new Date()),
+      },
       invite: latest
         ? { expiresAt: latest.expires_at.toISOString(), claimed: latest.claimed_at != null }
         : null,

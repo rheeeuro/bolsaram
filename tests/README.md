@@ -46,6 +46,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
 | `profile-images.test.ts`       | 프로필 사진 상한 — 서비스와 DB 트리거 양쪽     | 필요 | 2    |
 | `profile-delete.test.ts`       | 프로필 삭제 — 등록한 주선자만·멤버 계정 정책 경계·원본과 신청까지 함께 | 필요 | 4 |
+| `profile-bump.test.ts`         | 끌어올리기 — 판정·등록한 주선자만·맨 앞 정렬·채팅방 한 줄·24시간·트리거 우회 차단 | 필요 | 13 |
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 검증·리다이렉트 주소  | –    | 11   |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
 | `image-crop.test.ts`           | 사진에서 쓸 영역 — 덮는 배율·밀 수 있는 범위·자를 사각형 | –    | 14   |

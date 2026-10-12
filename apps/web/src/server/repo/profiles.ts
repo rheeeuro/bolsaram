@@ -8,12 +8,16 @@ import type { Sql } from "@bolsaram/db";
 import {
   DomainError,
   HAS_PHOTO_SQL,
+  PROFILE_BUMP_COOLDOWN_HOURS,
+  PROFILE_LISTED_AT_SQL,
   PROFILE_ORDER_BY,
+  assertBumpable,
   buildAttributeClauses,
   buildDiscoverWhere,
   decodeCursor,
   encodeCursor,
   isOppositeGender,
+  profileCursorClause,
   type FullProfile,
 } from "@bolsaram/domain";
 import type {
@@ -30,7 +34,7 @@ const PROFILE_COLUMNS = `
   p.residence_region, p.workplace_region, p.religion, p.mbti,
   p.smoking, p.drinking, p.hobbies, p.hashtags, p.bio, p.ideal_type_text,
   p.host_comment, p.real_name, p.contact_note, p.status,
-  p.created_at, p.updated_at`;
+  p.bumped_at, p.created_at, p.updated_at`;
 
 type ProfileRow = {
   id: string;
@@ -57,19 +61,23 @@ type ProfileRow = {
   real_name: string | null;
   contact_note: string | null;
   status: ProfileStatus;
+  bumped_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
 
 /**
- * 목록 쿼리는 사진 유무를 함께 뽑는다. 커서에 실어야 다음 페이지가 같은 자리에서 이어진다.
+ * 목록 쿼리는 정렬 키(사진 유무·올라온 시각)를 함께 뽑는다. 커서에 실어야 다음 페이지가
+ * 같은 자리에서 이어진다.
  */
-type ProfileListRow = ProfileRow & { has_photo: boolean };
+type ProfileListRow = ProfileRow & { has_photo: boolean; listed_at: Date };
 
-const LIST_COLUMNS = `${PROFILE_COLUMNS}, ${HAS_PHOTO_SQL} AS has_photo`;
+const LIST_COLUMNS = `${PROFILE_COLUMNS}, ${HAS_PHOTO_SQL} AS has_photo, ${PROFILE_LISTED_AT_SQL} AS listed_at`;
 
 export type ProfileRecord = FullProfile & {
   userId: string | null;
+  /** 마지막으로 끌어올린 시각. 한 번도 안 했으면 null. */
+  bumpedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -109,6 +117,7 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     contactNote: row.contact_note,
     status: row.status,
     images,
+    bumpedAt: row.bumped_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -224,8 +233,8 @@ export async function findDiscoverProfiles(
   let clause = where.text;
   const cursor = decodeCursor(query.cursor);
   if (cursor) {
-    values.push(cursor.hasPhoto, cursor.createdAt, cursor.id);
-    clause += ` AND (${HAS_PHOTO_SQL}, p.created_at, p.id) < ($${values.length - 2}, $${values.length - 1}, $${values.length})`;
+    values.push(cursor.hasPhoto, cursor.listedAt, cursor.id);
+    clause += ` AND ${profileCursorClause(`$${values.length - 2}`, `$${values.length - 1}`, `$${values.length}`)}`;
   }
   values.push(query.limit + 1);
 
@@ -254,7 +263,7 @@ export async function findDiscoverProfiles(
       hasMore && last
         ? encodeCursor({
             hasPhoto: last.has_photo,
-            createdAt: last.created_at,
+            listedAt: last.listed_at,
             id: last.id,
           })
         : null,
@@ -375,6 +384,43 @@ export async function updateProfileStatus(
 ): Promise<boolean> {
   const result = await sql.query(`UPDATE profiles SET status = $2 WHERE id = $1`, [id, status]);
   return (result.rowCount ?? 0) > 0;
+}
+
+// ── 끌어올리기 ────────────────────────────────────────────────
+
+/**
+ * 목록 맨 앞으로 다시 올린다 — 등록한 주선자만(0062).
+ *
+ * 판정은 도메인이 하고 DB 에는 같은 조건의 조건부 UPDATE 로 적용한다. 두 번 연달아
+ * 눌러도 뒤의 것은 0건이 되어 채팅방에 알림이 한 줄만 남는다. 모임 프로필이면
+ * 트리거가 그 방에 시스템 메시지를 남긴다.
+ *
+ * 반드시 `assertCanEditProfile` 을 먼저 부른다. 남의 프로필은 RLS 가 0건으로 만들어
+ * 이유 없이 실패한다.
+ */
+export async function bumpProfile(sql: Sql, profileId: string): Promise<Date> {
+  const found = await sql.query<{ status: ProfileStatus; bumped_at: Date | null; now: Date }>(
+    `SELECT status, bumped_at, now() AS now FROM profiles WHERE id = $1`,
+    [profileId],
+  );
+  const current = found.rows[0];
+  if (!current) throw new DomainError("NOT_FOUND", "프로필을 찾을 수 없습니다.");
+  // 시각은 DB 의 것을 쓴다 — 트리거가 같은 시계로 다시 판정한다.
+  assertBumpable({ status: current.status, bumpedAt: current.bumped_at }, current.now);
+
+  const result = await sql.query<{ bumped_at: Date }>(
+    `UPDATE profiles SET bumped_at = now()
+      WHERE id = $1
+        AND status = 'ACTIVE'
+        AND (bumped_at IS NULL OR bumped_at <= now() - make_interval(hours => $2))
+      RETURNING bumped_at`,
+    [profileId, PROFILE_BUMP_COOLDOWN_HOURS],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new DomainError("CONFLICT", "방금 다른 곳에서 끌어올렸습니다. 새로고침해 주세요.");
+  }
+  return row.bumped_at;
 }
 
 // ── 삭제 ──────────────────────────────────────────────────────
@@ -567,8 +613,8 @@ export async function findAdminProfiles(
   let clause = where;
   const cursor = decodeCursor(query.cursor);
   if (cursor) {
-    values.push(cursor.hasPhoto, cursor.createdAt, cursor.id);
-    clause += ` AND (${HAS_PHOTO_SQL}, p.created_at, p.id) < ($${values.length - 2}, $${values.length - 1}, $${values.length})`;
+    values.push(cursor.hasPhoto, cursor.listedAt, cursor.id);
+    clause += ` AND ${profileCursorClause(`$${values.length - 2}`, `$${values.length - 1}`, `$${values.length}`)}`;
   }
   values.push(query.limit + 1);
 
@@ -595,7 +641,7 @@ export async function findAdminProfiles(
       hasMore && last
         ? encodeCursor({
             hasPhoto: last.has_photo,
-            createdAt: last.created_at,
+            listedAt: last.listed_at,
             id: last.id,
           })
         : null,

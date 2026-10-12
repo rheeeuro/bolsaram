@@ -302,6 +302,8 @@ export const GROUP_MESSAGE_SYSTEM_KINDS = [
   /** 모임장이 바뀌었다. `actorName` 이 새 모임장이다. */
   "OWNER_TRANSFERRED",
   "PROFILE_REGISTERED",
+  /** 등록한 주선자가 목록 맨 앞으로 끌어올렸다(0062). */
+  "PROFILE_BUMPED",
   "MATCH_REQUESTED",
   /** 이 제품에서 「수락」은 곧 연결이다(0021 이후 ACCEPTED 는 쓰지 않는다). */
   "MATCH_INTRODUCED",

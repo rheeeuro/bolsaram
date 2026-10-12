@@ -65,7 +65,7 @@ apps/web/src/
 │   │   ├── home/             오늘 할 일 + 지표 + 최근 신청
 │   │   ├── account/          계정 설정 — 내 이름·로그인 방식·텔레그램 연결·로그아웃
 │   │   ├── imports/          가져오기 + 검토 상세
-│   │   ├── profiles/         카드 목록 · 원본 목록(?view=raw) + 상세(게시·초대·대행)
+│   │   ├── profiles/         카드 목록 · 원본 목록(?view=raw) + 상세(게시·끌어올리기·초대·대행)
 │   │   ├── profiles/[id]/edit/  내용 편집 — 등록한 주선자만
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
@@ -193,6 +193,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/profiles/[id]`                      | GET / PATCH / DELETE | 멤버 / 주선자 / 등록한 주선자 | 상세 조회 / 내용 수정 / 삭제(원본·멤버 계정·파일 포함) |
 | `/api/profiles/[id]/status`               | PATCH               | 주선자            | 활성·비활성 전환                     |
 | `/api/profiles/[id]/memo`                 | PUT                 | 등록한 주선자     | 나만 보는 메모 저장 (빈 글이면 삭제) |
+| `/api/profiles/[id]/bump`                 | POST                | 등록한 주선자     | 목록 맨 앞으로 끌어올리기 (활성만, 24시간에 한 번) |
 | `/api/match-requests`                     | GET / POST          | 멤버(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/profiles`                     | GET                 | 주선자            | 목록 조건에 맞는 사람 수 (조건 시트의 「N명 보기」) |

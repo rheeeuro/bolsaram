@@ -101,6 +101,8 @@ export function groupSystemMessageParts(
       return [text(`${who} 님이 모임장이 됐습니다.`)];
     case "PROFILE_REGISTERED":
       return [code(payload.profileCode), text(` 멤버가 등록됐습니다. (${who})`)];
+    case "PROFILE_BUMPED":
+      return [code(payload.profileCode), text(` 멤버를 목록 맨 앞으로 끌어올렸습니다. (${who})`)];
     case "MATCH_REQUESTED":
       return [
         code(payload.requesterCode),
