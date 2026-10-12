@@ -26,8 +26,12 @@ export type RawListItem = {
   /** 담당인데 아직 초대하지 않았다 — 주선자가 할 일이 남은 분. */
   awaitingInvite: boolean;
   images: { id: string; url: string }[];
-  /** 가져오기로 받은 원문. 세션이 없거나(시드) 남의 전체공개 건이면 null 이다. */
+  /** 가져오기로 받은 원문. 세션이 없거나 담당이 아니면 null 이다. */
   rawText: string | null;
+  /** 담당이 아니라 원본을 읽을 수 없다 — 원문이 없는 것과 다르게 안내한다. */
+  sourceHidden: boolean;
+  /** 원문이 없을 때 대신 보여줄 정리된 내용(줄글). 보여도 되는 값만 담는다. */
+  summary: string | null;
   source: string | null;
   at: string | null;
 };
@@ -81,11 +85,17 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
                 <p className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--color-ivory-100)] px-3.5 py-3 text-[13px] leading-relaxed text-[var(--color-ink-800)]">
                   {item.rawText}
                 </p>
+              ) : item.summary ? (
+                // 원문 대신 정리된 내용을 같은 자리에 둔다. 원문이 아니라는 것은 머리말로 밝힌다.
+                <div className="rounded-lg bg-[var(--color-ivory-100)] px-3.5 py-3">
+                  <p className="text-[11.5px] text-[var(--surface-text-muted)]">{fallbackNote(item)}</p>
+                  <p className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-[13px] leading-relaxed text-[var(--color-ink-800)]">
+                    {item.summary}
+                  </p>
+                </div>
               ) : (
                 <p className="rounded-lg bg-[var(--color-ivory-100)] px-3.5 py-3 text-[12.5px] text-[var(--surface-text-muted)]">
-                  {item.images.length > 0
-                    ? "사진만 받았고 글은 없습니다."
-                    : "가져온 원본이 없습니다. 정리된 내용은 프로필에서 봅니다."}
+                  {fallbackNote(item)}
                 </p>
               )}
             </div>
@@ -94,6 +104,16 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
       ))}
     </ul>
   );
+}
+
+/** 원문을 못 보여주는 이유. 정리된 내용이 있으면 그 머리말이 된다. */
+function fallbackNote(item: RawListItem): string {
+  const reason = item.sourceHidden
+    ? "원본은 등록한 주선자만 봅니다."
+    : item.source
+      ? "사진만 받았고 글은 없습니다."
+      : "가져온 원본이 없습니다.";
+  return item.summary ? `${reason} 정리된 내용입니다.` : `${reason} 정리된 내용은 프로필에서 봅니다.`;
 }
 
 /**

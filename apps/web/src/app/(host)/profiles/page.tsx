@@ -12,7 +12,7 @@ import { Count, PageHeader, Panel } from "@/components/host/surface";
 import { introducedWithManaged } from "@/server/repo/matches";
 import { canEditProfiles, findAdminProfiles } from "@/server/repo/profiles";
 import { sourceTextsFor } from "@/server/repo/imports";
-import { disclosureFor, toDetailView } from "@/server/views/profile-view";
+import { disclosureFor, toDetailView, type ProfileDetailView } from "@/server/views/profile-view";
 import { formatDay } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import { HostProfileFilters } from "@/components/host/profile-filters";
@@ -296,15 +296,7 @@ function ViewTab({
  * 사진은 공개 단계가 이미 걸러 준 것만 쓴다 — 담당이 아닌 프로필은 대표 한 장이다.
  */
 function toRawItem(item: {
-  view: {
-    id: string;
-    code: string;
-    gender: string;
-    birthYear: number;
-    realName?: string | null;
-    images?: { id: string; url: string }[];
-    primaryImage: { id: string; url: string } | null;
-  };
+  view: ProfileDetailView;
   claimed: boolean;
   canEdit: boolean;
   visible: boolean;
@@ -322,7 +314,47 @@ function toRawItem(item: {
     awaitingInvite: item.canEdit && !item.claimed,
     images: images.map((image) => ({ id: image.id, url: image.url })),
     rawText: item.source?.rawText ?? null,
+    // 가져오기 원본은 올린 주선자만 읽는다(RLS). 같은 모임이어도 남이 올린 건
+    // 원문이 오지 않으므로, 「글이 없다」가 아니라 「볼 수 없다」로 안내한다.
+    sourceHidden: !item.canEdit,
+    summary: summaryText(item.view),
     source: item.source?.source ?? null,
     at: item.source?.committedAt?.toISOString() ?? null,
   };
+}
+
+/**
+ * 원문이 없을 때 대신 보여줄 줄글. 카카오톡 프로필처럼 「항목: 값」 줄로 쓴다.
+ *
+ * view 는 공개 단계를 이미 통과한 값이라 담당이 아니면 이름·연락처가 들어 있지 않다 —
+ * 그래서 남이 올린 원문을 열지 않고도 같은 내용을 훑을 수 있다. 여기서 더 걸러내지 않는다.
+ */
+function summaryText(view: ProfileDetailView): string | null {
+  const job = [view.jobTitle ?? label.jobCategory(view.jobCategory), view.company]
+    .filter(Boolean)
+    .join(" · ");
+  const lines: [string, string | null][] = [
+    ["나이", label.birthYear(view.birthYear)],
+    ["키", view.height ? `${view.height}cm` : null],
+    ["직업", job || null],
+    ["학력", view.education],
+    ["사는 곳", label.region(view.residenceRegion)],
+    ["직장 지역", label.region(view.workplaceRegion)],
+    ["종교", label.religion(view.religion)],
+    ["MBTI", view.mbti],
+    ["흡연", label.smoking(view.smoking)],
+    ["음주", label.drinking(view.drinking)],
+    ["취미", view.hobbies.length > 0 ? view.hobbies.join(", ") : null],
+    ["이상형", view.idealTypeText],
+  ];
+  const blocks = [
+    lines
+      .filter(([, value]) => value)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("\n"),
+    view.bio,
+    view.hostComment ? `주선자 한마디: ${view.hostComment}` : null,
+    view.hashtags.length > 0 ? view.hashtags.map((tag) => `#${tag}`).join(" ") : null,
+  ].filter((block): block is string => Boolean(block?.trim()));
+  return blocks.length > 0 ? blocks.join("\n\n") : null;
 }
