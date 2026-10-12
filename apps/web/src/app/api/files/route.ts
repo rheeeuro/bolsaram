@@ -5,8 +5,11 @@
  * 서명 URL 은 짧게 만료되며 캐시를 금지한다.
  */
 import { NextResponse } from "next/server";
+import { withRls } from "@bolsaram/db";
+import { rlsContextOf } from "@/server/auth/guard";
 import { readSession } from "@/server/auth/session";
 import { fail, route } from "@/server/http/respond";
+import { isVisibleImageKey } from "@/server/repo/profile-images";
 import {
   isHostOnlyKey,
   objectSize,
@@ -28,17 +31,22 @@ export const GET = route(async (request: Request) => {
   const sig = params.get("sig");
   if (!key || !exp || !sig) return fail("VALIDATION", "잘못된 요청입니다.", 400);
 
-  // Import 원본은 주선자 전용이다. 서명이 유출돼도 멤버 세션으로는 열리지 않는다.
-  // 있는지 없는지 구분해 주지 않으므로 잘못된 서명과 같은 응답이다.
-  if (isHostOnlyKey(key) && user.role !== "ADMIN") {
-    return fail("FORBIDDEN", "잘못된 링크입니다.", 403);
-  }
-
   const verified = verifySignature("download", key, exp, sig);
   if (!verified.ok) {
     return verified.reason === "expired"
       ? fail("FORBIDDEN", "링크가 만료되었습니다.", 410)
       : fail("FORBIDDEN", "잘못된 링크입니다.", 403);
+  }
+
+  // Import 원본은 주선자 전용이다. 서명이 유출돼도 멤버 세션으로는 열리지 않는다.
+  // 다만 게시된 프로필 사진도 원본 키를 그대로 쓰므로, 멤버가 RLS 로 볼 수 있는
+  // 프로필에 붙은 사진이면 연다. 있는지 없는지 구분해 주지 않으므로 잘못된 서명과 같은 응답이다.
+  if (
+    isHostOnlyKey(key) &&
+    user.role !== "ADMIN" &&
+    !(await withRls(rlsContextOf(user), (sql) => isVisibleImageKey(sql, key)))
+  ) {
+    return fail("FORBIDDEN", "잘못된 링크입니다.", 403);
   }
 
   const size = await objectSize(key);

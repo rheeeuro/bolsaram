@@ -42,7 +42,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 40   |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기·권한 경계 | 필요 | 32 |
 | `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
-| `group-isolation.test.ts`      | 모임 간 격리·대행 중 풀 경계·claim 가로채기 차단 | 필요 | 21   |
+| `group-isolation.test.ts`      | 모임 간 격리·대행 중 풀 경계·claim 가로채기 차단 | 필요 | 22   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·멤버 삭제    | 필요 | 8    |
 | `admin-signup.test.ts`         | 가입(소셜 첫 로그인)·계정 잇기·전체공개 풀·주선자 목록 찾기(원문·담당 이름·메모)·주선자 메모 경계·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 60 |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 14   |
@@ -117,6 +117,7 @@ docker exec bolsaram_postgres dropdb -U bolsaram_owner --force bolsaram_test
 | `group-isolation.test.ts` 「남의 모임 …못한다」            | 주선자 자유 가입의 마지막 방어선    |
 | `group-isolation.test.ts` 「모임을 넘는 소개 신청」        | 테넌트 경계를 넘는 신청 차단        |
 | `group-isolation.test.ts` 「대행 중 목록도 같다」          | 대행이 멤버의 풀 경계를 넓히지 않음 |
+| `group-isolation.test.ts` 「가져오기 원본 키로 붙은 사진」 | 멤버는 볼 수 있는 프로필 사진만 연다 |
 | `admin-signup.test.ts` 「전체공개를 남이 고칠 수 없다」    | 보이는 것과 고치는 것을 분리         |
 | `admin-signup.test.ts` 「같은 모임 주선자는 메모를 …」     | 메모는 등록한 주선자만 (0059)        |
 | `admin-signup.test.ts` 「마지막 주선자는 …나갈 수 없다」   | 아무도 못 보는 멤버를 만들지 않음    |

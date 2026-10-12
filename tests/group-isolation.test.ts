@@ -20,6 +20,7 @@ import {
   isOutsidePoolForViewer,
 } from "../apps/web/src/server/repo/profiles";
 import { createSession, setSessionGroup } from "../apps/web/src/server/repo/imports";
+import { isVisibleImageKey } from "../apps/web/src/server/repo/profile-images";
 import { runTag } from "./tags";
 
 const TAG = runTag("grp");
@@ -205,6 +206,33 @@ describe("멤버는 자기 모임 안에서만 본다", () => {
       return r.rowCount ?? 0;
     });
     expect(rows).toBe(1);
+  });
+
+  it("가져오기 원본 키로 붙은 사진은 같은 모임 멤버만 연다", async () => {
+    // 가져온 사진은 `import/…` 키 그대로 프로필 사진이 된다. 파일 라우트는 이 영역을
+    // 주선자 전용으로 막고, 멤버에게는 볼 수 있는 프로필의 사진일 때만 연다.
+    const keyA = `import/${TAG}-a/photo.jpg`;
+    const keyB = `import/${TAG}-b/photo.jpg`;
+    await withOwner(async (sql) => {
+      for (const [profileId, key] of [
+        [A.profileId, keyA],
+        [B.profileId, keyB],
+      ] as const) {
+        await sql.query(
+          `INSERT INTO profile_images (profile_id, storage_key, mime_type, byte_size, sort_order, is_primary)
+           VALUES ($1, $2, 'image/jpeg', 100, 0, true)`,
+          [profileId, key],
+        );
+      }
+    });
+    const [own, other, loose] = await withRls(A.member, async (sql) => [
+      await isVisibleImageKey(sql, keyA),
+      await isVisibleImageKey(sql, keyB),
+      await isVisibleImageKey(sql, `import/${TAG}-a/unattached.jpg`),
+    ]);
+    expect(own).toBe(true);
+    expect(other).toBe(false);
+    expect(loose).toBe(false);
   });
 
   it("모임을 넘는 소개 신청을 만들 수 없다", async () => {

@@ -50,6 +50,19 @@ function toRecord(row: Row): ProfileImageRecord {
   };
 }
 
+/**
+ * 이 저장 키가 지금 볼 수 있는 프로필의 사진인가. 판정은 RLS(`profile_images_read`)가 한다.
+ *
+ * Import 로 들어온 사진은 원본 키(`import/…`)를 그대로 프로필 사진으로 쓴다. 그 영역은
+ * 주선자 전용이지만, 프로필에 붙어 멤버에게 보이는 사진이면 멤버도 열어야 한다.
+ */
+export async function isVisibleImageKey(sql: Sql, storageKey: string): Promise<boolean> {
+  const result = await sql.query(`SELECT 1 FROM profile_images WHERE storage_key = $1 LIMIT 1`, [
+    storageKey,
+  ]);
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function listImages(sql: Sql, profileId: string): Promise<ProfileImageRecord[]> {
   const result = await sql.query<Row>(
     `SELECT ${COLUMNS} FROM profile_images WHERE profile_id = $1 ORDER BY sort_order`,
