@@ -83,6 +83,7 @@ pnpm db:backup:list    # 가진 백업 목록
 pnpm db:backup:verify  # 최근 백업을 임시 DB 로 되살려 확인
 pnpm db:purge-seed     # 합성 시드 정리 (기본은 미리보기, --yes 로 실제 삭제)
 pnpm dev:session       # 점검용 주선자 세션 쿠키 (개발 전용, production 거절)
+pnpm guide:screenshots # 시작 가이드 화면 사진 (합성 DB·3031 에서 찍는다, 빌드 필요)
 
 pnpm health:check      # 가동 확인 1회 (앱 + 공개 주소)
 pnpm health:test       # 알림 경로 확인 (테스트 메시지 한 통)
@@ -228,7 +229,7 @@ db/migrations/    번호순 SQL. 적용된 파일은 절대 수정하지 않고 
 db/sample/        시드가 읽는 샘플 프로필 (git 제외)
 tests/            vitest. 도메인 단위 + DB 통합
 .agent-config/    에이전트 하네스 원본 (위 참고)
-scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 점검 세션)
+scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 점검 세션, 가이드 화면 사진)
 ecosystem.config.cjs  PM2 정의
 var/             private 스토리지 · DB 백업 · PM2 로그 (git 제외, 열람 금지)
 ```
@@ -287,6 +288,13 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 | `admin.md`  | 주선자 — Import, 검토·게시, 초대, 연결 |
 | `faq.md`    | 공통 질문과 오류 메시지                |
 | `privacy.md`| 개인정보 처리방침 (코드 기준, 법률 검토 전). **`/privacy` 화면이 이 파일을 그대로 렌더한다** |
+| `start.md`  | 처음 온 주선자 — 화면 사진으로 보는 첫날 할 일. **`/guide` 화면이 이 파일을 그대로 렌더한다** |
+
+`start.md` 의 화면 사진(`apps/web/public/guide/`)은 `pnpm guide:screenshots` 로만 만든다.
+합성 데이터 전용 DB(`bolsaram_guide`)와 임시 스토리지로 빌드된 앱을 3031 에 띄워 찍는다 —
+**운영 화면을 찍어 싣지 않는다**(실제 멤버의 사진·이름이 들어간다). 주선자 화면을 크게
+바꿨으면 `pnpm build` 뒤 다시 찍는다. 이 호스트는 Chromium 라이브러리·한글 폰트를
+`~/.cache/bolsaram-chromium-libs` 에 풀어 두었다(`GUIDE_CHROMIUM_LIBS` · `GUIDE_CHROMIUM_FONTS`).
 
 **사용자에게 보이는 동작이나 정책을 바꾸면 같은 턴에 가이드도 고친다.** 대상 축:
 멤버·주선자 화면, 인증(`server/auth/`), 상태 enum, 업로드 제한, PM2 스케줄.
@@ -298,6 +306,7 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
   프로필 사진 5장·분석 6장·신뢰도 65%·정리 04:10·기본 필터 범위)가 코드와 같은가
 - 상태 라벨(프로필·신청)이 전부 설명돼 있는가
 - 보안 약속(연결 전 이름 비공개, 비로그인 차단, AI 자동 게시 금지)이 적혀 있는가
+- 시작 가이드가 싣는 사진이 모두 있고, 안 쓰는 사진이 없는가
 
 정책을 의도적으로 바꿨다면 가이드와 이 테스트를 함께 고친다. 문구·표현은 검사하지 않는다.
 

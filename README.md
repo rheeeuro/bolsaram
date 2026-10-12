@@ -11,7 +11,7 @@
 [docs/implementation-plan.md](docs/implementation-plan.md)에 있습니다.
 
 **서비스를 쓰는 분은 [사용 가이드](docs/guide/README.md)를 보세요** —
-[멤버용](docs/guide/member.md) · [주선자용](docs/guide/admin.md) · [FAQ](docs/guide/faq.md)
+[처음 온 주선자용](docs/guide/start.md) · [멤버용](docs/guide/member.md) · [주선자용](docs/guide/admin.md) · [FAQ](docs/guide/faq.md)
 
 ## 빠르게 시작하기
 
@@ -88,7 +88,7 @@ pnpm dev          # http://127.0.0.1:3020
 | `packages/config`    | 공용 tsconfig / eslint                                      | –                                      |
 | `db`                 | 스키마와 마이그레이션 (RLS 정책 포함)                       | [README](db/README.md)                 |
 | `tests`              | vitest — 도메인 단위 + DB 통합                              | [README](tests/README.md)              |
-| `scripts`            | 운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시) | –                          |
+| `scripts`            | 운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 가이드 화면 사진) | –                          |
 | `docs`               | 설계 문서 · 구현 계획 · [사용 가이드](docs/guide/README.md) | –                                      |
 | `assets`             | 브랜드 에셋 원본 (로고·심볼·favicon) — `apps/web/public/` 로 복사해 쓴다 | [README](assets/README.md)   |
 

@@ -19,6 +19,8 @@ type Kpi = {
   requestsIntroduced: number;
   inboxPending: number;
   membersTotal: number;
+  /** 어느 채널이든 내가 등록한 프로필 수. 0 이면 처음 온 주선자로 보고 가이드를 권한다. */
+  myProfiles: number;
 };
 
 type RecentRow = {
@@ -60,9 +62,10 @@ export default async function HostHomePage() {
           WHERE group_id IS NOT DISTINCT FROM $1
             AND status IN ('RECEIVED','UPLOADING','ANALYZING','REVIEW_REQUIRED','READY','FAILED'))::int AS "inboxPending",
         (SELECT count(*) FROM profiles
-          WHERE group_id IS NOT DISTINCT FROM $1 AND user_id IS NOT NULL)::int AS "membersTotal"
+          WHERE group_id IS NOT DISTINCT FROM $1 AND user_id IS NOT NULL)::int AS "membersTotal",
+        (SELECT count(*) FROM profiles WHERE created_by = $2)::int AS "myProfiles"
     `,
-      [viewer.groupId],
+      [viewer.groupId, viewer.userId],
     );
 
     const requests = await sql.query<RecentRow>(
@@ -111,6 +114,25 @@ export default async function HostHomePage() {
           좋은 사람을, 좋은 방식으로. {activeName}에서 오늘 볼 것만 모았습니다.
         </p>
       </section>
+
+      {kpi.myProfiles === 0 ? (
+        <Link
+          href="/guide"
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-white px-5 py-4 shadow-[var(--shadow-card)] transition-colors hover:border-[var(--color-rose-300)]"
+        >
+          <span className="min-w-0">
+            <span className="display block text-[16px] text-[var(--color-ink-900)]">
+              처음 오셨나요?
+            </span>
+            <span className="mt-1 block text-[13px] leading-relaxed text-[var(--surface-text-muted)]">
+              텔레그램 봇 연결부터 프로필 등록, 입장 링크 보내기까지 실제 화면으로 안내합니다.
+            </span>
+          </span>
+          <span className="shrink-0 text-[13px] text-[var(--color-rose-600)]">
+            시작 가이드 보기 →
+          </span>
+        </Link>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
@@ -229,6 +251,11 @@ export default async function HostHomePage() {
               href="/group"
               title="모임 설정"
               description="모임 정보와 동료 주선자를 관리합니다."
+            />
+            <QuickLink
+              href="/guide"
+              title="사용 가이드"
+              description="화면 사진과 함께 처음부터 순서대로 봅니다."
             />
           </div>
         </Panel>

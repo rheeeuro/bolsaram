@@ -301,6 +301,10 @@ function MoreSheet({
           ) : null}
 
           <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
+            <SheetItem href="/guide">사용 가이드 — 화면 사진으로 보는 첫날 할 일</SheetItem>
+          </div>
+
+          <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
             {/* 계정은 모임과 무관하다 — 모임 설정 아래에 선을 두고 따로 묶는다. */}
             <SheetItem
               href="/account"

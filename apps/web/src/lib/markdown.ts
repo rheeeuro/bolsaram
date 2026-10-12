@@ -8,9 +8,13 @@
  * 판정은 **블록 배열까지만** 한다. JSX 는 `components/ui/markdown.tsx` 가 만든다 —
  * 그래서 테스트가 렌더링 없이 문서 전체를 훑어 놓친 문법을 잡을 수 있다.
  *
- * 지원하지 않는 문법(링크·이미지·중첩 목록·코드 블록)은 **문단 텍스트로 그대로**
- * 남는다. 조용히 사라지지 않게 하려고 이렇게 뒀고, 문서가 그것을 쓰지 않는지는
- * `tests/markdown.test.ts` 가 지킨다.
+ * 이미지는 **한 줄을 통째로 차지할 때만** 받는다 — `![설명](/guide/파일.jpg "phone")`.
+ * 주소는 앱이 내려주는 `/guide/` 아래 파일만 허용한다(문서가 외부 이미지를 끌어오지
+ * 않게). 따옴표 안의 값은 사진 틀이다: `phone`(폰 화면)·`panel`(화면 한 칸)·생략(PC 화면).
+ *
+ * 지원하지 않는 문법(링크·문장 속 이미지·중첩 목록·코드 블록)은 **문단 텍스트로
+ * 그대로** 남는다. 조용히 사라지지 않게 하려고 이렇게 뒀고, 문서가 그것을 쓰지
+ * 않는지는 `tests/markdown.test.ts` 가 지킨다.
  */
 
 export type InlineSpan =
@@ -24,7 +28,11 @@ export type Block =
   | { kind: "quote"; paragraphs: InlineSpan[][] }
   | { kind: "list"; ordered: boolean; items: InlineSpan[][] }
   | { kind: "table"; head: InlineSpan[][]; rows: InlineSpan[][][] }
-  | { kind: "rule" };
+  | { kind: "rule" }
+  | { kind: "image"; src: string; alt: string; frame: ImageFrame };
+
+/** 사진 틀. 화면 크기에 맞춰 폭을 다르게 잡는다. */
+export type ImageFrame = "desktop" | "phone" | "panel";
 
 const HEADING = /^(#{1,3})\s+(.*)$/;
 const RULE = /^-{3,}$/;
@@ -36,6 +44,9 @@ const CONTINUATION = /^\s{2,}(\S.*)$/;
 const TABLE_ROW = /^\|(.*)\|$/;
 /** `|---|:--:|` 형태의 표 구분선. */
 const TABLE_DIVIDER = /^\|[\s:|-]+\|$/;
+
+/** 한 줄짜리 이미지. 주소는 `/guide/` 아래 파일 이름만 받는다. */
+const IMAGE = /^!\[([^\]]*)\]\((\/guide\/[A-Za-z0-9_-]+\.(?:jpg|png|webp))(?:\s+"(phone|panel)")?\)$/;
 
 /** 인라인 강조와 코드. 코드 안의 `**` 는 강조로 보지 않도록 한 번에 훑는다. */
 const INLINE = /`([^`]+)`|\*\*([^*]+?)\*\*/g;
@@ -79,6 +90,18 @@ export function parseMarkdown(source: string): Block[] {
 
     if (RULE.test(line.trim())) {
       blocks.push({ kind: "rule" });
+      i += 1;
+      continue;
+    }
+
+    const image = IMAGE.exec(line.trim());
+    if (image) {
+      blocks.push({
+        kind: "image",
+        alt: image[1]!.trim(),
+        src: image[2]!,
+        frame: (image[3] as ImageFrame | undefined) ?? "desktop",
+      });
       i += 1;
       continue;
     }
@@ -156,6 +179,7 @@ export function parseMarkdown(source: string): Block[] {
       const current = lines[i]!;
       if (current.trim().length === 0) break;
       if (RULE.test(current.trim()) || HEADING.test(current) || QUOTE.test(current)) break;
+      if (IMAGE.test(current.trim())) break;
       if (BULLET.test(current) || ORDERED.test(current) || TABLE_ROW.test(current)) break;
       paragraph.push(current.trim());
       i += 1;
@@ -179,6 +203,8 @@ export function blockText(block: Block): string {
       return block.items.map(fromSpans).join(" ");
     case "table":
       return [block.head, ...block.rows].map((row) => row.map(fromSpans).join(" ")).join(" ");
+    case "image":
+      return block.alt;
     case "rule":
       return "";
   }

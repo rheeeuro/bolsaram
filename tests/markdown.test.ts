@@ -15,6 +15,10 @@ const PRIVACY = readFileSync(
   path.join(import.meta.dirname, "..", "docs", "guide", "privacy.md"),
   "utf8",
 );
+const START = readFileSync(
+  path.join(import.meta.dirname, "..", "docs", "guide", "start.md"),
+  "utf8",
+);
 
 describe("블록 판정", () => {
   it("제목 세 단계를 읽는다", () => {
@@ -83,6 +87,38 @@ describe("블록 판정", () => {
   });
 });
 
+describe("이미지 판정", () => {
+  it("한 줄짜리 이미지를 블록으로 읽는다", () => {
+    expect(parseMarkdown("![홈 화면](/guide/home.jpg)")).toEqual([
+      { kind: "image", alt: "홈 화면", src: "/guide/home.jpg", frame: "desktop" },
+    ]);
+  });
+
+  it("따옴표 안의 값으로 사진 틀을 고른다", () => {
+    expect(parseMarkdown('![폰](/guide/a.jpg "phone")')[0]).toMatchObject({ frame: "phone" });
+    expect(parseMarkdown('![칸](/guide/a.jpg "panel")')[0]).toMatchObject({ frame: "panel" });
+  });
+
+  it("문단 바로 다음 줄의 이미지를 문단에 삼키지 않는다", () => {
+    expect(parseMarkdown("설명\n![사진](/guide/a.jpg)").map((b) => b.kind)).toEqual([
+      "paragraph",
+      "image",
+    ]);
+  });
+
+  it("앱 밖 주소나 경로 탈출은 이미지로 보지 않는다", () => {
+    // 문서가 외부 이미지를 끌어오거나 다른 정적 파일을 가리키지 못하게 한다.
+    for (const line of [
+      "![x](https://example.com/a.jpg)",
+      "![x](/guide/../favicon.ico)",
+      "![x](/bolsaram-logo-primary.png)",
+      "![x](/guide/a.svg)",
+    ]) {
+      expect(parseMarkdown(line).map((b) => b.kind), line).toEqual(["paragraph"]);
+    }
+  });
+});
+
 describe("인라인 판정", () => {
   it("강조를 뽑아낸다", () => {
     expect(parseInline("보통 **강조** 보통")).toEqual([
@@ -139,6 +175,44 @@ describe("처리방침 문서를 화면에 낼 수 있다", () => {
 
   it("표시 문자가 본문에 남지 않는다", () => {
     for (const block of blocks) {
+      expect(blockText(block)).not.toMatch(/\*\*|^#|`/);
+    }
+  });
+});
+
+describe("시작 가이드 문서를 화면에 낼 수 있다", () => {
+  const blocks = parseMarkdown(START);
+
+  it("제목으로 시작하고 단계마다 `##` 를 쓴다", () => {
+    expect(blocks[0]).toMatchObject({ kind: "heading", level: 1 });
+    expect(blocks.filter((b) => b.kind === "heading" && b.level === 2).length).toBeGreaterThan(5);
+  });
+
+  it("이미지 줄이 모두 이미지 블록이 된다", () => {
+    const lines = START.split("\n").filter((line) => line.startsWith("!["));
+    expect(blocks.filter((b) => b.kind === "image")).toHaveLength(lines.length);
+  });
+
+  it("사진마다 설명이 있다", () => {
+    // 설명이 곧 alt 이자 캡션이다. 화면을 보지 않는 사용자에게는 이것이 사진이다.
+    for (const block of blocks) {
+      if (block.kind === "image") expect(block.alt.length, block.src).toBeGreaterThan(0);
+    }
+  });
+
+  it("파서가 모르는 문법을 쓰지 않는다", () => {
+    for (const [index, line] of START.split("\n").entries()) {
+      const at = `${index + 1}행: ${line}`;
+      if (line.startsWith("![")) continue;
+      expect(line, at).not.toMatch(/!\[|\]\(/);
+      expect(line, at).not.toMatch(/^```/);
+      expect(line, at).not.toMatch(/^\s+[-*]\s/);
+    }
+  });
+
+  it("표시 문자가 본문에 남지 않는다", () => {
+    for (const block of blocks) {
+      if (block.kind === "image") continue;
       expect(blockText(block)).not.toMatch(/\*\*|^#|`/);
     }
   });

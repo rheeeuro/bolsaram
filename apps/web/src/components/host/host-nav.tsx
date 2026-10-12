@@ -131,6 +131,14 @@ function HostSidebar({
             );
           })}
         </nav>
+
+        {/* 화면 사진이 든 시작 가이드. 모임과 무관해서 메뉴 목록과 떼어 맨 아래 둔다. */}
+        <Link
+          href="/guide"
+          className="mb-4 mt-auto rounded-lg px-3 py-2 text-[12.5px] text-[var(--surface-text-muted)] transition-colors hover:bg-[var(--color-ivory-200)] hover:text-[var(--color-ink-800)]"
+        >
+          사용 가이드 →
+        </Link>
       </div>
     </aside>
   );

@@ -61,6 +61,16 @@ curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' \
 
 ## 브라우저 스크린샷
 
-이 호스트에는 Chromium 실행에 필요한 시스템 라이브러리(`libatk-1.0`)가 없어 Playwright 가
-브라우저를 띄우지 못한다. 스크린샷 대신 렌더링된 HTML 에서 핵심 요소를 grep 으로 확인한다.
-설치가 필요하면 사용자에게 먼저 확인한다(시스템 패키지 변경이다).
+이 호스트에는 Chromium 이 쓰는 시스템 라이브러리(`libatk-1.0` 등)와 한글 폰트가 없다.
+시스템 패키지를 설치하지 않고 `.deb` 를 `~/.cache/bolsaram-chromium-libs` 에 풀어 두었으니
+Playwright 를 띄울 때 그 브라우저 프로세스에만 넘긴다.
+
+```js
+const C = `${process.env.HOME}/.cache/bolsaram-chromium-libs`;
+await chromium.launch({ env: { ...process.env,
+  LD_LIBRARY_PATH: `${C}/root/usr/lib/x86_64-linux-gnu`, FONTCONFIG_FILE: `${C}/fonts.conf` } });
+```
+
+디렉터리가 없으면 `apt-get download` 로 받아 `dpkg -x` 로 풀면 된다(sudo 불필요).
+**운영 앱(3020)을 찍을 때는 실제 멤버가 화면에 나온다** — 확인용으로만 보고 파일로 남기지
+않는다. 문서에 실을 사진은 `pnpm guide:screenshots` 처럼 합성 DB 에서 찍는다.

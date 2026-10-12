@@ -42,6 +42,9 @@ export default async function LoginPage({
           <AuthFooterLink href="/enter" label="입장코드로 들어가기">
             초대받은 멤버이신가요?
           </AuthFooterLink>
+          <AuthFooterLink href="/guide" label="시작 가이드 보기">
+            주선자가 처음이신가요?
+          </AuthFooterLink>
         </>
       }
     >

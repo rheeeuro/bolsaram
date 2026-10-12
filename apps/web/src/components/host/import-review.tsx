@@ -570,7 +570,8 @@ function FieldRow({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="h-8 text-[12.5px]"
+          // 높이를 h-8 로 고정했으니 세로 여백은 뺀다 — 남겨 두면 글자 아랫부분이 잘린다.
+          className="h-8 py-0 text-[12.5px]"
         >
           <option value="">선택 안 함</option>
           {enumOptions.values.map((option) => (

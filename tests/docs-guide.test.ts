@@ -36,7 +36,7 @@ import { TELEGRAM_MAX_FILE_BYTES } from "@bolsaram/schemas";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const GUIDE_DIR = path.join(ROOT, "docs", "guide");
 
-const GUIDE_FILES = ["README.md", "member.md", "admin.md", "faq.md", "privacy.md"];
+const GUIDE_FILES = ["README.md", "member.md", "admin.md", "faq.md", "privacy.md", "start.md"];
 
 function guide(name: string): string {
   return readFileSync(path.join(GUIDE_DIR, name), "utf8");
@@ -59,7 +59,7 @@ function constantOf(relPath: string, name: string): number {
 }
 
 describe("가이드 파일", () => {
-  it("네 문서가 모두 있다", () => {
+  it("문서가 모두 있다", () => {
     for (const name of GUIDE_FILES) {
       expect(existsSync(path.join(GUIDE_DIR, name)), `${name} 없음`).toBe(true);
     }
@@ -461,5 +461,39 @@ describe("가이드가 보안 약속을 정확히 설명한다", () => {
     // app_discover_excluded_profile_ids 와 삽입 트리거가 방향을 구분하지 않는다.
     expect(guide("member.md")).toMatch(/\*\*서로\*\* 탐색 목록에 보이지 않습니다/);
     expect(guide("member.md")).toMatch(/\*\*서로\*\* 마음을 보낼 수 없습니다/);
+  });
+});
+
+describe("시작 가이드의 화면 사진", () => {
+  // `/guide` 화면이 start.md 를 그대로 그리고, 사진은 앱의 정적 파일이다.
+  // 문서가 없는 사진을 가리키면 화면에 빈 틀이 뜨고, 아무도 안 쓰는 사진은
+  // 다시 찍을 때(pnpm guide:screenshots) 갈 곳 없이 쌓인다. 양쪽을 본다.
+  const SHOT_DIR = path.join(ROOT, "apps", "web", "public", "guide");
+  const referenced = new Set(
+    [...guide("start.md").matchAll(/^!\[[^\]]*\]\(\/guide\/([^)\s]+)/gm)].map((m) => m[1]!),
+  );
+  const files = new Set(readdirSync(SHOT_DIR).filter((f) => /\.(jpg|png|webp)$/.test(f)));
+
+  it("사진을 하나 이상 싣는다", () => {
+    expect(referenced.size).toBeGreaterThan(0);
+  });
+
+  for (const name of [...referenced].sort()) {
+    it(`${name} 파일이 있다`, () => {
+      expect(files.has(name), `start.md 가 ${name} 을 싣지만 파일이 없습니다`).toBe(true);
+    });
+  }
+
+  it("쓰지 않는 사진이 없다", () => {
+    const unused = [...files].filter((name) => !referenced.has(name));
+    expect(unused, "start.md 가 싣지 않는 사진").toEqual([]);
+  });
+
+  it("텔레그램 연결과 입장 링크를 안내한다", () => {
+    const start = guide("start.md");
+    expect(start).toMatch(/연결 코드 받기/);
+    expect(start).toMatch(/15분/);
+    expect(start).toMatch(/초대 링크 발급/);
+    expect(start).toMatch(/72시간/);
   });
 });

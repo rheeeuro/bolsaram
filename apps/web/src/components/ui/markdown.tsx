@@ -66,6 +66,34 @@ function Table({ block }: { block: Extract<Block, { kind: "table" }> }) {
   );
 }
 
+/** 사진 틀마다 화면에서 차지할 폭. 폰 화면을 본문 폭으로 늘리면 글자가 지나치게 커진다. */
+const FRAME_WIDTH: Record<Extract<Block, { kind: "image" }>["frame"], string> = {
+  desktop: "w-full",
+  panel: "w-full max-w-[340px]",
+  phone: "w-full max-w-[280px]",
+};
+
+function Figure({ block }: { block: Extract<Block, { kind: "image" }> }) {
+  return (
+    <figure className="my-6">
+      <div
+        className={`${FRAME_WIDTH[block.frame]} mx-auto overflow-hidden border border-[var(--surface-border)] bg-[var(--color-ivory-100)] shadow-[var(--shadow-card)] ${
+          block.frame === "phone" ? "rounded-[22px]" : "rounded-xl"
+        }`}
+      >
+        {/* 앱에 들어 있는 정적 화면 사진이다. 크기가 제각각이라 최적화 없이 그대로 낸다. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={block.src} alt={block.alt} loading="lazy" className="block h-auto w-full" />
+      </div>
+      {block.alt ? (
+        <figcaption className="mt-2.5 text-center text-[12.5px] text-[var(--color-ink-600)]">
+          {block.alt}
+        </figcaption>
+      ) : null}
+    </figure>
+  );
+}
+
 export function Markdown({ blocks }: { blocks: Block[] }) {
   return (
     <div className="text-[14px] leading-relaxed text-[var(--color-ink-700)]">
@@ -140,6 +168,8 @@ export function Markdown({ blocks }: { blocks: Block[] }) {
             return <Table key={index} block={block} />;
           case "rule":
             return <hr key={index} className="my-8 border-[var(--surface-border)]" />;
+          case "image":
+            return <Figure key={index} block={block} />;
         }
       })}
     </div>

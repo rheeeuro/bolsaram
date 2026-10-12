@@ -54,6 +54,7 @@ apps/web/src/
 │   ├── enter/                멤버 입장 — 입장코드 하나만 묻는다
 │   ├── claim/[token]/        초대 링크 → 프로필 연결 (실패 시 /enter 로 코드 유지)
 │   ├── privacy/              개인정보 처리방침 — docs/guide/privacy.md 를 그대로 렌더 (로그인 불필요)
+│   ├── guide/                주선자 시작 가이드 — docs/guide/start.md + 화면 사진 (로그인 불필요, 색인 안 함)
 │   ├── (member)/             멤버 영역 (하단 탭 레이아웃)
 │   │   ├── discover/         프로필 목록 + 필터 시트
 │   │   ├── discover/[id]/    상세 + 신청 모달 + 연출
@@ -82,7 +83,7 @@ apps/web/src/
 │   ├── dates.ts              시각 표기 (서울 시간대 고정 — 서버·클라이언트가 같은 글자)
 │   ├── invite-code.ts        입장코드 정규화 (링크·공백 섞여 들어온 값에서 코드만)
 │   ├── next-path.ts          `?next=` 검증 — 같은 출처 경로만
-│   ├── markdown.ts           가이드 문서 마크다운 부분집합 → 블록 배열
+│   ├── markdown.ts           가이드 문서 마크다운 부분집합 → 블록 배열 (한 줄짜리 `/guide/` 이미지 포함)
 │   ├── crop-rect.ts          사진에서 쓸 영역 계산 (덮는 배율·밀 수 있는 범위·자를 사각형)
 │   └── cn.ts                 Tailwind 클래스 병합
 └── server/                   서버 전용 (아래 참고)
@@ -107,8 +108,14 @@ apps/web/public/
 ├── site.webmanifest          홈 화면 이름·색 — app/layout.tsx 가 link 를 낸다
 ├── bolsaram-logo-primary.png     세로 락업 (볼사람 / BOLSARAM)
 ├── bolsaram-logo-horizontal.png  가로 락업 (볼사람 | BOLSARAM)
-└── bolsaram-symbol.png           심볼 마크
+├── bolsaram-symbol.png           심볼 마크
+└── guide/                    시작 가이드의 화면 사진 — `pnpm guide:screenshots` 가 만든다
 ```
+
+`public/guide/` 의 사진은 손으로 찍지 않는다. `scripts/guide-screenshots.ts` 가 합성 데이터만
+담은 별도 DB(`<DB 이름>_guide`)와 임시 스토리지로 빌드된 앱을 다른 포트에 띄워 찍는다 —
+운영 DB 의 실제 멤버가 사진에 들어가지 않게 하기 위해서다. 화면을 바꾸면 빌드 후 다시
+돌리고, `tests/docs-guide.test.ts` 가 문서와 사진이 서로 빠짐없이 맞는지 본다.
 
 > 원본 캔버스에 여백이 비대칭으로 들어 있어서 로고는 `BrandLogo` 를 통해서만 쓴다.
 > 실측한 글리프 경계를 잘라 그리고, 화면 크기에 맞는 변형(`wordmark`·`lockup`·
@@ -129,7 +136,7 @@ server/
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
-├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트)
+├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트 — privacy · start)
 ├── storage/local.ts          로컬/R2 private 저장소 + signed download/upload URL
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
