@@ -100,5 +100,21 @@ module.exports = {
       env: { NODE_ENV: "production" },
       ...log("bolsaram-cleanup"),
     },
+
+    // ── 업데이트 소식 (매주 월요일 09:00) ──────────────────────
+    // 지난주 커밋과 가이드 변경분으로 docs/guide/updates.md 에 항목을 덧붙이고
+    // OPS_TELEGRAM_CHAT_ID 로 알린다. /updates 는 요청마다 파일을 읽어 빌드가 필요 없다.
+    {
+      name: "bolsaram-updates",
+      script: "pnpm",
+      args: "updates:weekly",
+      cwd: ROOT,
+      interpreter: "none",
+      instances: 1,
+      autorestart: false,
+      cron_restart: "0 9 * * 1",
+      env: { NODE_ENV: "production" },
+      ...log("bolsaram-updates"),
+    },
   ],
 };

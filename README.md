@@ -88,7 +88,7 @@ pnpm dev          # http://127.0.0.1:3020
 | `packages/config`    | 공용 tsconfig / eslint                                      | –                                      |
 | `db`                 | 스키마와 마이그레이션 (RLS 정책 포함)                       | [README](db/README.md)                 |
 | `tests`              | vitest — 도메인 단위 + DB 통합                              | [README](tests/README.md)              |
-| `scripts`            | 운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 가이드 화면 사진) | –                          |
+| `scripts`            | 운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 가이드 화면 사진, 업데이트 소식) | –                          |
 | `docs`               | 설계 문서 · 구현 계획 · [사용 가이드](docs/guide/README.md) | –                                      |
 | `assets`             | 브랜드 에셋 원본 (로고·심볼·favicon) — `apps/web/public/` 로 복사해 쓴다 | [README](assets/README.md)   |
 
@@ -124,6 +124,7 @@ pnpm pm2:logs     # 로그
 | `bolsaram-web`     | 웹 + API (3020)                                   | 상시       |
 | `bolsaram-backup`  | `pg_dump` 백업 (14개 보관)                        | 매일 03:40 |
 | `bolsaram-cleanup` | 만료 세션·초대·알림 정리, 방치된 Import 원본 삭제 | 매일 04:10 |
+| `bolsaram-updates` | 지난주 커밋으로 업데이트 소식(`/updates`) 작성      | 매주 월 09:00 |
 
 정의는 [ecosystem.config.cjs](ecosystem.config.cjs)에 있습니다. 이 호스트에는 다른 프로젝트의
 PM2 앱도 함께 떠 있으니 항상 앱 이름을 지정해 조작하세요.

@@ -55,6 +55,7 @@ apps/web/src/
 │   ├── claim/[token]/        초대 링크 → 프로필 연결 (실패 시 /enter 로 코드 유지)
 │   ├── privacy/              개인정보 처리방침 — docs/guide/privacy.md 를 그대로 렌더 (로그인 불필요)
 │   ├── guide/                주선자 시작 가이드 — docs/guide/start.md + 화면 사진 (로그인 불필요, 색인 안 함)
+│   ├── updates/              업데이트 소식 — docs/guide/updates.md 를 그대로 렌더 (로그인 불필요, 색인 안 함)
 │   ├── (member)/             멤버 영역 (하단 탭 레이아웃)
 │   │   ├── discover/         프로필 목록 + 필터 시트
 │   │   ├── discover/[id]/    상세 + 신청 모달 + 연출
@@ -136,7 +137,7 @@ server/
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
-├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트 — privacy · start)
+├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트 — privacy · start · updates)
 ├── storage/local.ts          로컬/R2 private 저장소 + signed download/upload URL
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION

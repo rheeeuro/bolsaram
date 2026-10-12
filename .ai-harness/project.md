@@ -87,6 +87,7 @@ pnpm guide:screenshots # 시작 가이드 화면 사진 (합성 DB·3031 에서 
 
 pnpm health:check      # 가동 확인 1회 (앱 + 공개 주소)
 pnpm health:test       # 알림 경로 확인 (테스트 메시지 한 통)
+pnpm updates:weekly    # 지난주 업데이트 소식 작성 (평소엔 cron 이 월 09:00 에 돌린다, --dry-run 미리보기)
 pnpm telegram:webhook  # 봇 webhook 등록 상태 (--set 등록, --delete 해제)
 pnpm ai:check          # OpenAI 키·모델 사용 가능 여부
 
@@ -126,6 +127,7 @@ pnpm agents:test       # 셸 가드 25개 + 자동 배포 회귀 테스트
 | `bolsaram-health`  | 가동 감시        | 상시. 1분마다 확인, 연속 실패 시 텔레그램으로 알린다 |
 | `bolsaram-backup`  | DB 백업          | 매일 03:40 cron. 정리보다 **먼저** 돈다              |
 | `bolsaram-cleanup` | 만료 데이터 정리 | 매일 04:10 cron. 매 실행 새 프로세스라 재시작 불필요 |
+| `bolsaram-updates` | 업데이트 소식 작성 | 매주 월 09:00 cron. 지난주 커밋 → AI → `docs/guide/updates.md` 에 바로 싣고 운영 텔레그램으로 알린다 |
 
 - 정의는 `ecosystem.config.cjs`. 루트 package.json 이 `type: module` 이라 확장자가 `.cjs` 다.
 - 앱을 추가·변경하면 `pnpm pm2:save` 로 저장해야 재부팅 후에도 살아난다
@@ -229,7 +231,7 @@ db/migrations/    번호순 SQL. 적용된 파일은 절대 수정하지 않고 
 db/sample/        시드가 읽는 샘플 프로필 (git 제외)
 tests/            vitest. 도메인 단위 + DB 통합
 .agent-config/    에이전트 하네스 원본 (위 참고)
-scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 점검 세션, 가이드 화면 사진)
+scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 점검 세션, 가이드 화면 사진, 업데이트 소식)
 ecosystem.config.cjs  PM2 정의
 var/             private 스토리지 · DB 백업 · PM2 로그 (git 제외, 열람 금지)
 ```
@@ -289,6 +291,7 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 | `faq.md`    | 공통 질문과 오류 메시지                |
 | `privacy.md`| 개인정보 처리방침 (코드 기준, 법률 검토 전). **`/privacy` 화면이 이 파일을 그대로 렌더한다** |
 | `start.md`  | 처음 온 주선자 — 화면 사진으로 보는 첫날 할 일. **`/guide` 화면이 이 파일을 그대로 렌더한다** |
+| `updates.md`| 모두 — 한 주씩 모은 업데이트 소식, 최근 주가 위. **`/updates` 화면이 요청마다 이 파일을 읽는다.** 매주 `bolsaram-updates` 가 자동으로 덧붙인다 |
 
 `start.md` 의 화면 사진(`apps/web/public/guide/`)은 `pnpm guide:screenshots` 로만 만든다.
 합성 데이터 전용 DB(`bolsaram_guide`)와 임시 스토리지로 빌드된 앱을 3031 에 띄워 찍는다 —

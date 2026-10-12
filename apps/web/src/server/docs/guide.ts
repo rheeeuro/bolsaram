@@ -15,6 +15,7 @@ import { parseMarkdown, type Block } from "@/lib/markdown";
 const GUIDES = {
   privacy: "privacy.md",
   start: "start.md",
+  updates: "updates.md",
 } as const;
 
 export type GuideSlug = keyof typeof GUIDES;

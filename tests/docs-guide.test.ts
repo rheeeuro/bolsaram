@@ -36,7 +36,15 @@ import { TELEGRAM_MAX_FILE_BYTES } from "@bolsaram/schemas";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const GUIDE_DIR = path.join(ROOT, "docs", "guide");
 
-const GUIDE_FILES = ["README.md", "member.md", "admin.md", "faq.md", "privacy.md", "start.md"];
+const GUIDE_FILES = [
+  "README.md",
+  "member.md",
+  "admin.md",
+  "faq.md",
+  "privacy.md",
+  "start.md",
+  "updates.md",
+];
 
 function guide(name: string): string {
   return readFileSync(path.join(GUIDE_DIR, name), "utf8");
@@ -495,5 +503,31 @@ describe("시작 가이드의 화면 사진", () => {
     expect(start).toMatch(/15분/);
     expect(start).toMatch(/초대 링크 발급/);
     expect(start).toMatch(/72시간/);
+  });
+});
+
+describe("업데이트 소식", () => {
+  // `/updates` 화면이 updates.md 를 그대로 그린다. `##` 하나가 한 주이고 최근 주가 위라야
+  // 처음 보이는 것이 새 소식이다. 손으로 덧붙이는 문서라 순서와 날짜 형식을 여기서 묶는다.
+  const weeks = [...guide("updates.md").matchAll(/^## (.+)$/gm)].map((m) => m[1]!);
+  const starts = weeks.map((title) => {
+    const match = /^(\d{4})년 (\d{1,2})월 (\d{1,2})일 ~ /.exec(title);
+    expect(match, `「${title}」 — 「2026년 10월 12일 ~ 18일」 형식이어야 합니다`).not.toBeNull();
+    return new Date(Number(match![1]), Number(match![2]) - 1, Number(match![3]));
+  });
+
+  it("한 주 이상 싣는다", () => {
+    expect(weeks.length).toBeGreaterThan(0);
+  });
+
+  it("최근 주가 위에 있다", () => {
+    for (let i = 1; i < starts.length; i++) {
+      expect(starts[i]!.getTime(), `「${weeks[i]}」 가 「${weeks[i - 1]}」 보다 위에 있어야 합니다`)
+        .toBeLessThan(starts[i - 1]!.getTime());
+    }
+  });
+
+  it("아직 오지 않은 주가 없다", () => {
+    expect(starts[0]!.getTime()).toBeLessThanOrEqual(Date.now());
   });
 });

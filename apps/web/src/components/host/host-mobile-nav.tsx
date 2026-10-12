@@ -302,6 +302,7 @@ function MoreSheet({
 
           <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
             <SheetItem href="/guide">사용 가이드 — 화면 사진으로 보는 첫날 할 일</SheetItem>
+            <SheetItem href="/updates">업데이트 소식 — 새로 생기거나 바뀐 것</SheetItem>
           </div>
 
           <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
