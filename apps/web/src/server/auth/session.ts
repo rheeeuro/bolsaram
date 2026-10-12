@@ -13,7 +13,13 @@ import { env, isProduction } from "../env";
 import { hmac, safeEqual } from "../crypto";
 
 export const SESSION_COOKIE = "bolsaram_session";
-const SESSION_TTL_DAYS = 30;
+/**
+ * 마지막으로 쓴 뒤 이만큼 지나면 끝난다. 쓰는 동안에는 요청마다 다시 늘어난다.
+ * 판정은 DB 의 `expires_at` 이 하고, 쿠키는 브라우저가 지우지 않을 만큼만 길게 둔다.
+ */
+const SESSION_IDLE_DAYS = 30;
+/** 쿠키 수명. 브라우저 상한(약 400일) 안에서 잡는다 — 실제 만료는 서버가 정한다. */
+const SESSION_COOKIE_DAYS = 395;
 
 export type SessionUser = {
   userId: string;
@@ -72,7 +78,7 @@ function parseCookieValue(value: string): string | null {
 }
 
 export async function createSession(userId: string, userAgent?: string): Promise<void> {
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000);
+  const expiresAt = new Date(Date.now() + SESSION_IDLE_DAYS * 86_400_000);
   // owner 커넥션: sessions 테이블은 app 롤에 권한이 없다(0006_rls.sql).
   const sessionId = await withOwner(async (sql) => {
     const result = await sql.query<{ id: string }>(
@@ -90,7 +96,7 @@ export async function createSession(userId: string, userAgent?: string): Promise
     sameSite: "lax",
     secure: isProduction(),
     path: "/",
-    expires: expiresAt,
+    expires: new Date(Date.now() + SESSION_COOKIE_DAYS * 86_400_000),
   });
 }
 
@@ -172,9 +178,16 @@ export async function readSession(): Promise<SessionUser | null> {
     const row = result.rows[0];
     if (!row) return null;
 
-    // 활동 시각 갱신은 실패해도 요청을 막지 않는다. 다만 조용히 넘기지 않고 로그를 남긴다.
+    // 쓰는 동안에는 만료를 뒤로 민다. 활동 시각 갱신은 실패해도 요청을 막지 않는다.
+    // 다만 조용히 넘기지 않고 로그를 남긴다.
     sql
-      .query(`UPDATE sessions SET last_seen_at = now() WHERE id = $1`, [sessionId])
+      .query(
+        `UPDATE sessions
+            SET last_seen_at = now(),
+                expires_at = GREATEST(expires_at, now() + make_interval(days => $2))
+          WHERE id = $1`,
+        [sessionId, SESSION_IDLE_DAYS],
+      )
       .catch((error: unknown) => {
         console.error("세션 last_seen_at 갱신 실패", error);
       });

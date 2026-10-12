@@ -6,9 +6,10 @@
  *
  * 여기서 지키는 성질:
  *   * 링크 하나로 계정이 만들어지고 프로필에 연결된다.
- *   * 같은 링크를 두 번 쓸 수 없다(replay 차단).
+ *   * 한 번 연 링크는 그 사람의 입장 링크다 — 다시 열면 같은 계정, 기한을 보지 않는다.
  *   * 이미 주인이 있는 프로필은 계정을 새로 만들지 않고 재로그인한다.
- *   * 만료·회수된 링크는 통하지 않는다.
+ *   * 처음 열기 전 기한이 지났거나 회수된 링크는 통하지 않는다.
+ *   * 다시 발급하면 이전 링크와 그 멤버의 세션이 함께 끝난다.
  *   * 링크를 쓴 멤버를 나중에 삭제할 수 있다(0016 제약 완화).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -85,14 +86,7 @@ describe("최초 진입", () => {
     expect(linked?.phone).toBeNull();
   });
 
-  it("같은 링크를 두 번 쓸 수 없다", async () => {
-    const profileId = await newProfile("재사용");
-    const token = await link(profileId);
-    await consumeInvite({ token });
-    await expect(consumeInvite({ token })).rejects.toThrow(/이미 사용된 링크/);
-  });
-
-  it("만료된 링크는 통하지 않는다", async () => {
+  it("처음 열기 전 기한이 지난 링크는 통하지 않는다", async () => {
     const profileId = await newProfile("만료");
     const token = await link(profileId);
     await withOwner((sql) =>
@@ -110,14 +104,80 @@ describe("최초 진입", () => {
     await withOwner((sql) =>
       sql.query(`UPDATE invites SET revoked_at = now() WHERE profile_id = $1`, [profileId]),
     );
-    await expect(consumeInvite({ token })).rejects.toThrow(/만료되었거나 이미 사용된/);
+    await expect(consumeInvite({ token })).rejects.toThrow(/만료되었거나 다시 발급되어/);
   });
 
   it("새 링크를 발급하면 이전 링크가 죽는다", async () => {
     const profileId = await newProfile("재발급");
     const first = await link(profileId);
     await link(profileId);
-    await expect(consumeInvite({ token: first })).rejects.toThrow(/만료되었거나 이미 사용된/);
+    await expect(consumeInvite({ token: first })).rejects.toThrow(/만료되었거나 다시 발급되어/);
+  });
+});
+
+describe("개인 입장 링크", () => {
+  it("한 번 연 링크로 다시 들어오면 같은 계정이다", async () => {
+    const profileId = await newProfile("입장링크");
+    const token = await link(profileId);
+    const first = await consumeInvite({ token });
+
+    const again = await consumeInvite({ token });
+    expect(again).toEqual({ userId: first.userId, profileId, firstTime: false });
+    // 미리보기도 계속 열린다 — /claim 화면이 이 판정으로 그려진다.
+    await expect(previewInvite(token)).resolves.toMatchObject({
+      profileId,
+      alreadyClaimedProfile: true,
+    });
+  });
+
+  it("연결된 링크는 처음 열기 기한이 지나도 통한다", async () => {
+    const profileId = await newProfile("기한후");
+    const token = await link(profileId);
+    const first = await consumeInvite({ token });
+    await withOwner((sql) =>
+      sql.query(
+        `UPDATE invites SET expires_at = now() - interval '30 days' WHERE profile_id = $1`,
+        [profileId],
+      ),
+    );
+    await expect(consumeInvite({ token })).resolves.toMatchObject({ userId: first.userId });
+  });
+
+  it("다시 발급하면 이전 링크와 그 멤버의 세션이 끝난다", async () => {
+    const profileId = await newProfile("유출");
+    const old = await link(profileId);
+    const { userId } = await consumeInvite({ token: old });
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO sessions (user_id, expires_at) VALUES ($1, now() + interval '30 days')`,
+        [userId],
+      ),
+    );
+
+    const fresh = await link(profileId);
+    await expect(consumeInvite({ token: old })).rejects.toThrow(/만료되었거나 다시 발급되어/);
+
+    const alive = await withOwner(async (sql) => {
+      const r = await sql.query<{ count: number }>(
+        `SELECT count(*)::int AS count FROM sessions
+          WHERE user_id = $1 AND revoked_at IS NULL`,
+        [userId],
+      );
+      return r.rows[0]!.count;
+    });
+    expect(alive).toBe(0);
+    // 새 링크로는 같은 계정에 들어온다.
+    await expect(consumeInvite({ token: fresh })).resolves.toMatchObject({ userId });
+  });
+
+  it("연결된 계정이 프로필에서 떨어지면 그 링크로 새 계정을 만들지 않는다", async () => {
+    const profileId = await newProfile("분리");
+    const token = await link(profileId);
+    await consumeInvite({ token });
+    await withOwner((sql) =>
+      sql.query(`UPDATE profiles SET user_id = NULL WHERE id = $1`, [profileId]),
+    );
+    await expect(consumeInvite({ token })).rejects.toThrow(/만료되었거나 다시 발급되어/);
   });
 });
 

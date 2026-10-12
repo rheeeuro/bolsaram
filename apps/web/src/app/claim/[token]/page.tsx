@@ -42,8 +42,8 @@ export default async function ClaimPage({
               코드를 잘못 옮겨 적었을 수 있습니다.
             </AuthFooterLink>
             <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-500)]">
-              링크와 입장코드는 한 번만 쓸 수 있고 72시간 뒤 만료됩니다. 이미 쓴 것이라면
-              주선자에게 새로 요청해 주세요.
+              처음 받은 링크는 72시간 안에 열어야 하고, 주선자가 새로 발급하면 이전 링크는
+              더 이상 열리지 않습니다. 주선자에게 새로 요청해 주세요.
             </p>
           </>
         }

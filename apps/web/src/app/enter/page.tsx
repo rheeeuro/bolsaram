@@ -32,8 +32,8 @@ export default async function EnterPage({
             프로필을 등록하는 분이신가요?
           </AuthFooterLink>
           <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-500)]">
-            코드는 한 번만 쓸 수 있고 72시간 뒤 만료됩니다. 안 들어가면 주선자에게 다시
-            요청하세요.
+            처음 받은 코드는 72시간 안에 써야 합니다. 한 번 들어온 뒤에는 같은 링크나 코드로
+            언제든 다시 들어옵니다. 안 들어가면 주선자에게 다시 요청하세요.
           </p>
         </>
       }

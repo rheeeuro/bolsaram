@@ -122,9 +122,9 @@ server/
 ├── crypto.ts                 HMAC·scrypt·랜덤 토큰·타이밍 안전 비교
 ├── audit.ts                  감사 로그 (민감값 제외)
 ├── auth/
-│   ├── session.ts            서명 쿠키 + sessions 테이블
+│   ├── session.ts            서명 쿠키 + sessions 테이블 (마지막 사용 후 30일)
 │   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 프로필 사진 가져오기, 연결된 계정 조회)
-│   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·1회용)
+│   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·처음 연 사람의 입장 링크)
 │   ├── group-invite.ts       모임 만들기·소속·사진·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile

@@ -144,8 +144,8 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     expect(ALL).toMatch(/비밀번호(를)? 볼사람에 저장|비밀번호를 저장하지 않/);
   });
 
-  it("로그인 유지 30일", () => {
-    expect(constantOf("apps/web/src/server/auth/session.ts", "SESSION_TTL_DAYS")).toBe(30);
+  it("로그인 유지 — 마지막 사용 후 30일", () => {
+    expect(constantOf("apps/web/src/server/auth/session.ts", "SESSION_IDLE_DAYS")).toBe(30);
     expect(ALL).toMatch(/30일/);
   });
 

@@ -106,6 +106,22 @@ export function HostProfileDetail({
     router.refresh();
   }
 
+  async function issueInvite() {
+    setBusy(true);
+    setError(null);
+    const result = await apiPost<{ url: string; code: string }>("/api/admin/invites", {
+      profileId: profile.id,
+      expiresInHours: 72,
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError({ scope: "invite", message: result.message });
+      return;
+    }
+    setIssued({ url: result.data.url, code: result.data.code });
+    router.refresh();
+  }
+
   const visible = isDiscoverable({ status: status as ProfileStatus });
 
   const summary = [
@@ -426,69 +442,58 @@ export function HostProfileDetail({
                 <h3 className="text-[13px] font-semibold text-[var(--surface-text)]">
                   본인에게 보내기
                 </h3>
-                {claimed ? (
-                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                    이미 본인 계정에 연결되어 있습니다. 본인이 직접 들어와 시그널을
-                    확인합니다.
+                <p className="mb-3 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                  {claimed
+                    ? "본인 계정에 연결되어 있습니다. 보낸 링크를 다시 누르면 언제든 들어옵니다. 링크를 잃어버렸거나 다른 사람에게 갔을 때만 새로 발급하세요."
+                    : "멤버는 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인이고, 한 번 열면 그분의 입장 링크로 계속 쓰입니다."}
+                </p>
+                {invite && !invite.claimed ? (
+                  <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+                    발급된 초대가 있습니다 (처음 열기 기한{" "}
+                    {new Date(invite.expiresAt).toLocaleString("ko-KR", {
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "2-digit",
+                    })}
+                    ). 새로 발급하면 기존 링크와 입장코드는 무효가 됩니다.
                   </p>
+                ) : null}
+
+                {claimed ? (
+                  <ConfirmButton
+                    size="md"
+                    label="입장 링크 다시 발급"
+                    confirmLabel="새로 발급"
+                    message="이전 링크는 더 이상 열리지 않고, 이분이 들어와 있던 기기도 모두 나갑니다."
+                    disabled={busy}
+                    onConfirm={() => void issueInvite()}
+                  />
                 ) : (
-                  <>
-                    <p className="mb-3 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                      멤버는 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인입니다.
-                    </p>
-                    {invite && !invite.claimed ? (
-                      <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
-                        발급된 초대가 있습니다 (만료{" "}
-                        {new Date(invite.expiresAt).toLocaleString("ko-KR", {
-                          month: "numeric",
-                          day: "numeric",
-                          hour: "2-digit",
-                        })}
-                        ). 새로 발급하면 기존 링크와 입장코드는 무효가 됩니다.
-                      </p>
-                    ) : null}
-
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      disabled={busy}
-                      onClick={() => {
-                        void (async () => {
-                          setBusy(true);
-                          setError(null);
-                          const result = await apiPost<{ url: string; code: string }>(
-                            "/api/admin/invites",
-                            { profileId: profile.id, expiresInHours: 72 },
-                          );
-                          setBusy(false);
-                          if (!result.ok) {
-                            setError({ scope: "invite", message: result.message });
-                            return;
-                          }
-                          setIssued({ url: result.data.url, code: result.data.code });
-                          router.refresh();
-                        })();
-                      }}
-                    >
-                      초대 링크 발급
-                    </Button>
-                    <FormError>{messageFor(error, "invite")}</FormError>
-
-                    {issued ? (
-                      <div className="mt-3.5 flex flex-col gap-2.5 rounded-[12px] bg-[var(--color-ivory-100)] p-3">
-                        <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                          지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요.
-                        </p>
-                        <CopyField label="초대 링크" value={issued.url} />
-                        <CopyField label="입장코드" value={issued.code} />
-                        <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                          둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 멤버는
-                          입장 화면에서 코드를 넣습니다.
-                        </p>
-                      </div>
-                    ) : null}
-                  </>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    disabled={busy}
+                    onClick={() => void issueInvite()}
+                  >
+                    초대 링크 발급
+                  </Button>
                 )}
+                <FormError>{messageFor(error, "invite")}</FormError>
+
+                {issued ? (
+                  <div className="mt-3.5 flex flex-col gap-2.5 rounded-[12px] bg-[var(--color-ivory-100)] p-3">
+                    <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                      지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요. 받은 분은 이
+                      메시지를 지우지 말고 들어올 때마다 다시 누르면 됩니다.
+                    </p>
+                    <CopyField label="초대 링크" value={issued.url} />
+                    <CopyField label="입장코드" value={issued.code} />
+                    <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                      둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 멤버는
+                      입장 화면에서 코드를 넣습니다.
+                    </p>
+                  </div>
+                ) : null}
               </section>
 
               <section className="mt-5 border-t border-[var(--surface-border)] pt-4">
@@ -496,7 +501,7 @@ export function HostProfileDetail({
                   대신 둘러보기
                 </h3>
                 <p className="mb-3 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                  주선자가 자기 폰으로 대신 봅니다. 초대는 소진되지 않고 주선자 로그인도
+                  주선자가 자기 폰으로 대신 봅니다. 초대 링크는 건드리지 않고 주선자 로그인도
                   그대로 유지됩니다.
                 </p>
                 <Button

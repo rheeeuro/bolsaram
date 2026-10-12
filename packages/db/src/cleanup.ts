@@ -17,7 +17,7 @@ import type { Sql } from "./client.js";
 export const RETENTION = {
   /** 만료·폐기된 세션 행 */
   sessions: 30,
-  /** 사용·만료된 초대 */
+  /** 회수된 초대(재발급·기한 초과). 연결된 개인 입장 링크는 살아 있는 동안 지우지 않는다 */
   invites: 90,
   /** 등록되지 않은 채 방치된 Import 세션 — 원본 사진까지 지운다 */
   abandonedImports: 30,
@@ -68,10 +68,11 @@ export const STEPS: Step[] = [
   {
     label: "오래된 초대 기록",
     run: async (sql) => {
+      // 연결된 링크는 그 멤버의 입장 수단이라 회수되기 전에는 건드리지 않는다.
       const r = await sql.query(
         `DELETE FROM invites
-          WHERE (claimed_at IS NOT NULL OR revoked_at IS NOT NULL)
-            AND created_at < now() - make_interval(days => $1)`,
+          WHERE revoked_at IS NOT NULL
+            AND revoked_at < now() - make_interval(days => $1)`,
         [RETENTION.invites],
       );
       return r.rowCount ?? 0;
