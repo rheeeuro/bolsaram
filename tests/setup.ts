@@ -1,12 +1,11 @@
-/** 테스트 공통 설정. 리포 루트의 .env 를 읽어 DB 연결 정보를 채운다. */
-import { existsSync } from "node:fs";
-import path from "node:path";
+/**
+ * 테스트 공통 설정. 리포 루트의 .env 를 읽고, DB 접속은 운영 DB 가 아니라
+ * 테스트 전용 DB(`<이름>_test`)로 돌린다 — `global-setup.ts` 가 미리 만들어 둔다.
+ */
+import { loadRootEnv, useTestDatabase } from "./test-db";
 
-const root = path.resolve(import.meta.dirname, "..");
-for (const file of [".env", ".env.local"]) {
-  const full = path.join(root, file);
-  if (existsSync(full)) process.loadEnvFile(full);
-}
+loadRootEnv();
+useTestDatabase();
 
 /**
  * 테스트는 외부 모델을 호출하지 않는다.

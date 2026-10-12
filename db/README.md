@@ -90,6 +90,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0060_profile_host_comment.sql`    | `profiles.host_comment` — 주선자가 쓰고 멤버 상세에 보이는 소개 한마디(500자) |
 | `0061_member_account_delete.sql`   | 등록한 주선자가 그 프로필에 연결된 **멤버** 계정을 지운다 — 프로필 삭제가 계정까지 지우게 |
 | `0062_profile_bump.sql`            | `profiles.bumped_at` — 등록한 주선자의 끌어올리기. 목록은 `COALESCE(bumped_at, created_at)` 순, 트리거가 지금 시각·활성·24시간 1회를 강제하고 모임 방에 `PROFILE_BUMPED` 를 남긴다 |
+| `0063_profile_code_from_one.sql`   | 공개 번호 시퀀스를 1 부터 — 다음 번호는 있는 번호 중 가장 큰 값 + 1 |
 
 ## 테이블
 

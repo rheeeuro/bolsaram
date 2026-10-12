@@ -13,6 +13,8 @@ export default defineConfig({
     // 통합 테스트는 로컬 Postgres 가 떠 있어야 한다(`pnpm db:up`).
     include: ["tests/**/*.test.ts"],
     environment: "node",
+    // 통합 테스트는 운영 DB 가 아니라 `<이름>_test` 에 붙는다. 실행 전에 만들고 마이그레이션한다.
+    globalSetup: ["tests/global-setup.ts"],
     setupFiles: ["tests/setup.ts"],
     // DB 를 공유하므로 파일 간 병렬 실행을 끈다.
     fileParallelism: false,

@@ -3,6 +3,10 @@
 vitest. 순수 도메인 단위 테스트와 **실제 Postgres 에 붙는 통합 테스트**가 섞여 있다.
 DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 
+통합 테스트는 **운영 DB 가 아니라 같은 서버의 `bolsaram_test`** 에 붙는다
+(`.env` 의 DB 이름 뒤에 `_test`). 운영 DB 에서 돌면 지운 프로필도 공개 번호를 소비하고,
+정리하지 못한 데이터가 실제 화면에 섞인다.
+
 > **불변식 1: "안 되는 것"을 테스트한다.**
 > 이 서비스는 비공개 소개팅이라 "동작하는가"보다 **"권한 없는 사람이 못 보는가"** 가 중요하다.
 > 정책을 추가하면 통과 케이스보다 차단 케이스를 먼저 쓴다.
@@ -53,7 +57,10 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 66   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
 
-`setup.ts` 가 리포 루트 `.env` 를 읽어 DB 접속 정보를 채운다.
+`test-db.ts` 가 `.env` 의 DB 접속 URL 을 테스트 DB 로 바꾸는 규칙을 가진다.
+`global-setup.ts` 는 실행 전에 한 번 돌아 테스트 DB 가 없으면 만들고 마이그레이션을 적용한다
+(지우고 다시 만들지 않는다 — 동시에 돌던 다른 실행을 끊지 않도록).
+`setup.ts` 는 파일마다 돌아 `.env` 를 읽고 DB 접속을 테스트 DB 로 돌린다.
 `stubs/server-only.ts` 는 `server-only` 표식을 Node 러너에서 무력화한다.
 `tags.ts` 는 실행마다 다른 짧은 태그를 만든다 — 모임 이름 20자 안에 들어가야 한다.
 
@@ -66,6 +73,12 @@ npx vitest                                 # watch
 ```
 
 DB 를 공유하므로 파일 간 병렬 실행을 끄고(`fileParallelism: false`) 순차로 돈다.
+
+테스트 DB 를 처음부터 다시 만들고 싶으면 지우기만 하면 된다 — 다음 실행이 새로 만든다.
+
+```bash
+docker exec bolsaram_postgres dropdb -U bolsaram_owner --force bolsaram_test
+```
 
 ## 무엇을 지키는 테스트인가
 
