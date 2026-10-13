@@ -33,12 +33,17 @@ export type GroupMessageRecord = {
   payload: GroupMessagePayload;
   /**
    * 공개 번호 → 프로필 id. 화면이 번호에 링크를 달 때 쓴다. 시스템 메시지는 payload 의
-   * 번호, 사람의 글은 본문의 태그(`@23`)가 대상이다.
+   * 번호, 사람의 글은 본문의 멤버 태그(`#23`)가 대상이다.
    *
    * **볼 수 있는 것만 들어온다** — 조회가 RLS 를 통과하므로 지워졌거나 담당 채널을
    * 벗어난 번호는 빠진다. 그런 번호는 링크 없이 글자로만 남는다.
    */
   profileIds: Record<string, string>;
+  /**
+   * 본문에 태그된(`@이름`) 주선자 — 표시 이름 → 사용자 id. 지금 이 모임에 있는
+   * 주선자만 들어온다. 나간 사람이나 이름을 바꾼 사람의 태그는 글자로 남는다.
+   */
+  hostIds: Record<string, string>;
 };
 
 type Row = {
@@ -52,6 +57,7 @@ type Row = {
   system_kind: GroupMessageSystemKind | null;
   payload: unknown;
   profile_ids: unknown;
+  host_ids: unknown;
 };
 
 /**
@@ -59,8 +65,8 @@ type Row = {
  *
  * 시스템 메시지의 payload 에는 번호만 있다(0044) — 이름을 적지 않기로 한 규칙이라
  * 그대로 두고, 화면이 링크를 걸 수 있도록 여기서 한 번 더 찾아 준다. 사람이 쓴 글은
- * 본문의 태그(`@23`)에서 번호를 뽑는다. 정규식은 화면 쪽 `GROUP_MESSAGE_MENTION` 과
- * 같은 판정이다 — 앞이 글자·숫자면 태그가 아니고, 아홉 자리까지만 본다(int 범위).
+ * 본문의 멤버 태그(`#23`)에서 번호를 뽑는다. 정규식은 화면 쪽 `GROUP_MESSAGE_MEMBER_TAG`
+ * 와 같은 판정이다 — 앞이 글자·숫자면 태그가 아니고, 아홉 자리까지만 본다(int 범위).
  * 지운 글은 본문이 비어 있어 찾을 것이 없다.
  *
  * 번호는 전역에서 유일하므로(`profiles.public_code UNIQUE`) 모임을 따로 묻지 않는다.
@@ -77,19 +83,36 @@ const PROFILE_LINKS = `LEFT JOIN LATERAL (
                                     ]
                                     ELSE ARRAY(
                                       SELECT tag[2]::int
-                                        FROM regexp_matches(m.body, '(^|[^[:alnum:]_])@([0-9]{1,9})', 'g') AS tag
+                                        FROM regexp_matches(m.body, '(^|[^[:alnum:]_])#([0-9]{1,9})', 'g') AS tag
                                     ) END)
                          ) links ON true`;
 
+/**
+ * 본문에 태그된 주선자(`@이름`). 이름은 모양이 정해져 있지 않아 뽑아내지 않고, 이 방의
+ * 주선자 이름이 `@` 뒤에 나오는지를 본다. 화면은 받은 이름을 긴 것부터 본문에서 찾는다.
+ * 모임 명단(`group_admins`)과 이름은 같은 모임 주선자에게만 보인다 — RLS 가 판정한다.
+ */
+const HOST_LINKS = `LEFT JOIN LATERAL (
+                        SELECT jsonb_object_agg(h.display_name, h.id) AS ids
+                          FROM group_admins ga
+                          JOIN users h ON h.id = ga.user_id
+                         WHERE ga.group_id = m.group_id
+                           AND m.system_kind IS NULL
+                           AND COALESCE(h.display_name, '') <> ''
+                           AND strpos(m.body, '@' || h.display_name) > 0
+                      ) hosts ON true`;
+
 const SELECT_MESSAGE = `SELECT m.id, m.group_id, m.author_user_id, u.display_name AS author_name,
                                m.body, m.created_at, m.deleted_at, m.system_kind, m.payload,
-                               links.ids AS profile_ids
+                               links.ids AS profile_ids, hosts.ids AS host_ids
                           FROM group_messages m
                           LEFT JOIN users u ON u.id = m.author_user_id
-                          ${PROFILE_LINKS}`;
+                          ${PROFILE_LINKS}
+                          ${HOST_LINKS}`;
 
 /** DB 가 만든 map 이지만 화면으로 나가기 전에 형태를 확인한다. payload 와 같은 규칙이다. */
 const profileIdsSchema = z.record(z.string(), z.uuid());
+const hostIdsSchema = z.record(z.string(), z.uuid());
 
 function toRecord(row: Row): GroupMessageRecord {
   return {
@@ -106,6 +129,7 @@ function toRecord(row: Row): GroupMessageRecord {
     // 문장을 만들지 못할 뿐 목록 전체가 깨지지는 않게 빈 값으로 떨어뜨린다.
     payload: groupMessagePayloadSchema.safeParse(row.payload).data ?? {},
     profileIds: profileIdsSchema.safeParse(row.profile_ids).data ?? {},
+    hostIds: hostIdsSchema.safeParse(row.host_ids).data ?? {},
   };
 }
 
@@ -281,6 +305,52 @@ export async function unreadByGroup(sql: Sql, userId: string): Promise<GroupUnre
   return result.rows.map((row) => ({ groupId: row.group_id, unread: row.unread }));
 }
 
+export type HostMentionCandidate = {
+  userId: string;
+  name: string;
+  isOwner: boolean;
+  /** 프로필 사진의 저장 키. 화면으로 보내기 전에 단기 signed URL 로 바꾼다. */
+  avatarKey: string | null;
+};
+
+/**
+ * `@` 태그 후보 — 이 모임의 주선자를 이름 앞자리로 찾는다. 나는 뺀다.
+ *
+ * 명단은 RLS 가 같은 모임 주선자에게만 보여주므로 속하지 않은 모임을 물으면 비어 있다.
+ * 앞자리 비교는 LIKE 를 쓰지 않는다 — 이름에 `%` `_` 가 들어 있어도 글자 그대로 본다.
+ */
+export async function listHostMentionCandidates(
+  sql: Sql,
+  groupId: string,
+  viewerId: string,
+  prefix: string,
+  limit: number,
+): Promise<HostMentionCandidate[]> {
+  const result = await sql.query<{
+    id: string;
+    display_name: string;
+    is_owner: boolean;
+    avatar_key: string | null;
+  }>(
+    `SELECT u.id, u.display_name, ga.is_owner, u.avatar_key
+       FROM group_admins ga
+       JOIN users u ON u.id = ga.user_id
+      WHERE ga.group_id = $1
+        AND u.id <> $2
+        AND COALESCE(u.display_name, '') <> ''
+        AND lower(left(u.display_name, length($3))) = lower($3)
+      ORDER BY ga.is_owner DESC, u.display_name
+      LIMIT $4`,
+    [groupId, viewerId, prefix, limit],
+  );
+  return result.rows.map((row) => ({
+    userId: row.id,
+    name: row.display_name,
+    isOwner: row.is_owner,
+    avatarKey: row.avatar_key,
+  }));
+}
+
 export type MentionCandidate = {
   profileId: string;
   code: number;
@@ -293,7 +363,7 @@ export type MentionCandidate = {
 };
 
 /**
- * 태그 후보 — 이 방의 모임에 등록된 멤버를 번호 앞자리로 찾는다.
+ * `#` 태그 후보 — 이 방의 모임에 등록된 멤버를 번호 앞자리로 찾는다.
  *
  * 모임으로 좁히는 것은 화면의 약속이다. 볼 수 있는지는 RLS 가 정하므로 소속이 아닌
  * 모임을 물으면 비어 돌아온다. 친 번호와 꼭 맞는 사람을 맨 앞에, 나머지는 최근 번호부터.

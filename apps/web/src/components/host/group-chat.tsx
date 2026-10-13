@@ -24,8 +24,9 @@ import { groupSystemMessageParts } from "@/lib/labels";
  * 그것은 말이 아니라 사건이므로 가운데 한 줄로 조용히 흐르게 둔다. 거기 적힌 멤버
  * 번호는 그 프로필로 가는 링크다 — 사건을 읽고 바로 그 사람을 열어 보는 자리다.
  *
- * 멤버는 `@23` 처럼 번호로 태그한다(`chat-mention.tsx`). 입력란에서 `@` 를 치면 이 모임
- * 멤버 목록이 뜨고, 보낸 글의 태그는 그 프로필로 가는 링크가 된다.
+ * 태그는 두 가지다(`chat-mention.tsx`). `@이름` 은 이 모임 주선자, `#23` 은 이 모임
+ * 멤버다. 입력란에서 `@`·`#` 를 치면 그 목록이 뜨고, 보낸 글의 멤버 태그는 그 프로필로
+ * 가는 링크가 된다.
  *
  * 보이는 범위는 **들어온 시점부터**다(0045). 화면이 자르는 것이 아니라 정책이 막으므로
  * 여기서는 따로 다루지 않는다 — 새로 합류한 사람에게는 자기 입장 기록이 첫 줄이 된다.
@@ -254,6 +255,7 @@ export function GroupChat({
                   key={message.id}
                   message={message}
                   mine={message.authorUserId === viewerId}
+                  viewerId={viewerId}
                   /** 같은 사람이 이어 쓰면 이름을 반복하지 않는다. */
                   grouped={isGrouped(messages[index - 1], message)}
                   onDelete={() => void remove(message.id)}
@@ -307,7 +309,7 @@ export function GroupChat({
             maxLength={GROUP_MESSAGE_MAX_LENGTH}
             rows={2}
             aria-label="메시지"
-            placeholder="메시지를 입력하세요. @번호로 멤버를 태그합니다"
+            placeholder="메시지를 입력하세요. @주선자 · #멤버 번호로 태그합니다"
             className={cn(
               "block max-h-40 min-h-12 w-full resize-none bg-transparent field-sizing-content",
               "text-[14px] leading-relaxed placeholder:text-[var(--color-ink-500)]",
@@ -316,7 +318,7 @@ export function GroupChat({
           />
           <div className="mt-1 flex items-center justify-between gap-2">
             <p className="text-[11.5px] text-[var(--surface-text-muted)]">
-              Enter 보내기 · Shift+Enter 줄바꿈 · @번호 태그
+              Enter 보내기 · Shift+Enter 줄바꿈 · @주선자 #멤버
             </p>
             <button
               type="button"
@@ -402,11 +404,13 @@ function isGrouped(previous: ChatMessage | undefined, current: ChatMessage): boo
 function MessageRow({
   message,
   mine,
+  viewerId,
   grouped,
   onDelete,
 }: {
   message: ChatMessage;
   mine: boolean;
+  viewerId: string;
   grouped: boolean;
   onDelete: () => void;
 }) {
@@ -438,7 +442,12 @@ function MessageRow({
               mine ? "text-[var(--color-burgundy-700)]" : "text-[var(--surface-text)]",
             )}
           >
-            <MentionText body={message.body} profileIds={message.profileIds} />
+            <MentionText
+              body={message.body}
+              profileIds={message.profileIds}
+              hostIds={message.hostIds}
+              viewerId={viewerId}
+            />
           </p>
         )}
         {mine && !message.deleted ? (

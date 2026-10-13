@@ -13,7 +13,8 @@
  *   * 새 글과 지움이 `LISTEN/NOTIFY` 로 알려지고, 그 payload 에 본문이 없다(0043).
  *   * 모임의 사건이 시스템 메시지로 남고, 사람은 그것을 만들지도 지우지도 못한다(0044).
  *   * 시스템 메시지의 공개 번호는 볼 수 있을 때만 프로필 id 로 풀린다(화면의 링크).
- *   * 본문의 태그(`@23`)도 같다. 태그 후보는 그 모임 멤버뿐이고 이름이 없다.
+ *   * 본문의 멤버 태그(`#23`)도 같다. 태그 후보는 그 모임 멤버뿐이고 이름이 없다.
+ *   * 주선자 태그(`@이름`)는 지금 그 모임 주선자만 풀린다. 후보에 나는 없다.
  *   * 나중에 합류한 주선자에게는 **들어오기 전 대화가 보이지 않는다**(0045).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -22,6 +23,7 @@ import { groupChatNotifySchema } from "@bolsaram/schemas";
 import {
   createMessage,
   deleteMessage,
+  listHostMentionCandidates,
   listMentionCandidates,
   listMessages,
   readMessage,
@@ -553,12 +555,12 @@ describe("멤버 태그", () => {
     });
   }
 
-  it("본문의 @번호는 볼 수 있을 때만 프로필로 풀린다", async () => {
+  it("본문의 #번호는 볼 수 있을 때만 프로필로 풀린다", async () => {
     const mine = await profileOf(A.groupId);
     const other = await profileOf(B.groupId);
 
     const written = await withRls(A.owner, (sql) =>
-      createMessage(sql, A.groupId, A.ownerId, `@${mine.code}번 확인 부탁 · @${other.code} · a@${mine.code}`),
+      createMessage(sql, A.groupId, A.ownerId, `#${mine.code}번 확인 부탁 · #${other.code} · a#${mine.code} · @${mine.code}`),
     );
     // 다른 모임의 번호는 RLS 가 걸러 링크가 없다. 앞이 글자인 것은 태그가 아니다.
     expect(written.profileIds).toEqual({ [String(mine.code)]: mine.id });
@@ -566,17 +568,53 @@ describe("멤버 태그", () => {
     // 같은 방 동료가 읽어도 같다. 본문은 친 그대로다 — 저장하는 것은 글뿐이다.
     const seen = await withRls(A.peer, (sql) => readMessage(sql, written.id));
     expect(seen!.profileIds).toEqual({ [String(mine.code)]: mine.id });
-    expect(seen!.body).toContain(`@${mine.code}번`);
+    expect(seen!.body).toContain(`#${mine.code}번`);
   });
 
   it("지운 글의 태그는 풀리지 않는다", async () => {
     const mine = await profileOf(A.groupId);
     const written = await withRls(A.owner, (sql) =>
-      createMessage(sql, A.groupId, A.ownerId, `@${mine.code} 지울 글`),
+      createMessage(sql, A.groupId, A.ownerId, `#${mine.code} @${TAG}-a-peer 지울 글`),
     );
     await withRls(A.owner, (sql) => deleteMessage(sql, A.groupId, written.id));
     const seen = await withRls(A.owner, (sql) => readMessage(sql, written.id));
     expect(seen!.profileIds).toEqual({});
+    expect(seen!.hostIds).toEqual({});
+  });
+
+  it("@이름은 지금 이 모임 주선자일 때만 풀린다", async () => {
+    const peerName = `${TAG}-a-peer`;
+    const outsider = `${TAG}-b-owner`;
+    const written = await withRls(A.owner, (sql) =>
+      createMessage(sql, A.groupId, A.ownerId, `@${peerName}님 확인 · @${outsider} · #1`),
+    );
+    // 다른 모임 주선자는 이 방의 명단에 없으니 풀리지 않는다. 멤버 번호와 섞이지 않는다.
+    expect(written.hostIds).toEqual({ [peerName]: A.peerId });
+
+    const seen = await withRls(A.peer, (sql) => readMessage(sql, written.id));
+    expect(seen!.hostIds).toEqual({ [peerName]: A.peerId });
+  });
+
+  it("주선자 후보는 이 모임 사람뿐이고 나는 빠진다", async () => {
+    const hosts = await withRls(A.owner, (sql) =>
+      listHostMentionCandidates(sql, A.groupId, A.ownerId, "", 50),
+    );
+    expect(hosts.map((h) => h.userId)).toEqual([A.peerId]);
+
+    // 앞자리는 대소문자를 가리지 않고 글자 그대로 비교한다(`%` 는 와일드카드가 아니다).
+    const narrowed = await withRls(A.owner, (sql) =>
+      listHostMentionCandidates(sql, A.groupId, A.ownerId, `${TAG}-A-P`.toUpperCase(), 50),
+    );
+    expect(narrowed.map((h) => h.userId)).toEqual([A.peerId]);
+    const wildcard = await withRls(A.owner, (sql) =>
+      listHostMentionCandidates(sql, A.groupId, A.ownerId, "%", 50),
+    );
+    expect(wildcard).toEqual([]);
+
+    const leaked = await withRls(B.owner, (sql) =>
+      listHostMentionCandidates(sql, A.groupId, B.ownerId, "", 50),
+    );
+    expect(leaked).toEqual([]);
   });
 
   it("후보는 그 모임 멤버뿐이고 번호 앞자리로 좁혀진다", async () => {

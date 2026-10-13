@@ -262,7 +262,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/[id]/admins/[userId]`  | PATCH / DELETE      | **모임장**        | 모임장 넘기기 / 주선자 내보내기      |
 | `/api/admin/groups/[id]/messages`         | GET / POST          | 그 모임 주선자    | 채팅 읽기(`before`·`after`) / 쓰기   |
 | `/api/admin/groups/[id]/messages/[messageId]` | DELETE          | 쓴 사람           | 내 메시지 지우기 (본문만 사라진다)   |
-| `/api/admin/groups/[id]/mentions`         | GET                 | 그 모임 주선자    | 채팅 태그(`@번호`) 후보 — 그 모임 멤버, 이름 없이 |
+| `/api/admin/groups/[id]/mentions`         | GET                 | 그 모임 주선자    | 채팅 태그 후보 — `kind=host` 그 모임 주선자(나 제외) · `kind=member` 그 모임 멤버(이름 없이) |
 | `/api/admin/groups/[id]/chat`             | GET / PATCH         | 그 모임 주선자    | 읽은 위치·텔레그램 알림 설정         |
 | `/api/admin/chat`                         | GET                 | 주선자            | 모임별 안 읽은 채팅 수 (첫 값·재동기화) |
 | `/api/admin/chat/stream`                  | GET (SSE)           | 주선자            | 속한 모든 방의 새 글·지움을 밀어준다 |

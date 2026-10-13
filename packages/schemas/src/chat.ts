@@ -34,24 +34,45 @@ export const groupMessageQuerySchema = z.object({
 export type GroupMessageQuery = z.infer<typeof groupMessageQuerySchema>;
 
 /**
- * 본문 안의 멤버 태그 — `@23` 처럼 `@` 뒤에 공개 번호를 붙인다. 뒤의 「번」은 있어도 된다.
+ * 본문 안의 태그 — 두 가지다.
  *
- * 저장하는 것은 글 그대로다. 번호가 어느 프로필인지는 **읽을 때** RLS 를 통과해
- * 붙는다(`profileIds`) — 볼 수 없는 번호는 링크 없이 글자로 남는다.
- * 앞이 글자·숫자면 태그가 아니다(`a@23` 은 메일 주소 같은 것으로 본다).
+ *   `@이름`  이 모임의 주선자. 이름은 주선자 표시 이름 그대로다(띄어쓰기 포함).
+ *   `#23`    이 모임의 멤버. `#` 뒤에 공개 번호를 붙이고, 뒤의 「번」은 있어도 된다.
  *
- * 서버의 같은 판정은 `server/repo/group-chat.ts` 의 SQL 정규식이다. 한쪽만 바꾸면
- * 화면이 링크를 달 자리와 서버가 번호를 풀어 주는 자리가 어긋난다.
+ * 저장하는 것은 글 그대로다. 누구를 가리키는지는 **읽을 때** RLS 를 통과해 붙는다
+ * (`hostIds` · `profileIds`) — 볼 수 없는 번호나 지금 모임에 없는 이름은 글자로 남는다.
+ * 주선자 이름은 정해진 모양이 없어서 정규식으로 뽑지 않고, 서버가 알려 준 이름을
+ * 본문에서 찾는다(긴 이름부터).
+ *
+ * 멤버 태그는 앞이 글자·숫자면 태그가 아니다(`a#23`). 서버의 같은 판정은
+ * `server/repo/group-chat.ts` 의 SQL 정규식이다 — 한쪽만 바꾸면 화면이 링크를 달 자리와
+ * 서버가 번호를 풀어 주는 자리가 어긋난다.
  */
-export const GROUP_MESSAGE_MENTION = /(?<![\p{L}\p{N}_])@(\d{1,9})(번)?/gu;
+export const GROUP_MESSAGE_MEMBER_TAG = /(?<![\p{L}\p{N}_])#(\d{1,9})(번)?/gu;
 
 /** 태그를 고를 때 한 번에 보여주는 후보 수. */
 export const GROUP_MENTION_LIMIT = 6;
 
-/** 태그 후보 조회. `q` 는 지금까지 친 번호 앞자리다 — 비어 있으면 최근 등록 순. */
-export const groupMentionQuerySchema = z.object({
-  q: z.string().regex(/^\d{0,9}$/).default(""),
-});
+/** 주선자 이름으로 치는 앞자리의 최대 길이. 표시 이름 길이보다 넉넉하다. */
+export const GROUP_MENTION_HOST_QUERY_MAX = 40;
+
+/**
+ * 태그 후보 조회.
+ *
+ *   kind=host    `@` — 이 모임 주선자를 이름 앞자리로(나는 빼고)
+ *   kind=member  `#` — 이 모임 멤버를 번호 앞자리로
+ *
+ * `q` 가 비어 있으면 처음부터 보여준다.
+ */
+export const groupMentionQuerySchema = z
+  .object({
+    kind: z.enum(["host", "member"]),
+    q: z.string().trim().max(GROUP_MENTION_HOST_QUERY_MAX).default(""),
+  })
+  .refine((v) => v.kind !== "member" || /^\d{0,9}$/.test(v.q), {
+    message: "멤버는 번호로 찾습니다.",
+    path: ["q"],
+  });
 export type GroupMentionQuery = z.infer<typeof groupMentionQuerySchema>;
 
 /**

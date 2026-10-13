@@ -41,6 +41,8 @@ export type ChatMessage = {
   payload: GroupMessagePayload;
   /** payload 의 공개 번호 → 프로필 id. 볼 수 있는 번호만 들어온다(시스템 메시지 링크). */
   profileIds: Record<string, string>;
+  /** 본문에 태그된(`@이름`) 이 모임 주선자 — 이름 → 사용자 id. */
+  hostIds: Record<string, string>;
 };
 
 export type ChatEvent = { kind: "message" | "deleted"; message: ChatMessage };
