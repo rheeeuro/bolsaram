@@ -35,14 +35,21 @@ function textFor(item: ClaimedNotification): string {
       return messages.intentDeclined(item.intentKind, item.requesterCode, item.targetCode);
     case "GROUP_MESSAGE":
       return messages.groupMessage(item.groupName);
+    case "GROUP_CREATION_REQUESTED":
+      return messages.groupCreationRequested(item.groupName);
   }
 }
 
-/** 알림마다 「다음에 할 일」이 다른 화면에 있다. 채팅만 방으로 보낸다. */
+/** 알림마다 「다음에 할 일」이 다른 화면에 있다. */
 function linkFor(item: ClaimedNotification): { text: string; path: string } {
-  return item.kind === "GROUP_MESSAGE"
-    ? { text: messages.chatButton, path: "/chat" }
-    : { text: messages.requestsButton, path: "/requests" };
+  switch (item.kind) {
+    case "GROUP_MESSAGE":
+      return { text: messages.chatButton, path: "/chat" };
+    case "GROUP_CREATION_REQUESTED":
+      return { text: messages.groupRequestsButton, path: "/operator/groups" };
+    default:
+      return { text: messages.requestsButton, path: "/requests" };
+  }
 }
 
 /**

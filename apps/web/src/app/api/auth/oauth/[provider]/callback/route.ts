@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { oauthProviderSchema } from "@bolsaram/schemas";
 import { OAUTH_COOKIE, completeOAuth, loginWithOAuth } from "@/server/auth/oauth";
 import { syncOperatorAccount } from "@/server/auth/operator";
-import { createSession } from "@/server/auth/session";
+import { AccountSuspendedError, createSession } from "@/server/auth/session";
 import { env } from "@/server/env";
 import { safeNextPath } from "@/lib/next-path";
 
@@ -50,6 +50,8 @@ export async function GET(
     await createSession(userId, request.headers.get("user-agent") ?? undefined);
     return NextResponse.redirect(new URL(safeNextPath(next) ?? "/home", origin));
   } catch (error) {
+    // 정지는 실패가 아니라 결정이다 — 로그 없이 이유를 알려준다.
+    if (error instanceof AccountSuspendedError) return back("suspended");
     // 신원·토큰은 남기지 않는다. 무엇이 실패했는지만 남긴다.
     console.error("소셜 로그인 콜백 실패", error);
     return back("failed");

@@ -228,7 +228,9 @@ export async function findTelegramIdentity(
                         WHERE ga.user_id = c.user_id AND ga.group_id = g.id)
                OR EXISTS (SELECT 1 FROM operator_settings os
                            WHERE os.operator_user_id = c.user_id))
-        WHERE c.telegram_user_id = $1`,
+        WHERE c.telegram_user_id = $1
+          -- 정지된 주선자의 봇 대화는 연결되지 않은 사람처럼 무시한다(0067).
+          AND NOT EXISTS (SELECT 1 FROM user_suspensions us WHERE us.user_id = c.user_id)`,
       [telegramUserId],
     );
     const row = result.rows[0];

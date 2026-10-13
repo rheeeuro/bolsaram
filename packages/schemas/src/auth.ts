@@ -65,6 +65,13 @@ export const operatorSettingsUpdateSchema = z
     { message: "바꿀 항목이 없습니다." },
   );
 
+/** 주선자 정지 사유 — 관리자만 보는 메모. 0067 의 길이 제약과 같다. */
+export const HOST_SUSPEND_REASON_MAX_LENGTH = 200;
+
+export const hostSuspendSchema = z.object({
+  reason: z.string().trim().max(HOST_SUSPEND_REASON_MAX_LENGTH).optional(),
+});
+
 /** 수정. 보낸 필드만 바꾼다 — 설명을 빈 문자열로 보내면 지운다. */
 export const groupUpdateSchema = z
   .object({

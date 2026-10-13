@@ -301,8 +301,20 @@ export const messages = {
       "볼사람에서 확인해 주세요.",
     ].join("\n"),
 
+  /**
+   * 모임 만들기 요청이 들어왔다 (0067). 관리자에게만 간다. 요청한 사람은 싣지 않는다 —
+   * 누가 요청했는지는 관리자 메뉴에서 본다.
+   */
+  groupCreationRequested: (groupName: string | null) =>
+    [
+      `새 모임 만들기 요청이 있습니다 — 「${groupName ?? "이름 없음"}」`,
+      "",
+      "관리자 메뉴에서 승인하거나 거절해 주세요.",
+    ].join("\n"),
+
   requestsButton: "신청 목록 열기",
   chatButton: "채팅방 열기",
+  groupRequestsButton: "요청 보러 가기",
 } as const;
 
 /** 소속이 없으면 전체공개다 — 봇 문구에서도 하나의 방처럼 부른다. */

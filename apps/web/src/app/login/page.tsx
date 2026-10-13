@@ -21,6 +21,7 @@ const ERRORS: Record<string, string> = {
   start: "로그인을 시작하지 못했습니다. 잠시 뒤 다시 시도해 주세요.",
   canceled: "로그인을 취소했습니다.",
   failed: "로그인을 끝내지 못했습니다. 다시 시도해 주세요.",
+  suspended: "이용이 정지된 계정입니다. 관리자에게 문의해 주세요.",
 };
 
 export default async function LoginPage({

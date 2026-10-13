@@ -1,18 +1,20 @@
 /**
- * 관리자 — 서비스 전체 설정(모임 만들기 승인·초대 코드 여러 번 쓰기)과 모임 만들기 승인.
+ * 관리자 — 서비스 전체 설정(모임 만들기 승인·초대 코드 여러 번 쓰기), 모임 만들기 승인,
+ * 주선자 목록과 정지.
  *
  * 관리자는 DB 역할이 아니다. `SEED_ADMIN_EMAIL1` 과 이메일이 같은 **주선자 계정**
  * 하나이고, `syncOperatorAccount` 가 그 계정을 `operator_settings.operator_user_id` 에
  * 적어 둔다. 세션(`SessionUser.isOperator`)과 RLS(`app_is_operator()`)가 모두 이 칸을
  * 읽는다 — 관리자는 모든 모임·프로필을 모임장·등록한 주선자처럼 다룬다(0065).
  *
- * 관리자 설정과 모임 만들기 요청 테이블은 런타임 롤 권한이 없고 owner 커넥션으로만
- * 읽고 쓴다(0064). 관리자 메뉴의 경로는 `requireOperator` 가 막는다.
+ * 관리자 설정·모임 만들기 요청·정지 테이블은 런타임 롤 권한이 없고 owner 커넥션으로만
+ * 읽고 쓴다(0064·0067). 관리자 메뉴의 경로는 `requireOperator` 가 막는다.
  *
  * 승인으로 모임을 만드는 일은 소속을 바꾸는 일이라 `group-invite.ts` 에 있다.
  */
 import "server-only";
 import { withOwner, withOwnerTx, type Sql } from "@bolsaram/db";
+import { DomainError } from "@bolsaram/domain";
 import { writeAudit } from "../audit";
 
 /**
@@ -44,6 +46,8 @@ export async function syncOperatorAccount(email: string | undefined): Promise<st
       [operatorId],
     );
     if (!operatorId) return null;
+    // 관리자는 정지할 수 없다. 정지된 주선자를 관리자로 지정했다면 정지가 풀린다.
+    await sql.query(`DELETE FROM user_suspensions WHERE user_id = $1`, [operatorId]);
 
     const owned = await sql.query<{ group_id: string }>(
       `SELECT group_id FROM group_admins WHERE user_id = $1 AND is_owner`,
@@ -229,5 +233,176 @@ export async function countPendingGroupCreationRequests(): Promise<number> {
       `SELECT count(*)::int AS count FROM group_creation_requests WHERE status = 'PENDING'`,
     );
     return result.rows[0]?.count ?? 0;
+  });
+}
+
+export type HostRow = {
+  userId: string;
+  displayName: string | null;
+  email: string | null;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+  isOperator: boolean;
+  /** 속한 모임 이름. 가입 순. */
+  groups: string[];
+  /** 이 주선자가 등록한 프로필 — 지금 공개 중인 수와 전체 수. */
+  activeProfiles: number;
+  totalProfiles: number;
+  telegramConnected: boolean;
+  suspension: { at: Date; reason: string | null; byName: string | null } | null;
+};
+
+/**
+ * 관리자 화면의 주선자 목록 — 정지된 사람을 위로, 그다음은 최근 가입 순.
+ *
+ * 이메일을 싣는다. 관리자가 사람을 알아보는 유일한 단서이고, 관리자 화면 밖으로는
+ * 나가지 않는다.
+ */
+export async function listHosts(): Promise<HostRow[]> {
+  return withOwner(async (sql) => {
+    const result = await sql.query<{
+      id: string;
+      display_name: string | null;
+      email: string | null;
+      created_at: Date;
+      last_login_at: Date | null;
+      is_operator: boolean;
+      groups: string[];
+      active_profiles: number;
+      total_profiles: number;
+      telegram_connected: boolean;
+      suspended_at: Date | null;
+      suspend_reason: string | null;
+      suspended_by_name: string | null;
+    }>(
+      `SELECT u.id, u.display_name, u.email::text AS email, u.created_at, u.last_login_at,
+              EXISTS (SELECT 1 FROM operator_settings os WHERE os.operator_user_id = u.id)
+                AS is_operator,
+              COALESCE((SELECT array_agg(g.name ORDER BY ga.added_at)
+                          FROM group_admins ga JOIN groups g ON g.id = ga.group_id
+                         WHERE ga.user_id = u.id), '{}') AS groups,
+              (SELECT count(*)::int FROM profiles p
+                WHERE p.created_by = u.id AND p.status = 'ACTIVE') AS active_profiles,
+              (SELECT count(*)::int FROM profiles p WHERE p.created_by = u.id) AS total_profiles,
+              EXISTS (SELECT 1 FROM telegram_connections tc WHERE tc.user_id = u.id)
+                AS telegram_connected,
+              us.created_at AS suspended_at, us.reason AS suspend_reason,
+              sb.display_name AS suspended_by_name
+         FROM users u
+         LEFT JOIN user_suspensions us ON us.user_id = u.id
+         LEFT JOIN users sb ON sb.id = us.suspended_by
+        WHERE u.role = 'ADMIN'
+        ORDER BY (us.user_id IS NOT NULL) DESC, u.created_at DESC`,
+    );
+    return result.rows.map((row) => ({
+      userId: row.id,
+      displayName: row.display_name,
+      email: row.email,
+      createdAt: row.created_at,
+      lastLoginAt: row.last_login_at,
+      isOperator: row.is_operator,
+      groups: row.groups,
+      activeProfiles: row.active_profiles,
+      totalProfiles: row.total_profiles,
+      telegramConnected: row.telegram_connected,
+      suspension: row.suspended_at
+        ? { at: row.suspended_at, reason: row.suspend_reason, byName: row.suspended_by_name }
+        : null,
+    }));
+  });
+}
+
+/**
+ * 주선자를 정지한다. 한 트랜잭션에서 그 사람이 남긴 흔적의 효력을 함께 끊는다.
+ *
+ *   - 세션을 모두 폐기한다 — 정지는 다음 요청부터가 아니라 **지금** 걸린다.
+ *   - 등록한 프로필 중 공개 중인 것을 비활성으로 돌린다. 담당자가 신청을 처리할 수
+ *     없게 된 프로필을 계속 보여주지 않는다(모임 나가기와 같은 규칙, 0056).
+ *     정지를 풀어도 되살리지 않는다 — 주선자가 직접 다시 공개한다.
+ *   - 기다리는 모임 만들기 요청은 거절로 닫는다.
+ *   - 그 사람이 발급한 살아 있는 모임 초대 코드를 거둔다.
+ *
+ * 모임 소속과 텔레그램 연결은 남긴다 — 정지를 풀면 그대로 돌아온다. 그동안 봇과
+ * 알림은 인증 레이어가 막는다.
+ */
+export async function suspendHost(input: {
+  operatorId: string;
+  userId: string;
+  reason?: string | undefined;
+}): Promise<{ deactivatedProfiles: number }> {
+  if (input.userId === input.operatorId) {
+    throw new DomainError("CONFLICT", "자기 자신은 정지할 수 없습니다.");
+  }
+  return withOwnerTx(async (sql) => {
+    const target = await sql.query<{ role: string }>(
+      `SELECT role FROM users WHERE id = $1 FOR UPDATE`,
+      [input.userId],
+    );
+    if (target.rows[0]?.role !== "ADMIN") {
+      throw new DomainError("NOT_FOUND", "주선자 계정을 찾지 못했습니다.");
+    }
+    if (await isOperatorUser(sql, input.userId)) {
+      throw new DomainError("CONFLICT", "관리자는 정지할 수 없습니다.");
+    }
+    const inserted = await sql.query(
+      `INSERT INTO user_suspensions (user_id, suspended_by, reason)
+       VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING`,
+      [input.userId, input.operatorId, input.reason?.trim() || null],
+    );
+    if ((inserted.rowCount ?? 0) === 0) {
+      throw new DomainError("CONFLICT", "이미 정지된 주선자입니다.");
+    }
+
+    await sql.query(
+      `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
+      [input.userId],
+    );
+    const deactivated = await sql.query(
+      `UPDATE profiles SET status = 'INACTIVE' WHERE created_by = $1 AND status = 'ACTIVE'`,
+      [input.userId],
+    );
+    await sql.query(
+      `UPDATE group_creation_requests
+          SET status = 'REJECTED', decided_at = now(), decided_by = $2
+        WHERE requested_by = $1 AND status = 'PENDING'`,
+      [input.userId, input.operatorId],
+    );
+    await sql.query(
+      `DELETE FROM group_invite_codes WHERE created_by = $1 AND consumed_at IS NULL`,
+      [input.userId],
+    );
+    await sql.query(
+      `UPDATE group_invite_codes SET expires_at = now()
+        WHERE created_by = $1 AND expires_at > now()`,
+      [input.userId],
+    );
+
+    const deactivatedProfiles = deactivated.rowCount ?? 0;
+    await writeAudit(sql, {
+      actorUserId: input.operatorId,
+      action: "operator.host.suspend",
+      entityType: "user",
+      entityId: input.userId,
+      metadata: { deactivatedProfiles },
+    });
+    return { deactivatedProfiles };
+  });
+}
+
+/** 정지를 푼다. 비활성으로 돌린 프로필은 그대로 둔다 — 주선자가 다시 공개한다. */
+export async function unsuspendHost(input: { operatorId: string; userId: string }): Promise<void> {
+  await withOwnerTx(async (sql) => {
+    const deleted = await sql.query(`DELETE FROM user_suspensions WHERE user_id = $1`, [
+      input.userId,
+    ]);
+    if ((deleted.rowCount ?? 0) === 0) {
+      throw new DomainError("NOT_FOUND", "정지된 주선자가 아닙니다.");
+    }
+    await writeAudit(sql, {
+      actorUserId: input.operatorId,
+      action: "operator.host.unsuspend",
+      entityType: "user",
+      entityId: input.userId,
+    });
   });
 }

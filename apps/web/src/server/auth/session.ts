@@ -8,6 +8,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { withOwner } from "@bolsaram/db";
+import { DomainError } from "@bolsaram/domain";
 import type { UserRole } from "@bolsaram/schemas";
 import { env, isProduction } from "../env";
 import { hmac, safeEqual } from "../crypto";
@@ -85,10 +86,25 @@ function parseCookieValue(value: string): string | null {
   return sessionId;
 }
 
+/** 정지된 계정이 새 세션을 받으려 할 때 던진다. 로그인 화면이 따로 안내한다. */
+export class AccountSuspendedError extends DomainError {
+  constructor() {
+    super("FORBIDDEN", "이용이 정지된 계정입니다. 관리자에게 문의해 주세요.");
+  }
+}
+
+/**
+ * 새 세션. 모든 로그인(소셜·초대 링크)이 이 함수를 지난다 — 정지된 계정은 여기서 막는다
+ * (0067). 이미 있던 세션은 `readSession` 이 막는다.
+ */
 export async function createSession(userId: string, userAgent?: string): Promise<void> {
   const expiresAt = new Date(Date.now() + SESSION_IDLE_DAYS * 86_400_000);
   // owner 커넥션: sessions 테이블은 app 롤에 권한이 없다(0006_rls.sql).
   const sessionId = await withOwner(async (sql) => {
+    const suspended = await sql.query(`SELECT 1 FROM user_suspensions WHERE user_id = $1`, [
+      userId,
+    ]);
+    if ((suspended.rowCount ?? 0) > 0) throw new AccountSuspendedError();
     const result = await sql.query<{ id: string }>(
       `INSERT INTO sessions (user_id, expires_at, user_agent)
        VALUES ($1, $2, $3) RETURNING id`,
@@ -202,7 +218,9 @@ export async function readSession(): Promise<SessionUser | null> {
                               )
         WHERE s.id = $1
           AND s.revoked_at IS NULL
-          AND s.expires_at > now()`,
+          AND s.expires_at > now()
+          -- 정지는 세션 폐기와 함께 걸지만, 남은 세션이 있어도 여기서 한 번 더 막는다(0067).
+          AND NOT EXISTS (SELECT 1 FROM user_suspensions us WHERE us.user_id = u.id)`,
       [sessionId],
     );
     const row = result.rows[0];

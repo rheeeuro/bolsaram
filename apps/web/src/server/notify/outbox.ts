@@ -7,8 +7,8 @@
  *   * 발송은 요청과 무관한 배경 작업이라 애초에 세션 컨텍스트가 없다.
  *
  * 대신 **닿는 범위를 좁게 유지한다** — 이 파일은 `notifications` 와
- * `telegram_connections` 만 만진다. 프로필·신청 내용은 읽지 않는다(트리거가 넣어 둔
- * 공개 번호만 payload 로 받는다).
+ * `telegram_connections` 를 만지고, 받는 사람이 정지됐는지만 `user_suspensions` 에서
+ * 본다. 프로필·신청 내용은 읽지 않는다(트리거가 넣어 둔 공개 번호만 payload 로 받는다).
  */
 import "server-only";
 import { NOTIFICATION_MAX_ATTEMPTS, NOTIFICATION_RETRY_WINDOW_DAYS } from "@bolsaram/domain";
@@ -27,13 +27,17 @@ export type ClaimedNotification = {
     | "MATCH_CANCELED"
     | "MEMBER_INTENT"
     | "INTENT_DECLINED"
-    | "GROUP_MESSAGE";
+    | "GROUP_MESSAGE"
+    | "GROUP_CREATION_REQUESTED";
   chatId: number;
   requesterCode: number | null;
   targetCode: number | null;
   /** 요청 알림(MEMBER_INTENT · INTENT_DECLINED)일 때만 채워진다 — 무슨 요청인지. */
   intentKind: MatchIntentKind | null;
-  /** 모임 채팅 알림(GROUP_MESSAGE)일 때만 채워진다 — 어느 방인지. */
+  /**
+   * 모임 채팅 알림(GROUP_MESSAGE)이면 어느 방인지, 모임 만들기 요청 알림
+   * (GROUP_CREATION_REQUESTED)이면 요청한 모임 이름이다.
+   */
   groupName: string | null;
 };
 
@@ -53,7 +57,7 @@ type ClaimRow = {
  * 네트워크 호출은 이 트랜잭션 **밖에서** 한다.
  *
  * 텔레그램에 연결되지 않은 주선자의 알림은 애초에 집지 않는다 — 나중에 연결하면
- * 그때 나가고, 그 전에 낡으면 정리 작업이 지운다.
+ * 그때 나가고, 그 전에 낡으면 정리 작업이 지운다. 정지된 주선자의 알림도 같다.
  */
 export async function claimPending(): Promise<ClaimedNotification[]> {
   return withOwner(async (sql) => {
@@ -65,6 +69,8 @@ export async function claimPending(): Promise<ClaimedNotification[]> {
             FROM notifications p
             JOIN telegram_connections tc ON tc.user_id = p.recipient_user_id
            WHERE p.sent_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM user_suspensions us
+                              WHERE us.user_id = p.recipient_user_id)
              AND p.attempts < $1
              AND p.created_at > now() - make_interval(days => $2)
            ORDER BY p.created_at

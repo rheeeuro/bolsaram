@@ -74,7 +74,7 @@ apps/web/src/
 │   │   ├── members/          초대·연결 현황
 │   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용, 오른쪽 아래 버튼으로 연다)
 │   │   ├── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
-│   │   └── operator/         관리자 메뉴 (관리자 계정만) — 메뉴 목록 + groups/ 모임 설정(모임 만들기 승인·초대 코드 여러 번 쓰기·요청 처리)
+│   │   └── operator/         관리자 메뉴 (관리자 계정만) — 메뉴 목록 + groups/ 모임 설정(모임 만들기 승인·초대 코드 여러 번 쓰기·요청 처리) + hosts/ 주선자 목록·정지
 │   └── api/                  Route Handler (아래 표)
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·global-progress)
@@ -138,11 +138,11 @@ server/
 ├── crypto.ts                 HMAC·scrypt·랜덤 토큰·타이밍 안전 비교
 ├── audit.ts                  감사 로그 (민감값 제외)
 ├── auth/
-│   ├── session.ts            서명 쿠키 + sessions 테이블 (마지막 사용 후 30일)
+│   ├── session.ts            서명 쿠키 + sessions 테이블 (마지막 사용 후 30일). 정지된 계정은 새 세션도 기존 세션도 막는다
 │   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 프로필 사진 가져오기, 연결된 계정 조회)
 │   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·처음 연 사람의 입장 링크)
 │   ├── group-invite.ts       모임 만들기(승인 요청·거두기·승인 처리 포함)·소속·사진·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
-│   ├── operator.ts           관리자 지정 동기화(env → DB, 기존 소속 걷어내기) · 관리자 설정(모임 만들기 승인·초대 코드 여러 번 쓰기) · 모임 만들기 요청 목록
+│   ├── operator.ts           관리자 지정 동기화(env → DB, 기존 소속 걷어내기) · 관리자 설정(모임 만들기 승인·초대 코드 여러 번 쓰기) · 모임 만들기 요청 목록 · 주선자 목록·정지/풀기
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireOperator / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
@@ -208,6 +208,11 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 관리자가 남의 가져오기를 등록해도 프로필의 등록자는 원본을 만든 주선자다. 관리자가 만든
 모임은 주선자 없이 시작한다 — 초대로 동료를 들이고 모임장을 넘긴다.
 
+**정지된 주선자(`user_suspensions`)는 인증 레이어에서 막는다.** RLS 컨텍스트가 만들어지기
+전에 걸리도록 세션 읽기(`readSession`)·새 세션(`createSession`)·텔레그램 신원
+(`findTelegramIdentity`)·알림 선점(`claimPending`)이 모두 같은 테이블을 본다. 새 인증 경로를
+만들면 여기에 함께 넣는다. 관리자와 멤버는 정지 대상이 아니다(DB 트리거가 한 번 더 막는다).
+
 `/api/health` 는 예외다. 밖에서 「살아 있는가」를 물어야 하는 경로라 로그인을 요구하지
 않고, 대신 답에 개인정보도 설정값도 담지 않는다(상태 두 글자뿐이다).
 
@@ -264,6 +269,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/trace`                        | GET                 | 주선자            | 워터마크의 주선자 코드 → 누구인지 (나·같은 모임 동료까지) |
 | `/api/operator/settings`                  | GET / PUT           | **관리자**        | 관리자 설정 — 모임 만들기 승인 · 초대 코드 여러 번 쓰기 켜기·끄기 (보낸 항목만) |
 | `/api/operator/group-requests/[id]/[action]` | POST             | **관리자**        | 모임 만들기 요청 approve · reject (승인하면 그때 모임 생성) |
+| `/api/operator/hosts/[id]/suspension`     | PUT / DELETE        | **관리자**        | 주선자 정지(세션 폐기·등록 프로필 비활성·요청 거절·초대 코드 회수) · 정지 풀기 |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |
 | `/api/uploads`                            | PUT                 | 주선자            | signed 토큰으로 직접 업로드          |

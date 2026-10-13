@@ -7,7 +7,11 @@
  */
 import Link from "next/link";
 import { requireOperatorPage } from "@/server/auth/guard";
-import { countPendingGroupCreationRequests, readOperatorSettings } from "@/server/auth/operator";
+import {
+  countPendingGroupCreationRequests,
+  listHosts,
+  readOperatorSettings,
+} from "@/server/auth/operator";
 import { PageHeader } from "@/components/host/surface";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +20,8 @@ export default async function OperatorPage() {
   await requireOperatorPage("/operator");
   const settings = await readOperatorSettings();
   const pending = await countPendingGroupCreationRequests();
+  const hosts = await listHosts();
+  const suspended = hosts.filter((host) => host.suspension).length;
 
   const items = [
     {
@@ -30,6 +36,14 @@ export default async function OperatorPage() {
           : "초대 코드는 1회용입니다.",
       ].join(" "),
       count: pending,
+      countLabel: "대기",
+    },
+    {
+      href: "/operator/hosts",
+      title: "주선자",
+      description: `주선자 ${hosts.length}명${suspended ? ` · 정지 ${suspended}명` : ""} — 목록을 보고 문제가 있는 계정을 정지합니다.`,
+      count: 0,
+      countLabel: "",
     },
   ];
 
@@ -55,7 +69,7 @@ export default async function OperatorPage() {
               </span>
               {item.count > 0 ? (
                 <span className="shrink-0 rounded-full bg-[var(--color-rose-600)] px-2 py-0.5 text-[12px] text-white">
-                  대기 {item.count}
+                  {item.countLabel} {item.count}
                 </span>
               ) : null}
               <span aria-hidden className="shrink-0 text-[var(--surface-text-muted)]">
