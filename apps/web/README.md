@@ -142,7 +142,7 @@ server/
 │   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 프로필 사진 가져오기, 연결된 계정 조회)
 │   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·처음 연 사람의 입장 링크)
 │   ├── group-invite.ts       모임 만들기(승인 요청·거두기·승인 처리 포함)·소속·사진·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
-│   ├── operator.ts           관리자 설정(모임 만들기 승인) · 모임 만들기 요청 목록 (owner 전용 테이블)
+│   ├── operator.ts           관리자 지정 동기화(env → DB, 기존 소속 걷어내기) · 관리자 설정(모임 만들기 승인) · 모임 만들기 요청 목록
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireOperator / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
@@ -195,10 +195,18 @@ server/
 API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한다.
 
 권한 열의 「관리자」는 DB 역할이 아니다. `SEED_ADMIN_EMAIL1` 과 이메일이 같은 주선자
-계정 하나이고(`SessionUser.isOperator`), RLS 는 관리자를 모른다. 그래서 관리자가 다루는
-테이블은 런타임 롤 권한이 없고 owner 커넥션으로만 열리며, 판정은 `requireOperator` 가
-전부 맡는다. 화면 경로가 `/admin` 이 아닌 `/operator` 인 것도 이 때문이다 — 「주선자」
-(`ADMIN`)와 섞이지 않게 한다.
+계정 하나이고, 인증 레이어가 기동·로그인 때 그 계정을 `operator_settings.operator_user_id`
+에 맞춘다(`syncOperatorAccount`). 세션(`SessionUser.isOperator`)과 RLS(`app_is_operator()`)가
+같은 칸을 읽는다. 관리자 메뉴 경로는 `requireOperator` 가 막는다. 화면 경로가 `/admin` 이
+아닌 `/operator` 인 것은 「주선자」(`ADMIN`)와 섞이지 않게 하려는 것이다.
+
+**관리자는 어느 모임에도 속하지 않고 모든 모임·프로필을 다룬다.** 표의 「그 모임
+주선자」·「모임장」·「등록한 주선자」 자리를 관리자도 모두 통과한다 — 프로필 수정·삭제·
+메모·초대, 「회원으로 보기」(대행), 남의 가져오기, 모든 방의 채팅(합류 전 글 포함), 모임
+설정·모임장 넘기기·내보내기·폐쇄. 판정은 DB 함수에 한 번(`app_is_operator()`), owner
+커넥션 경로(`assertGroupAdmin` · `assertGroupOwner` · `readMyGroups` · 세션)에 한 번 들어 있다.
+관리자가 남의 가져오기를 등록해도 프로필의 등록자는 원본을 만든 주선자다. 관리자가 만든
+모임은 주선자 없이 시작한다 — 초대로 동료를 들이고 모임장을 넘긴다.
 
 `/api/health` 는 예외다. 밖에서 「살아 있는가」를 물어야 하는 경로라 로그인을 요구하지
 않고, 대신 답에 개인정보도 설정값도 담지 않는다(상태 두 글자뿐이다).

@@ -19,8 +19,18 @@ import { cn } from "@/lib/cn";
  *
  * 전체공개에는 이 메뉴가 없다. 이름도 주선자도 없는 공용 방이라 설정할 것이 없다
  * (부르는 쪽에서 가른다).
+ *
+ * 관리자에게는 나가기가 없다 — 어느 모임에도 속하지 않고 모든 모임을 다룬다.
  */
-export function GroupMenu({ groupId, groupName }: { groupId: string; groupName: string }) {
+export function GroupMenu({
+  groupId,
+  groupName,
+  asOperator,
+}: {
+  groupId: string;
+  groupName: string;
+  asOperator: boolean;
+}) {
   const [dialog, setDialog] = useState<"invite" | "leave" | null>(null);
 
   return (
@@ -50,9 +60,11 @@ export function GroupMenu({ groupId, groupName }: { groupId: string; groupName: 
       >
         <MenuItem onSelect={() => setDialog("invite")}>주선자 초대 코드</MenuItem>
         <MenuItem href={`/group/${groupId}`}>모임 설정</MenuItem>
-        <MenuItem danger onSelect={() => setDialog("leave")}>
-          모임 나가기
-        </MenuItem>
+        {asOperator ? null : (
+          <MenuItem danger onSelect={() => setDialog("leave")}>
+            모임 나가기
+          </MenuItem>
+        )}
       </Menu>
 
       <InviteDialog

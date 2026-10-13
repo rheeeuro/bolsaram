@@ -12,6 +12,11 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 > 정책 없이 RLS 만 켜면 앱 롤이 **아무것도 못 읽는다**(빈 결과로 조용히 깨진다).
 > 의도적으로 앱 접근을 막는 테이블이면 `REVOKE` 로 의도를 명시한다.
 >
+> **불변식: 관리자는 어느 모임에도 속하지 않는다.** `operator_settings.operator_user_id`
+> 의 계정은 `group_admins` 에 들어갈 수 없고(트리거), 대신 `app_is_operator()` 가 판정
+> 함수(`app_is_group_admin` · `app_can_edit_profile` · `app_can_edit_import`)를 모두
+> 통과시킨다. 관리자가 아닌 주선자의 경계는 그대로다.
+>
 > **불변식 3: enum 은 `packages/schemas/src/enums.ts` 와 1:1 이다.** 한쪽만 바꾸지 않는다.
 >
 > 이 README 는 현재 스키마의 소스 오브 트루스다. 마이그레이션을 추가하면 함께 갱신한다.
@@ -92,6 +97,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0062_profile_bump.sql`            | `profiles.bumped_at` — 등록한 주선자의 끌어올리기. 목록은 `COALESCE(bumped_at, created_at)` 순, 트리거가 지금 시각·활성·24시간 1회를 강제하고 모임 방에 `PROFILE_BUMPED` 를 남긴다 |
 | `0063_profile_code_from_one.sql`   | 공개 번호 시퀀스를 1 부터 — 다음 번호는 있는 번호 중 가장 큰 값 + 1 |
 | `0064_operator_group_approval.sql` | 관리자 설정(`operator_settings`, 모임 만들기 승인)과 `group_creation_requests` — 승인 전까지 `groups` 행을 만들지 않는다. 둘 다 owner 전용 |
+| `0065_operator_full_access.sql`   | 관리자는 모든 모임·프로필을 모임장·등록한 주선자처럼 다룬다 — `operator_settings.operator_user_id` + `app_is_operator()`, 판정 함수·가져오기/프로필 쓰기 정책에 관리자 분기, 관리자의 `group_admins` 소속 금지 |
 
 ## 테이블
 
@@ -119,7 +125,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
 | `group_invite_codes`                           | 모임 초대 코드(해시). 동료 주선자 합류             | **권한 없음** (owner 커넥션 전용)   |
 | `oauth_accounts`                               | 주선자 신원 — 제공자(카카오·구글) + 제공자 고유 id | **권한 없음** (owner 커넥션 전용)   |
-| `operator_settings`                            | 관리자 설정 한 줄 — 모임 만들기 승인 여부          | **권한 없음** (owner 커넥션 전용)   |
+| `operator_settings`                            | 관리자 설정 한 줄 — 관리자 계정(`operator_user_id`)·모임 만들기 승인 여부 | **권한 없음** (owner 커넥션 전용)   |
 | `group_creation_requests`                      | 모임 만들기 요청. 대기·승인·거절·거둠, 승인되면 만든 모임을 가리킨다 | **권한 없음** (owner 커넥션 전용)   |
 
 ## 무결성을 DB 가 지키는 것

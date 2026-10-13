@@ -126,17 +126,26 @@ function HostSidebar({
           unread={unread}
           requests={groupRequests}
           approvalRequired={groupApprovalRequired}
+          isOperator={operator != null}
         />
         <div className="mt-4 border-t border-[var(--surface-border)] pt-5">
           {activeGroupId ? (
-            <GroupMenu groupId={activeGroupId} groupName={activeName} />
+            <GroupMenu
+              groupId={activeGroupId}
+              groupName={activeName}
+              asOperator={operator != null}
+            />
           ) : (
             <p className="truncate px-2 text-[15px] font-semibold" title={activeName}>
               {activeName}
             </p>
           )}
           <p className="mt-1 px-2 text-[11px] text-[var(--surface-text-muted)]">
-            {activeGroupId ? "이름을 눌러 설정·초대·나가기" : "전체공개 프로필을 함께 살펴보세요"}
+            {activeGroupId
+              ? operator
+                ? "관리자로 보는 중 · 이름을 눌러 설정·초대"
+                : "이름을 눌러 설정·초대·나가기"
+              : "전체공개 프로필을 함께 살펴보세요"}
           </p>
         </div>
 

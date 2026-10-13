@@ -159,6 +159,7 @@ export function HostMobileNav({
         unread={unread}
         requests={groupRequests}
         approvalRequired={groupApprovalRequired}
+        isOperator={operator != null}
         onClose={() => setSheet(null)}
       />
       <MoreSheet
@@ -184,6 +185,7 @@ function GroupSheet({
   unread,
   requests,
   approvalRequired,
+  isOperator,
   onClose,
 }: {
   open: boolean;
@@ -192,18 +194,25 @@ function GroupSheet({
   unread: Record<string, number>;
   requests: GroupRequestChoice[];
   approvalRequired: boolean;
+  /** 관리자는 모든 모임이 목록에 있고, 속하지 않으므로 상한도 참여도 없다. */
+  isOperator: boolean;
   onClose: () => void;
 }) {
   const { switchTo, busy, error } = useGroupSwitch(activeGroupId);
   const [dialog, setDialog] = useState<"create" | "join" | null>(null);
   // 승인을 기다리는 요청도 한 자리다 — 서버가 같은 기준으로 센다.
   const pendingCount = requests.filter((request) => request.status === "PENDING").length;
-  const full = groups.length + pendingCount >= MAX_GROUPS_PER_ADMIN;
+  const full = !isOperator && groups.length + pendingCount >= MAX_GROUPS_PER_ADMIN;
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} label="내 모임" variant="sheet">
-        <SheetHead title="내 모임" onClose={onClose} />
+      <Dialog
+        open={open}
+        onClose={onClose}
+        label={isOperator ? "모든 모임" : "내 모임"}
+        variant="sheet"
+      >
+        <SheetHead title={isOperator ? "모든 모임" : "내 모임"} onClose={onClose} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3" aria-busy={busy}>
           {[{ id: null, name: "전체공개", imageUrl: null }, ...groups].map((group) => {
@@ -237,7 +246,11 @@ function GroupSheet({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-medium">{group.name}</span>
                   <span className="block text-[11.5px] text-[var(--surface-text-muted)]">
-                    {group.id ? "함께하는 모임" : "모든 주선자의 공간"}
+                    {group.id
+                      ? isOperator
+                        ? "관리하는 모임"
+                        : "함께하는 모임"
+                      : "모든 주선자의 공간"}
                   </span>
                 </span>
                 {count > 0 ? <UnreadBadge count={count} label="개 안 읽음" /> : null}
@@ -262,7 +275,9 @@ function GroupSheet({
                 <SheetItem onSelect={() => setDialog("create")}>
                   {approvalRequired ? "새 모임 만들기 요청" : "새 모임 만들기"}
                 </SheetItem>
-                <SheetItem onSelect={() => setDialog("join")}>초대 코드로 참여</SheetItem>
+                {isOperator ? null : (
+                  <SheetItem onSelect={() => setDialog("join")}>초대 코드로 참여</SheetItem>
+                )}
               </>
             )}
           </div>

@@ -320,9 +320,29 @@ async function createHosts(): Promise<void> {
   });
 }
 
-/** 시드가 만든 모임 이름을 바꾸고, 모임을 하나 더 둔다(모임 전환을 보여주려고). */
+/**
+ * 시드가 만든 모임 이름을 바꾸고, 모임을 하나 더 둔다(모임 전환을 보여주려고).
+ *
+ * 시드는 1번을 관리자로 두고 모임에서 뺀다. 가이드는 **보통 주선자의 화면**을 찍으므로
+ * 관리자 지정을 풀고 1번(김하늘)을 모임장으로 되돌린다. 찍는 앱도 운영 `.env` 의
+ * 관리자 이메일로 기동하는데, 이 DB 에는 그 계정이 없어 관리자는 비어 있게 된다.
+ */
 async function dressUp(): Promise<void> {
   await withOwnerTx(async (sql) => {
+    await sql.query(`UPDATE operator_settings SET operator_user_id = NULL`);
+    await sql.query(
+      `UPDATE group_admins SET is_owner = false WHERE user_id <> (SELECT id FROM users WHERE email = $1)`,
+      [HOST_EMAIL],
+    );
+    // 처음부터 있던 사람처럼 넣는다 — 채팅은 합류한 뒤의 것만 보이고(0045), 합류
+    // 안내 한 줄이 방 맨 아래에 남으면 사진에 그대로 찍힌다.
+    await sql.query(
+      `INSERT INTO group_admins (group_id, user_id, is_owner, added_by, added_at)
+       SELECT g.id, u.id, true, u.id, g.created_at - interval '1 minute'
+         FROM groups g, users u WHERE u.email = $1`,
+      [HOST_EMAIL],
+    );
+    await sql.query(`DELETE FROM group_messages WHERE system_kind = 'ADMIN_JOINED'`);
     await sql.query(`UPDATE groups SET name = $1, description = $2`, [
       GROUP_NAME,
       "독서 모임 친구들끼리 서로 소개해 주는 방",

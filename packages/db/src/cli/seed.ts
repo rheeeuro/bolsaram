@@ -7,7 +7,8 @@
  *
  * 하는 일:
  *   1) 주선자 두 명(`SEED_ADMIN_EMAIL1` · `SEED_ADMIN_EMAIL2`)을 만들거나 찾는다.
- *   2) 1번이 모임 하나를 만들고 2번이 같은 모임에 합류한다.
+ *   2) 1번을 관리자로 지정하고(`operator_settings`), 2번이 모임 하나를 만든다.
+ *      관리자는 어느 모임에도 속하지 않고 모든 모임을 다룬다(0065).
  *   3) 샘플 디렉터리를 번호순으로 반씩 나눠 각자 명의로 등록한다
  *      (앞쪽 = 1번, 뒤쪽 = 2번). 사진은 private 스토리지로 복사한다.
  *   4) 프로필마다 가져오기 세션을 남긴다 — `profile.txt` 원문과 사진, 그 원문에서
@@ -368,18 +369,22 @@ async function main(): Promise<void> {
     }
     const [firstAdminId, secondAdminId] = adminIds as [string, string];
 
-    // ── 모임 ────────────────────────────────────────────────
-    // 1번이 만들고(OWNER) 2번이 합류한다. 소속을 만드는 것은 평소 인증 레이어뿐이고
-    // (설계 규칙) 여기서는 owner 커넥션으로 그 경로를 대신한다.
+    // ── 관리자 · 모임 ───────────────────────────────────────
+    // 1번(`SEED_ADMIN_EMAIL1`)은 앱이 관리자로 쓰는 계정이다. 앱도 기동·로그인 때 같은
+    // 값을 맞추지만 시드 직후부터 맞도록 여기서도 적는다. 관리자는 모임에 속하지
+    // 않으므로(트리거가 막는다) 모임은 2번이 만들어 모임장이 된다. 소속을 만드는 것은
+    // 평소 인증 레이어뿐이고(설계 규칙) 여기서는 owner 커넥션으로 그 경로를 대신한다.
+    await sql.query(`UPDATE operator_settings SET operator_user_id = $1`, [firstAdminId]);
+    await sql.query(`DELETE FROM group_admins WHERE user_id = $1`, [firstAdminId]);
     const group = await sql.query<{ id: string }>(
       `INSERT INTO groups (name, description, created_by) VALUES ($1, $2, $3) RETURNING id`,
-      [GROUP_NAME, "시드가 만든 개발용 모임입니다.", firstAdminId],
+      [GROUP_NAME, "시드가 만든 개발용 모임입니다.", secondAdminId],
     );
     const groupId = group.rows[0]!.id;
     await sql.query(
       `INSERT INTO group_admins (group_id, user_id, is_owner, added_by)
-       VALUES ($1, $2, true, $2), ($1, $3, false, $2)`,
-      [groupId, firstAdminId, secondAdminId],
+       VALUES ($1, $2, true, $2)`,
+      [groupId, secondAdminId],
     );
     // 보고 있는 모임(화면 필터). 권한은 group_admins 가 정한다.
     await sql.query(`UPDATE users SET active_group_id = $1 WHERE id = ANY($2::uuid[])`, [

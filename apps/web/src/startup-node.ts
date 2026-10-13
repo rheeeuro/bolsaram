@@ -8,6 +8,7 @@
 import "server-only";
 import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 import { env } from "./server/env";
+import { syncOperatorAccount } from "./server/auth/operator";
 import { startNotificationSweep } from "./server/notify/dispatch";
 
 /**
@@ -31,6 +32,12 @@ export function startup(): void {
   // 밀린 알림을 줍는 그물. 요청 경로가 즉시 발송을 띄우지만, 그때 프로세스가 죽었거나
   // 텔레그램이 잠깐 죽어 있었다면 아웃박스에 남는다.
   startNotificationSweep();
+
+  // 관리자 이메일을 DB 에 맞춘다(RLS 가 그 칸을 읽는다). 기다리지 않는다 — DB 가 늦게
+  // 떠도 기동은 끝나야 하고, 실패하면 다음 로그인 때 다시 맞춘다.
+  syncOperatorAccount(config.SEED_ADMIN_EMAIL1).catch((error: unknown) => {
+    console.error("관리자 계정 동기화 실패", error);
+  });
 
   console.info(
     `볼사람 서버 기동 — APP_ENV=${config.APP_ENV} (NODE_ENV=${config.NODE_ENV})` +

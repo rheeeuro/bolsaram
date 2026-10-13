@@ -10,6 +10,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { oauthProviderSchema } from "@bolsaram/schemas";
 import { OAUTH_COOKIE, completeOAuth, loginWithOAuth } from "@/server/auth/oauth";
+import { syncOperatorAccount } from "@/server/auth/operator";
 import { createSession } from "@/server/auth/session";
 import { env } from "@/server/env";
 import { safeNextPath } from "@/lib/next-path";
@@ -43,6 +44,9 @@ export async function GET(
     const provider = oauthProviderSchema.parse((await params).provider);
     const { identity, next } = await completeOAuth({ provider, code, state, cookieValue });
     const userId = await loginWithOAuth(identity);
+    // 관리자 계정이 기동 뒤에 처음 생겼을 수 있다. 로그인마다 맞춰 둔다 — 바뀐 것이
+    // 없으면 아무것도 쓰지 않는다.
+    await syncOperatorAccount(env().SEED_ADMIN_EMAIL1);
     await createSession(userId, request.headers.get("user-agent") ?? undefined);
     return NextResponse.redirect(new URL(safeNextPath(next) ?? "/home", origin));
   } catch (error) {

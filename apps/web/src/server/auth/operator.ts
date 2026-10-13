@@ -2,16 +2,81 @@
  * 관리자 — 서비스 전체 설정과 모임 만들기 승인.
  *
  * 관리자는 DB 역할이 아니다. `SEED_ADMIN_EMAIL1` 과 이메일이 같은 **주선자 계정**
- * 하나이며 판정은 세션을 읽을 때 한다(`SessionUser.isOperator`). RLS 는 관리자를
- * 모르므로 여기서 다루는 테이블(`operator_settings` · `group_creation_requests`)은
- * 런타임 롤 권한이 없고 owner 커넥션으로만 읽고 쓴다(0064). 관리자인지 확인하는 것은
- * 전적으로 호출부의 `requireOperator` 몫이다.
+ * 하나이고, `syncOperatorAccount` 가 그 계정을 `operator_settings.operator_user_id` 에
+ * 적어 둔다. 세션(`SessionUser.isOperator`)과 RLS(`app_is_operator()`)가 모두 이 칸을
+ * 읽는다 — 관리자는 모든 모임·프로필을 모임장·등록한 주선자처럼 다룬다(0065).
+ *
+ * 관리자 설정과 모임 만들기 요청 테이블은 런타임 롤 권한이 없고 owner 커넥션으로만
+ * 읽고 쓴다(0064). 관리자 메뉴의 경로는 `requireOperator` 가 막는다.
  *
  * 승인으로 모임을 만드는 일은 소속을 바꾸는 일이라 `group-invite.ts` 에 있다.
  */
 import "server-only";
-import { withOwner, withOwnerTx } from "@bolsaram/db";
+import { withOwner, withOwnerTx, type Sql } from "@bolsaram/db";
 import { writeAudit } from "../audit";
+
+/**
+ * 환경변수의 관리자 이메일을 DB 에 맞춘다. 기동할 때와 소셜 로그인 직후에 부른다.
+ *
+ * 관리자는 **어느 모임에도 속하지 않는다** — 모든 모임에 이미 접근하므로 소속이 있으면
+ * 「누가 이 모임 주선자인가」가 흐려진다. 그래서 지정하면서 기존 소속을 걷어낸다.
+ * 모임장이었던 모임은 가장 먼저 들어온 다른 주선자에게 넘기고, 혼자였던 모임은
+ * 주선자 없이 남는다(관리자가 계속 다룬다). 걷어낼 때 「나가기」 뒷정리(프로필
+ * 비활성·퇴장 안내)는 트리거가 건너뛴다(0065).
+ *
+ * 맞는 주선자 계정이 없으면 관리자를 비운다. 이메일을 바꾸면 이전 관리자는 보통
+ * 주선자로 돌아가고, 걷어낸 소속은 되살아나지 않는다.
+ */
+export async function syncOperatorAccount(email: string | undefined): Promise<string | null> {
+  return withOwnerTx(async (sql) => {
+    const found = email
+      ? await sql.query<{ id: string }>(
+          `SELECT id FROM users WHERE role = 'ADMIN' AND email = $1::citext`,
+          [email.trim()],
+        )
+      : null;
+    const operatorId = found?.rows[0]?.id ?? null;
+
+    // 트리거가 이 값을 보고 뒷정리를 건너뛰므로 소속보다 먼저 적는다.
+    await sql.query(
+      `UPDATE operator_settings SET operator_user_id = $1
+        WHERE operator_user_id IS DISTINCT FROM $1`,
+      [operatorId],
+    );
+    if (!operatorId) return null;
+
+    const owned = await sql.query<{ group_id: string }>(
+      `SELECT group_id FROM group_admins WHERE user_id = $1 AND is_owner`,
+      [operatorId],
+    );
+    for (const { group_id: groupId } of owned.rows) {
+      // 모임장 하나만 허용하는 부분 유니크 인덱스 때문에 해제한 뒤 부여한다.
+      await sql.query(
+        `UPDATE group_admins SET is_owner = false WHERE group_id = $1 AND user_id = $2`,
+        [groupId, operatorId],
+      );
+      await sql.query(
+        `UPDATE group_admins SET is_owner = true
+          WHERE group_id = $1
+            AND user_id = (SELECT user_id FROM group_admins
+                            WHERE group_id = $1 AND user_id <> $2
+                            ORDER BY added_at LIMIT 1)`,
+        [groupId, operatorId],
+      );
+    }
+    await sql.query(`DELETE FROM group_admins WHERE user_id = $1`, [operatorId]);
+    return operatorId;
+  });
+}
+
+/** 이 사용자가 관리자인가. owner 커넥션 경로(모임 설정·소속)에서 쓴다. */
+export async function isOperatorUser(sql: Sql, userId: string): Promise<boolean> {
+  const result = await sql.query(
+    `SELECT 1 FROM operator_settings WHERE operator_user_id = $1`,
+    [userId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
 
 export type OperatorSettings = {
   /** 켜져 있으면 주선자의 모임 만들기가 관리자 승인을 기다린다. */

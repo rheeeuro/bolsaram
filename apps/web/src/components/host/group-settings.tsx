@@ -39,6 +39,8 @@ export type Group = {
   /** 모임 사진의 단기 signed URL. 없으면 모임 이름의 앞글자를 그린다. */
   imageUrl: string | null;
   isOwner: boolean;
+  /** 소속이 아니라 관리자로서 보고 있다 — 모임장과 같은 권한, 나가기는 없다. */
+  asOperator: boolean;
   memberCount: number;
   importCount: number;
   /** 내가 등록한 활성 프로필 수. 나가면 모두 비활성이 된다. */
@@ -191,7 +193,10 @@ function Overview({ group }: { group: Group }) {
           <Stat label="멤버" value={`${group.memberCount}명`} />
           <Stat label="주선자" value={`${group.admins.length}명`} />
           <Stat label="가져오기" value={`${group.importCount}건`} />
-          <Stat label="내 역할" value={group.isOwner ? "모임장" : "주선자"} />
+          <Stat
+            label="내 역할"
+            value={group.asOperator ? "관리자" : group.isOwner ? "모임장" : "주선자"}
+          />
         </dl>
       </Panel>
     </>
@@ -222,6 +227,11 @@ function GroupAdmins({ group, viewerUserId }: { group: Group; viewerUserId: stri
   return (
     <>
       <Panel title="주선자">
+        {group.admins.length === 0 ? (
+          <p className="text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+            아직 주선자가 없습니다. 아래 초대 코드로 동료를 들인 뒤 모임장을 넘겨 주세요.
+          </p>
+        ) : null}
         <ul className="grid gap-1.5">
           {group.admins.map((admin) => (
             <AdminRow
@@ -284,7 +294,8 @@ function AdminRow({ group, admin, isMe }: { group: Group; admin: Admin; isMe: bo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = admin.displayName ?? "이름 없음";
-  const canManage = group.isOwner && !isMe;
+  // 관리자는 어느 모임에서든 모임장과 같은 일을 한다.
+  const canManage = (group.isOwner || group.asOperator) && !isMe;
 
   async function send(run: () => Promise<{ ok: boolean; message?: string }>) {
     setBusy(true);
@@ -313,7 +324,11 @@ function AdminRow({ group, admin, isMe }: { group: Group; admin: Admin; isMe: bo
             <ConfirmButton
               label="모임장 넘기기"
               confirmLabel="넘기기"
-              message={`${name} 님이 모임장이 되고 나는 보통 주선자가 됩니다. 되돌리려면 그분이 다시 넘겨야 합니다.`}
+              message={
+                group.asOperator
+                  ? `${name} 님이 이 모임의 모임장이 됩니다.`
+                  : `${name} 님이 모임장이 되고 나는 보통 주선자가 됩니다. 되돌리려면 그분이 다시 넘겨야 합니다.`
+              }
               disabled={busy}
               onConfirm={() =>
                 void send(() =>
@@ -397,7 +412,8 @@ function ChatNotify({ group }: { group: Group }) {
 function DangerZone({ group }: { group: Group }) {
   return (
     <>
-      <LeaveGroup group={group} />
+      {/* 관리자는 속하지 않았으므로 나갈 것이 없다. */}
+      {group.asOperator ? null : <LeaveGroup group={group} />}
       <CloseGroup group={group} />
     </>
   );
@@ -455,7 +471,7 @@ function CloseGroup({ group }: { group: Group }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!group.isOwner) {
+  if (!group.isOwner && !group.asOperator) {
     return (
       <DangerPanel
         title="모임 폐쇄"
@@ -480,7 +496,8 @@ function CloseGroup({ group }: { group: Group }) {
     );
   }
 
-  const others = group.admins.length - 1;
+  // 관리자는 주선자 목록에 없으므로 빠지는 사람은 목록 전부다.
+  const others = group.asOperator ? group.admins.length : group.admins.length - 1;
 
   return (
     <DangerPanel

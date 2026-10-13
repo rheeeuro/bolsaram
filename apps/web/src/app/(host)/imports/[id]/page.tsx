@@ -43,9 +43,9 @@ export default async function ImportDetailPage({
         errorMessage: session.errorMessage,
         committedProfileId: session.committedProfileId,
         groupId: session.groupId,
-        // 전체공개로 되돌리는 것은 정책상 세션을 만든 사람만 할 수 있다
+        // 전체공개로 되돌리는 것은 정책상 세션을 만든 사람과 관리자만 할 수 있다
         // (`import_sessions_admin` 의 WITH CHECK). 화면에서도 같은 판정을 한다.
-        canUsePublic: session.createdBy === viewer.userId,
+        canUsePublic: session.createdBy === viewer.userId || viewer.isOperator,
         telegram: conversation
           ? {
               state: TELEGRAM_SESSION_STATE_LABELS[conversation.state],

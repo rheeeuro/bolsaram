@@ -152,11 +152,15 @@ export async function consumeTelegramLinkCode(input: {
     // 받아 온 참이다. 이후로는 연결 설정(또는 봇의 `/room`)이 따로 정한다(0039).
     // 소속이 아닌 값이면 전체공개로 떨어뜨린다 — 소속 판정은 group_admins 가 하고
     // active_group_id 는 그중 어디를 보고 있는지만 말한다(0036).
+    // 관리자는 소속 없이 모든 모임에 담을 수 있다(0065).
     const group = await sql.query<{ group_id: string; name: string }>(
-      `SELECT ga.group_id, g.name FROM group_admins ga
-         JOIN users u ON u.id = ga.user_id AND u.active_group_id = ga.group_id
-         JOIN groups g ON g.id = ga.group_id
-        WHERE ga.user_id = $1`,
+      `SELECT g.id AS group_id, g.name FROM users u
+         JOIN groups g ON g.id = u.active_group_id
+        WHERE u.id = $1
+          AND (EXISTS (SELECT 1 FROM group_admins ga
+                        WHERE ga.user_id = u.id AND ga.group_id = g.id)
+               OR EXISTS (SELECT 1 FROM operator_settings os
+                           WHERE os.operator_user_id = u.id))`,
       [row.user_id],
     );
     const uploadGroupId = group.rows[0]?.group_id ?? null;
@@ -218,9 +222,12 @@ export async function findTelegramIdentity(
               g.id AS group_id, g.name AS group_name
          FROM telegram_connections c
          JOIN users u ON u.id = c.user_id
-         LEFT JOIN group_admins ga ON ga.user_id = c.user_id
-                                  AND ga.group_id = c.upload_group_id
-         LEFT JOIN groups g ON g.id = ga.group_id
+         LEFT JOIN groups g
+           ON g.id = c.upload_group_id
+          AND (EXISTS (SELECT 1 FROM group_admins ga
+                        WHERE ga.user_id = c.user_id AND ga.group_id = g.id)
+               OR EXISTS (SELECT 1 FROM operator_settings os
+                           WHERE os.operator_user_id = c.user_id))
         WHERE c.telegram_user_id = $1`,
       [telegramUserId],
     );

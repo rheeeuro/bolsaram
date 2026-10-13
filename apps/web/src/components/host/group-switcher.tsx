@@ -35,24 +35,27 @@ export function GroupSwitcher({
   unread,
   requests,
   approvalRequired,
+  isOperator,
 }: {
   groups: GroupChoice[];
   activeGroupId: string | null;
   unread: Record<string, number>;
   requests: GroupRequestChoice[];
   approvalRequired: boolean;
+  /** 관리자는 모든 모임이 목록에 있고, 속하지 않으므로 상한도 참여도 없다. */
+  isOperator: boolean;
 }) {
   const { switchTo, busy, error } = useGroupSwitch(activeGroupId);
   const [dialog, setDialog] = useState<"create" | "join" | null>(null);
   // 승인을 기다리는 요청도 한 자리다 — 서버가 같은 기준으로 센다.
   const pendingCount = requests.filter((request) => request.status === "PENDING").length;
-  const full = groups.length + pendingCount >= MAX_GROUPS_PER_ADMIN;
+  const full = !isOperator && groups.length + pendingCount >= MAX_GROUPS_PER_ADMIN;
 
   return (
     <section aria-label="내 모임" aria-busy={busy} className="flex min-h-0 flex-col">
       <div className="mb-2 px-2">
         <p className="text-[11px] font-medium tracking-wider text-[var(--surface-text-muted)]">
-          내 모임
+          {isOperator ? "모든 모임" : "내 모임"}
         </p>
       </div>
       <div className="flex max-h-[32dvh] flex-col gap-2 overflow-y-auto pb-2">
@@ -88,7 +91,7 @@ export function GroupSwitcher({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-medium">{group.name}</span>
                 <span className="block text-[11px] text-[var(--surface-text-muted)]">
-                  {group.id ? "함께하는 모임" : "모든 주선자의 공간"}
+                  {group.id ? (isOperator ? "관리하는 모임" : "함께하는 모임") : "모든 주선자의 공간"}
                 </span>
               </span>
               {count > 0 && (
@@ -122,14 +125,16 @@ export function GroupSwitcher({
             <span aria-hidden className="text-xl">
               ＋
             </span>{" "}
-            모임 만들기 · 참여하기
+            {isOperator ? "모임 만들기" : "모임 만들기 · 참여하기"}
           </span>
         )}
       >
         <MenuItem onSelect={() => setDialog("create")}>
           {approvalRequired ? "새 모임 만들기 요청" : "새 모임 만들기"}
         </MenuItem>
-        <MenuItem onSelect={() => setDialog("join")}>초대 코드로 참여</MenuItem>
+        {isOperator ? null : (
+          <MenuItem onSelect={() => setDialog("join")}>초대 코드로 참여</MenuItem>
+        )}
       </Menu>
       {full && (
         <p className="px-2 pb-1 text-[11px] leading-relaxed text-[var(--surface-text-muted)]">

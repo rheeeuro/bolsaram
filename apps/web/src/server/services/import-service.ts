@@ -204,8 +204,9 @@ export async function commitSession(
       : // 새 프로필은 **Import 세션과 같은 모임**에 만든다. 커밋하는 주선자의 모임이
         // 아니라 세션의 모임을 쓴다 — 세션을 볼 수 있다는 것 자체가 RLS 로 이미
         // 그 모임의 주선자임을 뜻하고, 여러 모임에 속한 주선자가 엉뚱한 모임에
-        // 등록하는 일을 막는다.
-        await insertProfile(sql, session.groupId, fields, ctx.userId, input.publish, {
+        // 등록하는 일을 막는다. 등록자도 세션을 만든 주선자다 — 관리자가 대신 등록해도
+        // 담당이 관리자에게 옮겨 가지 않는다(0065).
+        await insertProfile(sql, session.groupId, fields, session.createdBy, input.publish, {
           realName: input.realName?.trim() || null,
           contactNote: input.contactNote?.trim() || null,
         });

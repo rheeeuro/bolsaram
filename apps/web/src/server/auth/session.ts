@@ -63,10 +63,11 @@ export type SessionUser = {
    */
   groups: { id: string; name: string; imageKey: string | null }[];
   /**
-   * 관리자인가 — `SEED_ADMIN_EMAIL1` 과 이메일이 같은 주선자 계정이다.
+   * 관리자인가 — `SEED_ADMIN_EMAIL1` 의 주선자 계정이다(`operator_settings.operator_user_id`).
    *
-   * DB 역할이 아니라 환경변수로 정하므로 RLS 는 이 값을 모른다. 관리자만 다루는
-   * 테이블은 런타임 롤 권한이 없고(0064), 그 경로는 `requireOperator` 가 막는다.
+   * 관리자는 어느 모임에도 속하지 않지만 모든 모임을 다룬다. 그래서 `groups` 는 모임
+   * 전부이고, 보고 있는 모임도 있는 모임이면 무엇이든 살린다. RLS 도 같은 칸을
+   * `app_is_operator()` 로 읽는다.
    */
   isOperator: boolean;
 };
@@ -151,39 +152,58 @@ export async function readSession(): Promise<SessionUser | null> {
       // 권한이 사라질 수 있으므로 세션을 읽을 때마다 다시 본다. 조건은
       // `app_can_edit_profile` 과 같고, owner 커넥션이라 RLS 컨텍스트가 없어 여기서는
       // 그 함수 대신 같은 판정을 직접 쓴다. 최종 판정은 RLS 가 한 번 더 한다.
+      // 관리자(op)는 소속이 없다 — 모임은 전부, 보고 있는 모임은 있는 모임이면 무엇이든,
+      // 대행은 어느 프로필이든 살린다(0065).
       `SELECT u.id AS user_id, u.role, u.display_name, u.avatar_key, p.id AS profile_id,
               ap.id AS acting_profile_id,
-              CASE WHEN u.role = 'ADMIN' THEN (
+              CASE WHEN u.role = 'ADMIN' AND op.is_operator THEN (
+                     SELECT g.id FROM groups g WHERE g.id = u.active_group_id
+                   )
+                   WHEN u.role = 'ADMIN' THEN (
                      SELECT ga.group_id FROM group_admins ga
                       WHERE ga.user_id = u.id AND ga.group_id = u.active_group_id
                    )
                    ELSE p.group_id END AS group_id,
-              COALESCE(
+              CASE WHEN u.role = 'ADMIN' AND op.is_operator THEN COALESCE(
+                (SELECT json_agg(json_build_object('id', g.id, 'name', g.name,
+                                                   'imageKey', g.image_key)
+                                 ORDER BY g.created_at)
+                   FROM groups g),
+                '[]'::json
+              ) ELSE COALESCE(
                 (SELECT json_agg(json_build_object('id', g.id, 'name', g.name,
                                                    'imageKey', g.image_key)
                                  ORDER BY ga.added_at)
                    FROM group_admins ga JOIN groups g ON g.id = ga.group_id
                   WHERE ga.user_id = u.id AND u.role = 'ADMIN'),
                 '[]'::json
-              ) AS groups,
-              -- 관리자는 주선자 계정만 될 수 있다. 이메일 비교는 citext 라 대소문자를 가리지 않는다.
-              (u.role = 'ADMIN' AND $2::citext IS NOT NULL AND u.email = $2::citext) AS is_operator
+              ) END AS groups,
+              op.is_operator
          FROM sessions s
          JOIN users u ON u.id = s.user_id
+         -- 관리자는 주선자 계정만 될 수 있다(동기화가 ADMIN 만 고른다).
+         CROSS JOIN LATERAL (
+           SELECT (u.role = 'ADMIN' AND EXISTS (
+                     SELECT 1 FROM operator_settings os WHERE os.operator_user_id = u.id
+                   )) AS is_operator
+         ) op
          LEFT JOIN profiles p ON p.user_id = u.id
          LEFT JOIN profiles ap ON ap.id = s.acting_profile_id
                               AND u.role = 'ADMIN'
-                              AND ap.created_by = u.id
                               AND (
-                                ap.group_id IS NULL
-                                OR EXISTS (SELECT 1 FROM group_admins ga
-                                            WHERE ga.user_id = u.id
-                                              AND ga.group_id = ap.group_id)
+                                op.is_operator
+                                OR (ap.created_by = u.id
+                                    AND (
+                                      ap.group_id IS NULL
+                                      OR EXISTS (SELECT 1 FROM group_admins ga
+                                                  WHERE ga.user_id = u.id
+                                                    AND ga.group_id = ap.group_id)
+                                    ))
                               )
         WHERE s.id = $1
           AND s.revoked_at IS NULL
           AND s.expires_at > now()`,
-      [sessionId, env().SEED_ADMIN_EMAIL1 ?? null],
+      [sessionId],
     );
     const row = result.rows[0];
     if (!row) return null;

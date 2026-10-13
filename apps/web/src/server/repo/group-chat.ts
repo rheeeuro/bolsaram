@@ -255,17 +255,19 @@ export type GroupUnread = { groupId: string; unread: number };
  */
 export async function unreadByGroup(sql: Sql, userId: string): Promise<GroupUnread[]> {
   const result = await sql.query<{ group_id: string; unread: number }>(
-    `SELECT ga.group_id,
+    // 방 목록은 소속이 아니라 `app_is_group_admin` 으로 고른다 — 관리자는 소속 없이
+    // 모든 방에 있다(0065). 대행 중에 열리는 멤버 모임(`groups_read`)은 여기 들지 않는다.
+    `SELECT g.id AS group_id,
             (SELECT count(*)::int FROM group_messages m
-              WHERE m.group_id = ga.group_id
+              WHERE m.group_id = g.id
                 AND m.deleted_at IS NULL
                 AND m.author_user_id IS DISTINCT FROM $1
                 AND m.created_at > COALESCE(p.last_read_at, '-infinity'::timestamptz)
             ) AS unread
-       FROM group_admins ga
+       FROM groups g
        LEFT JOIN group_chat_prefs p
-         ON p.group_id = ga.group_id AND p.user_id = ga.user_id
-      WHERE ga.user_id = $1`,
+         ON p.group_id = g.id AND p.user_id = $1
+      WHERE app_is_group_admin(g.id)`,
     [userId],
   );
   return result.rows.map((row) => ({ groupId: row.group_id, unread: row.unread }));

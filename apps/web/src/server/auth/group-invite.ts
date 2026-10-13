@@ -20,7 +20,7 @@ import { DomainError } from "@bolsaram/domain";
 import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
 import { env } from "../env";
 import { writeAudit } from "../audit";
-import { readOperatorSettings } from "./operator";
+import { isOperatorUser, readOperatorSettings } from "./operator";
 import { peppered, randomToken } from "../crypto";
 
 /**
@@ -88,11 +88,26 @@ export async function createGroupForAdmin(input: {
   description?: string;
 }): Promise<{ groupId: string }> {
   return withOwnerTx(async (sql) => {
+    const description = input.description?.trim() || null;
+    // 관리자는 모임에 속하지 않는다(0065). 모임만 만들고, 모임장은 나중에 합류한
+    // 주선자에게 모임 설정에서 넘긴다. 속하지 않으니 상한도 없다.
+    if (await isOperatorUser(sql, input.userId)) {
+      const group = await sql.query<{ id: string }>(
+        `INSERT INTO groups (name, description, created_by) VALUES ($1, $2, $3) RETURNING id`,
+        [input.name, description, input.userId],
+      );
+      const groupId = group.rows[0]!.id;
+      await sql.query(`UPDATE users SET active_group_id = $2 WHERE id = $1`, [
+        input.userId,
+        groupId,
+      ]);
+      return { groupId };
+    }
     await assertGroupCapacity(sql, input.userId);
     const groupId = await insertGroupWithOwner(sql, {
       userId: input.userId,
       name: input.name,
-      description: input.description?.trim() || null,
+      description,
     });
     // 방금 만든 모임을 보고 있게 한다 — 만들자마자 그 안에서 일할 것이다.
     await sql.query(`UPDATE users SET active_group_id = $2 WHERE id = $1`, [
@@ -266,14 +281,20 @@ function hashCode(code: string): string {
  *
  * RLS 도 같은 판정을 하지만(`app_is_group_admin`) 모임 설정·초대 코드 경로는 owner
  * 커넥션으로 돌기 때문에 정책이 걸리지 않는다. 그래서 여기서 막는 것이 유일한 방어가
- * 아니라 **애플리케이션 레이어의 몫 전체**다.
+ * 아니라 **애플리케이션 레이어의 몫 전체**다. 관리자도 여기를 통과한다.
  */
 export async function assertGroupAdmin(userId: string, groupId: string): Promise<void> {
+  // 관리자는 소속 없이 모든 모임을 다룬다(0065) — 모임이 있기만 하면 통과한다.
   const result = await withOwner((sql) =>
-    sql.query(`SELECT 1 FROM group_admins WHERE user_id = $1 AND group_id = $2`, [
-      userId,
-      groupId,
-    ]),
+    sql.query(
+      `SELECT 1 FROM groups g
+        WHERE g.id = $2
+          AND (EXISTS (SELECT 1 FROM group_admins ga
+                        WHERE ga.group_id = g.id AND ga.user_id = $1)
+               OR EXISTS (SELECT 1 FROM operator_settings os
+                           WHERE os.operator_user_id = $1))`,
+      [userId, groupId],
+    ),
   );
   if ((result.rowCount ?? 0) === 0) {
     throw new DomainError("FORBIDDEN", "속하지 않은 모임입니다.");
@@ -337,6 +358,13 @@ export async function consumeGroupInvite(input: {
   userId: string;
 }): Promise<{ groupId: string }> {
   return withOwnerTx(async (sql) => {
+    // 코드를 쓰기 전에 거른다 — 관리자가 눌러 봤다고 동료의 코드가 사라지면 안 된다.
+    if (await isOperatorUser(sql, input.userId)) {
+      throw new DomainError(
+        "CONFLICT",
+        "관리자는 초대 코드 없이 모든 모임에 들어갑니다. 위쪽 모임 목록에서 고르세요.",
+      );
+    }
     const claimed = await sql.query<{ group_id: string }>(
       `UPDATE group_invite_codes
           SET consumed_at = now(), consumed_by = $2
@@ -383,6 +411,11 @@ export type GroupSummary = {
   /** 모임 사진의 저장 키. 없으면 화면이 모임 이름의 앞글자를 그린다. */
   imageKey: string | null;
   isOwner: boolean;
+  /**
+   * 소속이 아니라 관리자로서 보고 있다. 모임장과 같은 권한이지만 나가기는 없다 —
+   * 애초에 속하지 않았다(0065).
+   */
+  asOperator: boolean;
   /** 이 모임에 등록된 멤버 수. 목록에서 어느 방이 활발한지 가늠하는 데 쓴다. */
   memberCount: number;
   /** 이 모임으로 가져온 Import 건수. 폐쇄를 막는 것이 무엇인지 화면에 적을 때 쓴다. */
@@ -402,6 +435,7 @@ export type GroupSummary = {
  */
 export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
   return withOwner(async (sql) => {
+    const operator = await isOperatorUser(sql, userId);
     const groups = await sql.query<{
       group_id: string;
       name: string;
@@ -413,19 +447,22 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       my_active_count: number;
       chat_notify: boolean;
     }>(
-      `SELECT g.id AS group_id, g.name, g.description, g.image_key, ga.is_owner,
+      // 관리자는 소속이 없으므로 모임 전부를 만든 순서대로 준다.
+      `SELECT g.id AS group_id, g.name, g.description, g.image_key,
+              COALESCE(ga.is_owner, false) AS is_owner,
               (SELECT count(*)::int FROM profiles p WHERE p.group_id = g.id) AS member_count,
               (SELECT count(*)::int FROM import_sessions i WHERE i.group_id = g.id) AS import_count,
               (SELECT count(*)::int FROM profiles p
-                WHERE p.group_id = g.id AND p.created_by = ga.user_id
+                WHERE p.group_id = g.id AND p.created_by = $1
                   AND p.status = 'ACTIVE') AS my_active_count,
               COALESCE(pref.telegram_notify, false) AS chat_notify
-         FROM group_admins ga
-         JOIN groups g ON g.id = ga.group_id
+         FROM groups g
+         LEFT JOIN group_admins ga ON ga.group_id = g.id AND ga.user_id = $1
          LEFT JOIN group_chat_prefs pref
-           ON pref.group_id = g.id AND pref.user_id = ga.user_id
-        WHERE ga.user_id = $1 ORDER BY ga.added_at`,
-      [userId],
+           ON pref.group_id = g.id AND pref.user_id = $1
+        WHERE $2::boolean OR ga.user_id IS NOT NULL
+        ORDER BY ga.added_at NULLS LAST, g.created_at`,
+      [userId, operator],
     );
     if (groups.rowCount === 0) return [];
 
@@ -447,6 +484,7 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       description: group.description,
       imageKey: group.image_key,
       isOwner: group.is_owner,
+      asOperator: operator,
       memberCount: group.member_count,
       importCount: group.import_count,
       myActiveCount: group.my_active_count,
@@ -520,9 +558,15 @@ export async function updateGroupImage(input: {
  * 쓴다 — 이름·설명 수정과 초대 코드 발급은 지금까지대로 소속 주선자 누구나 한다.
  */
 export async function assertGroupOwner(userId: string, groupId: string): Promise<void> {
+  // 관리자는 모든 모임에서 모임장과 같은 일을 한다(0065).
   const result = await withOwner((sql) =>
     sql.query(
-      `SELECT 1 FROM group_admins WHERE user_id = $1 AND group_id = $2 AND is_owner`,
+      `SELECT 1 FROM groups g
+        WHERE g.id = $2
+          AND (EXISTS (SELECT 1 FROM group_admins ga
+                        WHERE ga.group_id = g.id AND ga.user_id = $1 AND ga.is_owner)
+               OR EXISTS (SELECT 1 FROM operator_settings os
+                           WHERE os.operator_user_id = $1))`,
       [userId, groupId],
     ),
   );
@@ -557,9 +601,12 @@ export async function transferGroupOwnership(input: {
       throw new DomainError("NOT_FOUND", "이 모임의 주선자가 아닙니다.");
     }
 
+    // 지금 모임장을 해제한다. 넘기는 사람이 모임장이면 자기 자신이고, 관리자가 넘기면
+    // 그 모임의 모임장(없을 수도 있다)이다.
     await sql.query(
-      `UPDATE group_admins SET is_owner = false WHERE group_id = $1 AND user_id = $2`,
-      [input.groupId, input.actorId],
+      `UPDATE group_admins SET is_owner = false
+        WHERE group_id = $1 AND is_owner AND user_id <> $2`,
+      [input.groupId, input.targetUserId],
     );
     await sql.query(
       `UPDATE group_admins SET is_owner = true WHERE group_id = $1 AND user_id = $2`,
@@ -595,12 +642,22 @@ export async function removeGroupAdmin(input: {
 
   await withOwnerTx(async (sql) => {
     await sql.query(`SELECT set_config('app.group_admin_removed_by', $1, true)`, [input.actorId]);
-    const removed = await sql.query(
-      `DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2`,
+    const removed = await sql.query<{ is_owner: boolean }>(
+      `DELETE FROM group_admins WHERE group_id = $1 AND user_id = $2 RETURNING is_owner`,
       [input.groupId, input.targetUserId],
     );
     if (removed.rowCount === 0) {
       throw new DomainError("NOT_FOUND", "이 모임의 주선자가 아닙니다.");
+    }
+    // 관리자가 모임장을 내보냈다. 나가기와 같이 가장 먼저 들어온 주선자가 이어받는다.
+    if (removed.rows[0]!.is_owner) {
+      await sql.query(
+        `UPDATE group_admins SET is_owner = true
+          WHERE group_id = $1
+            AND user_id = (SELECT user_id FROM group_admins
+                            WHERE group_id = $1 ORDER BY added_at LIMIT 1)`,
+        [input.groupId],
+      );
     }
   });
 }
