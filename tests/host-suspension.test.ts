@@ -185,6 +185,18 @@ describe("정지하면", () => {
     expect(row?.suspension).toMatchObject({ reason: "테스트" });
   });
 
+  it("점검 계정(`pnpm dev:session`)은 목록에 나오지 않는다", async () => {
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO users (role, email, display_name)
+         VALUES ('ADMIN', 'dev-check@bolsaram.local', '점검') ON CONFLICT DO NOTHING`,
+      ),
+    );
+    const emails = (await listHosts()).map((h) => h.email);
+    expect(emails).not.toContain("dev-check@bolsaram.local");
+    expect(emails).toContain(`${TAG}-1@test.local`);
+  });
+
   it("두 번 정지할 수 없다", async () => {
     await expect(suspendHost({ operatorId, userId: host })).rejects.toMatchObject({
       code: "CONFLICT",

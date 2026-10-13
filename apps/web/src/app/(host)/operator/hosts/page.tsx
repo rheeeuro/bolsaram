@@ -3,6 +3,7 @@
  */
 import { requireOperatorPage } from "@/server/auth/guard";
 import { listHosts, type HostRow } from "@/server/auth/operator";
+import { imageUrlFor } from "@/server/views/image-url";
 import { Breadcrumb, PageHeader } from "@/components/host/surface";
 import { HostList, type OperatorHost } from "@/components/host/operator-hosts";
 
@@ -13,6 +14,7 @@ function serialize(row: HostRow): OperatorHost {
     userId: row.userId,
     displayName: row.displayName,
     email: row.email,
+    avatarUrl: imageUrlFor(row.avatarKey),
     createdAt: row.createdAt.toISOString(),
     lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
     isOperator: row.isOperator,

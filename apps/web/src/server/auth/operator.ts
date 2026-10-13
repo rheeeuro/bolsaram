@@ -240,6 +240,8 @@ export type HostRow = {
   userId: string;
   displayName: string | null;
   email: string | null;
+  /** 계정 설정에서 올린 사진의 저장 키. 화면에 내보낼 때 signed URL 로 바꾼다. */
+  avatarKey: string | null;
   createdAt: Date;
   lastLoginAt: Date | null;
   isOperator: boolean;
@@ -252,11 +254,14 @@ export type HostRow = {
   suspension: { at: Date; reason: string | null; byName: string | null } | null;
 };
 
+/** `pnpm dev:session` 이 만드는 점검 계정. 실제 주선자가 아니라 목록에서 뺀다. */
+const DEV_CHECK_EMAIL = "dev-check@bolsaram.local";
+
 /**
  * 관리자 화면의 주선자 목록 — 정지된 사람을 위로, 그다음은 최근 가입 순.
  *
  * 이메일을 싣는다. 관리자가 사람을 알아보는 유일한 단서이고, 관리자 화면 밖으로는
- * 나가지 않는다.
+ * 나가지 않는다. 점검 계정은 싣지 않는다.
  */
 export async function listHosts(): Promise<HostRow[]> {
   return withOwner(async (sql) => {
@@ -264,6 +269,7 @@ export async function listHosts(): Promise<HostRow[]> {
       id: string;
       display_name: string | null;
       email: string | null;
+      avatar_key: string | null;
       created_at: Date;
       last_login_at: Date | null;
       is_operator: boolean;
@@ -275,7 +281,7 @@ export async function listHosts(): Promise<HostRow[]> {
       suspend_reason: string | null;
       suspended_by_name: string | null;
     }>(
-      `SELECT u.id, u.display_name, u.email::text AS email, u.created_at, u.last_login_at,
+      `SELECT u.id, u.display_name, u.email::text AS email, u.avatar_key, u.created_at, u.last_login_at,
               EXISTS (SELECT 1 FROM operator_settings os WHERE os.operator_user_id = u.id)
                 AS is_operator,
               COALESCE((SELECT array_agg(g.name ORDER BY ga.added_at)
@@ -291,13 +297,15 @@ export async function listHosts(): Promise<HostRow[]> {
          FROM users u
          LEFT JOIN user_suspensions us ON us.user_id = u.id
          LEFT JOIN users sb ON sb.id = us.suspended_by
-        WHERE u.role = 'ADMIN'
+        WHERE u.role = 'ADMIN' AND u.email IS DISTINCT FROM $1::citext
         ORDER BY (us.user_id IS NOT NULL) DESC, u.created_at DESC`,
+      [DEV_CHECK_EMAIL],
     );
     return result.rows.map((row) => ({
       userId: row.id,
       displayName: row.display_name,
       email: row.email,
+      avatarKey: row.avatar_key,
       createdAt: row.created_at,
       lastLoginAt: row.last_login_at,
       isOperator: row.is_operator,

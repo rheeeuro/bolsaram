@@ -23,6 +23,7 @@ loadDotEnv();
 
 const SESSION_COOKIE = "bolsaram_session";
 const TTL_DAYS = 1;
+// 관리자 메뉴의 주선자 목록이 이 이메일을 뺀다(`listHosts`). 바꾸면 함께 고친다.
 const DEFAULT_EMAIL = "dev-check@bolsaram.local";
 
 async function main(): Promise<void> {

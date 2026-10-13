@@ -5,6 +5,7 @@ import { useState } from "react";
 import { HOST_SUSPEND_REASON_MAX_LENGTH } from "@bolsaram/schemas";
 import { formatWhen } from "@/lib/dates";
 import { apiDelete, apiPut } from "@/lib/api-client";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -24,6 +25,8 @@ export type OperatorHost = {
   userId: string;
   displayName: string | null;
   email: string | null;
+  /** 단기 signed URL. 없으면 이름 앞글자를 그린다. */
+  avatarUrl: string | null;
   createdAt: string;
   lastLoginAt: string | null;
   isOperator: boolean;
@@ -96,6 +99,11 @@ function HostItem({ host }: { host: OperatorHost }) {
   return (
     <li className="py-3.5 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
+        <Avatar
+          src={host.avatarUrl}
+          name={host.displayName}
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-ivory-200)] text-sm font-semibold text-[var(--color-ink-600)]"
+        />
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2">
             <span className="truncate text-[14.5px] font-medium">{name}</span>
