@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { apiDelete, apiPost } from "@/lib/api-client";
@@ -51,66 +51,130 @@ export function ProfileDetail({
   // 마음 보내기는 주선자를 거친다 — 대행 중일 때만 그 자리에서 전달된다(0026).
   const [moment, setMoment] = useState<MomentVariant | null>(null);
 
-  const images = profile.images.length > 0 ? profile.images : [];
-  const current = images[imageIndex];
+  const images = profile.images;
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // 화살표·점·탭은 스크롤만 옮긴다. 현재 장 표시는 onScroll 이 맞춘다.
+  function goTo(index: number) {
+    const el = trackRef.current;
+    if (!el || index < 0 || index >= images.length) return;
+    el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
+  }
 
   return (
     <main className="pb-8">
       {/* 큰 인물 사진 (UI 컨셉 04).
           모바일은 화면을 꽉 채우고, 데스크톱은 본문 폭보다 좁은 세로 카드로 둔다 —
           전체폭을 유지하면 넓은 화면에서 사진만 한 화면을 다 먹는다. */}
-      <div className="relative mx-auto aspect-4/5 w-full overflow-hidden bg-[var(--color-ivory-200)] sm:mt-6 sm:max-w-[400px] sm:rounded-[var(--radius-card)]">
-        {current ? (
-          // signed URL 은 단기 만료된다. next/image 캐싱을 피한다.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={current.url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[13px] text-[var(--color-ink-500)]">
-            사진 준비 중
-          </div>
-        )}
-
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-24"
-          style={{ background: "linear-gradient(to bottom, rgb(0 0 0 / 0.28), transparent)" }}
-        />
-
-        <Link
-          href={backHref}
-          aria-label="뒤로"
-          className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/85 backdrop-blur"
-        >
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
-            <path
-              d="M12 4 6 10l6 6"
-              stroke="var(--color-ink-900)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Link>
-
-        {images.length > 1 ? (
-          <>
-            <div className="absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[12px] text-white">
-              {imageIndex + 1}/{images.length}
-            </div>
-            <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
-              {images.map((image, index) => (
-                <button
+      <div className="relative mx-auto w-full sm:mt-6 sm:max-w-[400px]">
+        <div className="relative aspect-4/5 w-full overflow-hidden bg-[var(--color-ivory-200)] sm:rounded-[var(--radius-card)]">
+          {images.length > 0 ? (
+            // 가로 스냅 스크롤이라 손가락·트랙패드로 넘긴다. 현재 장은 스크롤 위치에서 읽는다.
+            // 사진을 누르면 누른 쪽으로 한 장 넘긴다 — 사진 위에 버튼을 얹지 않기 위해서다.
+            // 밀어서 넘긴 경우에는 브라우저가 click 을 보내지 않는다.
+            <div
+              ref={trackRef}
+              onClick={(event) => {
+                if (images.length < 2) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                const leftSide = event.clientX - rect.left < rect.width / 2;
+                goTo(imageIndex + (leftSide ? -1 : 1));
+              }}
+              onScroll={(event) => {
+                const el = event.currentTarget;
+                const next = Math.round(el.scrollLeft / el.clientWidth);
+                if (next !== imageIndex) setImageIndex(next);
+              }}
+              tabIndex={images.length > 1 ? 0 : -1}
+              aria-label="프로필 사진"
+              className={cn(
+                "no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain outline-none",
+                images.length > 1 && "cursor-pointer",
+              )}
+            >
+              {images.map((image) => (
+                // signed URL 은 단기 만료된다. next/image 캐싱을 피한다.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   key={image.id}
-                  type="button"
-                  aria-label={`${index + 1}번째 사진`}
-                  onClick={() => setImageIndex(index)}
-                  className={cn(
-                    "h-1.5 rounded-full transition-all duration-[var(--duration-quick)]",
-                    index === imageIndex ? "w-5 bg-white" : "w-1.5 bg-white/55",
-                  )}
+                  src={image.url}
+                  alt=""
+                  draggable={false}
+                  className="h-full w-full shrink-0 snap-center snap-always object-cover"
                 />
               ))}
             </div>
+          ) : (
+            <div className="flex h-full items-center justify-center text-[13px] text-[var(--color-ink-500)]">
+              사진 준비 중
+            </div>
+          )}
+
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-24"
+            style={{ background: "linear-gradient(to bottom, rgb(0 0 0 / 0.28), transparent)" }}
+          />
+
+          <Link
+            href={backHref}
+            aria-label="뒤로"
+            className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/85 backdrop-blur"
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
+              <path
+                d="M12 4 6 10l6 6"
+                stroke="var(--color-ink-900)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Link>
+
+          {images.length > 1 ? (
+            <>
+              <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[12px] text-white">
+                {imageIndex + 1}/{images.length}
+              </div>
+              {/* 점은 작게 보이되 누르는 영역은 넉넉하게 둔다. */}
+              <div className="absolute inset-x-0 bottom-1.5 flex justify-center">
+                {images.map((image, index) => (
+                  <button
+                    key={image.id}
+                    type="button"
+                    aria-label={`${index + 1}번째 사진`}
+                    aria-current={index === imageIndex}
+                    onClick={() => goTo(index)}
+                    className="grid h-7 place-items-center px-1"
+                  >
+                    <span
+                      className={cn(
+                        "block h-1.5 rounded-full shadow-[0_0_2px_rgb(0_0_0/0.35)] transition-all duration-[var(--duration-quick)]",
+                        index === imageIndex ? "w-5 bg-white" : "w-1.5 bg-white/60",
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        {/* 데스크톱 화살표는 사진 밖 여백에 둔다. 사진을 가리지 않고, 사진 위의 뒤로가기와
+          섞이지 않는다. 폰에서는 밀거나 눌러서 넘긴다. */}
+        {images.length > 1 ? (
+          <>
+            <PhotoArrow
+              direction="prev"
+              disabled={imageIndex === 0}
+              onClick={() => goTo(imageIndex - 1)}
+            />
+            <PhotoArrow
+              direction="next"
+              disabled={imageIndex === images.length - 1}
+              onClick={() => goTo(imageIndex + 1)}
+            />
           </>
         ) : null}
       </div>
@@ -344,6 +408,39 @@ function RequestAction({
     <Button size="lg" className="flex-[1.4]" onClick={onOpen}>
       소개 신청하기
     </Button>
+  );
+}
+
+function PhotoArrow({
+  direction,
+  disabled,
+  onClick,
+}: {
+  direction: "prev" | "next";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={direction === "prev" ? "이전 사진" : "다음 사진"}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "absolute top-1/2 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-[var(--surface-border)] bg-white text-[var(--color-ink-700)] transition-opacity hover:bg-[var(--color-ivory-100)] disabled:pointer-events-none disabled:opacity-0 sm:grid",
+        direction === "prev" ? "-left-16" : "-right-16",
+      )}
+    >
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden>
+        <path
+          d={direction === "prev" ? "M12 4 6 10l6 6" : "M8 4l6 6-6 6"}
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
   );
 }
 
