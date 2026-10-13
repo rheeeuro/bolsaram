@@ -563,8 +563,6 @@ function adminProfileWhere(
 
   if (query.status?.length) clauses.push(`p.status = ANY(${push(query.status)})`);
   if (query.gender) clauses.push(`p.gender = ${push(query.gender)}`);
-  if (query.claimed === "yes") clauses.push("p.user_id IS NOT NULL");
-  if (query.claimed === "no") clauses.push("p.user_id IS NULL");
   // 나이·키·지역·직업군·태그는 멤버 탐색과 같은 절이다.
   clauses.push(...buildAttributeClauses(query, new Date().getFullYear(), push));
   if (query.q) {

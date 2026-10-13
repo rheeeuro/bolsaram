@@ -130,7 +130,7 @@ export const discoverQuerySchema = z.object({
 export type DiscoverQuery = z.infer<typeof discoverQuerySchema>;
 
 /**
- * 주선자 프로필 목록 필터. 멤버 필터와 달리 상태·성별·초대 여부를 직접 다룬다 —
+ * 주선자 프로필 목록 필터. 멤버 필터와 달리 상태·성별을 직접 다룬다 —
  * 주선자는 양쪽 성별을 모두 맡는다.
  */
 export const adminProfileQuerySchema = z.object({
@@ -138,7 +138,6 @@ export const adminProfileQuerySchema = z.object({
   q: z.string().trim().max(60).optional(),
   status: csv(PROFILE_STATUSES),
   gender: z.enum(GENDERS).optional(),
-  claimed: z.enum(["yes", "no"]).optional(),
   cursor: z.string().trim().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

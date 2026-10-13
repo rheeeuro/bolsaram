@@ -5,7 +5,6 @@ import { withRls } from "@bolsaram/db";
 import { isDiscoverable } from "@bolsaram/domain";
 import { adminProfileQuerySchema, PROFILE_STATUSES } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
-import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { ProfileCode } from "@/components/ui/marks";
 import { Count, PageHeader, Panel } from "@/components/host/surface";
@@ -71,8 +70,6 @@ export default async function HostProfilesPage({
             canEdit: editable.has(profile.id),
           }),
         ),
-        claimed: profile.userId != null,
-        // 초대는 담당만 보낼 수 있다 — 「초대 전」은 담당에게만 할 일로 보인다.
         canEdit: editable.has(profile.id),
         // 운영 상태는 개인정보가 아니라 담당이 아니어도 보인다. 공개 단계가 낮아지면
         // view 에서 빠지므로 레코드에서 직접 싣는다.
@@ -171,7 +168,7 @@ export default async function HostProfilesPage({
         <ProfileRawList items={page.items.map(toRawItem)} />
       ) : (
         <ul className="stagger mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-          {page.items.map(({ view, claimed, canEdit, visible, createdAt, bumpedAt }) => (
+          {page.items.map(({ view, visible, createdAt, bumpedAt }) => (
             <li key={view.id}>
               <Link href={`/profiles/${view.id}`} className="lift-move group block">
                 <div className="lift-shadow relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
@@ -239,11 +236,6 @@ export default async function HostProfilesPage({
                       </>
                     )}
                   </p>
-                  {canEdit && !claimed ? (
-                    <p className="mt-1.5">
-                      <Badge tone="neutral">초대 전</Badge>
-                    </p>
-                  ) : null}
                 </div>
               </Link>
             </li>
@@ -308,7 +300,6 @@ function ViewTab({
  */
 function toRawItem(item: {
   view: ProfileDetailView;
-  claimed: boolean;
   canEdit: boolean;
   visible: boolean;
   source: { source: string; rawText: string | null; committedAt: Date | null } | null;
@@ -321,8 +312,6 @@ function toRawItem(item: {
     gender: item.view.gender,
     birthYear: item.view.birthYear,
     visible: item.visible,
-    // 초대는 담당만 보낸다 — 담당이 아니면 초대 여부를 할 일로 보여주지 않는다.
-    awaitingInvite: item.canEdit && !item.claimed,
     images: images.map((image) => ({ id: image.id, url: image.url })),
     rawText: item.source?.rawText ?? null,
     // 가져오기 원본은 올린 주선자만 읽는다(RLS). 같은 모임이어도 남이 올린 건

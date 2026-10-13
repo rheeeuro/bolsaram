@@ -23,8 +23,6 @@ export type RawListItem = {
   gender: string;
   birthYear: number;
   visible: boolean;
-  /** 담당인데 아직 초대하지 않았다 — 주선자가 할 일이 남은 분. */
-  awaitingInvite: boolean;
   images: { id: string; url: string }[];
   /** 가져오기로 받은 원문. 세션이 없거나 담당이 아니면 null 이다. */
   rawText: string | null;
@@ -59,7 +57,6 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
               {label.gender(item.gender)} · {label.birthYear(item.birthYear)}
             </span>
             {!item.visible ? <Badge tone="neutral">비활성 · 멤버에게 안 보임</Badge> : null}
-            {item.awaitingInvite ? <Badge tone="neutral">초대 전</Badge> : null}
 
             <span className="ml-auto text-[11.5px] text-[var(--surface-text-muted)]">
               {[item.source ? label.importSource(item.source) : null, item.at ? formatWhen(item.at) : null]

@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { PROFILE_STATUS_LABELS, type ProfileStatus } from "@bolsaram/schemas";
-import { Input, Select } from "@/components/ui/field";
+import { Input } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { FilterSheet } from "@/components/member/filter-sheet";
 import {
@@ -32,7 +32,7 @@ const SHEET_KEYS = [
 ] as const;
 
 /** 시트 밖에서 고르는 조건. 시트의 「N명 보기」에도 함께 걸려야 숫자가 맞는다. */
-const BAR_KEYS = ["q", "status", "gender", "claimed"] as const;
+const BAR_KEYS = ["q", "status", "gender"] as const;
 
 /**
  * 프로필 목록 필터.
@@ -144,16 +144,6 @@ export function HostProfileFilters({ statuses }: { statuses: readonly ProfileSta
           ]}
           onChange={(value) => apply({ status: value })}
         />
-        <Select
-          aria-label="초대"
-          className="h-9 w-auto text-[13px]"
-          value={params.get("claimed") ?? ""}
-          onChange={(e) => apply({ claimed: e.target.value })}
-        >
-          <option value="">초대 전체</option>
-          <option value="yes">계정 연결됨</option>
-          <option value="no">초대 전</option>
-        </Select>
 
         <button
           type="button"
