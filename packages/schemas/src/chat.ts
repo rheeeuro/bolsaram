@@ -53,6 +53,12 @@ export const GROUP_MESSAGE_MEMBER_TAG = /(?<![\p{L}\p{N}_])#(\d{1,9})(번)?/gu;
 /** 멘션을 고를 때 한 번에 보여주는 후보 수. */
 export const GROUP_MENTION_LIMIT = 6;
 
+/**
+ * 주선자 후보는 한 방에 많지 않으므로 넉넉히 준다. 입력창이 이 목록으로 `@이름` 을
+ * 알아보고 색을 입히므로 잘리면 그 사람의 멘션만 색이 빠진다.
+ */
+export const GROUP_MENTION_HOST_LIMIT = 50;
+
 /** 주선자 이름으로 치는 앞자리의 최대 길이. 표시 이름 길이보다 넉넉하다. */
 export const GROUP_MENTION_HOST_QUERY_MAX = 40;
 

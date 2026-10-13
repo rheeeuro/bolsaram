@@ -10,7 +10,12 @@ import {
 } from "@bolsaram/schemas";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { useChatStream, type ChatMessage } from "@/components/host/chat-stream";
-import { MentionText, useMentionPicker } from "@/components/host/chat-mention";
+import {
+  MENTION_COLORS,
+  MentionInputMirror,
+  MentionText,
+  useMentionPicker,
+} from "@/components/host/chat-mention";
 import { FormError } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { groupSystemMessageParts } from "@/lib/labels";
@@ -70,6 +75,7 @@ export function GroupChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const mention = useMentionPicker({ groupId, value: draft, setValue: setDraft, inputRef });
   /** 이미 읽음으로 찍은 시각. 같은 값을 두 번 보내지 않는다. */
   const markedRef = useRef<string | null>(null);
@@ -311,37 +317,54 @@ export function GroupChat({
           )}
         >
           {mention.list}
-          <textarea
-            ref={inputRef}
-            value={draft}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              mention.sync();
-            }}
-            onSelect={() => mention.sync()}
-            onBlur={() => mention.close()}
-            onKeyDown={(event) => {
-              // 멘션 목록이 열려 있으면 ↑↓·Enter·Tab·Esc 는 목록이 먼저 쓴다.
-              if (mention.onKeyDown(event)) return;
-              // Enter 로 보내고 Shift+Enter 로 줄을 바꾼다. 조합 중(한글)에는 보내지 않는다.
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void send();
-              }
-            }}
-            maxLength={GROUP_MESSAGE_MAX_LENGTH}
-            rows={2}
-            aria-label="메시지"
-            placeholder="메시지를 입력하세요. @주선자 · #멤버 번호로 멘션합니다"
-            className={cn(
-              "block max-h-40 min-h-12 w-full resize-none bg-transparent field-sizing-content",
-              "text-[14px] leading-relaxed placeholder:text-[var(--color-ink-500)]",
-              "focus-visible:outline-none",
-            )}
-          />
+          {/* 입력창 글자는 투명하고, 뒤의 층이 같은 글을 그려 멘션에 색을 입힌다. 두 층의
+              글꼴·줄 간격·줄바꿈이 같아야 커서가 글자 위에 맞는다. */}
+          <div className="relative">
+            <MentionInputMirror
+              value={draft}
+              hostNames={mention.hostNames}
+              mirrorRef={mirrorRef}
+              className={cn("absolute inset-0", INPUT_TEXT, "text-[var(--surface-text)]")}
+            />
+            <textarea
+              ref={inputRef}
+              value={draft}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                mention.sync();
+              }}
+              onSelect={() => mention.sync()}
+              onBlur={() => mention.close()}
+              onScroll={(event) => {
+                // 길어져 입력창 안에서 스크롤되면 뒤의 층도 같은 만큼 올린다.
+                if (mirrorRef.current) mirrorRef.current.scrollTop = event.currentTarget.scrollTop;
+              }}
+              onKeyDown={(event) => {
+                // 멘션 목록이 열려 있으면 ↑↓·Enter·Tab·Esc 는 목록이 먼저 쓴다.
+                if (mention.onKeyDown(event)) return;
+                // Enter 로 보내고 Shift+Enter 로 줄을 바꾼다. 조합 중(한글)에는 보내지 않는다.
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              maxLength={GROUP_MESSAGE_MAX_LENGTH}
+              rows={2}
+              aria-label="메시지"
+              placeholder="메시지를 입력하세요. @주선자 · #멤버 번호로 멘션합니다"
+              className={cn(
+                "no-scrollbar relative block max-h-40 min-h-12 w-full resize-none bg-transparent field-sizing-content",
+                INPUT_TEXT,
+                "text-transparent caret-[var(--surface-text)] placeholder:text-[var(--color-ink-500)]",
+                "focus-visible:outline-none",
+              )}
+            />
+          </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <p className="text-[11.5px] text-[var(--surface-text-muted)]">
-              Enter 보내기 · Shift+Enter 줄바꿈 · @주선자 #멤버
+              Enter 보내기 · Shift+Enter 줄바꿈 ·{" "}
+              <span className={cn("rounded-[3px] px-0.5", MENTION_COLORS.host)}>@주선자</span>{" "}
+              <span className={cn("rounded-[3px] px-0.5", MENTION_COLORS.member)}>#멤버</span>
             </p>
             <button
               type="button"
@@ -413,6 +436,9 @@ function SystemRow({
     </div>
   );
 }
+
+/** 입력창과 그 뒤의 층이 함께 쓰는 글자 모양. 한쪽만 바꾸면 커서가 글자와 어긋난다. */
+const INPUT_TEXT = "whitespace-pre-wrap break-words text-[14px] leading-relaxed";
 
 /** 같은 사람이 5분 안에 이어 쓴 줄인가. 이름과 시각을 반복하지 않기 위한 판정이다. */
 function isGrouped(previous: ChatMessage | undefined, current: ChatMessage): boolean {

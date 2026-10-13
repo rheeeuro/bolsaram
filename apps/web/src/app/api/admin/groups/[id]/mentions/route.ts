@@ -7,7 +7,11 @@
  * 소속은 `requireGroupAdmin` 이, 볼 수 있는 명단과 프로필은 RLS 가 다시 판정한다.
  */
 import { withRls } from "@bolsaram/db";
-import { GROUP_MENTION_LIMIT, groupMentionQuerySchema } from "@bolsaram/schemas";
+import {
+  GROUP_MENTION_HOST_LIMIT,
+  GROUP_MENTION_LIMIT,
+  groupMentionQuerySchema,
+} from "@bolsaram/schemas";
 import { requireGroupAdmin, rlsContextOf } from "@/server/auth/guard";
 import { listHostMentionCandidates, listMentionCandidates } from "@/server/repo/group-chat";
 import { imageUrlFor } from "@/server/views/image-url";
@@ -23,7 +27,7 @@ export const GET = route(async (request: Request, { params }: Params) => {
   const viewer = await requireGroupAdmin(id);
   if (query.kind === "host") {
     const hosts = await withRls(rlsContextOf(viewer), (sql) =>
-      listHostMentionCandidates(sql, id, viewer.userId, query.q, GROUP_MENTION_LIMIT),
+      listHostMentionCandidates(sql, id, viewer.userId, query.q, GROUP_MENTION_HOST_LIMIT),
     );
     return ok({
       hosts: hosts.map(({ avatarKey, ...host }) => ({ ...host, avatarUrl: imageUrlFor(avatarKey) })),
