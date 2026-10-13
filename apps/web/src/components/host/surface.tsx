@@ -75,7 +75,7 @@ export function PageHeader({
   aside?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <header className="animate-fade mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         {kicker ? <p className="kicker mb-2">{kicker}</p> : null}
         <h1 className="display text-[26px] leading-tight text-[var(--surface-text)]">
@@ -116,7 +116,9 @@ export function Panel({
   return (
     <section
       className={cn(
-        "rounded-[var(--radius-card)] border border-[var(--surface-border)]",
+        // 스켈레톤이 걷히고 본문이 들어올 때 뚝 바뀌지 않게 한다. 투명도만 쓴다 —
+        // 이동(transform)을 섞으면 모션 동안 안쪽 fixed 요소의 기준이 패널로 바뀐다.
+        "animate-fade rounded-[var(--radius-card)] border border-[var(--surface-border)]",
         "bg-[var(--surface-card)] shadow-[var(--shadow-card)]",
         className,
       )}

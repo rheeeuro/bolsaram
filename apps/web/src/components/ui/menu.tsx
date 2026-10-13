@@ -135,7 +135,7 @@ export function Menu({
             role="menu"
             aria-label={label}
             className={cn(
-              "animate-rise absolute left-0 right-0 top-[calc(100%+4px)] z-40 grid gap-0.5",
+              "animate-pop absolute left-0 right-0 top-[calc(100%+4px)] z-40 grid gap-0.5",
               "rounded-xl border border-[var(--surface-border)] bg-white p-1.5",
               "shadow-[var(--shadow-lift)]",
               panelClassName,

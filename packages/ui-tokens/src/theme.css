@@ -103,6 +103,8 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* 목록 엇갈림·연출 지연이 남으면 그동안 항목이 투명한 채로 비어 보인다. */
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
 }

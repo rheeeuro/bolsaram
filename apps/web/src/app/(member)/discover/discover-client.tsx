@@ -190,14 +190,14 @@ export function DiscoverClient() {
           </p>
           {view === "list" ? (
             <div className="divide-y divide-[var(--surface-border)]">
-              {items.map((profile) => (
-                <ProfileRow key={profile.id} profile={profile} />
+              {items.map((profile, index) => (
+                <ProfileRow key={profile.id} profile={profile} index={index} />
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-              {items.map((profile) => (
-                <ProfileCard key={profile.id} profile={profile} />
+              {items.map((profile, index) => (
+                <ProfileCard key={profile.id} profile={profile} index={index} />
               ))}
             </div>
           )}

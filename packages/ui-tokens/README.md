@@ -59,7 +59,23 @@ packages/ui-tokens/src/
 
 `--duration-emotive`(520ms)는 **감정 구간에서만** 쓴다 — 마음 보내기 확인, 신청 직후 연출.
 리스트·필터 같은 기능 화면은 `quick`(140ms) 또는 `base`(240ms)를 쓴다.
-`prefers-reduced-motion` 에서는 전역으로 애니메이션이 꺼진다.
+`prefers-reduced-motion` 에서는 전역으로 애니메이션이 꺼진다(지연도 0 이 된다).
+
+키프레임과 `animate-*` 클래스는 `apps/web/src/app/globals.css` 에 있고 이 토큰만 읽는다.
+
+| 클래스                | 길이    | 쓰는 곳                                             |
+| --------------------- | ------- | --------------------------------------------------- |
+| `animate-fade`        | base    | 배경막, 주선자 패널·제목, 빈 상태, 폼 오류          |
+| `animate-pop`         | base    | 메뉴, 제자리 확인                                   |
+| `animate-enter`       | base    | 목록 항목. `--enter-i` 로 앞 6개만 엇갈린다         |
+| `animate-sheet`       | base    | 아래 시트                                           |
+| `animate-heart`       | base    | 관심 하트를 채우는 순간                             |
+| `animate-rise`        | emotive | 첫 화면, 가운데 덮개, 감정 연출                     |
+| `animate-draw`        | emotive | 감정 연출의 하트 윤곽                               |
+| `*-out` · `animate-sink` | base | 덮개가 닫힐 때 — 열릴 때의 반대 방향               |
+
+주선자 패널처럼 안에 무엇이 들어올지 모르는 껍데기에는 투명도만 쓴다 — 이동(transform)이
+섞이면 모션 동안 안쪽 `fixed` 요소의 기준이 바뀐다.
 
 ## 하지 말 것
 

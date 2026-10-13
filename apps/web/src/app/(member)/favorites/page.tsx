@@ -45,8 +45,8 @@ export default async function FavoritesPage() {
           />
         ) : (
           <div className="grid grid-cols-2 gap-x-3 gap-y-6 pb-8 sm:grid-cols-3 lg:grid-cols-4">
-            {items.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} from="favorites" />
+            {items.map((profile, index) => (
+              <ProfileCard key={profile.id} profile={profile} from="favorites" index={index} />
             ))}
           </div>
         )}

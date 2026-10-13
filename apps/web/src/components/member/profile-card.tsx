@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
+import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
 import { FavoriteButton } from "@/components/member/favorite-button";
 import { ProfileCode } from "@/components/ui/marks";
@@ -24,20 +26,36 @@ export function cardLines(profile: ProfileCardView): { facts: string; work: stri
 }
 
 /**
+ * 목록 등장 순서. 받은 순번을 `.animate-enter` 가 읽어 앞쪽 몇 개만 엇갈려 내보낸다.
+ * 순번을 주지 않으면 모션 없이 그대로 그린다.
+ */
+export function enterProps(index: number | undefined): {
+  className?: string;
+  style?: CSSProperties;
+} {
+  if (index == null) return {};
+  return { className: "animate-enter", style: { "--enter-i": index } as CSSProperties };
+}
+
+/**
  * Discover 카드 (UI 컨셉 02).
  * 리스트는 빠르고 기능적으로 — 공개 범위는 익명 코드/사진/출생연도/키/직업군/지역까지.
  */
 export function ProfileCard({
   profile,
   from,
+  index,
 }: {
   profile: ProfileCardView;
   from?: CardOrigin;
+  /** 목록 안 순번. 주면 등장 모션이 붙는다. */
+  index?: number;
 }) {
   const href = profileHref(profile.id, from);
   const lines = cardLines(profile);
+  const enter = enterProps(index);
   return (
-    <article className="group relative">
+    <article className={cn("group relative", enter.className)} style={enter.style}>
       {/* 사진은 장식이라 접근명이 없다. 같은 곳으로 가는 링크가 아래에 하나 더 있으므로
           이쪽은 접근성 트리에서 감춘다 — 그러지 않으면 이름 없는 링크가 하나 더 읽힌다. */}
       <Link href={href} aria-hidden tabIndex={-1} className="block">

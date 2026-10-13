@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { DURATION } from "@bolsaram/ui-tokens";
 import { cn } from "@/lib/cn";
 
 /**
@@ -39,10 +40,20 @@ const WRAP: Record<Variant, string> = {
 
 const PANEL: Record<Variant, string> = {
   center:
-    "animate-rise relative w-full max-w-sm rounded-[var(--radius-sheet)] bg-white p-6 shadow-[var(--shadow-lift)]",
+    "relative w-full max-w-sm rounded-[var(--radius-sheet)] bg-white p-6 shadow-[var(--shadow-lift)]",
   sheet:
-    "animate-sheet relative flex max-h-[85dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-sheet)] bg-white shadow-[var(--shadow-sheet)]",
+    "relative flex max-h-[85dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-sheet)] bg-white shadow-[var(--shadow-sheet)]",
   full: "relative flex w-full flex-col items-center",
+};
+
+/**
+ * 패널의 등장·퇴장. 둘 중 하나만 붙인다 — `cn` 은 직접 만든 `animate-*` 를 같은
+ * 계열로 알아보지 못해 둘 다 남긴다. 연출 화면(full)은 바탕째 함께 사라진다.
+ */
+const PANEL_MOTION: Record<Variant, { in: string; out: string }> = {
+  center: { in: "animate-rise", out: "animate-sink" },
+  sheet: { in: "animate-sheet", out: "animate-sheet-out" },
+  full: { in: "", out: "" },
 };
 
 /** 포커스를 받을 수 있는 것들. 화면에서 감춘 것(`hidden`)은 아래에서 걸러낸다. */
@@ -73,6 +84,11 @@ export function Dialog({
   const panelRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLSpanElement>(null);
   const [mount, setMount] = useState<HTMLElement | null>(null);
+  // 닫힌 뒤에도 퇴장 모션이 끝날 때까지 그려 둔다. 열리는 순간은 렌더 중에 바로
+  // 맞춘다 — 효과에서 맞추면 첫 프레임이 비어 등장 모션이 한 박자 늦는다.
+  const [shown, setShown] = useState(open);
+  if (open && !shown) setShown(true);
+  const closing = shown && !open;
 
   // 부르는 자리에 남겨 둔 표식에서 표면 루트를 찾는다. 마운트 뒤에야 DOM 이 있으므로
   // 첫 렌더에는 아무것도 그리지 않는다 — 덮개는 늘 사용자가 눌러야 열린다.
@@ -150,15 +166,36 @@ export function Dialog({
     // 패널이 생기므로, 여기 넣지 않으면 포커스 트랩과 스크롤 락이 걸리지 않는다.
   }, [open, mount]);
 
-  if (!open || !mount) return <span ref={anchorRef} hidden />;
+  useEffect(() => {
+    if (!closing) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => setShown(false), reduce ? 0 : DURATION.base);
+    return () => window.clearTimeout(timer);
+  }, [closing]);
 
+  if (!shown || !mount) return <span ref={anchorRef} hidden />;
+
+  // 닫히는 중에는 포커스 트랩·스크롤 락이 이미 풀려 있다(위 효과는 `open` 을 본다).
+  // 남은 껍데기는 그림일 뿐이라 `inert` 로 클릭·포커스·읽기에서 모두 뺀다.
   return createPortal(
-    <div className={cn("fixed inset-0", WRAP[variant])} style={style}>
+    <div
+      inert={closing}
+      className={cn(
+        "fixed inset-0",
+        WRAP[variant],
+        closing && "pointer-events-none",
+        closing && variant === "full" && "animate-fade-out",
+      )}
+      style={style}
+    >
       {backdrop ? (
         <div
           aria-hidden
           onClick={onClose}
-          className="animate-fade absolute inset-0 bg-[var(--color-ink-900)]/45"
+          className={cn(
+            "absolute inset-0 bg-[var(--color-ink-900)]/45",
+            closing ? "animate-fade-out" : "animate-fade",
+          )}
         />
       ) : null}
 
@@ -168,7 +205,11 @@ export function Dialog({
         aria-modal="true"
         aria-label={label}
         tabIndex={-1}
-        className={cn(PANEL[variant], className)}
+        className={cn(
+          PANEL[variant],
+          closing ? PANEL_MOTION[variant].out : PANEL_MOTION[variant].in,
+          className,
+        )}
       >
         {children}
       </div>

@@ -22,6 +22,8 @@ export function FavoriteButton({
 }) {
   const [favorited, setFavorited] = useState(initial);
   const [failed, setFailed] = useState(false);
+  // 누른 순간에만 튄다. 처음부터 저장돼 있던 하트가 화면을 열 때마다 튀면 안 된다.
+  const [popped, setPopped] = useState(false);
   const [pending, startTransition] = useTransition();
 
   return (
@@ -41,6 +43,7 @@ export function FavoriteButton({
           // 낙관적으로 먼저 반영하고, 실패하면 되돌린다.
           const next = !favorited;
           setFavorited(next);
+          setPopped(next);
           setFailed(false);
           startTransition(async () => {
             const result = next
@@ -48,6 +51,7 @@ export function FavoriteButton({
               : await apiDelete("/api/favorites", { profileId });
             if (!result.ok) {
               setFavorited(!next);
+              setPopped(false);
               setFailed(true);
             }
           });
@@ -61,13 +65,21 @@ export function FavoriteButton({
             "active:scale-90",
           )}
         >
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden
+            className={popped ? "animate-heart" : undefined}
+          >
             <path
               d="M10 16s-6-3.7-6-7.6A3.4 3.4 0 0 1 10 6.3a3.4 3.4 0 0 1 6 2.1C16 12.3 10 16 10 16Z"
               stroke={favorited ? "var(--color-rose-500)" : "var(--color-ink-600)"}
               strokeWidth="1.4"
               strokeLinejoin="round"
               fill={favorited ? "var(--color-rose-500)" : "none"}
+              className="transition-[fill,stroke] duration-[var(--duration-quick)]"
             />
           </svg>
         </span>

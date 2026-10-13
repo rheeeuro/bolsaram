@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { ProfileCode } from "@/components/ui/marks";
 import { Button } from "@/components/ui/button";
@@ -112,13 +112,19 @@ export function SignalTabs({
         </div>
       </MemberSubBar>
 
-      <div id="signal-panel" role="tabpanel" aria-labelledby={`signal-tab-${direction}`}>
+      {/* 탭을 바꾸면 패널을 새로 그려 목록이 다시 들어오게 한다. */}
+      <div
+        key={direction}
+        id="signal-panel"
+        role="tabpanel"
+        aria-labelledby={`signal-tab-${direction}`}
+      >
         {items.length === 0 ? (
           <Empty {...(EMPTY_COPY[direction] ?? EMPTY_COPY.incoming!)} />
         ) : (
           <ul className="flex flex-col gap-2.5 pb-8">
-            {items.map((item) => (
-              <SignalRow key={item.id} item={item} direction={direction} />
+            {items.map((item, index) => (
+              <SignalRow key={item.id} item={item} direction={direction} index={index} />
             ))}
           </ul>
         )}
@@ -127,7 +133,15 @@ export function SignalTabs({
   );
 }
 
-function SignalRow({ item, direction }: { item: SignalItem; direction: string }) {
+function SignalRow({
+  item,
+  direction,
+  index,
+}: {
+  item: SignalItem;
+  direction: string;
+  index: number;
+}) {
   const router = useRouter();
   // RLS 로 걸러졌거나 지워진 프로필은 갈 곳이 없다. 예전에는 `#` 을 넣어
   // 아무 데도 가지 않는 링크가 포커스를 받았다.
@@ -161,7 +175,10 @@ function SignalRow({ item, direction }: { item: SignalItem; direction: string })
   }
 
   return (
-    <li className="rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-white p-3.5">
+    <li
+      className="animate-enter rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-white p-3.5"
+      style={{ "--enter-i": index } as CSSProperties}
+    >
       <div className="flex gap-3">
         <Thumb href={href}>
           {item.profile?.primaryImage ? (

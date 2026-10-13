@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { FavoriteButton } from "@/components/member/favorite-button";
 import { ProfileCode } from "@/components/ui/marks";
-import { cardLines, profileHref, type CardOrigin } from "@/components/member/profile-card";
+import {
+  cardLines,
+  enterProps,
+  profileHref,
+  type CardOrigin,
+} from "@/components/member/profile-card";
+import { cn } from "@/lib/cn";
 import type { ProfileCardView } from "@/server/views/profile-view";
 
 /**
@@ -13,11 +19,21 @@ import type { ProfileCardView } from "@/server/views/profile-view";
  * 이 형태는 사진을 썸네일로 줄이고 같은 내용을 옆에 한 줄로 편다 — 공개 범위는 카드와 똑같다
  * (익명 코드·대표 사진·출생연도·키·직업군·지역).
  */
-export function ProfileRow({ profile, from }: { profile: ProfileCardView; from?: CardOrigin }) {
+export function ProfileRow({
+  profile,
+  from,
+  index,
+}: {
+  profile: ProfileCardView;
+  from?: CardOrigin;
+  /** 목록 안 순번. 주면 등장 모션이 붙는다. */
+  index?: number;
+}) {
   const href = profileHref(profile.id, from);
   const lines = cardLines(profile);
+  const enter = enterProps(index);
   return (
-    <article className="relative">
+    <article className={cn("relative", enter.className)} style={enter.style}>
       {/* 하트는 링크 안에 넣을 수 없어 형제로 겹친다. 오른쪽 44px 는 그 자리로 비워 둔다. */}
       <Link href={href} className="flex items-center gap-3 py-2.5 pr-12">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">

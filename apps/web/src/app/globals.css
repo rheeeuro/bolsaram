@@ -158,6 +158,98 @@
     animation: fade var(--duration-base) var(--ease-soft) both;
   }
 
+  /* 눌러서 열리는 작은 것(메뉴·제자리 확인). 누른 자리에서 살짝 자라 나온다. */
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-pop {
+    animation: pop var(--duration-base) var(--ease-soft) both;
+    transform-origin: top center;
+  }
+
+  /* 목록 항목 등장. `--enter-i` 로 순서를 받아 앞쪽 몇 개만 엇갈리게 내보낸다 —
+     뒤까지 늦추면 스크롤해 내려간 사람이 빈 칸을 본다. */
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-enter {
+    animation: enter var(--duration-base) var(--ease-soft) both;
+    animation-delay: calc(min(var(--enter-i, 0), 6) * 35ms);
+  }
+
+  /* 관심 하트가 채워지는 순간. 끄는 쪽에는 쓰지 않는다. */
+  @keyframes heart {
+    0% {
+      transform: scale(1);
+    }
+    40% {
+      transform: scale(1.28);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  .animate-heart {
+    animation: heart var(--duration-base) var(--ease-soft);
+  }
+
+  /* 감정 연출의 하트 윤곽을 그려 나간다. path 에 pathLength="1" 이 있어야 한다. */
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .animate-draw {
+    stroke-dasharray: 1;
+    animation: draw calc(var(--duration-emotive) * 2) var(--ease-soft) var(--duration-quick) both;
+  }
+
+  /* 덮개가 닫힐 때. 열릴 때의 반대 방향으로, 기능 화면 길이(base)로 짧게 나간다. */
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  .animate-fade-out {
+    animation: fade-out var(--duration-base) var(--ease-soft) both;
+  }
+
+  @keyframes sheet-down {
+    to {
+      transform: translateY(100%);
+    }
+  }
+  .animate-sheet-out {
+    animation: sheet-down var(--duration-base) var(--ease-soft) both;
+  }
+
+  @keyframes sink {
+    to {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  .animate-sink {
+    animation: sink var(--duration-base) var(--ease-soft) both;
+  }
+
   /* 듀얼 썸 범위 슬라이더 (UI 컨셉 03).
      range 두 개를 같은 트랙 위에 겹쳐 놓는다. 입력 자체는 클릭을 받지 않고
      썸만 받게 해서, 겹쳐 있어도 두 손잡이를 각각 집을 수 있다. */

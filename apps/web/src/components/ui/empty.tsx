@@ -11,7 +11,7 @@ export function Empty({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+    <div className="animate-fade flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
       <p className="text-[15px] text-[var(--surface-text)]">{title}</p>
       {description ? (
         <p className="max-w-xs text-[13px] leading-relaxed text-[var(--surface-text-muted)]">

@@ -51,8 +51,8 @@ export default async function HiddenPage() {
               숨김을 해제할 수 있습니다.
             </p>
             <div className="grid grid-cols-2 gap-x-3 gap-y-6 pb-8 sm:grid-cols-3 lg:grid-cols-4">
-              {items.map((profile) => (
-                <ProfileCard key={profile.id} profile={profile} from="hidden" />
+              {items.map((profile, index) => (
+                <ProfileCard key={profile.id} profile={profile} from="hidden" index={index} />
               ))}
             </div>
           </>

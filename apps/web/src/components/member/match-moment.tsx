@@ -72,6 +72,8 @@ export function MatchMoment({
         >
           <path
             d="M36 57S6 40 6 22.5A15 15 0 0 1 36 15a15 15 0 0 1 30 7.5C66 40 36 57 36 57Z"
+            pathLength={1}
+            className="animate-draw"
             stroke="var(--color-rose-300)"
             strokeWidth="1.6"
             strokeLinejoin="round"

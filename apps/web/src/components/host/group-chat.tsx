@@ -268,7 +268,7 @@ function SystemRow({
   message: ChatMessage & { systemKind: NonNullable<ChatMessage["systemKind"]> };
 }) {
   return (
-    <div className="flex items-center gap-2.5 px-1 py-2">
+    <div className="animate-fade flex items-center gap-2.5 px-1 py-2">
       <span aria-hidden className="h-px flex-1 bg-[var(--surface-border)]" />
       <span className="text-center text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
         {groupSystemMessageParts(message.systemKind, message.payload).map((part, index) => {
@@ -318,7 +318,7 @@ function MessageRow({
   onDelete: () => void;
 }) {
   return (
-    <div className={cn("group px-1", grouped ? "pt-0.5" : "pt-3")}>
+    <div className={cn("animate-enter group px-1", grouped ? "pt-0.5" : "pt-3")}>
       {grouped ? null : (
         <div className="flex items-baseline gap-2">
           <span className="text-[12.5px] font-medium text-[var(--surface-text)]">

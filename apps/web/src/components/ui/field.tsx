@@ -71,7 +71,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
 export function FormError({ children }: { children?: string | null }) {
   if (!children) return null;
   return (
-    <p role="alert" className="text-[13px] leading-relaxed text-[var(--color-danger)]">
+    <p role="alert" className="animate-fade text-[13px] leading-relaxed text-[var(--color-danger)]">
       {children}
     </p>
   );
