@@ -30,7 +30,8 @@ export function HostChatPanel({
   // Esc 로 닫는다. 입력 중인 한글 조합을 끊지 않게 조합 중에는 무시한다.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !event.isComposing) onClose();
+      // 입력란의 태그 목록이 먼저 Esc 를 쓰면(defaultPrevented) 패널은 그대로 둔다.
+      if (event.key === "Escape" && !event.isComposing && !event.defaultPrevented) onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

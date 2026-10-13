@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GROUP_MESSAGE_MAX_LENGTH } from "@bolsaram/schemas";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { useChatStream, type ChatMessage } from "@/components/host/chat-stream";
+import { MentionText, useMentionPicker } from "@/components/host/chat-mention";
 import { FormError } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { groupSystemMessageParts } from "@/lib/labels";
@@ -22,6 +23,9 @@ import { groupSystemMessageParts } from "@/lib/labels";
  * 모임에서 일어난 일(입장·퇴장·멤버 등록·신청·연결)도 같은 줄기에 섞여 내려온다.
  * 그것은 말이 아니라 사건이므로 가운데 한 줄로 조용히 흐르게 둔다. 거기 적힌 멤버
  * 번호는 그 프로필로 가는 링크다 — 사건을 읽고 바로 그 사람을 열어 보는 자리다.
+ *
+ * 멤버는 `@23` 처럼 번호로 태그한다(`chat-mention.tsx`). 입력란에서 `@` 를 치면 이 모임
+ * 멤버 목록이 뜨고, 보낸 글의 태그는 그 프로필로 가는 링크가 된다.
  *
  * 보이는 범위는 **들어온 시점부터**다(0045). 화면이 자르는 것이 아니라 정책이 막으므로
  * 여기서는 따로 다루지 않는다 — 새로 합류한 사람에게는 자기 입장 기록이 첫 줄이 된다.
@@ -58,6 +62,7 @@ export function GroupChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mention = useMentionPicker({ groupId, value: draft, setValue: setDraft, inputRef });
   /** 이미 읽음으로 찍은 시각. 같은 값을 두 번 보내지 않는다. */
   const markedRef = useRef<string | null>(null);
 
@@ -274,17 +279,25 @@ export function GroupChat({
       <div className={cn(compact && "border-t border-[var(--surface-border)] p-3")}>
         <div
           className={cn(
-            "rounded-2xl border border-[var(--surface-border)] bg-white px-3.5 pb-2 pt-3",
+            "relative rounded-2xl border border-[var(--surface-border)] bg-white px-3.5 pb-2 pt-3",
             "transition-colors duration-[var(--duration-quick)]",
             // 안쪽 입력칸의 포커스 링을 지운 대신 상자가 포커스를 드러낸다.
             "focus-within:border-[var(--color-rose-400)] focus-within:ring-1 focus-within:ring-[var(--color-rose-400)]",
           )}
         >
+          {mention.list}
           <textarea
             ref={inputRef}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              mention.sync();
+            }}
+            onSelect={() => mention.sync()}
+            onBlur={() => mention.close()}
             onKeyDown={(event) => {
+              // 태그 목록이 열려 있으면 ↑↓·Enter·Tab·Esc 는 목록이 먼저 쓴다.
+              if (mention.onKeyDown(event)) return;
               // Enter 로 보내고 Shift+Enter 로 줄을 바꾼다. 조합 중(한글)에는 보내지 않는다.
               if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
@@ -294,7 +307,7 @@ export function GroupChat({
             maxLength={GROUP_MESSAGE_MAX_LENGTH}
             rows={2}
             aria-label="메시지"
-            placeholder="메시지를 입력하세요"
+            placeholder="메시지를 입력하세요. @번호로 멤버를 태그합니다"
             className={cn(
               "block max-h-40 min-h-12 w-full resize-none bg-transparent field-sizing-content",
               "text-[14px] leading-relaxed placeholder:text-[var(--color-ink-500)]",
@@ -303,7 +316,7 @@ export function GroupChat({
           />
           <div className="mt-1 flex items-center justify-between gap-2">
             <p className="text-[11.5px] text-[var(--surface-text-muted)]">
-              Enter 보내기 · Shift+Enter 줄바꿈
+              Enter 보내기 · Shift+Enter 줄바꿈 · @번호 태그
             </p>
             <button
               type="button"
@@ -425,7 +438,7 @@ function MessageRow({
               mine ? "text-[var(--color-burgundy-700)]" : "text-[var(--surface-text)]",
             )}
           >
-            {message.body}
+            <MentionText body={message.body} profileIds={message.profileIds} />
           </p>
         )}
         {mine && !message.deleted ? (

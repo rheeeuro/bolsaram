@@ -13,6 +13,7 @@
  *   * 새 글과 지움이 `LISTEN/NOTIFY` 로 알려지고, 그 payload 에 본문이 없다(0043).
  *   * 모임의 사건이 시스템 메시지로 남고, 사람은 그것을 만들지도 지우지도 못한다(0044).
  *   * 시스템 메시지의 공개 번호는 볼 수 있을 때만 프로필 id 로 풀린다(화면의 링크).
+ *   * 본문의 태그(`@23`)도 같다. 태그 후보는 그 모임 멤버뿐이고 이름이 없다.
  *   * 나중에 합류한 주선자에게는 **들어오기 전 대화가 보이지 않는다**(0045).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,6 +22,7 @@ import { groupChatNotifySchema } from "@bolsaram/schemas";
 import {
   createMessage,
   deleteMessage,
+  listMentionCandidates,
   listMessages,
   readMessage,
   unreadByGroup,
@@ -536,6 +538,66 @@ describe("시스템 메시지", () => {
       return r.rows[0]!.n;
     });
     expect(count).toBe(0);
+  });
+});
+
+describe("멤버 태그", () => {
+  /** 그 모임에 등록된 프로필 하나의 번호와 id. */
+  async function profileOf(groupId: string): Promise<{ id: string; code: number }> {
+    return withOwner(async (sql) => {
+      const r = await sql.query<{ id: string; public_code: number }>(
+        `SELECT id, public_code FROM profiles WHERE group_id = $1 ORDER BY created_at LIMIT 1`,
+        [groupId],
+      );
+      return { id: r.rows[0]!.id, code: r.rows[0]!.public_code };
+    });
+  }
+
+  it("본문의 @번호는 볼 수 있을 때만 프로필로 풀린다", async () => {
+    const mine = await profileOf(A.groupId);
+    const other = await profileOf(B.groupId);
+
+    const written = await withRls(A.owner, (sql) =>
+      createMessage(sql, A.groupId, A.ownerId, `@${mine.code}번 확인 부탁 · @${other.code} · a@${mine.code}`),
+    );
+    // 다른 모임의 번호는 RLS 가 걸러 링크가 없다. 앞이 글자인 것은 태그가 아니다.
+    expect(written.profileIds).toEqual({ [String(mine.code)]: mine.id });
+
+    // 같은 방 동료가 읽어도 같다. 본문은 친 그대로다 — 저장하는 것은 글뿐이다.
+    const seen = await withRls(A.peer, (sql) => readMessage(sql, written.id));
+    expect(seen!.profileIds).toEqual({ [String(mine.code)]: mine.id });
+    expect(seen!.body).toContain(`@${mine.code}번`);
+  });
+
+  it("지운 글의 태그는 풀리지 않는다", async () => {
+    const mine = await profileOf(A.groupId);
+    const written = await withRls(A.owner, (sql) =>
+      createMessage(sql, A.groupId, A.ownerId, `@${mine.code} 지울 글`),
+    );
+    await withRls(A.owner, (sql) => deleteMessage(sql, A.groupId, written.id));
+    const seen = await withRls(A.owner, (sql) => readMessage(sql, written.id));
+    expect(seen!.profileIds).toEqual({});
+  });
+
+  it("후보는 그 모임 멤버뿐이고 번호 앞자리로 좁혀진다", async () => {
+    const mine = await profileOf(A.groupId);
+    const other = await profileOf(B.groupId);
+
+    const all = await withRls(A.owner, (sql) => listMentionCandidates(sql, A.groupId, "", 50));
+    expect(all.map((c) => c.profileId)).toContain(mine.id);
+    expect(all.map((c) => c.profileId)).not.toContain(other.id);
+    // 이름은 싣지 않는다. 픽스처의 이름은 `${TAG}-…-이름` 이다.
+    expect(JSON.stringify(all)).not.toContain("-이름");
+
+    const exact = await withRls(A.owner, (sql) =>
+      listMentionCandidates(sql, A.groupId, String(mine.code), 50),
+    );
+    expect(exact[0]!.profileId).toBe(mine.id);
+  });
+
+  it("속하지 않은 모임의 후보는 비어 있다", async () => {
+    const leaked = await withRls(B.owner, (sql) => listMentionCandidates(sql, A.groupId, "", 50));
+    expect(leaked).toEqual([]);
   });
 });
 

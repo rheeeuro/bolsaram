@@ -34,6 +34,27 @@ export const groupMessageQuerySchema = z.object({
 export type GroupMessageQuery = z.infer<typeof groupMessageQuerySchema>;
 
 /**
+ * 본문 안의 멤버 태그 — `@23` 처럼 `@` 뒤에 공개 번호를 붙인다. 뒤의 「번」은 있어도 된다.
+ *
+ * 저장하는 것은 글 그대로다. 번호가 어느 프로필인지는 **읽을 때** RLS 를 통과해
+ * 붙는다(`profileIds`) — 볼 수 없는 번호는 링크 없이 글자로 남는다.
+ * 앞이 글자·숫자면 태그가 아니다(`a@23` 은 메일 주소 같은 것으로 본다).
+ *
+ * 서버의 같은 판정은 `server/repo/group-chat.ts` 의 SQL 정규식이다. 한쪽만 바꾸면
+ * 화면이 링크를 달 자리와 서버가 번호를 풀어 주는 자리가 어긋난다.
+ */
+export const GROUP_MESSAGE_MENTION = /(?<![\p{L}\p{N}_])@(\d{1,9})(번)?/gu;
+
+/** 태그를 고를 때 한 번에 보여주는 후보 수. */
+export const GROUP_MENTION_LIMIT = 6;
+
+/** 태그 후보 조회. `q` 는 지금까지 친 번호 앞자리다 — 비어 있으면 최근 등록 순. */
+export const groupMentionQuerySchema = z.object({
+  q: z.string().regex(/^\d{0,9}$/).default(""),
+});
+export type GroupMentionQuery = z.infer<typeof groupMentionQuerySchema>;
+
+/**
  * 시스템 메시지가 싣는 것 (마이그레이션 0044).
  *
  * 전부 선택이다 — 종류마다 채우는 것이 다르다. 멤버는 공개 번호로만 등장하고

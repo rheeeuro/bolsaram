@@ -32,7 +32,8 @@ export type GroupMessageRecord = {
   /** 시스템 메시지가 싣는 것. 사람의 글에서는 비어 있다. */
   payload: GroupMessagePayload;
   /**
-   * payload 의 공개 번호 → 프로필 id. 화면이 번호에 링크를 달 때 쓴다.
+   * 공개 번호 → 프로필 id. 화면이 번호에 링크를 달 때 쓴다. 시스템 메시지는 payload 의
+   * 번호, 사람의 글은 본문의 태그(`@23`)가 대상이다.
    *
    * **볼 수 있는 것만 들어온다** — 조회가 RLS 를 통과하므로 지워졌거나 담당 채널을
    * 벗어난 번호는 빠진다. 그런 번호는 링크 없이 글자로만 남는다.
@@ -54,11 +55,13 @@ type Row = {
 };
 
 /**
- * 시스템 메시지의 공개 번호를 프로필 id 로 바꿔 함께 읽는다.
+ * 글에 나오는 공개 번호를 프로필 id 로 바꿔 함께 읽는다.
  *
- * payload 에는 번호만 있다(0044) — 이름을 적지 않기로 한 규칙이라 그대로 두고, 화면이
- * 링크를 걸 수 있도록 여기서 한 번 더 찾아 준다. 사람이 쓴 글에서는 찾을 것이 없으므로
- * 조인 조건으로 걸러 아예 돌지 않게 한다.
+ * 시스템 메시지의 payload 에는 번호만 있다(0044) — 이름을 적지 않기로 한 규칙이라
+ * 그대로 두고, 화면이 링크를 걸 수 있도록 여기서 한 번 더 찾아 준다. 사람이 쓴 글은
+ * 본문의 태그(`@23`)에서 번호를 뽑는다. 정규식은 화면 쪽 `GROUP_MESSAGE_MENTION` 과
+ * 같은 판정이다 — 앞이 글자·숫자면 태그가 아니고, 아홉 자리까지만 본다(int 범위).
+ * 지운 글은 본문이 비어 있어 찾을 것이 없다.
  *
  * 번호는 전역에서 유일하므로(`profiles.public_code UNIQUE`) 모임을 따로 묻지 않는다.
  * 볼 수 없는 프로필은 RLS 가 걸러 map 에서 빠진다.
@@ -66,12 +69,17 @@ type Row = {
 const PROFILE_LINKS = `LEFT JOIN LATERAL (
                            SELECT jsonb_object_agg(p.public_code::text, p.id) AS ids
                              FROM profiles p
-                            WHERE p.public_code = ANY (ARRAY[
-                                    (m.payload->>'profileCode')::int,
-                                    (m.payload->>'requesterCode')::int,
-                                    (m.payload->>'targetCode')::int
-                                  ])
-                         ) links ON m.system_kind IS NOT NULL`;
+                            WHERE p.public_code = ANY (
+                                    CASE WHEN m.system_kind IS NOT NULL THEN ARRAY[
+                                      (m.payload->>'profileCode')::int,
+                                      (m.payload->>'requesterCode')::int,
+                                      (m.payload->>'targetCode')::int
+                                    ]
+                                    ELSE ARRAY(
+                                      SELECT tag[2]::int
+                                        FROM regexp_matches(m.body, '(^|[^[:alnum:]_])@([0-9]{1,9})', 'g') AS tag
+                                    ) END)
+                         ) links ON true`;
 
 const SELECT_MESSAGE = `SELECT m.id, m.group_id, m.author_user_id, u.display_name AS author_name,
                                m.body, m.created_at, m.deleted_at, m.system_kind, m.payload,
@@ -271,4 +279,59 @@ export async function unreadByGroup(sql: Sql, userId: string): Promise<GroupUnre
     [userId],
   );
   return result.rows.map((row) => ({ groupId: row.group_id, unread: row.unread }));
+}
+
+export type MentionCandidate = {
+  profileId: string;
+  code: number;
+  gender: string;
+  birthYear: number;
+  jobTitle: string | null;
+  status: string;
+  /** 대표 사진의 저장 키. 화면으로 보내기 전에 단기 signed URL 로 바꾼다. */
+  photoKey: string | null;
+};
+
+/**
+ * 태그 후보 — 이 방의 모임에 등록된 멤버를 번호 앞자리로 찾는다.
+ *
+ * 모임으로 좁히는 것은 화면의 약속이다. 볼 수 있는지는 RLS 가 정하므로 소속이 아닌
+ * 모임을 물으면 비어 돌아온다. 친 번호와 꼭 맞는 사람을 맨 앞에, 나머지는 최근 번호부터.
+ * 이름은 싣지 않는다 — 방에서는 번호로만 부른다.
+ */
+export async function listMentionCandidates(
+  sql: Sql,
+  groupId: string,
+  prefix: string,
+  limit: number,
+): Promise<MentionCandidate[]> {
+  const result = await sql.query<{
+    id: string;
+    public_code: number;
+    gender: string;
+    birth_year: number;
+    job_title: string | null;
+    status: string;
+    photo_key: string | null;
+  }>(
+    `SELECT p.id, p.public_code, p.gender, p.birth_year, p.job_title, p.status,
+            (SELECT i.storage_key FROM profile_images i
+              WHERE i.profile_id = p.id
+              ORDER BY i.is_primary DESC, i.sort_order LIMIT 1) AS photo_key
+       FROM profiles p
+      WHERE p.group_id = $1
+        AND ($2 = '' OR p.public_code::text LIKE $2 || '%')
+      ORDER BY (p.public_code::text = $2) DESC, p.public_code DESC
+      LIMIT $3`,
+    [groupId, prefix, limit],
+  );
+  return result.rows.map((row) => ({
+    profileId: row.id,
+    code: row.public_code,
+    gender: row.gender,
+    birthYear: row.birth_year,
+    jobTitle: row.job_title,
+    status: row.status,
+    photoKey: row.photo_key,
+  }));
 }
