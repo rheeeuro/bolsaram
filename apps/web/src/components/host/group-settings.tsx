@@ -30,7 +30,7 @@ import { cn } from "@/lib/cn";
  *   개요     사진·이름·설명
  *   주선자   구성원 목록 · 초대 코드 · 모임장 넘기기 · 내보내기
  *   알림     이 방의 채팅을 텔레그램으로도 받을지 (사람마다 따로)
- *   위험     모임 나가기 · 모임 폐쇄
+ *   모임 정리  모임 나가기 · 모임 폐쇄
  *
  * 모임장에게만 보이는 것이 있다 — 주선자 목록의 조작 버튼과 폐쇄다. 다른 사람의
  * 소속이나 방 자체를 건드리는 자리라 다른 주선자에게는 버튼을 그리지 않고, 서버도
@@ -62,7 +62,7 @@ const TABS = [
   { key: "overview", label: "개요" },
   { key: "admins", label: "주선자" },
   { key: "notify", label: "알림" },
-  { key: "danger", label: "위험 구역" },
+  { key: "danger", label: "모임 정리" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -554,7 +554,7 @@ function CloseGroup({ group }: { group: Group }) {
   );
 }
 
-/** 위험 구역의 한 칸. 무슨 일이 벌어지는지 먼저 읽히게 문장이 버튼보다 앞에 온다. */
+/** 모임 정리 탭의 한 칸. 무슨 일이 벌어지는지 먼저 읽히게 문장이 버튼보다 앞에 온다. */
 function DangerPanel({
   title,
   description,
