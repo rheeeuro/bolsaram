@@ -77,7 +77,7 @@ apps/web/src/
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·global-progress)
 │   ├── member/               멤버 화면
-│   └── host/                 주선자 화면 — 공통 표면·목록·패널
+│   └── host/                 주선자 화면 — 공통 표면·목록·패널·스켈레톤 블록
 ├── lib/
 │   ├── api-client.ts         fetch 래퍼 — 오류를 판별 가능한 결과로 변환
 │   ├── labels.ts             열거형 → 한글 라벨
@@ -91,7 +91,11 @@ apps/web/src/
 ```
 
 모든 페이지가 `force-dynamic` 이고 요청마다 DB 를 읽는다. 그래서 멤버 화면 다섯 곳과
-주선자 영역에 `loading.tsx` 를 둔다 — 모임 내비게이션은 바로 뜨고 본문만 스켈레톤이 된다.
+멤버 프로필 상세, 주선자 영역에 `loading.tsx` 를 둔다 — 모임 내비게이션은 바로 뜨고
+본문만 스켈레톤이 된다. 주선자 영역은 공통 스켈레톤(제목 + 패널 둘)을 기본으로 쓰고,
+모양이 크게 다른 프로필 목록·상세·고치기와 가져오기 검토만 자기 것을 둔다.
+`loading.tsx` 는 하위 경로까지 감싸므로 상세 경로에 자기 것이 없으면 목록 스켈레톤이
+대신 뜬다 — 목록에 스켈레톤을 둘 때는 그 아래 상세도 같이 둔다.
 화면을 통째로 바꾸지 않는 왕복(모임 전환 등)은 `GlobalProgressProvider` 가 루트에서
 받는다. 표시가 화면 흐름 밖에 떠 있어야 기다리는 동안 눌린 자리가 밀리지 않는다.
 스켈레톤은 `aria-hidden` 이라 `LoadingLabel` 을 같이 놓아야 화면을 보지 않는 사용자에게도
