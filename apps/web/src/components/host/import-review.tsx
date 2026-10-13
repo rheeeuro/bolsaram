@@ -348,7 +348,7 @@ export function ImportReview({
           />
           <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
             {committed
-              ? "이미 등록했습니다. 옮기려면 프로필 화면에서 다뤄야 합니다."
+              ? "이미 등록했습니다. 옮기려면 「멤버」 메뉴에서 다뤄야 합니다."
               : "여기서 고른 방에 프로필이 만들어집니다. 방을 바꾸면 이 건은 그 방의 가져오기 목록으로 옮겨 갑니다."}
           </p>
         </Panel>

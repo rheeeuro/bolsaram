@@ -15,7 +15,7 @@ export default async function TracePage() {
   await requireAdminPage("/profiles/trace");
   return (
     <>
-      <Breadcrumb items={[{ label: "프로필", href: "profiles" }, { label: "캡처본 확인" }]} />
+      <Breadcrumb items={[{ label: "멤버", href: "profiles" }, { label: "캡처본 확인" }]} />
       <PageHeader
         title="캡처본 확인"
         description="멤버가 보는 사진에는 보는 사람의 번호가 맨눈에 안 보이게 들어 있습니다. 밖에서 돌아다니는 캡처본을 넣으면 그 번호를 드러냅니다."

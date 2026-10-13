@@ -54,7 +54,7 @@ export function HostProfileFilters({ statuses }: { statuses: readonly ProfileSta
   const filters = useMemo(() => filtersFromParams(new URLSearchParams(paramString)), [paramString]);
   const summary = filterSummary(filters, new Date().getFullYear());
 
-  // 상세에서 「프로필」로 돌아올 때 이 조건으로 돌아오게 기억해 둔다.
+  // 상세에서 「멤버」로 돌아올 때 이 조건으로 돌아오게 기억해 둔다.
   useEffect(() => rememberProfilesList(paramString), [paramString]);
 
   function push(search: URLSearchParams) {
@@ -114,7 +114,7 @@ export function HostProfileFilters({ statuses }: { statuses: readonly ProfileSta
         <Input
           type="search"
           placeholder="이름 · 직업 · 학교 · 동네 · 원문의 아무 말 · 17번"
-          aria-label="프로필 검색"
+          aria-label="멤버 검색"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="h-10 min-w-0 flex-1 sm:max-w-md"

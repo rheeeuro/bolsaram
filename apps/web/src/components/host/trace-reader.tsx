@@ -264,7 +264,7 @@ function Slider({
 
 type HostMatch = { displayName: string | null; isSelf: boolean };
 
-/** 읽은 표기를 넣으면 누구인지 알려준다. 멤버는 프로필 찾기로, 주선자는 이름으로. */
+/** 읽은 표기를 넣으면 누구인지 알려준다. 멤버는 멤버 찾기로, 주선자는 이름으로. */
 function CodeLookup({
   code,
   onChange,
@@ -304,7 +304,7 @@ function CodeLookup({
             href={`/profiles?q=${parsed.publicCode}`}
             className={buttonClasses({ size: "sm", className: "h-9" })}
           >
-            프로필 찾기
+            멤버 찾기
           </Link>
         ) : parsed?.kind === "host" ? (
           <Button size="sm" className="h-9" disabled={busy} onClick={() => lookupHost(parsed.prefix)}>

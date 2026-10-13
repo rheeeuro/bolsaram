@@ -24,7 +24,7 @@ export default async function HostProfileDetailPage({
 
   return (
     <>
-      <Breadcrumb items={[{ label: "프로필", href: "profiles" }, { code: data.view.code }]} />
+      <Breadcrumb items={[{ label: "멤버", href: "profiles" }, { code: data.view.code }]} />
       <HostProfileDetail
         profile={data.view}
         canEdit={data.canEdit}

@@ -127,7 +127,7 @@ export default async function HostHomePage() {
               처음 오셨나요?
             </span>
             <span className="mt-1 block text-[13px] leading-relaxed text-[var(--surface-text-muted)]">
-              텔레그램 봇 연결부터 프로필 등록, 입장 링크 보내기까지 실제 화면으로 안내합니다.
+              텔레그램 봇 연결부터 멤버 등록, 입장 링크 보내기까지 실제 화면으로 안내합니다.
             </span>
           </span>
           <span className="shrink-0 text-[13px] text-[var(--color-rose-600)]">
@@ -152,9 +152,9 @@ export default async function HostHomePage() {
           accent={kpi.inboxPending > 0}
         />
         <Stat
-          label="멤버에게 보이는 프로필"
+          label="멤버에게 보이는 분"
           value={kpi.profilesActive}
-          hint={`등록한 프로필 ${kpi.profilesTotal}명`}
+          hint={`등록한 멤버 ${kpi.profilesTotal}명`}
           href="/profiles?status=ACTIVE"
         />
         <Stat
@@ -241,7 +241,7 @@ export default async function HostHomePage() {
             />
             <QuickLink
               href="/profiles?status=INACTIVE"
-              title="비활성 프로필"
+              title="비활성 멤버"
               description="멤버에게 안 보이는 분을 확인하고 활성으로 바꿉니다."
             />
             <QuickLink
@@ -275,7 +275,7 @@ function greeting(kpi: Kpi): string {
     return `가져온 프로필 ${kpi.inboxPending}건이 검토를 기다립니다.`;
   }
   if (kpi.profilesActive === 0) {
-    return "첫 프로필을 등록해 보세요.";
+    return "첫 멤버를 등록해 보세요.";
   }
   return "오늘은 조용합니다.";
 }

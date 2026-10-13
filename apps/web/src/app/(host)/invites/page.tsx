@@ -175,7 +175,7 @@ export default async function HostInvitesPage({
           <Blank>
             {q
               ? "검색 조건에 맞는 분이 없습니다."
-              : "아직 등록된 프로필이 없습니다. 「가져오기」에서 첫 프로필을 만들어 보세요."}
+              : "아직 등록된 멤버가 없습니다. 「가져오기」에서 첫 멤버를 등록해 보세요."}
           </Blank>
         </Panel>
       ) : (
