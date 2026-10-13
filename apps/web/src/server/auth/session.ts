@@ -62,6 +62,13 @@ export type SessionUser = {
    * 이 목록이 아니라 RLS 가 정한다.
    */
   groups: { id: string; name: string; imageKey: string | null }[];
+  /**
+   * 관리자인가 — `SEED_ADMIN_EMAIL1` 과 이메일이 같은 주선자 계정이다.
+   *
+   * DB 역할이 아니라 환경변수로 정하므로 RLS 는 이 값을 모른다. 관리자만 다루는
+   * 테이블은 런타임 롤 권한이 없고(0064), 그 경로는 `requireOperator` 가 막는다.
+   */
+  isOperator: boolean;
 };
 
 function signSessionId(sessionId: string): string {
@@ -131,6 +138,7 @@ export async function readSession(): Promise<SessionUser | null> {
       acting_profile_id: string | null;
       group_id: string | null;
       groups: { id: string; name: string; imageKey: string | null }[];
+      is_operator: boolean;
     }>(
       // 주선자의 채널은 users.active_group_id, 멤버의 모임은 자기 프로필에서 온다.
       // 주선자의 활성 채널은 **지금도 그 모임에 속해 있을 때만** 살린다 — 나간 모임을
@@ -157,7 +165,9 @@ export async function readSession(): Promise<SessionUser | null> {
                    FROM group_admins ga JOIN groups g ON g.id = ga.group_id
                   WHERE ga.user_id = u.id AND u.role = 'ADMIN'),
                 '[]'::json
-              ) AS groups
+              ) AS groups,
+              -- 관리자는 주선자 계정만 될 수 있다. 이메일 비교는 citext 라 대소문자를 가리지 않는다.
+              (u.role = 'ADMIN' AND $2::citext IS NOT NULL AND u.email = $2::citext) AS is_operator
          FROM sessions s
          JOIN users u ON u.id = s.user_id
          LEFT JOIN profiles p ON p.user_id = u.id
@@ -173,7 +183,7 @@ export async function readSession(): Promise<SessionUser | null> {
         WHERE s.id = $1
           AND s.revoked_at IS NULL
           AND s.expires_at > now()`,
-      [sessionId],
+      [sessionId, env().SEED_ADMIN_EMAIL1 ?? null],
     );
     const row = result.rows[0];
     if (!row) return null;
@@ -201,6 +211,7 @@ export async function readSession(): Promise<SessionUser | null> {
       actingProfileId: row.acting_profile_id,
       groupId: row.group_id,
       groups: row.groups,
+      isOperator: row.is_operator,
     };
   });
 }

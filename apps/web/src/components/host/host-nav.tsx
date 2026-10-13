@@ -14,6 +14,10 @@ import {
   isHostLinkActive,
 } from "@/components/host/host-nav-links";
 import { useChatStream } from "@/components/host/chat-stream";
+import type { GroupRequestChoice } from "@/components/host/group-requests";
+
+/** 관리자에게만 넘어온다. 다른 주선자에게는 관리자 메뉴가 그려지지 않는다. */
+export type OperatorNav = { pending: number } | null;
 
 /**
  * 주선자 내비게이션. 화면 폭에 따라 **다른 물건 두 개**를 그린다.
@@ -30,6 +34,9 @@ import { useChatStream } from "@/components/host/chat-stream";
  *
  * 전체공개에는 메뉴가 없다. 이름도 주선자도 없는 공용 방이라 다룰 것이 없다.
  *
+ * 관리자 계정이면 맨 아래 가이드 위에 「관리자 메뉴」가 붙는다. 모임과 무관한
+ * 서비스 전체 설정이라 모임 안의 화면 목록에 섞지 않는다.
+ *
  * 로그아웃은 여기 없다 — 계정을 다루는 일은 「○○ 님」을 눌러 들어가는 계정 설정
  * 화면 한 곳에 모은다. 내비게이션에 두면 모임을 고르려다 손이 스친다.
  */
@@ -38,12 +45,20 @@ export function HostNav({
   avatarUrl,
   groups,
   activeGroupId,
+  groupRequests,
+  groupApprovalRequired,
+  operator,
 }: {
   displayName: string | null;
   /** 내 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
   avatarUrl: string | null;
   groups: GroupChoice[];
   activeGroupId: string | null;
+  /** 내 모임 만들기 요청 — 승인 대기와 최근에 승인되지 않은 것. */
+  groupRequests: GroupRequestChoice[];
+  /** 지금 「새 모임 만들기」가 관리자 승인을 거치는가. */
+  groupApprovalRequired: boolean;
+  operator: OperatorNav;
 }) {
   return (
     <>
@@ -52,12 +67,18 @@ export function HostNav({
         avatarUrl={avatarUrl}
         groups={groups}
         activeGroupId={activeGroupId}
+        groupRequests={groupRequests}
+        groupApprovalRequired={groupApprovalRequired}
+        operator={operator}
       />
       <HostMobileNav
         displayName={displayName}
         avatarUrl={avatarUrl}
         groups={groups}
         activeGroupId={activeGroupId}
+        groupRequests={groupRequests}
+        groupApprovalRequired={groupApprovalRequired}
+        operator={operator}
       />
     </>
   );
@@ -68,11 +89,17 @@ function HostSidebar({
   avatarUrl,
   groups,
   activeGroupId,
+  groupRequests,
+  groupApprovalRequired,
+  operator,
 }: {
   displayName: string | null;
   avatarUrl: string | null;
   groups: GroupChoice[];
   activeGroupId: string | null;
+  groupRequests: GroupRequestChoice[];
+  groupApprovalRequired: boolean;
+  operator: OperatorNav;
 }) {
   const pathname = usePathname();
   // 모임별 안 읽음은 SSE 가 밀어주는 값이다(`ChatStreamProvider`). 여기서 따로 묻지
@@ -93,7 +120,13 @@ function HostSidebar({
           </div>
         </div>
 
-        <GroupSwitcher groups={groups} activeGroupId={activeGroupId} unread={unread} />
+        <GroupSwitcher
+          groups={groups}
+          activeGroupId={activeGroupId}
+          unread={unread}
+          requests={groupRequests}
+          approvalRequired={groupApprovalRequired}
+        />
         <div className="mt-4 border-t border-[var(--surface-border)] pt-5">
           {activeGroupId ? (
             <GroupMenu groupId={activeGroupId} groupName={activeName} />
@@ -134,6 +167,26 @@ function HostSidebar({
 
         {/* 화면 사진이 든 시작 가이드. 모임과 무관해서 메뉴 목록과 떼어 맨 아래 둔다. */}
         <div className="mb-4 mt-auto flex flex-col">
+          {operator ? (
+            <Link
+              href="/operator"
+              aria-current={pathname.startsWith("/operator") ? "page" : undefined}
+              className={cn(
+                "mb-2 flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-[13px] transition-colors",
+                pathname.startsWith("/operator")
+                  ? "border-[var(--color-rose-300)] bg-[var(--color-rose-600)]/10 text-[var(--color-rose-600)]"
+                  : "border-[var(--surface-border)] text-[var(--color-ink-700)] hover:bg-[var(--color-ivory-200)]",
+              )}
+            >
+              <span className="flex-1">관리자 메뉴</span>
+              {operator.pending > 0 ? (
+                <span className="rounded-full bg-[var(--color-rose-600)] px-1.5 text-[11px] text-white">
+                  {operator.pending > 99 ? "99+" : operator.pending}
+                  <span className="sr-only">건 승인 대기</span>
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
           <Link
             href="/guide"
             className="rounded-lg px-3 py-2 text-[12.5px] text-[var(--surface-text-muted)] transition-colors hover:bg-[var(--color-ivory-200)] hover:text-[var(--color-ink-800)]"

@@ -54,6 +54,11 @@ export const groupCreateSchema = z.object({
   description: groupDescriptionSchema.optional(),
 });
 
+/** 관리자 설정. 지금은 모임 만들기 승인 하나뿐이다. */
+export const operatorSettingsUpdateSchema = z.object({
+  groupCreationRequiresApproval: z.boolean(),
+});
+
 /** 수정. 보낸 필드만 바꾼다 — 설명을 빈 문자열로 보내면 지운다. */
 export const groupUpdateSchema = z
   .object({

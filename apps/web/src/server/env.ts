@@ -73,6 +73,18 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: blankAsAbsent,
   GOOGLE_CLIENT_SECRET: blankAsAbsent,
 
+  /**
+   * 관리자 계정의 이메일. 시드의 1번 주선자와 같은 값을 그대로 쓴다.
+   *
+   * 이 이메일을 가진 **주선자 계정** 하나가 관리자 메뉴(`/operator`)에 들어가고
+   * 모임 만들기 승인 같은 서비스 전체 설정을 다룬다. 비어 있으면 관리자가 없고,
+   * 관리자 메뉴는 아무에게도 열리지 않는다.
+   */
+  //
+  // 형식 검사를 하지 않는다 — 시드용 값이 틀렸다고 앱 전체가 멈출 일은 아니다.
+  // 맞는 계정이 없으면 관리자가 없을 뿐이다.
+  SEED_ADMIN_EMAIL1: blankAsAbsent,
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /**
    * 배포 환경. NODE_ENV 와 분리한 축이다.

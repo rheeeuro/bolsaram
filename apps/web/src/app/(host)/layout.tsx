@@ -7,6 +7,8 @@
  */
 import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
+import { readMyGroupRequests } from "@/server/auth/group-invite";
+import { countPendingGroupCreationRequests, readOperatorSettings } from "@/server/auth/operator";
 import { unreadByGroup } from "@/server/repo/group-chat";
 import { imageUrlFor } from "@/server/views/image-url";
 import { HostNav } from "@/components/host/host-nav";
@@ -25,6 +27,12 @@ export default async function HostLayout({ children }: { children: React.ReactNo
     unreadByGroup(sql, viewer.userId),
   );
 
+  // 모임 만들기가 승인을 거치는지와 내가 기다리는 요청. 모임 목록 아래 「만들기」와
+  // 대기 줄을 그리는 데 쓴다. 관리자에게는 처리할 요청 수를 메뉴 배지로 단다.
+  const settings = await readOperatorSettings();
+  const groupRequests = await readMyGroupRequests(viewer.userId);
+  const operatorPending = viewer.isOperator ? await countPendingGroupCreationRequests() : 0;
+
   return (
     <div className="host-surface min-h-dvh bg-[var(--surface-page)] text-[var(--surface-text)]">
       <ChatStreamProvider
@@ -42,6 +50,13 @@ export default async function HostLayout({ children }: { children: React.ReactNo
             imageUrl: imageUrlFor(group.imageKey),
           }))}
           activeGroupId={viewer.groupId}
+          groupRequests={groupRequests.map((request) => ({
+            id: request.requestId,
+            name: request.name,
+            status: request.status,
+          }))}
+          groupApprovalRequired={settings.groupCreationRequiresApproval && !viewer.isOperator}
+          operator={viewer.isOperator ? { pending: operatorPending } : null}
         />
         {/* 좁은 화면에서는 하단 탭이 본문 위에 떠 있다 — 그만큼 바닥을 비운다.
             넓은 화면에는 탭이 없고 사이드바가 왼쪽을 차지한다. */}

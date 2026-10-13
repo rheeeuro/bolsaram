@@ -73,7 +73,8 @@ apps/web/src/
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
 │   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용, 오른쪽 아래 버튼으로 연다)
-│   │   └── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
+│   │   ├── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
+│   │   └── operator/         관리자 메뉴 (관리자 계정만) — 메뉴 목록 + groups/ 모임 설정(모임 만들기 승인·요청 처리)
 │   └── api/                  Route Handler (아래 표)
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·global-progress)
@@ -140,9 +141,10 @@ server/
 │   ├── session.ts            서명 쿠키 + sessions 테이블 (마지막 사용 후 30일)
 │   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 프로필 사진 가져오기, 연결된 계정 조회)
 │   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·처음 연 사람의 입장 링크)
-│   ├── group-invite.ts       모임 만들기·소속·사진·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
+│   ├── group-invite.ts       모임 만들기(승인 요청·거두기·승인 처리 포함)·소속·사진·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
+│   ├── operator.ts           관리자 설정(모임 만들기 승인) · 모임 만들기 요청 목록 (owner 전용 테이블)
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
-│   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
+│   └── guard.ts              requireUser / requireAdmin / requireOperator / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트 — privacy · start · updates)
 ├── storage/
@@ -192,6 +194,12 @@ server/
 권한 열의 「주선자」는 DB 의 `ADMIN` 역할이다. 화면 경로에서 `/admin` 은 없앴지만
 API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한다.
 
+권한 열의 「관리자」는 DB 역할이 아니다. `SEED_ADMIN_EMAIL1` 과 이메일이 같은 주선자
+계정 하나이고(`SessionUser.isOperator`), RLS 는 관리자를 모른다. 그래서 관리자가 다루는
+테이블은 런타임 롤 권한이 없고 owner 커넥션으로만 열리며, 판정은 `requireOperator` 가
+전부 맡는다. 화면 경로가 `/admin` 이 아닌 `/operator` 인 것도 이 때문이다 — 「주선자」
+(`ADMIN`)와 섞이지 않게 한다.
+
 `/api/health` 는 예외다. 밖에서 「살아 있는가」를 물어야 하는 경로라 로그인을 요구하지
 않고, 대신 답에 개인정보도 설정값도 담지 않는다(상태 두 글자뿐이다).
 
@@ -230,7 +238,8 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/imports/[id]/analyze`               | POST                | 주선자            | AI 추출 실행                         |
 | `/api/imports/[id]/extraction`            | PATCH               | 주선자            | 검토 결과 저장                       |
 | `/api/imports/[id]/commit`                | POST                | 주선자            | 프로필 생성 (idempotent)             |
-| `/api/admin/groups`                       | GET / POST          | 주선자            | 속한 모임들 + 보고 있는 모임 / 모임 만들기 |
+| `/api/admin/groups`                       | GET / POST          | 주선자            | 속한 모임들 + 보고 있는 모임 + 내 요청 / 모임 만들기 (승인이 켜져 있으면 요청만 남기고 202) |
+| `/api/admin/groups/requests/[id]`         | DELETE              | 요청한 주선자     | 기다리는 모임 만들기 요청 거두기     |
 | `/api/admin/groups/join`                  | POST                | 주선자            | 초대 코드로 모임 합류                |
 | `/api/admin/groups/active`                | PUT                 | 주선자            | 보고 있는 모임 전환 (`null` = 전체공개) |
 | `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
@@ -245,6 +254,8 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/chat/stream`                  | GET (SSE)           | 주선자            | 속한 모든 방의 새 글·지움을 밀어준다 |
 | `/api/admin/telegram`                     | GET / POST / PATCH / DELETE | 주선자    | 봇 연결 상태 / 연결 코드 발급 / 담을 모임 변경 / 해제 |
 | `/api/admin/trace`                        | GET                 | 주선자            | 워터마크의 주선자 코드 → 누구인지 (나·같은 모임 동료까지) |
+| `/api/operator/settings`                  | GET / PUT           | **관리자**        | 관리자 설정 — 모임 만들기 승인 켜기·끄기 |
+| `/api/operator/group-requests/[id]/[action]` | POST             | **관리자**        | 모임 만들기 요청 approve · reject (승인하면 그때 모임 생성) |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |
 | `/api/uploads`                            | PUT                 | 주선자            | signed 토큰으로 직접 업로드          |

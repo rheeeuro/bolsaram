@@ -17,6 +17,8 @@ import {
   isHostLinkActive,
 } from "@/components/host/host-nav-links";
 import type { GroupChoice } from "@/components/host/group-switcher";
+import { GroupRequestRows, type GroupRequestChoice } from "@/components/host/group-requests";
+import type { OperatorNav } from "@/components/host/host-nav";
 
 /**
  * 모바일 주선자 내비게이션 — 위에서 **어느 모임을 볼지** 고르고, 아래에서 **그 모임
@@ -37,12 +39,18 @@ export function HostMobileNav({
   avatarUrl,
   groups,
   activeGroupId,
+  groupRequests,
+  groupApprovalRequired,
+  operator,
 }: {
   displayName: string | null;
   /** 내 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
   avatarUrl: string | null;
   groups: GroupChoice[];
   activeGroupId: string | null;
+  groupRequests: GroupRequestChoice[];
+  groupApprovalRequired: boolean;
+  operator: OperatorNav;
 }) {
   const pathname = usePathname();
   const { unread } = useChatStream();
@@ -66,7 +74,8 @@ export function HostMobileNav({
   // 계정 설정도 「더보기」 안에 있다 — 그 화면에 있으면 탭도 함께 켠다.
   const moreActive =
     secondary.some((link) => isHostLinkActive(link, pathname)) ||
-    pathname.startsWith("/account");
+    pathname.startsWith("/account") ||
+    pathname.startsWith("/operator");
 
   return (
     <>
@@ -148,6 +157,8 @@ export function HostMobileNav({
         groups={groups}
         activeGroupId={activeGroupId}
         unread={unread}
+        requests={groupRequests}
+        approvalRequired={groupApprovalRequired}
         onClose={() => setSheet(null)}
       />
       <MoreSheet
@@ -158,6 +169,7 @@ export function HostMobileNav({
         avatarUrl={avatarUrl}
         activeGroupId={activeGroupId}
         activeName={activeName}
+        operator={operator}
         onClose={() => setSheet(null)}
       />
     </>
@@ -170,17 +182,23 @@ function GroupSheet({
   groups,
   activeGroupId,
   unread,
+  requests,
+  approvalRequired,
   onClose,
 }: {
   open: boolean;
   groups: GroupChoice[];
   activeGroupId: string | null;
   unread: Record<string, number>;
+  requests: GroupRequestChoice[];
+  approvalRequired: boolean;
   onClose: () => void;
 }) {
   const { switchTo, busy, error } = useGroupSwitch(activeGroupId);
   const [dialog, setDialog] = useState<"create" | "join" | null>(null);
-  const full = groups.length >= MAX_GROUPS_PER_ADMIN;
+  // 승인을 기다리는 요청도 한 자리다 — 서버가 같은 기준으로 센다.
+  const pendingCount = requests.filter((request) => request.status === "PENDING").length;
+  const full = groups.length + pendingCount >= MAX_GROUPS_PER_ADMIN;
 
   return (
     <>
@@ -227,6 +245,12 @@ function GroupSheet({
             );
           })}
 
+          {requests.length > 0 ? (
+            <div className="mt-1">
+              <GroupRequestRows requests={requests} roomy />
+            </div>
+          ) : null}
+
           <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
             {full ? (
               <p className="px-3 py-2 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
@@ -235,7 +259,9 @@ function GroupSheet({
               </p>
             ) : (
               <>
-                <SheetItem onSelect={() => setDialog("create")}>새 모임 만들기</SheetItem>
+                <SheetItem onSelect={() => setDialog("create")}>
+                  {approvalRequired ? "새 모임 만들기 요청" : "새 모임 만들기"}
+                </SheetItem>
                 <SheetItem onSelect={() => setDialog("join")}>초대 코드로 참여</SheetItem>
               </>
             )}
@@ -249,7 +275,11 @@ function GroupSheet({
         </div>
       </Dialog>
 
-      <GroupCreateDialogs which={dialog} onClose={() => setDialog(null)} />
+      <GroupCreateDialogs
+        which={dialog}
+        approvalRequired={approvalRequired}
+        onClose={() => setDialog(null)}
+      />
     </>
   );
 }
@@ -263,6 +293,7 @@ function MoreSheet({
   avatarUrl,
   activeGroupId,
   activeName,
+  operator,
   onClose,
 }: {
   open: boolean;
@@ -272,6 +303,7 @@ function MoreSheet({
   avatarUrl: string | null;
   activeGroupId: string | null;
   activeName: string;
+  operator: OperatorNav;
   onClose: () => void;
 }) {
   return (
@@ -296,6 +328,18 @@ function MoreSheet({
             <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
               <SheetItem href={`/group/${activeGroupId}`}>
                 「{activeName}」 모임 설정
+              </SheetItem>
+            </div>
+          ) : null}
+
+          {/* 관리자 계정에만 있다. 모임과 무관한 서비스 전체 설정이다. */}
+          {operator ? (
+            <div className="mt-2 border-t border-[var(--surface-border)] pt-2">
+              <SheetItem href="/operator" active={pathname.startsWith("/operator")}>
+                <span className="flex-1">관리자 메뉴 — 모임 설정</span>
+                {operator.pending > 0 ? (
+                  <UnreadBadge count={operator.pending} label="건 승인 대기" />
+                ) : null}
               </SheetItem>
             </div>
           ) : null}

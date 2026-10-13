@@ -91,6 +91,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0061_member_account_delete.sql`   | 등록한 주선자가 그 프로필에 연결된 **멤버** 계정을 지운다 — 프로필 삭제가 계정까지 지우게 |
 | `0062_profile_bump.sql`            | `profiles.bumped_at` — 등록한 주선자의 끌어올리기. 목록은 `COALESCE(bumped_at, created_at)` 순, 트리거가 지금 시각·활성·24시간 1회를 강제하고 모임 방에 `PROFILE_BUMPED` 를 남긴다 |
 | `0063_profile_code_from_one.sql`   | 공개 번호 시퀀스를 1 부터 — 다음 번호는 있는 번호 중 가장 큰 값 + 1 |
+| `0064_operator_group_approval.sql` | 관리자 설정(`operator_settings`, 모임 만들기 승인)과 `group_creation_requests` — 승인 전까지 `groups` 행을 만들지 않는다. 둘 다 owner 전용 |
 
 ## 테이블
 
@@ -118,6 +119,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
 | `group_invite_codes`                           | 모임 초대 코드(해시). 동료 주선자 합류             | **권한 없음** (owner 커넥션 전용)   |
 | `oauth_accounts`                               | 주선자 신원 — 제공자(카카오·구글) + 제공자 고유 id | **권한 없음** (owner 커넥션 전용)   |
+| `operator_settings`                            | 관리자 설정 한 줄 — 모임 만들기 승인 여부          | **권한 없음** (owner 커넥션 전용)   |
+| `group_creation_requests`                      | 모임 만들기 요청. 대기·승인·거절·거둠, 승인되면 만든 모임을 가리킨다 | **권한 없음** (owner 커넥션 전용)   |
 
 ## 무결성을 DB 가 지키는 것
 

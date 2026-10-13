@@ -19,27 +19,57 @@ import { withOwner, withOwnerTx, type Sql } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
 import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
 import { env } from "../env";
+import { writeAudit } from "../audit";
+import { readOperatorSettings } from "./operator";
 import { peppered, randomToken } from "../crypto";
 
 /**
  * 모임 수 상한을 지킨다. 넘으면 던진다.
  *
  * **만들기와 합류가 같은 문을 지난다** — 한쪽만 막으면 초대 코드로 넘어간다.
+ * 승인을 기다리는 모임 만들기 요청도 한 자리로 센다 — 대기 중에 상한을 넘겨 두면
+ * 승인하는 순간 거절된다.
+ *
  * 세기 전에 `users` 행을 잠가 둔다: 같은 계정으로 두 요청이 동시에 들어와도
  * 한쪽이 끝난 뒤에 세므로 상한을 한 칸 넘겨 통과하는 일이 없다.
  */
-async function assertGroupCapacity(sql: Sql, userId: string): Promise<void> {
+export async function assertGroupCapacity(
+  sql: Sql,
+  userId: string,
+  message = `모임은 최대 ${MAX_GROUPS_PER_ADMIN}개까지입니다. 쓰지 않는 모임에서 나간 뒤 다시 시도하세요.`,
+): Promise<void> {
   await sql.query(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [userId]);
   const counted = await sql.query<{ count: number }>(
-    `SELECT count(*)::int AS count FROM group_admins WHERE user_id = $1`,
+    `SELECT (SELECT count(*) FROM group_admins WHERE user_id = $1)
+          + (SELECT count(*) FROM group_creation_requests
+              WHERE requested_by = $1 AND status = 'PENDING') AS count`,
     [userId],
   );
-  if ((counted.rows[0]?.count ?? 0) >= MAX_GROUPS_PER_ADMIN) {
-    throw new DomainError(
-      "CONFLICT",
-      `모임은 최대 ${MAX_GROUPS_PER_ADMIN}개까지입니다. 쓰지 않는 모임에서 나간 뒤 다시 시도하세요.`,
-    );
+  if (Number(counted.rows[0]?.count ?? 0) >= MAX_GROUPS_PER_ADMIN) {
+    throw new DomainError("CONFLICT", message);
   }
+}
+
+/**
+ * 모임 행과 모임장 소속을 함께 만든다. 상한은 호출부가 먼저 본다.
+ *
+ * 바로 만들기와 관리자 승인이 같은 모양의 모임을 만들도록 한 곳에 둔다.
+ */
+export async function insertGroupWithOwner(
+  sql: Sql,
+  input: { userId: string; name: string; description: string | null },
+): Promise<string> {
+  const group = await sql.query<{ id: string }>(
+    `INSERT INTO groups (name, description, created_by) VALUES ($1, $2, $3) RETURNING id`,
+    [input.name, input.description, input.userId],
+  );
+  const groupId = group.rows[0]!.id;
+  await sql.query(
+    `INSERT INTO group_admins (group_id, user_id, is_owner, added_by)
+     VALUES ($1, $2, true, $2)`,
+    [groupId, input.userId],
+  );
+  return groupId;
 }
 
 /**
@@ -59,21 +89,167 @@ export async function createGroupForAdmin(input: {
 }): Promise<{ groupId: string }> {
   return withOwnerTx(async (sql) => {
     await assertGroupCapacity(sql, input.userId);
-    const group = await sql.query<{ id: string }>(
-      `INSERT INTO groups (name, description, created_by) VALUES ($1, $2, $3) RETURNING id`,
-      [input.name, input.description?.trim() || null, input.userId],
-    );
-    const groupId = group.rows[0]!.id;
-    await sql.query(
-      `INSERT INTO group_admins (group_id, user_id, is_owner, added_by)
-       VALUES ($1, $2, true, $2)`,
-      [groupId, input.userId],
-    );
+    const groupId = await insertGroupWithOwner(sql, {
+      userId: input.userId,
+      name: input.name,
+      description: input.description?.trim() || null,
+    });
     // 방금 만든 모임을 보고 있게 한다 — 만들자마자 그 안에서 일할 것이다.
     await sql.query(`UPDATE users SET active_group_id = $2 WHERE id = $1`, [
       input.userId,
       groupId,
     ]);
+    return { groupId };
+  });
+}
+
+export type GroupCreationResult =
+  | { status: "CREATED"; groupId: string }
+  | { status: "PENDING"; requestId: string };
+
+/**
+ * 「모임 만들기」. 관리자가 승인을 켜 두었으면 모임 대신 요청을 남긴다.
+ *
+ * 승인 여부는 요청이 들어온 순간의 설정으로 정한다 — 화면이 열린 뒤 관리자가 설정을
+ * 바꿨어도 서버가 판정한 결과를 돌려주므로 화면은 그대로 따르면 된다.
+ * 관리자 본인은 승인할 사람이 자기라서 기다리지 않고 바로 만든다.
+ */
+export async function requestGroupCreation(input: {
+  userId: string;
+  isOperator: boolean;
+  name: string;
+  description?: string;
+}): Promise<GroupCreationResult> {
+  if (input.isOperator || !(await readOperatorSettings()).groupCreationRequiresApproval) {
+    const created = await createGroupForAdmin(input);
+    return { status: "CREATED", groupId: created.groupId };
+  }
+  return withOwnerTx(async (sql) => {
+    await assertGroupCapacity(sql, input.userId);
+    const inserted = await sql.query<{ id: string }>(
+      `INSERT INTO group_creation_requests (requested_by, name, description)
+       VALUES ($1, $2, $3) RETURNING id`,
+      [input.userId, input.name, input.description?.trim() || null],
+    );
+    return { status: "PENDING", requestId: inserted.rows[0]!.id };
+  });
+}
+
+export type MyGroupRequest = {
+  requestId: string;
+  name: string;
+  status: "PENDING" | "REJECTED";
+  createdAt: Date;
+};
+
+/** 승인되지 않은 요청을 이만큼 보여주고 접는다. 그 뒤에는 다시 요청하면 된다. */
+const REJECTED_VISIBLE_DAYS = 7;
+
+/**
+ * 내 모임 만들기 요청 — 기다리는 것과 최근에 승인되지 않은 것.
+ *
+ * 승인된 요청은 모임 목록에 모임으로 나타나므로 여기서 빼고, 거절은 며칠만 남겨
+ * 「왜 모임이 안 생겼는지」를 알 수 있게 한다.
+ */
+export async function readMyGroupRequests(userId: string): Promise<MyGroupRequest[]> {
+  return withOwner(async (sql) => {
+    const result = await sql.query<{
+      id: string;
+      name: string;
+      status: "PENDING" | "REJECTED";
+      created_at: Date;
+    }>(
+      `SELECT id, name, status, created_at
+         FROM group_creation_requests
+        WHERE requested_by = $1
+          AND (status = 'PENDING'
+               OR (status = 'REJECTED'
+                   AND decided_at > now() - make_interval(days => $2)))
+        ORDER BY created_at`,
+      [userId, REJECTED_VISIBLE_DAYS],
+    );
+    return result.rows.map((row) => ({
+      requestId: row.id,
+      name: row.name,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
+  });
+}
+
+/** 기다리는 내 요청을 거둔다. 이미 결정된 것은 건드리지 않는다. */
+export async function cancelGroupCreationRequest(input: {
+  userId: string;
+  requestId: string;
+}): Promise<void> {
+  const result = await withOwner((sql) =>
+    sql.query(
+      `UPDATE group_creation_requests
+          SET status = 'CANCELED', decided_at = now(), decided_by = $2
+        WHERE id = $1 AND requested_by = $2 AND status = 'PENDING'`,
+      [input.requestId, input.userId],
+    ),
+  );
+  if ((result.rowCount ?? 0) === 0) {
+    throw new DomainError("NOT_FOUND", "기다리는 요청이 아닙니다. 화면을 새로 고쳐 주세요.");
+  }
+}
+
+/**
+ * 관리자가 기다리는 요청을 승인하거나 거절한다. 호출부가 관리자인지 먼저 확인한다.
+ *
+ * 승인은 그 순간에 모임을 만들고 요청한 사람을 모임장으로 둔다. 요청 행을 먼저
+ * 조건부로 닫아 두 번 눌러도 모임이 둘 생기지 않게 하고, 그 뒤에 상한을 센다 —
+ * 닫힌 요청은 더 이상 자리를 차지하지 않으므로 자기 자신에게 막히지 않는다.
+ * 보고 있는 모임은 바꾸지 않는다. 요청한 사람은 다른 일을 하는 중일 수 있다.
+ */
+export async function decideGroupCreationRequest(input: {
+  requestId: string;
+  operatorId: string;
+  approve: boolean;
+}): Promise<{ groupId: string | null }> {
+  return withOwnerTx(async (sql) => {
+    const closed = await sql.query<{
+      requested_by: string;
+      name: string;
+      description: string | null;
+    }>(
+      `UPDATE group_creation_requests
+          SET status = $3, decided_by = $2, decided_at = now()
+        WHERE id = $1 AND status = 'PENDING'
+        RETURNING requested_by, name, description`,
+      [input.requestId, input.operatorId, input.approve ? "APPROVED" : "REJECTED"],
+    );
+    const request = closed.rows[0];
+    if (!request) {
+      throw new DomainError("CONFLICT", "이미 처리했거나 거둬진 요청입니다.");
+    }
+
+    let groupId: string | null = null;
+    if (input.approve) {
+      await assertGroupCapacity(
+        sql,
+        request.requested_by,
+        `요청한 주선자가 이미 모임 ${MAX_GROUPS_PER_ADMIN}개에 속해 있어 만들 수 없습니다.`,
+      );
+      groupId = await insertGroupWithOwner(sql, {
+        userId: request.requested_by,
+        name: request.name,
+        description: request.description,
+      });
+      await sql.query(`UPDATE group_creation_requests SET group_id = $2 WHERE id = $1`, [
+        input.requestId,
+        groupId,
+      ]);
+    }
+
+    await writeAudit(sql, {
+      actorUserId: input.operatorId,
+      action: input.approve ? "group_request.approve" : "group_request.reject",
+      entityType: "group_creation_request",
+      entityId: input.requestId,
+      metadata: groupId ? { groupId } : {},
+    });
     return { groupId };
   });
 }

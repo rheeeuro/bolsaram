@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/avatar";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { GroupCreateDialogs } from "@/components/host/group-create";
+import { GroupRequestRows, type GroupRequestChoice } from "@/components/host/group-requests";
 import { useGroupSwitch } from "@/components/host/use-group-switch";
 
 export type GroupChoice = {
@@ -32,14 +33,20 @@ export function GroupSwitcher({
   groups,
   activeGroupId,
   unread,
+  requests,
+  approvalRequired,
 }: {
   groups: GroupChoice[];
   activeGroupId: string | null;
   unread: Record<string, number>;
+  requests: GroupRequestChoice[];
+  approvalRequired: boolean;
 }) {
   const { switchTo, busy, error } = useGroupSwitch(activeGroupId);
   const [dialog, setDialog] = useState<"create" | "join" | null>(null);
-  const full = groups.length >= MAX_GROUPS_PER_ADMIN;
+  // 승인을 기다리는 요청도 한 자리다 — 서버가 같은 기준으로 센다.
+  const pendingCount = requests.filter((request) => request.status === "PENDING").length;
+  const full = groups.length + pendingCount >= MAX_GROUPS_PER_ADMIN;
 
   return (
     <section aria-label="내 모임" aria-busy={busy} className="flex min-h-0 flex-col">
@@ -93,6 +100,7 @@ export function GroupSwitcher({
             </button>
           );
         })}
+        <GroupRequestRows requests={requests} />
       </div>
       {/* 스크롤 목록 밖에 둔다. 안에 두면 펼친 메뉴가 목록 높이에 잘리고 스크롤바가 생긴다. */}
       <Menu
@@ -118,7 +126,9 @@ export function GroupSwitcher({
           </span>
         )}
       >
-        <MenuItem onSelect={() => setDialog("create")}>새 모임 만들기</MenuItem>
+        <MenuItem onSelect={() => setDialog("create")}>
+          {approvalRequired ? "새 모임 만들기 요청" : "새 모임 만들기"}
+        </MenuItem>
         <MenuItem onSelect={() => setDialog("join")}>초대 코드로 참여</MenuItem>
       </Menu>
       {full && (
@@ -133,7 +143,11 @@ export function GroupSwitcher({
         </p>
       )}
 
-      <GroupCreateDialogs which={dialog} onClose={() => setDialog(null)} />
+      <GroupCreateDialogs
+        which={dialog}
+        approvalRequired={approvalRequired}
+        onClose={() => setDialog(null)}
+      />
     </section>
   );
 }

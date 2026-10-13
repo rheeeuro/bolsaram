@@ -22,6 +22,13 @@
 API 경로 `/api/admin/*` 은 그대로 둡니다(설계문서 §13에서 벗어난 결정은
 `docs/implementation-plan.md`).
 
+주선자 위에 **관리자 한 명**이 있습니다 — `.env` 의 `SEED_ADMIN_EMAIL1` 과 이메일이 같은
+주선자 계정입니다. DB 역할이 아니라서 RLS 는 관리자를 모르고, 관리자 화면 `/operator` 와
+API `/api/operator/*` 는 `requireOperator` 가 막습니다. 관리자만 다루는 테이블
+(`operator_settings` · `group_creation_requests`)은 런타임 롤 권한이 없습니다(0064).
+**모임 만들기 승인**이 켜져 있으면 주선자의 모임 만들기는 요청만 남고, 관리자가 승인할
+때 비로소 모임이 생깁니다.
+
 상세 설계는 `docs/v2/`(원본 설계 문서)와 `docs/implementation-plan.md`(실제 구현 결정)를 봅니다.
 
 ## 기술 스택

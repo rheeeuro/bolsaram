@@ -28,6 +28,21 @@ export async function requireAdmin(): Promise<Viewer> {
 }
 
 /**
+ * 관리자만 통과. 관리자는 `SEED_ADMIN_EMAIL1` 의 주선자 계정 하나다.
+ *
+ * 관리자 경로가 다루는 테이블은 RLS 정책 없이 owner 커넥션으로만 열리므로(0064)
+ * 여기가 유일한 판정이다. 주선자에게는 관리자 메뉴가 있는지조차 알리지 않으려고
+ * 일반 「접근할 수 없음」으로 답한다.
+ */
+export async function requireOperator(): Promise<Viewer> {
+  const user = await requireAdmin();
+  if (!user.isOperator) {
+    throw new DomainError("FORBIDDEN", "접근할 수 없습니다.");
+  }
+  return user;
+}
+
+/**
  * 모임 하나를 지정해 다루는 주선자만 통과. 모임 설정·초대 코드·나가기에 쓴다.
  *
  * 이 경로들은 owner 커넥션으로 도는 인증 레이어라 RLS 정책이 걸리지 않는다 —
@@ -88,6 +103,13 @@ export async function requireAdminPage(next?: string): Promise<Viewer> {
   const user = await readSession();
   if (!user) redirect(loginPath(next));
   if (user.role !== "ADMIN") redirect("/discover");
+  return user;
+}
+
+/** 관리자 화면용. 관리자가 아니면 주선자 홈으로 돌려보낸다. */
+export async function requireOperatorPage(next?: string): Promise<Viewer> {
+  const user = await requireAdminPage(next);
+  if (!user.isOperator) redirect("/home");
   return user;
 }
 

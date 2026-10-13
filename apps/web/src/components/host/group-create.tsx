@@ -18,14 +18,17 @@ import { apiPost } from "@/lib/api-client";
 
 export function GroupCreateDialogs({
   which,
+  approvalRequired,
   onClose,
 }: {
   which: "create" | "join" | null;
+  /** 관리자가 승인을 켜 두었으면 만들기가 요청으로 바뀐다. 최종 판정은 서버가 한다. */
+  approvalRequired: boolean;
   onClose: () => void;
 }) {
   return (
     <>
-      <CreateDialog open={which === "create"} onClose={onClose} />
+      <CreateDialog open={which === "create"} approvalRequired={approvalRequired} onClose={onClose} />
       <JoinDialog open={which === "join"} onClose={onClose} />
     </>
   );
@@ -77,21 +80,55 @@ function FormDialog({
   );
 }
 
-function CreateDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateDialog({
+  open,
+  approvalRequired,
+  onClose,
+}: {
+  open: boolean;
+  approvalRequired: boolean;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 요청으로 남았을 때 보여줄 이름. 화면을 열 때의 설정과 달리 서버가 요청으로
+  // 받았을 수도 있으므로 응답을 보고 정한다.
+  const [requested, setRequested] = useState<string | null>(null);
+
+  if (requested) {
+    const done = () => {
+      setRequested(null);
+      onClose();
+    };
+    return (
+      <Dialog open={open} onClose={done} label="모임 만들기 요청">
+        <h2 className="display text-[19px] text-[var(--surface-text)]">요청을 보냈습니다</h2>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+          「{requested}」 모임은 관리자가 승인하면 만들어지고, 내가 모임장이 됩니다. 그동안
+          모임 목록 아래에 「관리자 승인 대기」로 보입니다.
+        </p>
+        <div className="mt-5 flex justify-end">
+          <Button onClick={done}>확인</Button>
+        </div>
+      </Dialog>
+    );
+  }
 
   return (
     <FormDialog
       open={open}
       onClose={onClose}
-      title="모임 만들기"
-      description="모임에 등록한 멤버는 같은 모임 주선자만 봅니다. 만들면 바로 그 모임을 보게 됩니다."
-      submitLabel="모임 만들기"
-      busyLabel="만드는 중…"
+      title={approvalRequired ? "모임 만들기 요청" : "모임 만들기"}
+      description={
+        approvalRequired
+          ? "새 모임은 관리자가 승인하면 만들어집니다. 모임에 등록한 멤버는 같은 모임 주선자만 봅니다."
+          : "모임에 등록한 멤버는 같은 모임 주선자만 봅니다. 만들면 바로 그 모임을 보게 됩니다."
+      }
+      submitLabel={approvalRequired ? "승인 요청" : "모임 만들기"}
+      busyLabel={approvalRequired ? "요청하는 중…" : "만드는 중…"}
       busy={busy}
       disabled={name.trim().length === 0}
       error={error}
@@ -99,10 +136,10 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: () => void })
         void (async () => {
           setBusy(true);
           setError(null);
-          const result = await apiPost("/api/admin/groups", {
-            name,
-            description: description || undefined,
-          });
+          const result = await apiPost<{ status: "CREATED" | "PENDING" }>(
+            "/api/admin/groups",
+            { name, description: description || undefined },
+          );
           setBusy(false);
           if (!result.ok) {
             setError(result.message);
@@ -110,8 +147,12 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: () => void })
           }
           setName("");
           setDescription("");
-          onClose();
           router.refresh();
+          if (result.data.status === "PENDING") {
+            setRequested(name.trim());
+            return;
+          }
+          onClose();
         })()
       }
     >

@@ -57,6 +57,10 @@ const kakaoProfileSchema = z.object({
   kakao_account: z
     .object({
       email: z.string().email().nullish(),
+      // 구글의 `email_verified` 와 같은 역할이다. 확인되지 않았거나 더는 쓸 수 없는
+      // 이메일로 기존 계정(관리자 포함)에 붙이면 계정 탈취가 된다.
+      is_email_valid: z.boolean().nullish(),
+      is_email_verified: z.boolean().nullish(),
       profile: z
         .object({
           nickname: z.string().nullish(),
@@ -97,7 +101,11 @@ const PROVIDERS: Record<OAuthProvider, ProviderConfig> = {
       const profile = p.kakao_account?.profile;
       return {
         subject: String(p.id),
-        email: p.kakao_account?.email ?? null,
+        email:
+          p.kakao_account?.is_email_valid === false ||
+          p.kakao_account?.is_email_verified === false
+            ? null
+            : (p.kakao_account?.email ?? null),
         displayName: profile?.nickname ?? null,
         avatarUrl: profile?.is_default_image ? null : httpsUrl(profile?.profile_image_url),
       };
