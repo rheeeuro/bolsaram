@@ -68,6 +68,7 @@ apps/web/src/
 │   │   ├── account/          계정 설정 — 내 이름·로그인 방식·텔레그램 연결·로그아웃
 │   │   ├── imports/          가져오기 + 검토 상세
 │   │   ├── profiles/         카드 목록 · 원본 목록(?view=raw) + 상세(게시·끌어올리기·초대·대행)
+│   ├── profiles/trace/   캡처본 확인 — 유출 사진의 숨은 워터마크를 브라우저에서 드러낸다 (DB 안 읽음)
 │   │   ├── profiles/[id]/edit/  내용 편집 — 등록한 주선자만
 │   │   ├── requests/         신청 목록 + 연결 처리
 │   │   ├── members/          초대·연결 현황
@@ -86,6 +87,8 @@ apps/web/src/
 │   ├── next-path.ts          `?next=` 검증 — 같은 출처 경로만
 │   ├── markdown.ts           가이드 문서 마크다운 부분집합 → 블록 배열 (한 줄짜리 `/guide/` 이미지 포함)
 │   ├── crop-rect.ts          사진에서 쓸 영역 계산 (덮는 배율·밀 수 있는 범위·자를 사각형)
+│   ├── trace-enhance.ts      캡처본의 숨은 워터마크 드러내기 (주변 평균 빼기 + 증폭)
+│   ├── viewer-code.ts        워터마크의 보는 사람 표기 (멤버 `No.17` · 주선자 `H-8F3A2C`) 와 판독
 │   └── cn.ts                 Tailwind 클래스 병합
 └── server/                   서버 전용 (아래 참고)
 ```
@@ -142,7 +145,9 @@ server/
 │   └── guard.ts              requireUser / requireAdmin / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
 ├── docs/guide.ts             docs/guide/ 문서 읽기 (파일명 화이트리스트 — privacy · start · updates)
-├── storage/local.ts          로컬/R2 private 저장소 + signed download/upload URL
+├── storage/
+│   ├── local.ts              로컬/R2 private 저장소 + signed download/upload URL
+│   └── watermark.ts          보는 사람 표시 합성 — 보이는 층 + 숨은 층 (멤버에게 나가는 남의 프로필 사진)
 ├── ai/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
 │   ├── mock.ts               규칙 기반 추출기 (기본, API 키 불필요)
@@ -239,6 +244,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/chat`                         | GET                 | 주선자            | 모임별 안 읽은 채팅 수 (첫 값·재동기화) |
 | `/api/admin/chat/stream`                  | GET (SSE)           | 주선자            | 속한 모든 방의 새 글·지움을 밀어준다 |
 | `/api/admin/telegram`                     | GET / POST / PATCH / DELETE | 주선자    | 봇 연결 상태 / 연결 코드 발급 / 담을 모임 변경 / 해제 |
+| `/api/admin/trace`                        | GET                 | 주선자            | 워터마크의 주선자 코드 → 누구인지 (나·같은 모임 동료까지) |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |
 | `/api/uploads`                            | PUT                 | 주선자            | signed 토큰으로 직접 업로드          |
@@ -264,6 +270,28 @@ Route Handler
 확정 단계에서 그 키가 **올린 사람의 것인지**(`avatar/<userId>/`·`group/<groupId>/`·
 `profile/<profileId>/`) 다시 본다.
 다운로드는 서명 + **로그인**을 함께 요구한다. URL 이 유출돼도 외부인은 쓸 수 없다.
+
+**프로필 사진에는 보는 사람 표시를 두 겹으로 합성한다**(`storage/watermark.ts`).
+웹에서는 캡처를 막을 수 없으므로 캡처본에 보는 사람과 서울 날짜가 남게 한다. 보는 사람
+표기는 `lib/viewer-code.ts` 하나가 정한다 — 멤버는 공개 번호 `No.17`, 주선자는 계정 id
+앞 여섯 자리 `H-8F3A2C`(주선자에게는 공개 번호가 없다).
+
+| 층 | 모양 | 역할 |
+| -- | ---- | ---- |
+| 보이는 층 | `BOLSARAM No.17 26.10.13` 작은 글씨, 넓은 간격, 아주 옅게 | 표시가 있다는 것 자체로 억제 |
+| 숨은 층 | `No.17 261013` 굵은 큰 글씨, 촘촘히, 밝기 2 단계만 낮춤 | 잘라내기·지우기·재압축 뒤에도 판독 |
+
+숨은 층은 맨눈으로 보이지 않는다. 주선자 화면 `/profiles/trace` 가 캡처본에서 주변 평균
+밝기를 빼고 차이를 키워 드러낸다(`lib/trace-enhance.ts`). **판독은 브라우저 안에서만 한다** —
+유출본을 서버로 받지 않는다. 읽어 낸 주선자 코드만 `/api/admin/trace` 로 보내 누구인지
+묻고, 찾는 범위는 RLS(`users_self_select`)대로 나 자신과 같은 모임 동료까지다.
+CSS 로 덮으면 걷어낼 수 있어 `/api/files` 가 픽셀에 직접 넣고 JPEG 로 다시 내보낸다
+(원본 메타데이터는 남지 않는다). 판정은 요청한 세션 기준이다 — URL 이 아니라 연 사람의
+표기가 찍힌다. 주선자는 화면 어디서 보든(가져오기 원본·대행 포함) 주선자 코드가 찍히고,
+멤버는 자기 사진만 원본이다. 주선자·모임 사진은 표시 없이 나간다.
+sharp 가 디코딩하지 못하는 HEIC 는 표시 없이 원본이 나간다.
+멤버 화면은 이와 별개로 사진의 길게 눌러 저장·우클릭·드래그를 막는다(`components/member/photo-guard.tsx`
+와 `globals.css`). 이건 원본을 손쉽게 가져가는 길만 닫는 것이고 캡처 방지가 아니다.
 
 주선자 프로필 사진과 모임 사진도 같은 저장소에 있다. 사진이 **없는 것이 정상**이며
 그때 화면은 이름의 앞글자를 그린다(`components/ui/avatar.tsx`). 주선자 사진은 카카오·구글

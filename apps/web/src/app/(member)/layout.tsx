@@ -10,6 +10,7 @@ import { rlsContextOf } from "@/server/auth/guard";
 import { countPendingIncoming } from "@/server/repo/matches";
 import { MemberNav } from "@/components/member/member-nav";
 import { ActingBanner } from "@/components/member/acting-banner";
+import { PhotoGuard } from "@/components/member/photo-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function MemberLayout({ children }: { children: React.React
       }}
     >
       {children}
+      <PhotoGuard />
       {actingCode ? <ActingBanner code={actingCode} /> : null}
       <MemberNav claimed={profileId != null} pendingSignals={pending} />
     </div>

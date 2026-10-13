@@ -22,6 +22,15 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* 멤버 화면의 사진은 길게 눌러 저장·끌어 옮기기를 막는다. 캡처는 막을 수 없어
+     서버가 보는 사람 표시를 합성하고, 여기서는 원본을 손쉽게 가져가는 길만 닫는다.
+     우클릭 메뉴는 PhotoGuard 가 막는다. */
+  .member-surface img {
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
   ::selection {
     background: var(--color-rose-200);
     color: var(--color-burgundy-900);

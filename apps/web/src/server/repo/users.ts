@@ -37,3 +37,22 @@ export async function updateAvatarKey(
   await sql.query(`UPDATE users SET avatar_key = $2 WHERE id = $1`, [userId, storageKey]);
   return { previousKey: previous.rows[0]?.avatar_key ?? null };
 }
+
+/**
+ * 워터마크의 주선자 코드(`H-8F3A2C`) → 그 주선자. 코드는 계정 id 앞 여섯 자리다.
+ *
+ * 찾는 범위는 RLS(`users_self_select`)가 정한다 — 나 자신과 같은 모임 동료까지다.
+ * 모르는 주선자의 이름을 코드로 캐낼 수 없게, 범위 밖이면 빈 목록이다.
+ */
+export async function findHostsByCode(
+  sql: Sql,
+  prefix: string,
+): Promise<{ userId: string; displayName: string | null }[]> {
+  const result = await sql.query<{ id: string; display_name: string | null }>(
+    `SELECT id, display_name FROM users
+      WHERE role = 'ADMIN' AND left(replace(id::text, '-', ''), 6) = $1
+      ORDER BY created_at`,
+    [prefix.toLowerCase()],
+  );
+  return result.rows.map((row) => ({ userId: row.id, displayName: row.display_name }));
+}

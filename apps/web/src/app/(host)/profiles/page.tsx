@@ -118,7 +118,18 @@ export default async function HostProfilesPage({
       <PageHeader
         title="프로필"
         description="등록한 분들입니다. 카드를 누르면 상세가 열리고, 내가 등록한 분은 거기서 공개 여부를 정하거나 내용을 고칩니다."
-        aside={<Count>{page.total}명</Count>}
+        aside={
+          <>
+            <Count>{page.total}명</Count>
+            {/* 드물게 쓰는 도구라 목록 옆에 조용히 둔다. */}
+            <Link
+              href="/profiles/trace"
+              className="text-[13px] text-[var(--surface-text-muted)] underline-offset-4 hover:text-[var(--color-rose-600)] hover:underline"
+            >
+              캡처본 확인
+            </Link>
+          </>
+        }
       />
 
       <HostProfileFilters statuses={[...PROFILE_STATUSES]} />

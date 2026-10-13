@@ -32,6 +32,8 @@ import {
   findProfileMemo,
   saveProfileMemo,
 } from "../apps/web/src/server/repo/profiles";
+import { findHostsByCode } from "../apps/web/src/server/repo/users";
+import { hostViewerCode } from "../apps/web/src/lib/viewer-code";
 import { runTag } from "./tags";
 
 const TAG = runTag("sgn");
@@ -1118,5 +1120,29 @@ describe("나가기와 보고 있는 모임", () => {
 
     const result = await leaveGroup(admin.userId, leaving.groupId);
     expect(result.activeGroupId).toBe(watching.groupId);
+  });
+});
+
+describe("워터마크의 주선자 코드 찾기", () => {
+  // 캡처본에서 `H-8F3A2C` 를 읽은 주선자가 그게 누구인지 찾는다. 가입이 열려 있으므로
+  // 코드만으로 모르는 주선자의 이름을 캐낼 수 있으면 안 된다 — 나와 같은 모임 동료까지다.
+  const prefixOf = (userId: string) => hostViewerCode(userId).slice(2);
+
+  it("나 자신과 같은 모임 동료는 찾고, 모르는 주선자는 찾지 못한다", async () => {
+    const me = await newAdmin("추적-나");
+    const colleague = await newAdmin("추적-동료");
+    const stranger = await newAdmin("추적-남");
+    const { groupId } = await createGroupForAdmin({ userId: me.userId, name: `${TAG}-추적모임` });
+    const issued = await issueGroupInvite({ groupId, createdBy: me.userId });
+    await consumeGroupInvite({ code: issued.code, userId: colleague.userId });
+
+    const [self, peer, other] = await withRls(me, async (sql) => [
+      await findHostsByCode(sql, prefixOf(me.userId)),
+      await findHostsByCode(sql, prefixOf(colleague.userId)),
+      await findHostsByCode(sql, prefixOf(stranger.userId)),
+    ]);
+    expect(self.map((h) => h.userId)).toContain(me.userId);
+    expect(peer.map((h) => h.userId)).toContain(colleague.userId);
+    expect(other.map((h) => h.userId)).not.toContain(stranger.userId);
   });
 });

@@ -281,6 +281,15 @@ export async function findProfileById(sql: Sql, id: string): Promise<ProfileReco
   return toRecord(row, images.get(row.id) ?? []);
 }
 
+/** 공개 번호 하나만. 사진 워터마크처럼 사람을 번호로만 가리키는 곳이 쓴다. */
+export async function findPublicCode(sql: Sql, id: string): Promise<number | null> {
+  const result = await sql.query<{ public_code: number }>(
+    `SELECT public_code FROM profiles WHERE id = $1`,
+    [id],
+  );
+  return result.rows[0]?.public_code ?? null;
+}
+
 export async function findProfilesByIds(sql: Sql, ids: string[]): Promise<ProfileRecord[]> {
   if (ids.length === 0) return [];
   const result = await sql.query<ProfileRow>(

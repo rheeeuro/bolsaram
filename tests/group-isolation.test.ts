@@ -20,7 +20,7 @@ import {
   isOutsidePoolForViewer,
 } from "../apps/web/src/server/repo/profiles";
 import { createSession, setSessionGroup } from "../apps/web/src/server/repo/imports";
-import { isVisibleImageKey } from "../apps/web/src/server/repo/profile-images";
+import { findImageProfileId } from "../apps/web/src/server/repo/profile-images";
 import { runTag } from "./tags";
 
 const TAG = runTag("grp");
@@ -226,13 +226,14 @@ describe("멤버는 자기 모임 안에서만 본다", () => {
       }
     });
     const [own, other, loose] = await withRls(A.member, async (sql) => [
-      await isVisibleImageKey(sql, keyA),
-      await isVisibleImageKey(sql, keyB),
-      await isVisibleImageKey(sql, `import/${TAG}-a/unattached.jpg`),
+      await findImageProfileId(sql, keyA),
+      await findImageProfileId(sql, keyB),
+      await findImageProfileId(sql, `import/${TAG}-a/unattached.jpg`),
     ]);
-    expect(own).toBe(true);
-    expect(other).toBe(false);
-    expect(loose).toBe(false);
+    // 어느 프로필 사진인지까지 알아야 자기 사진에서 워터마크를 뺄 수 있다.
+    expect(own).toBe(A.profileId);
+    expect(other).toBeNull();
+    expect(loose).toBeNull();
   });
 
   it("모임을 넘는 소개 신청을 만들 수 없다", async () => {

@@ -44,7 +44,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
 | `group-isolation.test.ts`      | 모임 간 격리·대행 중 풀 경계·claim 가로채기 차단 | 필요 | 22   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·멤버 삭제    | 필요 | 8    |
-| `admin-signup.test.ts`         | 가입(소셜 첫 로그인)·계정 잇기·전체공개 풀·주선자 목록 찾기(원문·담당 이름·메모)·주선자 메모 경계·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기 | 필요 | 60 |
+| `admin-signup.test.ts`         | 가입(소셜 첫 로그인)·계정 잇기·전체공개 풀·주선자 목록 찾기(원문·담당 이름·메모)·주선자 메모 경계·모임 정보·초대·나가기·폐쇄·모임장 위임/내보내기·워터마크 주선자 코드 찾기 범위 | 필요 | 61 |
 | `notifications.test.ts`        | 알림 트리거·수신자 판정·중복·권한 경계         | 필요 | 14   |
 | `group-chat.test.ts`           | 모임 채팅 경계·합류 시점·수정 불가·지우기·알림 접힘·NOTIFY·시스템 메시지 | 필요 | 31 |
 | `profile-order.test.ts`        | 목록 정렬(사진 우선)·커서 경계 유지            | 필요 | 4    |
@@ -54,6 +54,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `auth-links.test.ts`           | 입장코드 정규화·`?next=` 검증·리다이렉트 주소  | –    | 11   |
 | `markdown.test.ts`              | 가이드 마크다운 파서·처리방침 문서 렌더 가능   | –    | 18   |
 | `image-crop.test.ts`           | 사진에서 쓸 영역 — 덮는 배율·밀 수 있는 범위·자를 사각형 | –    | 14   |
+| `watermark.test.ts`            | 보는 사람 표시 — 글자(번호·서울 날짜·ASCII)·합성·방향 세우기·메타데이터 제거·열 수 없는 파일·주선자 코드·읽은 표기 판독·숨은 층 판독(축소·재압축·잘라내기 뒤)·숨은 층 깊이 | –    | 17   |
 | `updates-weekly.test.ts`       | 업데이트 소식 주간 작업 — 주 계산·날짜 순 삽입·손으로 쓴 문장 보존·내부 용어 거름·AI 응답 상한 | – | 12 |
 | `docs-guide.test.ts`           | 사용자 가이드와 구현의 정합성                  | –    | 66   |
 | `docs-readme.test.ts`          | 디렉터리 README 와 코드 구조의 정합성          | –    | 42   |
@@ -124,6 +125,7 @@ docker exec bolsaram_postgres dropdb -U bolsaram_owner --force bolsaram_test
 | `admin-signup.test.ts` 「마지막 주선자는 …나갈 수 없다」   | 아무도 못 보는 멤버를 만들지 않음    |
 | `admin-signup.test.ts` 「멤버가 남아 있으면 폐쇄할 수 없다」| 방을 치우며 멤버가 사라지지 않음     |
 | `admin-signup.test.ts` 「모임장이 아닌 …폐쇄할 수 없다」   | 방을 없애는 것은 모임장만            |
+| `admin-signup.test.ts` 「…모르는 주선자는 찾지 못한다」    | 워터마크 코드로 남의 이름을 캐내지 못함 |
 | `group-isolation.test.ts` 「남의 프로필을 자기 것으로」    | 초대 없는 claim 차단 (0013)          |
 | `member-magic-link.test.ts` 「같은 링크를 두 번」          | 링크 replay 차단 (멤버 로그인 수단)  |
 | `member-magic-link.test.ts` 「링크를 쓴 멤버를 삭제」      | 탈퇴 처리가 제약에 막히지 않음 (0016)|
