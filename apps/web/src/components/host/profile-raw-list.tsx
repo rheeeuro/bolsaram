@@ -38,7 +38,7 @@ export type RawListItem = {
 
 export function ProfileRawList({ items }: { items: RawListItem[] }) {
   return (
-    <ul className="mt-5 flex flex-col gap-3">
+    <ul className="stagger mt-5 flex flex-col gap-3">
       {items.map((item) => (
         <li
           key={item.id}

@@ -116,9 +116,10 @@ export function Panel({
   return (
     <section
       className={cn(
-        // 스켈레톤이 걷히고 본문이 들어올 때 뚝 바뀌지 않게 한다. 투명도만 쓴다 —
-        // 이동(transform)을 섞으면 모션 동안 안쪽 fixed 요소의 기준이 패널로 바뀐다.
-        "animate-fade rounded-[var(--radius-card)] border border-[var(--surface-border)]",
+        // 스켈레톤이 걷히고 본문이 들어올 때 뚝 바뀌지 않게 살짝 올라온다. 모션 동안은
+        // 패널이 안쪽 fixed 요소의 기준이 되므로 패널 안에 fixed 를 두지 않는다
+        // (덮개는 표면 루트로 올라가 영향이 없다).
+        "animate-enter rounded-[var(--radius-card)] border border-[var(--surface-border)]",
         "bg-[var(--surface-card)] shadow-[var(--shadow-card)]",
         className,
       )}
@@ -167,9 +168,9 @@ export function Stat({
 
   const shell = cn(
     "block rounded-[var(--radius-card)] border bg-[var(--surface-card)] px-5 py-4",
-    "shadow-[var(--shadow-card)] transition-colors duration-[var(--duration-quick)]",
+    "shadow-[var(--shadow-card)]",
     accent ? "border-[var(--color-rose-200)]" : "border-[var(--surface-border)]",
-    href ? "hover:border-[var(--color-rose-300)]" : "",
+    href ? "lift hover:border-[var(--color-rose-300)]" : "",
   );
 
   return href ? (
@@ -183,7 +184,7 @@ export function Stat({
 
 /** 카드 안에서 항목을 세로로 쌓는 목록. 테이블 대신 쓴다. */
 export function RowList({ children }: { children: ReactNode }) {
-  return <ul className="divide-y divide-[var(--surface-border)]">{children}</ul>;
+  return <ul className="stagger divide-y divide-[var(--surface-border)]">{children}</ul>;
 }
 
 export function Row({

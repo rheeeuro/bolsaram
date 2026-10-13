@@ -55,11 +55,11 @@ export function ProfileCard({
   const lines = cardLines(profile);
   const enter = enterProps(index);
   return (
-    <article className={cn("group relative", enter.className)} style={enter.style}>
+    <article className={cn("lift-move group relative", enter.className)} style={enter.style}>
       {/* 사진은 장식이라 접근명이 없다. 같은 곳으로 가는 링크가 아래에 하나 더 있으므로
           이쪽은 접근성 트리에서 감춘다 — 그러지 않으면 이름 없는 링크가 하나 더 읽힌다. */}
       <Link href={href} aria-hidden tabIndex={-1} className="block">
-        <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
+        <div className="lift-shadow relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
           {profile.primaryImage ? (
             // signed URL 은 매 요청마다 새로 발급된다. next/image 최적화를 쓰면
             // URL 이 캐시되어 만료 후 깨지므로 img 를 그대로 쓴다.

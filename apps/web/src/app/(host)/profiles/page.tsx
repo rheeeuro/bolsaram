@@ -170,11 +170,11 @@ export default async function HostProfilesPage({
       ) : mode === "raw" ? (
         <ProfileRawList items={page.items.map(toRawItem)} />
       ) : (
-        <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
+        <ul className="stagger mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
           {page.items.map(({ view, claimed, canEdit, visible, createdAt, bumpedAt }) => (
             <li key={view.id}>
-              <Link href={`/profiles/${view.id}`} className="group block">
-                <div className="relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
+              <Link href={`/profiles/${view.id}`} className="lift-move group block">
+                <div className="lift-shadow relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
                   {view.primaryImage ? (
                     // signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면
                     // URL 이 캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다.

@@ -134,7 +134,7 @@ export default async function HostHomePage() {
         </Link>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
           label="답을 기다리는 신청"
           value={kpi.requestsPending}
@@ -194,7 +194,7 @@ export default async function HostHomePage() {
               아직 신청이 없습니다. 프로필을 공개하면 여기에 쌓입니다.
             </p>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul className="stagger flex flex-col gap-3">
               {recent.map((item) => (
                 <li
                   key={item.id}

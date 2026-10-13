@@ -100,7 +100,7 @@ export function HostRequestList({
           </p>
         </Panel>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="stagger flex flex-col gap-3">
           {items.map((item) => {
             const connected = item.status === "INTRODUCED";
             return (

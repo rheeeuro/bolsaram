@@ -163,8 +163,11 @@
       opacity: 1;
     }
   }
+  /* 등장 모션은 끝나면 원래 스타일로 돌아가게 `backwards` 로 채운다. `both` 로 마지막
+     프레임을 붙들고 있으면 요소가 쌓임 맥락으로 남아, 안에서 열린 메뉴가 다음 형제
+     아래로 깔리고 hover 이동이 먹지 않는다. */
   .animate-fade {
-    animation: fade var(--duration-base) var(--ease-soft) both;
+    animation: fade var(--duration-base) var(--ease-soft) backwards;
   }
 
   /* 눌러서 열리는 작은 것(메뉴·제자리 확인). 누른 자리에서 살짝 자라 나온다. */
@@ -183,21 +186,64 @@
     transform-origin: top center;
   }
 
-  /* 목록 항목 등장. `--enter-i` 로 순서를 받아 앞쪽 몇 개만 엇갈리게 내보낸다 —
+  /* 목록 항목·패널 등장. `--enter-i` 로 순서를 받아 앞쪽 몇 개만 엇갈리게 내보낸다 —
      뒤까지 늦추면 스크롤해 내려간 사람이 빈 칸을 본다. */
   @keyframes enter {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
       transform: none;
     }
   }
-  .animate-enter {
-    animation: enter var(--duration-base) var(--ease-soft) both;
-    animation-delay: calc(min(var(--enter-i, 0), 6) * 35ms);
+  .animate-enter,
+  .stagger > * {
+    animation: enter var(--duration-base) var(--ease-soft) backwards;
+    animation-delay: calc(min(var(--enter-i, 0), 6) * 40ms);
+  }
+
+  /* 순번을 넘기기 어려운 목록(서버 컴포넌트의 줄·카드)은 껍데기에 `.stagger` 를 붙인다.
+     자식 순서로 `--enter-i` 를 매긴다. */
+  .stagger > :nth-child(2) {
+    --enter-i: 1;
+  }
+  .stagger > :nth-child(3) {
+    --enter-i: 2;
+  }
+  .stagger > :nth-child(4) {
+    --enter-i: 3;
+  }
+  .stagger > :nth-child(5) {
+    --enter-i: 4;
+  }
+  .stagger > :nth-child(6) {
+    --enter-i: 5;
+  }
+  .stagger > :nth-child(n + 7) {
+    --enter-i: 6;
+  }
+
+  /* 마우스를 올리면 떠오른다. 누를 수 있는 카드에만 붙인다.
+     `.lift` 는 자기 자신이 떠오르고 그림자도 진다. 사진 카드처럼 글자까지 감싼
+     링크는 `.lift-move`(이동만) 를 붙이고 그림자는 사진 칸의 `.lift-shadow` 가 받는다. */
+  .lift,
+  .lift-move,
+  .lift-shadow {
+    transition-property: transform, box-shadow, border-color, background-color;
+    transition-duration: var(--duration-base);
+    transition-timing-function: var(--ease-soft);
+  }
+  @media (hover: hover) {
+    .lift:hover,
+    .lift-move:hover {
+      transform: translateY(-3px);
+    }
+    .lift:hover,
+    .lift-move:hover .lift-shadow {
+      box-shadow: var(--shadow-lift);
+    }
   }
 
   /* 관심 하트가 채워지는 순간. 끄는 쪽에는 쓰지 않는다. */

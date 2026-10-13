@@ -63,19 +63,23 @@ packages/ui-tokens/src/
 
 키프레임과 `animate-*` 클래스는 `apps/web/src/app/globals.css` 에 있고 이 토큰만 읽는다.
 
-| 클래스                | 길이    | 쓰는 곳                                             |
-| --------------------- | ------- | --------------------------------------------------- |
-| `animate-fade`        | base    | 배경막, 주선자 패널·제목, 빈 상태, 폼 오류          |
-| `animate-pop`         | base    | 메뉴, 제자리 확인                                   |
-| `animate-enter`       | base    | 목록 항목. `--enter-i` 로 앞 6개만 엇갈린다         |
-| `animate-sheet`       | base    | 아래 시트                                           |
-| `animate-heart`       | base    | 관심 하트를 채우는 순간                             |
-| `animate-rise`        | emotive | 첫 화면, 가운데 덮개, 감정 연출                     |
-| `animate-draw`        | emotive | 감정 연출의 하트 윤곽                               |
-| `*-out` · `animate-sink` | base | 덮개가 닫힐 때 — 열릴 때의 반대 방향               |
+| 클래스                   | 길이    | 쓰는 곳                                                |
+| ------------------------ | ------- | ------------------------------------------------------ |
+| `animate-fade`           | base    | 배경막, 주선자 제목, 빈 상태, 폼 오류                  |
+| `animate-pop`            | base    | 메뉴, 제자리 확인                                      |
+| `animate-enter`          | base    | 주선자 패널, 멤버 목록 항목. `--enter-i` 로 앞 6개만 엇갈린다 |
+| `stagger`                | base    | 목록 껍데기에 붙이면 자식이 순서대로 `enter` 한다      |
+| `lift` · `lift-move` · `lift-shadow` | base | 누를 수 있는 카드의 hover 떠오름 (마우스 환경만) |
+| `animate-sheet`          | base    | 아래 시트                                              |
+| `animate-heart`          | base    | 관심 하트를 채우는 순간                                |
+| `animate-rise`           | emotive | 첫 화면, 가운데 덮개, 감정 연출                        |
+| `animate-draw`           | emotive | 감정 연출의 하트 윤곽                                  |
+| `*-out` · `animate-sink` | base    | 덮개가 닫힐 때 — 열릴 때의 반대 방향                   |
 
-주선자 패널처럼 안에 무엇이 들어올지 모르는 껍데기에는 투명도만 쓴다 — 이동(transform)이
-섞이면 모션 동안 안쪽 `fixed` 요소의 기준이 바뀐다.
+등장 모션(`fade`·`enter`·`stagger`)은 `backwards` 로 채운다 — 끝난 뒤 마지막 프레임을
+붙들고 있으면 요소가 쌓임 맥락으로 남아 안에서 열린 메뉴가 다음 형제 아래로 깔리고
+hover 이동이 먹지 않는다. 움직이는 동안은 그 요소가 안쪽 `fixed` 의 기준이 되므로
+주선자 패널 안에는 `fixed` 를 두지 않는다(덮개는 표면 루트로 올라간다).
 
 ## 하지 말 것
 

@@ -72,7 +72,7 @@ export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
         <p className="mb-3 text-[13px] text-[var(--color-danger)]">{error}</p>
       ) : null}
 
-      <ul className="flex flex-col gap-2.5">
+      <ul className="stagger flex flex-col gap-2.5">
         {items.map((item) => (
           <li
             key={item.id}
