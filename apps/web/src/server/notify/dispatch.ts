@@ -34,7 +34,9 @@ function textFor(item: ClaimedNotification): string {
     case "INTENT_DECLINED":
       return messages.intentDeclined(item.intentKind, item.requesterCode, item.targetCode);
     case "GROUP_MESSAGE":
-      return messages.groupMessage(item.groupName);
+      return item.mention
+        ? messages.groupMention(item.groupName)
+        : messages.groupMessage(item.groupName);
     case "GROUP_CREATION_REQUESTED":
       return messages.groupCreationRequested(item.groupName);
   }

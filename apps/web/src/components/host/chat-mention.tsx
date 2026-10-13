@@ -15,9 +15,9 @@ import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
 
 /**
- * 채팅의 태그 — 두 가지다.
+ * 채팅의 멘션 — 두 가지다.
  *
- *   `@이름`  이 모임의 주선자. 누구를 부르는지 눈에 띄게 남긴다. 나를 부른 태그는 더 진하다.
+ *   `@이름`  이 모임의 주선자. 누구를 부르는지 눈에 띄게 남긴다. 나를 부른 멘션은 더 진하다.
  *   `#23`    이 모임의 멤버(공개 번호). 그 프로필로 가는 링크가 된다.
  *
  * 쓰는 쪽: 입력란에서 `@` 나 `#` 를 치면 그 목록이 입력란 위에 뜨고, 이어 칠수록
@@ -86,7 +86,7 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&
 
 const CHIP = "rounded-md px-1 py-px font-medium";
 
-/** 본문을 글자와 태그로 나눠 그린다. 서버가 풀어 준 태그만 칩이 된다. */
+/** 본문을 글자와 멘션으로 나눠 그린다. 서버가 풀어 준 멘션만 칩이 된다. */
 export function MentionText({
   body,
   profileIds,
@@ -167,7 +167,7 @@ export function MentionText({
 type Typing = { kind: Kind; start: number; query: string };
 
 /**
- * 커서 바로 앞이 태그를 쓰는 중인가. `@` 뒤로는 공백 전까지의 이름 앞자리,
+ * 커서 바로 앞이 멘션을 쓰는 중인가. `@` 뒤로는 공백 전까지의 이름 앞자리,
  * `#` 뒤로는 번호 앞자리(없어도 됨)를 본다.
  */
 function typingAt(value: string, caret: number): Typing | null {
@@ -180,7 +180,7 @@ function typingAt(value: string, caret: number): Typing | null {
 }
 
 /**
- * 입력란에 붙는 태그 고르기.
+ * 입력란에 붙는 멘션 고르기.
  *
  * 입력란의 값·커서를 보고 목록을 열고 닫는다. 키보드(↑↓·Enter·Tab·Esc)는 목록이 열려
  * 있을 때만 가로챈다 — 그 밖의 Enter 는 원래대로 보내기다.
@@ -202,10 +202,10 @@ export function useMentionPicker({
   const [active, setActive] = useState(0);
   /** Esc 로 닫은 자리. 같은 `@`·`#` 에서 다시 열지 않는다. */
   const dismissedRef = useRef<number | null>(null);
-  /** 고른 태그 바로 뒤. 값이 화면에 반영되는 그 순간 커서를 옮긴다. */
+  /** 고른 멘션 바로 뒤. 값이 화면에 반영되는 그 순간 커서를 옮긴다. */
   const caretRef = useRef<number | null>(null);
 
-  // 값이 바뀐 직후, 다음 키 입력보다 먼저 커서를 태그 뒤로 옮긴다. 한 프레임 미루면
+  // 값이 바뀐 직후, 다음 키 입력보다 먼저 커서를 멘션 뒤로 옮긴다. 한 프레임 미루면
   // 그 사이 친 글자가 커서가 끝으로 튄 자리에 들어가 순서가 뒤섞인다.
   useLayoutEffect(() => {
     const position = caretRef.current;
@@ -331,13 +331,13 @@ const LIST_COPY: Record<
   { label: string; hint: string; filtered: (q: string) => string; empty: string }
 > = {
   host: {
-    label: "태그할 주선자",
+    label: "멘션할 주선자",
     hint: "이 모임 주선자 — 이름을 이어 치면 좁혀집니다",
     filtered: (q) => `이름 앞자리 ${q}`,
     empty: "이 모임에 맞는 주선자가 없습니다.",
   },
   member: {
-    label: "태그할 멤버",
+    label: "멘션할 멤버",
     hint: "이 모임 멤버 — 번호를 이어 치면 좁혀집니다",
     filtered: (q) => `번호 앞자리 ${q}`,
     empty: "이 모임에 맞는 번호가 없습니다.",

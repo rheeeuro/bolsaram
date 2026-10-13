@@ -5,7 +5,7 @@
  * 프로필·연락처가 등장하지 않는다 — 본문 텍스트 하나뿐이다.
  */
 import { z } from "zod";
-import { GROUP_MESSAGE_SYSTEM_KINDS } from "./enums";
+import { GROUP_CHAT_NOTIFY_MODES, GROUP_MESSAGE_SYSTEM_KINDS } from "./enums";
 
 /** DB CHECK(`group_messages_body_sane`)와 같은 값. 한쪽만 바꾸면 저장에서 터진다. */
 export const GROUP_MESSAGE_MAX_LENGTH = 2000;
@@ -34,7 +34,7 @@ export const groupMessageQuerySchema = z.object({
 export type GroupMessageQuery = z.infer<typeof groupMessageQuerySchema>;
 
 /**
- * 본문 안의 태그 — 두 가지다.
+ * 본문 안의 멘션 — 두 가지다.
  *
  *   `@이름`  이 모임의 주선자. 이름은 주선자 표시 이름 그대로다(띄어쓰기 포함).
  *   `#23`    이 모임의 멤버. `#` 뒤에 공개 번호를 붙이고, 뒤의 「번」은 있어도 된다.
@@ -44,20 +44,20 @@ export type GroupMessageQuery = z.infer<typeof groupMessageQuerySchema>;
  * 주선자 이름은 정해진 모양이 없어서 정규식으로 뽑지 않고, 서버가 알려 준 이름을
  * 본문에서 찾는다(긴 이름부터).
  *
- * 멤버 태그는 앞이 글자·숫자면 태그가 아니다(`a#23`). 서버의 같은 판정은
+ * 멤버 멘션은 앞이 글자·숫자면 멘션이 아니다(`a#23`). 서버의 같은 판정은
  * `server/repo/group-chat.ts` 의 SQL 정규식이다 — 한쪽만 바꾸면 화면이 링크를 달 자리와
  * 서버가 번호를 풀어 주는 자리가 어긋난다.
  */
 export const GROUP_MESSAGE_MEMBER_TAG = /(?<![\p{L}\p{N}_])#(\d{1,9})(번)?/gu;
 
-/** 태그를 고를 때 한 번에 보여주는 후보 수. */
+/** 멘션을 고를 때 한 번에 보여주는 후보 수. */
 export const GROUP_MENTION_LIMIT = 6;
 
 /** 주선자 이름으로 치는 앞자리의 최대 길이. 표시 이름 길이보다 넉넉하다. */
 export const GROUP_MENTION_HOST_QUERY_MAX = 40;
 
 /**
- * 태그 후보 조회.
+ * 멘션 후보 조회.
  *
  *   kind=host    `@` — 이 모임 주선자를 이름 앞자리로(나는 빼고)
  *   kind=member  `#` — 이 모임 멤버를 번호 앞자리로
@@ -115,15 +115,16 @@ export type GroupChatNotify = z.infer<typeof groupChatNotifySchema>;
 /**
  * 내 방 상태. 보낸 필드만 바꾼다.
  *
- *   readUpTo        여기까지 읽었다(배지에서 뺀다)
- *   telegramNotify  이 방의 새 글을 텔레그램으로도 받는다
+ *   readUpTo  여기까지 읽었다(배지에서 뺀다)
+ *   notify    이 방의 텔레그램 알림 — 모든 새 메시지 · 멘션만 · 끄기(0068).
+ *             텔레그램을 연결한 사람만 바꿀 수 있다.
  */
 export const groupChatPrefsSchema = z
   .object({
     readUpTo: z.iso.datetime().optional(),
-    telegramNotify: z.boolean().optional(),
+    notify: z.enum(GROUP_CHAT_NOTIFY_MODES).optional(),
   })
-  .refine((v) => v.readUpTo !== undefined || v.telegramNotify !== undefined, {
+  .refine((v) => v.readUpTo !== undefined || v.notify !== undefined, {
     message: "바꿀 항목이 없습니다.",
   });
 export type GroupChatPrefs = z.infer<typeof groupChatPrefsSchema>;

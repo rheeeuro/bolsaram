@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GROUP_MESSAGE_MAX_LENGTH } from "@bolsaram/schemas";
+import {
+  GROUP_CHAT_NOTIFY_LABELS,
+  GROUP_CHAT_NOTIFY_MODES,
+  GROUP_MESSAGE_MAX_LENGTH,
+  type GroupChatNotifyMode,
+} from "@bolsaram/schemas";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { useChatStream, type ChatMessage } from "@/components/host/chat-stream";
 import { MentionText, useMentionPicker } from "@/components/host/chat-mention";
@@ -24,8 +29,8 @@ import { groupSystemMessageParts } from "@/lib/labels";
  * 그것은 말이 아니라 사건이므로 가운데 한 줄로 조용히 흐르게 둔다. 거기 적힌 멤버
  * 번호는 그 프로필로 가는 링크다 — 사건을 읽고 바로 그 사람을 열어 보는 자리다.
  *
- * 태그는 두 가지다(`chat-mention.tsx`). `@이름` 은 이 모임 주선자, `#23` 은 이 모임
- * 멤버다. 입력란에서 `@`·`#` 를 치면 그 목록이 뜨고, 보낸 글의 멤버 태그는 그 프로필로
+ * 멘션은 두 가지다(`chat-mention.tsx`). `@이름` 은 이 모임 주선자, `#23` 은 이 모임
+ * 멤버다. 입력란에서 `@`·`#` 를 치면 그 목록이 뜨고, 보낸 글의 멤버 멘션은 그 프로필로
  * 가는 링크가 된다.
  *
  * 보이는 범위는 **들어온 시점부터**다(0045). 화면이 자르는 것이 아니라 정책이 막으므로
@@ -41,20 +46,22 @@ export function GroupChat({
   groupId,
   viewerId,
   initialMessages,
-  telegramNotify,
+  notify: initialNotify,
+  telegramLinked,
   compact = false,
 }: {
   groupId: string;
   viewerId: string;
   initialMessages: ChatMessage[];
-  telegramNotify: boolean;
+  notify: GroupChatNotifyMode;
+  telegramLinked: boolean;
   compact?: boolean;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notify, setNotify] = useState(telegramNotify);
+  const [notify, setNotify] = useState(initialNotify);
   const [olderDone, setOlderDone] = useState(initialMessages.length === 0);
   const [loadingOlder, setLoadingOlder] = useState(false);
 
@@ -178,15 +185,16 @@ export function GroupChat({
     );
   }
 
-  async function toggleNotify() {
-    const next = !notify;
+  async function changeNotify(next: GroupChatNotifyMode) {
+    const previous = notify;
     setNotify(next);
-    const result = await apiPatch(`/api/admin/groups/${groupId}/chat`, { telegramNotify: next });
+    const result = await apiPatch(`/api/admin/groups/${groupId}/chat`, { notify: next });
     if (!result.ok) {
-      setNotify(!next);
+      setNotify(previous);
       setError(result.message);
     }
   }
+
 
   return (
     <div className={compact ? "flex h-full min-h-0 flex-col" : "grid max-w-3xl gap-3"}>
@@ -203,15 +211,30 @@ export function GroupChat({
             지운 메시지는 자리만 남고 내용은 사라집니다. 고칠 수는 없습니다.
           </p>
         )}
-        <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-[var(--surface-text-muted)]">
-          <input
-            type="checkbox"
-            checked={notify}
-            onChange={() => void toggleNotify()}
-            className="h-3.5 w-3.5 accent-[var(--color-rose-600)]"
-          />
-          새 글을 텔레그램으로도 받기
-        </label>
+        {/* 텔레그램을 연결해야 보낼 곳이 생긴다. 그 전에는 고르지 않고 연결로 안내한다. */}
+        {telegramLinked ? (
+          <label className="flex items-center gap-2 text-[12.5px] text-[var(--surface-text-muted)]">
+            텔레그램 알림
+            <select
+              value={notify}
+              onChange={(event) => void changeNotify(event.target.value as GroupChatNotifyMode)}
+              className="rounded-lg border border-[var(--surface-border)] bg-white py-1 pl-2 pr-6 text-[12.5px] text-[var(--surface-text)]"
+            >
+              {GROUP_CHAT_NOTIFY_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {GROUP_CHAT_NOTIFY_LABELS[mode]}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <Link
+            href="/account"
+            className="text-[12.5px] text-[var(--surface-text-muted)] underline-offset-4 hover:text-[var(--color-rose-600)] hover:underline"
+          >
+            텔레그램을 연결하면 알림을 받습니다 →
+          </Link>
+        )}
       </div>
 
       <div
@@ -298,7 +321,7 @@ export function GroupChat({
             onSelect={() => mention.sync()}
             onBlur={() => mention.close()}
             onKeyDown={(event) => {
-              // 태그 목록이 열려 있으면 ↑↓·Enter·Tab·Esc 는 목록이 먼저 쓴다.
+              // 멘션 목록이 열려 있으면 ↑↓·Enter·Tab·Esc 는 목록이 먼저 쓴다.
               if (mention.onKeyDown(event)) return;
               // Enter 로 보내고 Shift+Enter 로 줄을 바꾼다. 조합 중(한글)에는 보내지 않는다.
               if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -309,7 +332,7 @@ export function GroupChat({
             maxLength={GROUP_MESSAGE_MAX_LENGTH}
             rows={2}
             aria-label="메시지"
-            placeholder="메시지를 입력하세요. @주선자 · #멤버 번호로 태그합니다"
+            placeholder="메시지를 입력하세요. @주선자 · #멤버 번호로 멘션합니다"
             className={cn(
               "block max-h-40 min-h-12 w-full resize-none bg-transparent field-sizing-content",
               "text-[14px] leading-relaxed placeholder:text-[var(--color-ink-500)]",

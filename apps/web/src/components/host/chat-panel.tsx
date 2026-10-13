@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { GroupChatNotifyMode } from "@bolsaram/schemas";
 import { apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { GroupChat, type ChatMessage } from "@/components/host/group-chat";
@@ -30,7 +31,7 @@ export function HostChatPanel({
   // Esc 로 닫는다. 입력 중인 한글 조합을 끊지 않게 조합 중에는 무시한다.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      // 입력란의 태그 목록이 먼저 Esc 를 쓰면(defaultPrevented) 패널은 그대로 둔다.
+      // 입력란의 멘션 목록이 먼저 Esc 를 쓰면(defaultPrevented) 패널은 그대로 둔다.
       if (event.key === "Escape" && !event.isComposing && !event.defaultPrevented) onClose();
     }
     window.addEventListener("keydown", onKey);
@@ -86,7 +87,11 @@ const ICON_BUTTON = cn(
   "transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--surface-text)]",
 );
 
-type Loaded = { messages: ChatMessage[]; telegramNotify: boolean };
+type Loaded = {
+  messages: ChatMessage[];
+  notify: GroupChatNotifyMode;
+  telegramLinked: boolean;
+};
 
 /** 방 하나의 첫 화면을 받아 채팅을 그린다. 받는 동안과 실패를 패널 안에서 보여준다. */
 function PanelRoom({ groupId, viewerId }: { groupId: string; viewerId: string }) {
@@ -99,12 +104,18 @@ function PanelRoom({ groupId, viewerId }: { groupId: string; viewerId: string })
     void (async () => {
       const [list, prefs] = await Promise.all([
         apiGet<{ messages: ChatMessage[] }>(`/api/admin/groups/${groupId}/messages`),
-        apiGet<{ telegramNotify: boolean }>(`/api/admin/groups/${groupId}/chat`),
+        apiGet<{ notify: GroupChatNotifyMode; telegramLinked: boolean }>(
+          `/api/admin/groups/${groupId}/chat`,
+        ),
       ]);
       if (cancelled) return;
       if (!list.ok) return setError(list.message);
       if (!prefs.ok) return setError(prefs.message);
-      setLoaded({ messages: list.data.messages, telegramNotify: prefs.data.telegramNotify });
+      setLoaded({
+        messages: list.data.messages,
+        notify: prefs.data.notify,
+        telegramLinked: prefs.data.telegramLinked,
+      });
     })();
     return () => {
       cancelled = true;
@@ -119,7 +130,8 @@ function PanelRoom({ groupId, viewerId }: { groupId: string; viewerId: string })
           groupId={groupId}
           viewerId={viewerId}
           initialMessages={loaded.messages}
-          telegramNotify={loaded.telegramNotify}
+          notify={loaded.notify}
+          telegramLinked={loaded.telegramLinked}
         />
       </div>
     );

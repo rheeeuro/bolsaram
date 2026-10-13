@@ -309,3 +309,17 @@ export const GROUP_MESSAGE_SYSTEM_KINDS = [
   "MATCH_INTRODUCED",
 ] as const;
 export type GroupMessageSystemKind = (typeof GROUP_MESSAGE_SYSTEM_KINDS)[number];
+
+/**
+ * 모임 채팅의 텔레그램 알림 (마이그레이션 0068). 사람마다·방마다 고른다.
+ * 기본은 「멘션만」이다 — 나를 부른 글(`@내 이름`)만 알린다.
+ */
+export const GROUP_CHAT_NOTIFY_MODES = ["ALL", "MENTIONS", "OFF"] as const;
+export type GroupChatNotifyMode = (typeof GROUP_CHAT_NOTIFY_MODES)[number];
+export const GROUP_CHAT_NOTIFY_DEFAULT: GroupChatNotifyMode = "MENTIONS";
+
+export const GROUP_CHAT_NOTIFY_LABELS: Record<GroupChatNotifyMode, string> = {
+  ALL: "모든 새 메시지",
+  MENTIONS: "멘션만",
+  OFF: "알림 끄기",
+};

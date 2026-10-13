@@ -7,14 +7,15 @@
  *   * 남의 이름으로 쓸 수 없다.
  *   * 쓴 글은 고칠 수 없다. 지우기만 되고, 그것도 자기 것만이다.
  *   * 지운 글의 본문은 DB 에도 남지 않는다.
- *   * 알림은 켜 둔 사람에게만 가고, 쓴 사람에게는 가지 않는다.
+ *   * 알림은 텔레그램을 연결한 사람에게만, 고른 단계대로 간다(기본은 멘션만, 0068).
+ *     쓴 사람에게는 가지 않고, 연결 전에는 알림 설정을 바꾸지 못한다.
  *   * 아직 보내지 않은 알림이 있으면 새 글이 와도 하나로 접힌다.
  *   * 계정이 지워져도 대화는 남는다(0041).
  *   * 새 글과 지움이 `LISTEN/NOTIFY` 로 알려지고, 그 payload 에 본문이 없다(0043).
  *   * 모임의 사건이 시스템 메시지로 남고, 사람은 그것을 만들지도 지우지도 못한다(0044).
  *   * 시스템 메시지의 공개 번호는 볼 수 있을 때만 프로필 id 로 풀린다(화면의 링크).
- *   * 본문의 멤버 태그(`#23`)도 같다. 태그 후보는 그 모임 멤버뿐이고 이름이 없다.
- *   * 주선자 태그(`@이름`)는 지금 그 모임 주선자만 풀린다. 후보에 나는 없다.
+ *   * 본문의 멤버 멘션(`#23`)도 같다. 멘션 후보는 그 모임 멤버뿐이고 이름이 없다.
+ *   * 주선자 멘션(`@이름`)은 지금 그 모임 주선자만 풀린다. 후보에 나는 없다.
  *   * 나중에 합류한 주선자에게는 **들어오기 전 대화가 보이지 않는다**(0045).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -27,6 +28,7 @@ import {
   listMentionCandidates,
   listMessages,
   readMessage,
+  readPrefs,
   unreadByGroup,
   updatePrefs,
 } from "../apps/web/src/server/repo/group-chat";
@@ -35,6 +37,8 @@ import { runTag } from "./tags";
 const TAG = runTag("cht");
 
 type Party = {
+  /** 이름에 들어가는 구분자. 주선자 표시 이름이 `${TAG}-${key}-peer` 다. */
+  key: string;
   groupId: string;
   ownerId: string;
   owner: RlsContext;
@@ -83,6 +87,7 @@ async function makeParty(sql: Sql, key: string): Promise<Party> {
   );
 
   return {
+    key,
     groupId,
     ownerId,
     owner: { userId: ownerId, role: "ADMIN" },
@@ -109,6 +114,18 @@ afterAll(async () => {
   });
   await closePools();
 });
+
+/** 텔레그램을 연결해 둔다. 알림은 연결한 사람에게만 생긴다(0068). */
+async function linkTelegram(userId: string): Promise<void> {
+  const telegramId = 9_000_000_000 + Math.floor(Math.random() * 999_999_999);
+  await withOwner((sql) =>
+    sql.query(
+      `INSERT INTO telegram_connections (user_id, telegram_user_id, telegram_chat_id)
+       VALUES ($1, $2, $2) ON CONFLICT (user_id) DO NOTHING`,
+      [userId, telegramId],
+    ),
+  );
+}
 
 /** owner 커넥션으로 한 줄 넣는다. 정책을 보지 않는 픽스처용 경로다. */
 async function seedMessage(groupId: string, authorId: string, body: string): Promise<string> {
@@ -518,8 +535,9 @@ describe("시스템 메시지", () => {
 
   it("시스템 메시지는 텔레그램 알림을 만들지 않는다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `t${Date.now() % 100000}`));
+    await linkTelegram(party.peerId);
     await withRls(party.peer, (sql) =>
-      updatePrefs(sql, party.groupId, party.peerId, { telegramNotify: true }),
+      updatePrefs(sql, party.groupId, party.peerId, { notify: "ALL" }),
     );
 
     // 알림을 켠 뒤에 일어난 사건이다. 신청·연결은 0017 계열이 이미 알린다.
@@ -714,15 +732,13 @@ describe("텔레그램 알림", () => {
     });
   }
 
-  it("켜 둔 동료에게만 생기고 쓴 사람에게는 생기지 않는다", async () => {
+  it("모든 새 메시지: 고른 동료에게 생기고 쓴 사람에게는 생기지 않는다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `n${Date.now() % 100000}`));
-    // 양쪽 다 켠다 — 그래도 쓴 사람은 받지 않아야 한다.
-    await withRls(party.peer, (sql) =>
-      updatePrefs(sql, party.groupId, party.peerId, { telegramNotify: true }),
-    );
-    await withRls(party.owner, (sql) =>
-      updatePrefs(sql, party.groupId, party.ownerId, { telegramNotify: true }),
-    );
+    // 양쪽 다 고른다 — 그래도 쓴 사람은 받지 않아야 한다.
+    for (const [ctx, id] of [[party.peer, party.peerId], [party.owner, party.ownerId]] as const) {
+      await linkTelegram(id);
+      await withRls(ctx, (sql) => updatePrefs(sql, party.groupId, id, { notify: "ALL" }));
+    }
 
     await withRls(party.owner, (sql) =>
       createMessage(sql, party.groupId, party.ownerId, "새 글"),
@@ -732,18 +748,63 @@ describe("텔레그램 알림", () => {
     expect(rows.map((r) => r.recipient)).toEqual([party.peerId]);
   });
 
-  it("끈 사람에게는 생기지 않는다", async () => {
-    const party = await withOwner((sql) => makeParty(sql, `f${Date.now() % 100000}`));
+  it("기본은 멘션만이다 — 나를 부른 글에만 생긴다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `m${Date.now() % 100000}`));
+    await linkTelegram(party.peerId);
+
+    // 설정을 만진 적이 없어도 기본값으로 읽힌다.
+    const prefs = await withRls(party.peer, (sql) => readPrefs(sql, party.groupId, party.peerId));
+    expect(prefs).toMatchObject({ notify: "MENTIONS", telegramLinked: true });
+
     await withRls(party.owner, (sql) =>
-      createMessage(sql, party.groupId, party.ownerId, "알림 없는 글"),
+      createMessage(sql, party.groupId, party.ownerId, "부르지 않은 글"),
+    );
+    expect(await notificationsFor(party.groupId)).toHaveLength(0);
+
+    const peerName = `${TAG}-${party.key}-peer`;
+    await withRls(party.owner, (sql) =>
+      createMessage(sql, party.groupId, party.ownerId, `@${peerName}님 확인 부탁드려요`),
+    );
+    expect((await notificationsFor(party.groupId)).map((r) => r.recipient)).toEqual([
+      party.peerId,
+    ]);
+  });
+
+  it("끄면 멘션해도 생기지 않는다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `o${Date.now() % 100000}`));
+    await linkTelegram(party.peerId);
+    await withRls(party.peer, (sql) =>
+      updatePrefs(sql, party.groupId, party.peerId, { notify: "OFF" }),
+    );
+    await withRls(party.owner, (sql) =>
+      createMessage(sql, party.groupId, party.ownerId, `@${TAG}-${party.key}-peer 확인`),
     );
     expect(await notificationsFor(party.groupId)).toHaveLength(0);
   });
 
+  it("텔레그램을 연결하지 않았으면 생기지 않고 설정도 바꾸지 못한다", async () => {
+    const party = await withOwner((sql) => makeParty(sql, `u${Date.now() % 100000}`));
+    await withRls(party.owner, (sql) =>
+      createMessage(sql, party.groupId, party.ownerId, `@${TAG}-${party.key}-peer 확인`),
+    );
+    expect(await notificationsFor(party.groupId)).toHaveLength(0);
+
+    await expect(
+      withRls(party.peer, (sql) => updatePrefs(sql, party.groupId, party.peerId, { notify: "ALL" })),
+    ).rejects.toThrow(/텔레그램/);
+    // 읽음 표시는 연결과 상관없이 된다.
+    await withRls(party.peer, (sql) =>
+      updatePrefs(sql, party.groupId, party.peerId, { readUpTo: new Date().toISOString() }),
+    );
+    const prefs = await withRls(party.peer, (sql) => readPrefs(sql, party.groupId, party.peerId));
+    expect(prefs).toMatchObject({ notify: "MENTIONS", telegramLinked: false });
+  });
+
   it("아직 보내지 않은 알림이 있으면 접힌다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `d${Date.now() % 100000}`));
+    await linkTelegram(party.peerId);
     await withRls(party.peer, (sql) =>
-      updatePrefs(sql, party.groupId, party.peerId, { telegramNotify: true }),
+      updatePrefs(sql, party.groupId, party.peerId, { notify: "ALL" }),
     );
 
     await withRls(party.owner, (sql) => createMessage(sql, party.groupId, party.ownerId, "1"));
@@ -758,13 +819,11 @@ describe("텔레그램 알림", () => {
     expect(await notificationsFor(party.groupId)).toHaveLength(2);
   });
 
-  it("payload 에는 모임 이름만 들어간다", async () => {
+  it("payload 에는 모임 이름과 멘션 여부만 들어간다", async () => {
     const party = await withOwner((sql) => makeParty(sql, `p${Date.now() % 100000}`));
-    await withRls(party.peer, (sql) =>
-      updatePrefs(sql, party.groupId, party.peerId, { telegramNotify: true }),
-    );
+    await linkTelegram(party.peerId);
     await withRls(party.owner, (sql) =>
-      createMessage(sql, party.groupId, party.ownerId, "본문은 실리지 않는다"),
+      createMessage(sql, party.groupId, party.ownerId, `@${TAG}-${party.key}-peer 본문은 실리지 않는다`),
     );
 
     const payload = await withOwner(async (sql) => {
@@ -774,8 +833,9 @@ describe("텔레그램 알림", () => {
       );
       return r.rows[0]!.payload;
     });
-    expect(Object.keys(payload)).toEqual(["groupName"]);
+    expect(Object.keys(payload).sort()).toEqual(["groupName", "mention"]);
     expect(payload.groupName).toContain(TAG);
+    expect(payload.mention).toBe(true);
   });
 
   it("알림 행을 런타임 롤이 만들지 못한다", async () => {

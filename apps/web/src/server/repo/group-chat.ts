@@ -12,7 +12,9 @@ import { z } from "zod";
 import type { Sql } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
 import {
+  GROUP_CHAT_NOTIFY_DEFAULT,
   groupMessagePayloadSchema,
+  type GroupChatNotifyMode,
   type GroupMessagePayload,
   type GroupMessageSystemKind,
 } from "@bolsaram/schemas";
@@ -33,15 +35,15 @@ export type GroupMessageRecord = {
   payload: GroupMessagePayload;
   /**
    * 공개 번호 → 프로필 id. 화면이 번호에 링크를 달 때 쓴다. 시스템 메시지는 payload 의
-   * 번호, 사람의 글은 본문의 멤버 태그(`#23`)가 대상이다.
+   * 번호, 사람의 글은 본문의 멤버 멘션(`#23`)가 대상이다.
    *
    * **볼 수 있는 것만 들어온다** — 조회가 RLS 를 통과하므로 지워졌거나 담당 채널을
    * 벗어난 번호는 빠진다. 그런 번호는 링크 없이 글자로만 남는다.
    */
   profileIds: Record<string, string>;
   /**
-   * 본문에 태그된(`@이름`) 주선자 — 표시 이름 → 사용자 id. 지금 이 모임에 있는
-   * 주선자만 들어온다. 나간 사람이나 이름을 바꾼 사람의 태그는 글자로 남는다.
+   * 본문에서 멘션된(`@이름`) 주선자 — 표시 이름 → 사용자 id. 지금 이 모임에 있는
+   * 주선자만 들어온다. 나간 사람이나 이름을 바꾼 사람의 멘션은 글자로 남는다.
    */
   hostIds: Record<string, string>;
 };
@@ -65,8 +67,8 @@ type Row = {
  *
  * 시스템 메시지의 payload 에는 번호만 있다(0044) — 이름을 적지 않기로 한 규칙이라
  * 그대로 두고, 화면이 링크를 걸 수 있도록 여기서 한 번 더 찾아 준다. 사람이 쓴 글은
- * 본문의 멤버 태그(`#23`)에서 번호를 뽑는다. 정규식은 화면 쪽 `GROUP_MESSAGE_MEMBER_TAG`
- * 와 같은 판정이다 — 앞이 글자·숫자면 태그가 아니고, 아홉 자리까지만 본다(int 범위).
+ * 본문의 멤버 멘션(`#23`)에서 번호를 뽑는다. 정규식은 화면 쪽 `GROUP_MESSAGE_MEMBER_TAG`
+ * 와 같은 판정이다 — 앞이 글자·숫자면 멘션이 아니고, 아홉 자리까지만 본다(int 범위).
  * 지운 글은 본문이 비어 있어 찾을 것이 없다.
  *
  * 번호는 전역에서 유일하므로(`profiles.public_code UNIQUE`) 모임을 따로 묻지 않는다.
@@ -88,7 +90,7 @@ const PROFILE_LINKS = `LEFT JOIN LATERAL (
                          ) links ON true`;
 
 /**
- * 본문에 태그된 주선자(`@이름`). 이름은 모양이 정해져 있지 않아 뽑아내지 않고, 이 방의
+ * 본문에서 멘션된 주선자(`@이름`). 이름은 모양이 정해져 있지 않아 뽑아내지 않고, 이 방의
  * 주선자 이름이 `@` 뒤에 나오는지를 본다. 화면은 받은 이름을 긴 것부터 본문에서 찾는다.
  * 모임 명단(`group_admins`)과 이름은 같은 모임 주선자에게만 보인다 — RLS 가 판정한다.
  */
@@ -227,25 +229,38 @@ export async function listMessagesSince(
 
 export type GroupChatPrefsRecord = {
   lastReadAt: Date | null;
-  telegramNotify: boolean;
+  /** 이 방의 텔레그램 알림(0068). 행이 없으면 기본값(멘션만)이다. */
+  notify: GroupChatNotifyMode;
+  /** 텔레그램을 연결했는가. 연결하지 않았으면 알림 설정을 바꿀 수 없다. */
+  telegramLinked: boolean;
 };
 
-/** 행이 없으면 「전부 안 읽음, 알림 꺼짐」이다. */
+type PrefsRow = { last_read_at: Date | null; notify: GroupChatNotifyMode | null; linked: boolean };
+
+/** 내 텔레그램 연결 여부. 연결 행은 본인 것만 보인다(RLS). */
+const TELEGRAM_LINKED = `EXISTS (SELECT 1 FROM telegram_connections tc WHERE tc.user_id = $2)`;
+
+function toPrefs(row: PrefsRow | undefined): GroupChatPrefsRecord {
+  return {
+    lastReadAt: row?.last_read_at ?? null,
+    notify: row?.notify ?? GROUP_CHAT_NOTIFY_DEFAULT,
+    telegramLinked: row?.linked ?? false,
+  };
+}
+
+/** 행이 없으면 「전부 안 읽음, 알림은 멘션만」이다. */
 export async function readPrefs(
   sql: Sql,
   groupId: string,
   userId: string,
 ): Promise<GroupChatPrefsRecord> {
-  const result = await sql.query<{ last_read_at: Date; telegram_notify: boolean }>(
-    `SELECT last_read_at, telegram_notify FROM group_chat_prefs
-      WHERE group_id = $1 AND user_id = $2`,
+  const result = await sql.query<PrefsRow>(
+    `SELECT pref.last_read_at, pref.notify, ${TELEGRAM_LINKED} AS linked
+       FROM (SELECT 1) one
+       LEFT JOIN group_chat_prefs pref ON pref.group_id = $1 AND pref.user_id = $2`,
     [groupId, userId],
   );
-  const row = result.rows[0];
-  return {
-    lastReadAt: row ? row.last_read_at : null,
-    telegramNotify: row ? row.telegram_notify : false,
-  };
+  return toPrefs(result.rows[0]);
 }
 
 /**
@@ -253,29 +268,43 @@ export async function readPrefs(
  *
  * 읽은 위치는 뒤로 가지 않는다(`GREATEST`) — 여러 탭이 열려 있으면 늦게 도착한
  * 요청이 옛 시각을 들고 올 수 있다. 행을 새로 만들 때 읽은 위치의 기본값이
- * `-infinity` 인 것도 같은 이유다. 알림만 켜다가 쌓인 것을 읽음 처리하면 안 된다.
+ * `-infinity` 인 것도 같은 이유다. 알림만 바꾸다가 쌓인 것을 읽음 처리하면 안 된다.
+ *
+ * 알림은 텔레그램을 연결한 사람만 바꾼다. 화면도 그때만 메뉴를 열지만, 보낼 곳이
+ * 없는 설정이 저장되지 않게 여기서도 막는다.
  */
 export async function updatePrefs(
   sql: Sql,
   groupId: string,
   userId: string,
-  input: { readUpTo?: string; telegramNotify?: boolean },
+  input: { readUpTo?: string; notify?: GroupChatNotifyMode },
 ): Promise<GroupChatPrefsRecord> {
-  const result = await sql.query<{ last_read_at: Date; telegram_notify: boolean }>(
-    `INSERT INTO group_chat_prefs (group_id, user_id, last_read_at, telegram_notify)
-     VALUES ($1, $2, COALESCE($3::timestamptz, '-infinity'), COALESCE($4::boolean, false))
+  if (input.notify !== undefined) {
+    const linked = await sql.query<{ linked: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM telegram_connections tc WHERE tc.user_id = $1) AS linked`,
+      [userId],
+    );
+    if (!linked.rows[0]?.linked) {
+      throw new DomainError("INVALID_STATE", "텔레그램을 먼저 연결해야 알림을 고를 수 있습니다.");
+    }
+  }
+
+  const result = await sql.query<PrefsRow>(
+    `INSERT INTO group_chat_prefs (group_id, user_id, last_read_at, notify)
+     VALUES ($1, $2, COALESCE($3::timestamptz, '-infinity'),
+             COALESCE($4::group_chat_notify, 'MENTIONS'))
      ON CONFLICT (group_id, user_id) DO UPDATE
        SET last_read_at = GREATEST(
              group_chat_prefs.last_read_at,
              COALESCE($3::timestamptz, group_chat_prefs.last_read_at)
            ),
-           telegram_notify = COALESCE($4::boolean, group_chat_prefs.telegram_notify)
-     RETURNING last_read_at, telegram_notify`,
-    [groupId, userId, input.readUpTo ?? null, input.telegramNotify ?? null],
+           notify = COALESCE($4::group_chat_notify, group_chat_prefs.notify)
+     RETURNING last_read_at, notify, ${TELEGRAM_LINKED} AS linked`,
+    [groupId, userId, input.readUpTo ?? null, input.notify ?? null],
   );
   const row = result.rows[0];
   if (!row) throw new DomainError("FORBIDDEN", "이 모임의 설정을 바꿀 수 없습니다.");
-  return { lastReadAt: row.last_read_at, telegramNotify: row.telegram_notify };
+  return toPrefs(row);
 }
 
 export type GroupUnread = { groupId: string; unread: number };
@@ -314,7 +343,7 @@ export type HostMentionCandidate = {
 };
 
 /**
- * `@` 태그 후보 — 이 모임의 주선자를 이름 앞자리로 찾는다. 나는 뺀다.
+ * `@` 멘션 후보 — 이 모임의 주선자를 이름 앞자리로 찾는다. 나는 뺀다.
  *
  * 명단은 RLS 가 같은 모임 주선자에게만 보여주므로 속하지 않은 모임을 물으면 비어 있다.
  * 앞자리 비교는 LIKE 를 쓰지 않는다 — 이름에 `%` `_` 가 들어 있어도 글자 그대로 본다.
@@ -363,7 +392,7 @@ export type MentionCandidate = {
 };
 
 /**
- * `#` 태그 후보 — 이 방의 모임에 등록된 멤버를 번호 앞자리로 찾는다.
+ * `#` 멘션 후보 — 이 방의 모임에 등록된 멤버를 번호 앞자리로 찾는다.
  *
  * 모임으로 좁히는 것은 화면의 약속이다. 볼 수 있는지는 RLS 가 정하므로 소속이 아닌
  * 모임을 물으면 비어 돌아온다. 친 번호와 꼭 맞는 사람을 맨 앞에, 나머지는 최근 번호부터.

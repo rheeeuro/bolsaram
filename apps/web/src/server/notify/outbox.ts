@@ -39,6 +39,8 @@ export type ClaimedNotification = {
    * (GROUP_CREATION_REQUESTED)이면 요청한 모임 이름이다.
    */
   groupName: string | null;
+  /** 모임 채팅 알림이 「나를 부른 글」 때문인가(0068). 그 밖에는 false. */
+  mention: boolean;
 };
 
 type ClaimRow = {
@@ -49,6 +51,7 @@ type ClaimRow = {
   target_code: number | null;
   intent_kind: MatchIntentKind | null;
   group_name: string | null;
+  mention: boolean;
 };
 
 /**
@@ -84,7 +87,8 @@ export async function claimPending(): Promise<ClaimedNotification[]> {
                   (n.payload->>'requesterCode')::int AS requester_code,
                   (n.payload->>'targetCode')::int AS target_code,
                   n.payload->>'intentKind' AS intent_kind,
-                  n.payload->>'groupName' AS group_name`,
+                  n.payload->>'groupName' AS group_name,
+                  COALESCE((n.payload->>'mention')::boolean, false) AS mention`,
       [NOTIFICATION_MAX_ATTEMPTS, NOTIFICATION_RETRY_WINDOW_DAYS, BATCH],
     );
     return result.rows.map((row) => ({
@@ -95,6 +99,7 @@ export async function claimPending(): Promise<ClaimedNotification[]> {
       targetCode: row.target_code,
       intentKind: row.intent_kind,
       groupName: row.group_name,
+      mention: row.mention,
     }));
   });
 }

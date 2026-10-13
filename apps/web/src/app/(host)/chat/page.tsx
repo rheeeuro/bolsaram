@@ -59,7 +59,8 @@ export default async function HostChatPage() {
         groupId={groupId}
         viewerId={viewer.userId}
         initialMessages={messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))}
-        telegramNotify={prefs.telegramNotify}
+        notify={prefs.notify}
+        telegramLinked={prefs.telegramLinked}
       />
     </>
   );

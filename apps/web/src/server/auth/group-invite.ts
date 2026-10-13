@@ -18,7 +18,7 @@
 import "server-only";
 import { withOwner, withOwnerTx, type Sql } from "@bolsaram/db";
 import { DomainError } from "@bolsaram/domain";
-import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
+import { MAX_GROUPS_PER_ADMIN, type GroupChatNotifyMode } from "@bolsaram/schemas";
 import { env } from "../env";
 import { writeAudit } from "../audit";
 import { isOperatorUser, readOperatorSettings } from "./operator";
@@ -444,8 +444,10 @@ export type GroupSummary = {
   /** 내가 이 모임에 등록한 활성 프로필 수. 나가면 모두 비활성이 된다(0056). */
   myActiveCount: number;
   admins: { userId: string; displayName: string | null; isOwner: boolean }[];
-  /** 이 방의 새 채팅을 텔레그램으로도 받을 것인가(0040). 사람마다 따로 켠다. */
-  chatNotify: boolean;
+  /** 이 방의 채팅 텔레그램 알림(0068). 사람마다 따로 고르고, 기본은 멘션만이다. */
+  chatNotify: GroupChatNotifyMode;
+  /** 텔레그램을 연결했는가. 연결해야 채팅 알림을 고를 수 있다. 모임과 상관없이 같다. */
+  telegramLinked: boolean;
 };
 
 /**
@@ -466,7 +468,8 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       member_count: number;
       import_count: number;
       my_active_count: number;
-      chat_notify: boolean;
+      chat_notify: GroupChatNotifyMode;
+      telegram_linked: boolean;
     }>(
       // 관리자는 소속이 없으므로 모임 전부를 만든 순서대로 준다.
       `SELECT g.id AS group_id, g.name, g.description, g.image_key,
@@ -476,7 +479,9 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
               (SELECT count(*)::int FROM profiles p
                 WHERE p.group_id = g.id AND p.created_by = $1
                   AND p.status = 'ACTIVE') AS my_active_count,
-              COALESCE(pref.telegram_notify, false) AS chat_notify
+              COALESCE(pref.notify, 'MENTIONS') AS chat_notify,
+              EXISTS (SELECT 1 FROM telegram_connections tc WHERE tc.user_id = $1)
+                AS telegram_linked
          FROM groups g
          LEFT JOIN group_admins ga ON ga.group_id = g.id AND ga.user_id = $1
          LEFT JOIN group_chat_prefs pref
@@ -510,6 +515,7 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       importCount: group.import_count,
       myActiveCount: group.my_active_count,
       chatNotify: group.chat_notify,
+      telegramLinked: group.telegram_linked,
       admins: admins.rows
         .filter((a) => a.group_id === group.group_id)
         .map((a) => ({
