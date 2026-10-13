@@ -38,12 +38,11 @@ export function ClaimForm({
               setError(result.message);
               return;
             }
-            // 처음이면 내 프로필을 확인하게, 재로그인이면 보려던 화면으로 보낸다.
+            // 보려던 화면이 있으면 그리로 — 처음이어도 같다. 주선자가 받은 신청을 알리며
+            // 보낸 초대 링크는 받은 시그널로 이어진다. 그 밖에 처음이면 내 프로필부터 본다.
             // 세션이 생겼으니 문서를 새로 연다. 클라이언트 라우터로 넘기면 로그인 이전의
             // 라우터 상태가 남아 이동한 화면이 다시 로그인으로 튕기고 무한 왕복이 된다.
-            window.location.replace(
-              result.data.firstTime ? "/me" : (next ?? "/discover"),
-            );
+            window.location.replace(next ?? (result.data.firstTime ? "/me" : "/discover"));
           })();
         }}
       >

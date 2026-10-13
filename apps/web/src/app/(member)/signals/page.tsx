@@ -22,11 +22,12 @@ export default async function SignalsPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const viewer = await requireUserPage("/signals");
   const { tab } = await searchParams;
   const direction: SignalDirection = DIRECTIONS.includes(tab as SignalDirection)
     ? (tab as SignalDirection)
     : "incoming";
+  // 입장 뒤 같은 탭으로 돌아온다 — 주선자가 보낸 「받은 신청」 링크가 여기로 온다.
+  const viewer = await requireUserPage(`/signals?tab=${direction}`);
 
   if (!viewer.profileId) {
     return (

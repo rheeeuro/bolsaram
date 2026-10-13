@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { Input, Textarea } from "@/components/ui/field";
 
 /**
  * 한 번만 보이는 값을 보여주고 복사시킨다.
@@ -13,8 +13,17 @@ import { Input } from "@/components/ui/field";
  * 재발급을 눌러 방금 보낸 링크를 스스로 깨뜨린다.
  *
  * 클립보드는 실패할 수 있다(권한·비보안 컨텍스트). 그때는 직접 고르게 안내한다.
+ * `multiline` 은 카카오톡에 그대로 붙일 안내 문구처럼 줄이 나뉜 값에 쓴다.
  */
-export function CopyField({ label, value }: { label?: string; value: string }) {
+export function CopyField({
+  label,
+  value,
+  multiline = false,
+}: {
+  label?: string;
+  value: string;
+  multiline?: boolean;
+}) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
   return (
@@ -22,13 +31,23 @@ export function CopyField({ label, value }: { label?: string; value: string }) {
       {label ? (
         <p className="mb-1 text-[11.5px] text-[var(--surface-text-muted)]">{label}</p>
       ) : null}
-      <div className="flex gap-1.5">
-        <Input
-          readOnly
-          value={value}
-          onFocus={(e) => e.currentTarget.select()}
-          className="h-9 flex-1 text-[11.5px]"
-        />
+      <div className={multiline ? "flex flex-col items-end gap-1.5" : "flex gap-1.5"}>
+        {multiline ? (
+          <Textarea
+            readOnly
+            value={value}
+            rows={value.split("\n").length}
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-h-0 resize-none text-[12.5px] leading-relaxed"
+          />
+        ) : (
+          <Input
+            readOnly
+            value={value}
+            onFocus={(e) => e.currentTarget.select()}
+            className="h-9 flex-1 text-[11.5px]"
+          />
+        )}
         <Button
           size="sm"
           variant={state === "copied" ? "primary" : "secondary"}

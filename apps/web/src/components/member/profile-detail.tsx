@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { apiDelete, apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
@@ -366,12 +366,21 @@ function RequestAction({
   relation: Relation;
   onOpen: () => void;
 }) {
+  // 받은 신청에 답하는 곳은 시그널 받은 탭이다. 여기서 막다른 버튼으로 두지 않는다.
+  if (existing?.status === "REQUESTED" && !existing.isRequester) {
+    return (
+      <Link
+        href="/signals?tab=incoming"
+        className={buttonClasses({ size: "lg", className: "flex-[1.4]" })}
+      >
+        받은 신청에 답하기
+      </Link>
+    );
+  }
   if (existing) {
     const text =
       existing.status === "REQUESTED"
-        ? existing.isRequester
-          ? "신청 대기 중"
-          : "받은 신청 확인"
+        ? "신청 대기 중"
         : "연결됨";
     return (
       <Button variant="secondary" size="lg" className="flex-[1.4]" disabled>

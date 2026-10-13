@@ -2,6 +2,7 @@
 import { withRls } from "@bolsaram/db";
 import { MATCH_REQUEST_STATUSES, type MatchRequestStatus } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
+import { env } from "@/server/env";
 import { introducedWithManaged, listForAdmin } from "@/server/repo/matches";
 import { canEditProfiles, findProfilesByIds, type ProfileRecord } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
@@ -11,6 +12,12 @@ import { HostIntentQueue } from "@/components/host/intent-queue";
 import { Count, PageHeader } from "@/components/host/surface";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * 받은 신청을 알릴 때 보내는 주소. 상대가 누구인지 담지 않는다 — 로그인한 본인만
+ * 받은 탭에서 상대 카드를 보고 답한다. 세션이 없으면 입장 화면을 거쳐 여기로 돌아온다.
+ */
+const SIGNALS_INCOMING = "/signals?tab=incoming";
 
 export default async function HostRequestsPage({
   searchParams,
@@ -65,14 +72,23 @@ export default async function HostRequestsPage({
     };
 
     return {
-      items: requests.map((request) => ({
-        id: request.id,
-        status: request.status,
-        message: request.message,
-        requestedAt: request.requestedAt.toISOString(),
-        requester: describe(byId.get(request.requesterProfileId)),
-        target: describe(byId.get(request.targetProfileId)),
-      })),
+      items: requests.map((request) => {
+        const target = byId.get(request.targetProfileId);
+        return {
+          id: request.id,
+          status: request.status,
+          message: request.message,
+          requestedAt: request.requestedAt.toISOString(),
+          requester: describe(byId.get(request.requesterProfileId)),
+          target: describe(target),
+          // 멤버에게는 알림이 가지 않는다 — 받은 신청은 받는 쪽 담당자가 카카오톡으로
+          // 전한다. 들어온 적이 없는 분이면 링크와 함께 초대도 보내야 한다.
+          notify:
+            request.status === "REQUESTED" && target && editable.has(target.id)
+              ? { joined: target.userId != null }
+              : null,
+        };
+      }),
       intents: pending.map((intent) => {
         const request = intent.matchRequestId
           ? byRequestId.get(intent.matchRequestId)
@@ -105,7 +121,11 @@ export default async function HostRequestsPage({
         aside={<Count>{items.length}건</Count>}
       />
       <HostIntentQueue items={intents} />
-      <HostRequestList items={items} activeStatus={status ?? ""} />
+      <HostRequestList
+        items={items}
+        activeStatus={status ?? ""}
+        signalsUrl={`${env().APP_ORIGIN}${SIGNALS_INCOMING}`}
+      />
     </>
   );
 }
