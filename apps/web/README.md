@@ -74,7 +74,7 @@ apps/web/src/
 │   │   ├── members/          초대·연결 현황
 │   │   ├── chat/             보고 있는 모임의 채팅방 (주선자 전용, 오른쪽 아래 버튼으로 연다)
 │   │   ├── group/[id]/       모임 설정 — 이름·주선자·초대 코드·알림·나가기·폐쇄
-│   │   └── operator/         관리자 메뉴 (관리자 계정만) — 메뉴 목록 + groups/ 모임 설정(모임 만들기 승인·요청 처리)
+│   │   └── operator/         관리자 메뉴 (관리자 계정만) — 메뉴 목록 + groups/ 모임 설정(모임 만들기 승인·초대 코드 여러 번 쓰기·요청 처리)
 │   └── api/                  Route Handler (아래 표)
 ├── components/
 │   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·global-progress)
@@ -142,7 +142,7 @@ server/
 │   ├── oauth.ts              주선자 로그인 = 가입 (카카오·구글, state+PKCE, 계정 잇기, 프로필 사진 가져오기, 연결된 계정 조회)
 │   ├── invite.ts             초대 링크 = 멤버 로그인 (매직 링크, 해시 저장·처음 연 사람의 입장 링크)
 │   ├── group-invite.ts       모임 만들기(승인 요청·거두기·승인 처리 포함)·소속·사진·초대 코드·모임장 위임/내보내기·보고 있는 모임 전환·폐쇄
-│   ├── operator.ts           관리자 지정 동기화(env → DB, 기존 소속 걷어내기) · 관리자 설정(모임 만들기 승인) · 모임 만들기 요청 목록
+│   ├── operator.ts           관리자 지정 동기화(env → DB, 기존 소속 걷어내기) · 관리자 설정(모임 만들기 승인·초대 코드 여러 번 쓰기) · 모임 만들기 요청 목록
 │   ├── telegram.ts           봇 계정 연결(해시 코드, 다른 계정에서 옮겨오기) + webhook 재전송 차단
 │   └── guard.ts              requireUser / requireAdmin / requireOperator / requireGroupAdmin / requireGroupOwner / requireMemberProfile
 │                             (미로그인: 멤버 화면 → /enter, 주선자 화면 → /login)
@@ -253,7 +253,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/groups/[id]`                  | PATCH / DELETE      | 그 모임 주선자    | 이름·설명 수정 / 모임 나가기         |
 | `/api/admin/groups/[id]/close`            | DELETE              | **모임장**        | 모임 폐쇄 (비어 있을 때만)           |
 | `/api/admin/groups/[id]/image`            | POST / DELETE       | 그 모임 주선자    | 모임 사진 올리기(슬롯·확정) / 지우기 |
-| `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급           |
+| `/api/admin/groups/[id]/invite`           | POST                | 그 모임 주선자    | 동료 주선자 초대 코드 발급 (1회용·여러 번은 관리자 설정, 응답 `reusable`) |
 | `/api/admin/groups/[id]/admins/[userId]`  | PATCH / DELETE      | **모임장**        | 모임장 넘기기 / 주선자 내보내기      |
 | `/api/admin/groups/[id]/messages`         | GET / POST          | 그 모임 주선자    | 채팅 읽기(`before`·`after`) / 쓰기   |
 | `/api/admin/groups/[id]/messages/[messageId]` | DELETE          | 쓴 사람           | 내 메시지 지우기 (본문만 사라진다)   |
@@ -262,7 +262,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/chat/stream`                  | GET (SSE)           | 주선자            | 속한 모든 방의 새 글·지움을 밀어준다 |
 | `/api/admin/telegram`                     | GET / POST / PATCH / DELETE | 주선자    | 봇 연결 상태 / 연결 코드 발급 / 담을 모임 변경 / 해제 |
 | `/api/admin/trace`                        | GET                 | 주선자            | 워터마크의 주선자 코드 → 누구인지 (나·같은 모임 동료까지) |
-| `/api/operator/settings`                  | GET / PUT           | **관리자**        | 관리자 설정 — 모임 만들기 승인 켜기·끄기 |
+| `/api/operator/settings`                  | GET / PUT           | **관리자**        | 관리자 설정 — 모임 만들기 승인 · 초대 코드 여러 번 쓰기 켜기·끄기 (보낸 항목만) |
 | `/api/operator/group-requests/[id]/[action]` | POST             | **관리자**        | 모임 만들기 요청 approve · reject (승인하면 그때 모임 생성) |
 | `/api/integrations/telegram/webhook`      | POST                | **봇 시크릿**     | 텔레그램 Bot API webhook             |
 | `/api/files`                              | GET                 | 로그인            | signed URL 로 이미지 다운로드        |

@@ -96,58 +96,88 @@ function InviteDialog({
   groupId: string;
   onClose: () => void;
 }) {
-  const [issued, setIssued] = useState<{ code: string; expiresAt: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function close() {
-    setIssued(null);
-    setError(null);
-    onClose();
-  }
-
   return (
-    <Dialog open={open} onClose={close} label="주선자 초대 코드">
+    <Dialog open={open} onClose={onClose} label="주선자 초대 코드">
       <h2 className="display text-[19px] text-[var(--surface-text)]">주선자 초대 코드</h2>
       <p className="mb-4 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-        동료 주선자를 이 모임에 부릅니다. 코드는 <b>24시간·1회용</b>이고 발급 직후 한 번만
-        보입니다. 새로 발급하면 내가 만들어 둔 이전 코드는 쓸 수 없습니다.
+        동료 주선자를 이 모임에 부릅니다.
       </p>
-
-      {issued ? (
-        <div className="space-y-2">
-          <CopyField value={issued.code} />
-          <p className="text-[11.5px] text-[var(--surface-text-muted)]">
-            {new Date(issued.expiresAt).toLocaleString("ko-KR")} 까지
-          </p>
-        </div>
-      ) : (
-        <Button
-          disabled={busy}
-          onClick={() =>
-            void (async () => {
-              setBusy(true);
-              setError(null);
-              const result = await apiPost<{ code: string; expiresAt: string }>(
-                `/api/admin/groups/${groupId}/invite`,
-              );
-              setBusy(false);
-              if (result.ok) setIssued(result.data);
-              else setError(result.message);
-            })()
-          }
-        >
-          {busy ? "발급 중…" : "초대 코드 받기"}
-        </Button>
-      )}
-      <FormError>{error}</FormError>
-
+      {/* 닫으면 발급한 코드를 지운다 — 창을 다시 열 때 새로 그린다. */}
+      {open ? <GroupInviteIssuer groupId={groupId} buttonLabel="초대 코드 받기" /> : null}
       <div className="mt-5 flex justify-end">
-        <Button variant="ghost" onClick={close}>
+        <Button variant="ghost" onClick={onClose}>
           닫기
         </Button>
       </div>
     </Dialog>
+  );
+}
+
+type IssuedInvite = { code: string; expiresAt: string; reusable: boolean };
+
+/**
+ * 초대 코드 발급 — 모임 이름 메뉴와 모임 설정이 함께 쓴다.
+ *
+ * 1회용인지 여러 번 쓰는지는 관리자 설정이 정하고, 발급 응답이 그 코드의 성격을
+ * 알려준다. 발급하기 전에는 설정이 바뀌었을 수 있으므로 단정하지 않는다.
+ */
+export function GroupInviteIssuer({
+  groupId,
+  buttonLabel,
+  compact = false,
+}: {
+  groupId: string;
+  buttonLabel: string;
+  /** 설정 화면처럼 다른 패널 사이에 놓일 때 버튼을 작게·보조 색으로 그린다. */
+  compact?: boolean;
+}) {
+  const [issued, setIssued] = useState<IssuedInvite | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function issue() {
+    setBusy(true);
+    setError(null);
+    const result = await apiPost<IssuedInvite>(`/api/admin/groups/${groupId}/invite`);
+    setBusy(false);
+    if (result.ok) setIssued(result.data);
+    else setError(result.message);
+  }
+
+  return (
+    <>
+      {issued ? (
+        <div className="space-y-2">
+          <CopyField value={issued.code} />
+          <p className="text-[12.5px] font-medium text-[var(--surface-text)]">
+            {issued.reusable
+              ? "여러 명이 쓸 수 있는 코드입니다. 만료 전까지 이 코드로 몇 명이든 참여합니다."
+              : "1회용 코드입니다. 한 사람만 참여할 수 있습니다."}
+          </p>
+          <p className="text-[11.5px] text-[var(--surface-text-muted)]">
+            {new Date(issued.expiresAt).toLocaleString("ko-KR")} 까지 · 이 창을 닫으면 다시 볼
+            수 없습니다
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+            코드는 <b>24시간</b> 동안 쓸 수 있고 발급 직후 한 번만 보입니다. 1회용인지 여러
+            명이 쓰는지는 관리자 설정을 따릅니다. 새로 발급하면 내가 만들어 둔 이전 코드는 쓸
+            수 없습니다.
+          </p>
+          <Button
+            size={compact ? "sm" : "md"}
+            variant={compact ? "secondary" : "primary"}
+            disabled={busy}
+            onClick={() => void issue()}
+          >
+            {busy ? "발급 중…" : buttonLabel}
+          </Button>
+        </>
+      )}
+      <FormError>{error}</FormError>
+    </>
   );
 }
 

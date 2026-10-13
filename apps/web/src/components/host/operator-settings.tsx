@@ -14,7 +14,8 @@ import { FormError } from "@/components/ui/field";
 import { Panel } from "@/components/host/surface";
 
 /**
- * 관리자 메뉴의 「모임 설정」 — 모임 만들기 승인 켜기·끄기와 들어온 요청 처리.
+ * 관리자 메뉴의 「모임 설정」 — 모임 만들기 승인·초대 코드 여러 번 쓰기 켜기·끄기와
+ * 들어온 요청 처리.
  *
  * 관리자만 이 화면에 들어온다(페이지와 API 가 각각 막는다). 여기서 하는 일은 서비스
  * 전체에 걸리므로 무엇이 바뀌는지를 버튼 옆에 문장으로 적는다.
@@ -48,27 +49,7 @@ export function GroupApprovalPanel({
   enabled: boolean;
   pendingCount: number;
 }) {
-  const router = useRouter();
-  const [on, setOn] = useState(enabled);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function toggle() {
-    const next = !on;
-    setOn(next);
-    setBusy(true);
-    setError(null);
-    const result = await apiPut("/api/operator/settings", {
-      groupCreationRequiresApproval: next,
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setOn(!next);
-      setError(result.message);
-      return;
-    }
-    router.refresh();
-  }
+  const { on, busy, error, toggle } = useSettingSwitch(enabled, "groupCreationRequiresApproval");
 
   return (
     <Panel title="모임 만들기 승인">
@@ -98,6 +79,66 @@ export function GroupApprovalPanel({
       <FormError>{error}</FormError>
     </Panel>
   );
+}
+
+export function GroupInviteReusePanel({ enabled }: { enabled: boolean }) {
+  const { on, busy, error, toggle } = useSettingSwitch(enabled, "groupInviteReusable");
+
+  return (
+    <Panel title="모임 초대 코드">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p id="group-invite-reuse-label" className="text-[14px] font-medium">
+            {on
+              ? "24시간 동안 같은 코드로 여러 명이 참여합니다"
+              : "초대 코드는 1회용입니다 — 한 사람만 참여합니다"}
+          </p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+            {on
+              ? "지금부터 발급하는 코드는 만료(24시간) 전까지 몇 명이든 쓸 수 있습니다. 코드가 밖으로 새면 누구나 그 모임의 멤버 전체를 보게 되니 전달에 주의하라고 안내하세요. 끄면 이미 나간 코드도 바로 1회용으로 돌아가고, 한 번 쓰인 코드는 그때부터 막힙니다."
+              : "켜면 그때부터 발급하는 코드는 24시간 동안 여러 명이 함께 쓸 수 있습니다. 이미 나간 1회용 코드는 1회용으로 남습니다."}
+          </p>
+        </div>
+        <Switch
+          checked={on}
+          disabled={busy}
+          labelledBy="group-invite-reuse-label"
+          onChange={() => void toggle()}
+        />
+      </div>
+      <FormError>{error}</FormError>
+    </Panel>
+  );
+}
+
+/**
+ * 설정 하나를 켜고 끄는 상태. 누르는 즉시 화면을 바꾸고 저장하며, 실패하면 되돌린다.
+ */
+function useSettingSwitch(
+  initial: boolean,
+  key: "groupCreationRequiresApproval" | "groupInviteReusable",
+) {
+  const router = useRouter();
+  const [on, setOn] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    const next = !on;
+    setOn(next);
+    setBusy(true);
+    setError(null);
+    const result = await apiPut("/api/operator/settings", { [key]: next });
+    setBusy(false);
+    if (!result.ok) {
+      setOn(!next);
+      setError(result.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  return { on, busy, error, toggle };
 }
 
 /** 켜고 끄는 스위치. 누르는 즉시 저장한다. */

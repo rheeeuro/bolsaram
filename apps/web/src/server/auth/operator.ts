@@ -1,5 +1,5 @@
 /**
- * 관리자 — 서비스 전체 설정과 모임 만들기 승인.
+ * 관리자 — 서비스 전체 설정(모임 만들기 승인·초대 코드 여러 번 쓰기)과 모임 만들기 승인.
  *
  * 관리자는 DB 역할이 아니다. `SEED_ADMIN_EMAIL1` 과 이메일이 같은 **주선자 계정**
  * 하나이고, `syncOperatorAccount` 가 그 계정을 `operator_settings.operator_user_id` 에
@@ -81,52 +81,74 @@ export async function isOperatorUser(sql: Sql, userId: string): Promise<boolean>
 export type OperatorSettings = {
   /** 켜져 있으면 주선자의 모임 만들기가 관리자 승인을 기다린다. */
   groupCreationRequiresApproval: boolean;
+  /** 켜져 있으면 새로 발급한 모임 초대 코드를 만료 전까지 여러 명이 쓴다. 끄면 1회용. */
+  groupInviteReusable: boolean;
   updatedAt: Date;
 };
 
+type SettingsRow = {
+  group_creation_requires_approval: boolean;
+  group_invite_reusable: boolean;
+  updated_at: Date;
+};
+
+const SETTINGS_COLUMNS = `group_creation_requires_approval, group_invite_reusable, updated_at`;
+
+function toSettings(row: SettingsRow | undefined): OperatorSettings {
+  // 한 줄은 마이그레이션이 넣어 둔다. 없으면 승인 없이·1회용으로 도는 기본값으로 본다.
+  return {
+    groupCreationRequiresApproval: row?.group_creation_requires_approval ?? false,
+    groupInviteReusable: row?.group_invite_reusable ?? false,
+    updatedAt: row?.updated_at ?? new Date(0),
+  };
+}
+
 export async function readOperatorSettings(): Promise<OperatorSettings> {
   return withOwner(async (sql) => {
-    const result = await sql.query<{
-      group_creation_requires_approval: boolean;
-      updated_at: Date;
-    }>(`SELECT group_creation_requires_approval, updated_at FROM operator_settings`);
-    const row = result.rows[0];
-    // 한 줄은 마이그레이션이 넣어 둔다. 없으면 승인 없이 도는 기본값으로 본다.
-    return {
-      groupCreationRequiresApproval: row?.group_creation_requires_approval ?? false,
-      updatedAt: row?.updated_at ?? new Date(0),
-    };
+    const result = await sql.query<SettingsRow>(
+      `SELECT ${SETTINGS_COLUMNS} FROM operator_settings`,
+    );
+    return toSettings(result.rows[0]);
   });
 }
 
-export async function setGroupCreationApproval(input: {
+/** 보낸 항목만 바꾼다. 바뀐 항목마다 감사 기록을 하나씩 남긴다. */
+export async function updateOperatorSettings(input: {
   operatorId: string;
-  enabled: boolean;
+  groupCreationRequiresApproval?: boolean;
+  groupInviteReusable?: boolean;
 }): Promise<OperatorSettings> {
   return withOwnerTx(async (sql) => {
-    const result = await sql.query<{
-      group_creation_requires_approval: boolean;
-      updated_at: Date;
-    }>(
-      `INSERT INTO operator_settings (id, group_creation_requires_approval, updated_by)
-       VALUES (true, $1, $2)
-       ON CONFLICT (id) DO UPDATE
-         SET group_creation_requires_approval = EXCLUDED.group_creation_requires_approval,
-             updated_by = EXCLUDED.updated_by
-       RETURNING group_creation_requires_approval, updated_at`,
-      [input.enabled, input.operatorId],
+    await sql.query(`INSERT INTO operator_settings (id) VALUES (true) ON CONFLICT (id) DO NOTHING`);
+    const result = await sql.query<SettingsRow>(
+      `UPDATE operator_settings
+          SET group_creation_requires_approval = COALESCE($1, group_creation_requires_approval),
+              group_invite_reusable = COALESCE($2, group_invite_reusable),
+              updated_by = $3
+        RETURNING ${SETTINGS_COLUMNS}`,
+      [
+        input.groupCreationRequiresApproval ?? null,
+        input.groupInviteReusable ?? null,
+        input.operatorId,
+      ],
     );
-    await writeAudit(sql, {
-      actorUserId: input.operatorId,
-      action: "operator.group_approval.set",
-      entityType: "operator_settings",
-      metadata: { enabled: input.enabled },
-    });
-    const row = result.rows[0]!;
-    return {
-      groupCreationRequiresApproval: row.group_creation_requires_approval,
-      updatedAt: row.updated_at,
-    };
+    if (input.groupCreationRequiresApproval !== undefined) {
+      await writeAudit(sql, {
+        actorUserId: input.operatorId,
+        action: "operator.group_approval.set",
+        entityType: "operator_settings",
+        metadata: { enabled: input.groupCreationRequiresApproval },
+      });
+    }
+    if (input.groupInviteReusable !== undefined) {
+      await writeAudit(sql, {
+        actorUserId: input.operatorId,
+        action: "operator.group_invite_reusable.set",
+        entityType: "operator_settings",
+        metadata: { enabled: input.groupInviteReusable },
+      });
+    }
+    return toSettings(result.rows[0]);
   });
 }
 

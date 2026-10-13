@@ -1,11 +1,13 @@
 /**
- * 관리자 메뉴 › 모임 설정 — 모임 만들기 승인 켜기·끄기와 들어온 요청 처리.
+ * 관리자 메뉴 › 모임 설정 — 모임 만들기 승인·초대 코드 여러 번 쓰기 켜기·끄기와
+ * 들어온 요청 처리.
  */
 import { requireOperatorPage } from "@/server/auth/guard";
 import { listGroupCreationRequests, readOperatorSettings } from "@/server/auth/operator";
 import { Breadcrumb, PageHeader } from "@/components/host/surface";
 import {
   GroupApprovalPanel,
+  GroupInviteReusePanel,
   GroupRequestHistory,
   GroupRequestQueue,
   type OperatorGroupRequest,
@@ -41,13 +43,14 @@ export default async function OperatorGroupsPage() {
       <PageHeader
         kicker="관리자"
         title="모임 설정"
-        description="주선자가 모임을 바로 만들지, 관리자 승인을 거쳐 만들지 정합니다."
+        description="주선자가 모임을 만드는 방식과 동료를 들이는 초대 코드의 쓰임을 정합니다."
       />
       <div className="grid max-w-3xl gap-4">
         <GroupApprovalPanel
           enabled={settings.groupCreationRequiresApproval}
           pendingCount={pending.length}
         />
+        <GroupInviteReusePanel enabled={settings.groupInviteReusable} />
         <GroupRequestQueue pending={pending.map(serialize)} />
         <GroupRequestHistory recent={recent.map(serialize)} />
       </div>

@@ -98,6 +98,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0063_profile_code_from_one.sql`   | 공개 번호 시퀀스를 1 부터 — 다음 번호는 있는 번호 중 가장 큰 값 + 1 |
 | `0064_operator_group_approval.sql` | 관리자 설정(`operator_settings`, 모임 만들기 승인)과 `group_creation_requests` — 승인 전까지 `groups` 행을 만들지 않는다. 둘 다 owner 전용 |
 | `0065_operator_full_access.sql`   | 관리자는 모든 모임·프로필을 모임장·등록한 주선자처럼 다룬다 — `operator_settings.operator_user_id` + `app_is_operator()`, 판정 함수·가져오기/프로필 쓰기 정책에 관리자 분기, 관리자의 `group_admins` 소속 금지 |
+| `0066_group_invite_reusable.sql`  | 모임 초대 코드 여러 번 쓰기 — `operator_settings.group_invite_reusable`, 코드마다 발급 때 설정(`reusable`)과 쓴 횟수(`use_count`). 끄면 이미 나간 코드도 바로 1회용으로 돌아간다 |
 
 ## 테이블
 
@@ -123,9 +124,9 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `telegram_import_sessions`                     | 봇 대화 상태 (ImportSession 과 1:1)                | 관리자만                            |
 | `sessions`                                     | 세션                                               | **권한 없음** (owner 커넥션 전용)   |
 | `telegram_link_codes` · `telegram_webhook_events` | 봇 연결 코드(해시) · webhook 중복 판정          | **권한 없음** (owner 커넥션 전용)   |
-| `group_invite_codes`                           | 모임 초대 코드(해시). 동료 주선자 합류             | **권한 없음** (owner 커넥션 전용)   |
+| `group_invite_codes`                           | 모임 초대 코드(해시). 동료 주선자 합류. 기본 1회용, `reusable` 이면 만료 전까지 여러 번 | **권한 없음** (owner 커넥션 전용)   |
 | `oauth_accounts`                               | 주선자 신원 — 제공자(카카오·구글) + 제공자 고유 id | **권한 없음** (owner 커넥션 전용)   |
-| `operator_settings`                            | 관리자 설정 한 줄 — 관리자 계정(`operator_user_id`)·모임 만들기 승인 여부 | **권한 없음** (owner 커넥션 전용)   |
+| `operator_settings`                            | 관리자 설정 한 줄 — 관리자 계정(`operator_user_id`)·모임 만들기 승인 여부·초대 코드 여러 번 쓰기 | **권한 없음** (owner 커넥션 전용)   |
 | `group_creation_requests`                      | 모임 만들기 요청. 대기·승인·거절·거둠, 승인되면 만든 모임을 가리킨다 | **권한 없음** (owner 커넥션 전용)   |
 
 ## 무결성을 DB 가 지키는 것

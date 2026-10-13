@@ -21,9 +21,14 @@ export default async function OperatorPage() {
     {
       href: "/operator/groups",
       title: "모임 설정",
-      description: settings.groupCreationRequiresApproval
-        ? "모임 만들기 승인 켜짐 — 주선자가 만든 모임은 승인해야 생깁니다."
-        : "모임 만들기 승인 꺼짐 — 주선자가 바로 모임을 만듭니다.",
+      description: [
+        settings.groupCreationRequiresApproval
+          ? "모임 만들기 승인 켜짐 — 주선자가 만든 모임은 승인해야 생깁니다."
+          : "모임 만들기 승인 꺼짐 — 주선자가 바로 모임을 만듭니다.",
+        settings.groupInviteReusable
+          ? "초대 코드는 24시간 동안 여러 명이 씁니다."
+          : "초대 코드는 1회용입니다.",
+      ].join(" "),
       count: pending,
     },
   ];

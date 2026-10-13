@@ -8,7 +8,8 @@
  *
  * 초대 코드는 `invites`(멤버 초대)·`telegram_link_codes` 와 같은 방식이다 — 평문을
  * 저장하지 않고 pepper 를 섞은 해시만 남기며, 소비는 조건부 UPDATE 로 한 번만
- * 성공한다(replay 차단).
+ * 성공한다(replay 차단). 관리자가 「여러 번 쓰기」를 켜 두면 그때 발급한 코드는
+ * 만료 전까지 여러 명이 쓴다(0066).
  *
  * owner 커넥션을 쓰는 이유: 모임 소속은 데이터가 아니라 **신원**에 가깝다.
  * `group_admins` 에 INSERT 정책을 주지 않았으므로 이 경로만이 소속을 바꿀 수 있다.
@@ -319,9 +320,15 @@ export type IssuedGroupInvite = {
   /** 평문 코드. 이 순간 이후 다시 조회할 수 없다. 로그에 남기지 않는다. */
   code: string;
   expiresAt: Date;
+  /** 만료 전까지 여러 명이 쓸 수 있는가. 발급할 때의 관리자 설정을 따른다. */
+  reusable: boolean;
 };
 
-/** 모임에 속한 주선자만 발급할 수 있다(호출부가 `assertGroupAdmin` 으로 확인한다). */
+/**
+ * 모임에 속한 주선자만 발급할 수 있다(호출부가 `assertGroupAdmin` 으로 확인한다).
+ *
+ * 1회용인지 여러 번 쓰는지는 지금 관리자 설정을 코드에 적어 둔다.
+ */
 export async function issueGroupInvite(input: {
   groupId: string;
   createdBy: string;
@@ -329,26 +336,38 @@ export async function issueGroupInvite(input: {
   const code = randomToken(16);
   const expiresAt = new Date(Date.now() + GROUP_INVITE_TTL_HOURS * 3_600_000);
 
-  await withOwnerTx(async (sql) => {
-    // 아직 쓰지 않은 코드는 지운다. 살아 있는 코드가 여러 개면 회수가 어렵다.
+  const reusable = await withOwnerTx(async (sql) => {
+    // 내가 만든 살아 있는 코드는 거둔다. 살아 있는 코드가 여러 개면 회수가 어렵다.
+    // 아직 안 쓴 것은 지우고, 이미 쓰였지만 여러 번 쓰는 것은 기록을 남긴 채 만료시킨다.
     await sql.query(
       `DELETE FROM group_invite_codes
         WHERE group_id = $1 AND created_by = $2 AND consumed_at IS NULL`,
       [input.groupId, input.createdBy],
     );
     await sql.query(
-      `INSERT INTO group_invite_codes (code_hash, group_id, created_by, expires_at)
-       VALUES ($1, $2, $3, $4)`,
+      `UPDATE group_invite_codes SET expires_at = now()
+        WHERE group_id = $1 AND created_by = $2 AND reusable AND expires_at > now()`,
+      [input.groupId, input.createdBy],
+    );
+    const inserted = await sql.query<{ reusable: boolean }>(
+      `INSERT INTO group_invite_codes (code_hash, group_id, created_by, expires_at, reusable)
+       VALUES ($1, $2, $3, $4,
+               COALESCE((SELECT group_invite_reusable FROM operator_settings), false))
+       RETURNING reusable`,
       [hashCode(code), input.groupId, input.createdBy, expiresAt],
     );
+    return inserted.rows[0]!.reusable;
   });
 
-  return { code, expiresAt };
+  return { code, expiresAt, reusable };
 }
 
 /**
  * 코드를 소비하고 그 모임에 합류한다. 이미 속한 모임이 있어도 상관없다 —
  * 여러 모임에 동시에 속할 수 있다. 합류한 모임을 바로 활성 채널로 만든다.
+ *
+ * 1회용 코드는 처음 한 번만 통과한다. 여러 번 쓰는 코드는 만료 전까지 통과하지만
+ * **지금도 관리자 설정이 켜져 있을 때만**이다 — 끄면 이미 쓰인 코드는 그 순간 막힌다.
  *
  * 상한은 **새로 들어갈 때만** 본다. 이미 속한 모임의 코드를 다시 넣으면 소속이
  * 늘지 않으므로 상한에 걸릴 이유가 없다.
@@ -367,10 +386,12 @@ export async function consumeGroupInvite(input: {
     }
     const claimed = await sql.query<{ group_id: string }>(
       `UPDATE group_invite_codes
-          SET consumed_at = now(), consumed_by = $2
+          SET consumed_at = now(), consumed_by = $2, use_count = use_count + 1
         WHERE code_hash = $1
-          AND consumed_at IS NULL
           AND expires_at > now()
+          AND (consumed_at IS NULL
+               OR (reusable AND COALESCE(
+                     (SELECT group_invite_reusable FROM operator_settings), false)))
         RETURNING group_id`,
       [hashCode(input.code), input.userId],
     );

@@ -5,11 +5,11 @@ import { useState, type ReactNode } from "react";
 import { GROUP_NAME_MAX_LENGTH } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
+import { GroupInviteIssuer } from "@/components/host/group-menu";
 import { ImagePicker } from "@/components/host/image-picker";
-import { CopyField } from "@/components/ui/copy-field";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, FormError, Input, Textarea } from "@/components/ui/field";
-import { apiDelete, apiPatch, apiPost } from "@/lib/api-client";
+import { apiDelete, apiPatch } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 
 /**
@@ -220,10 +220,6 @@ function Stat({ label, value }: { label: string; value: string }) {
  * 보면서 누르게 한다.
  */
 function GroupAdmins({ group, viewerUserId }: { group: Group; viewerUserId: string }) {
-  const [issued, setIssued] = useState<{ code: string; expiresAt: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   return (
     <>
       <Panel title="주선자">
@@ -245,39 +241,11 @@ function GroupAdmins({ group, viewerUserId }: { group: Group; viewerUserId: stri
       </Panel>
 
       <Panel title="동료 초대">
-        <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-          코드를 받아 동료에게 전달하세요. <b>24시간·1회용</b>이고 발급 직후 한 번만
-          보입니다. 새로 발급하면 내가 만들어 둔 이전 코드는 쓸 수 없습니다.
-        </p>
-        {issued ? (
-          <div className="space-y-2">
-            <CopyField value={issued.code} />
-            <p className="text-[11.5px] text-[var(--surface-text-muted)]">
-              {new Date(issued.expiresAt).toLocaleString("ko-KR")} 까지
-            </p>
-          </div>
-        ) : (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={() =>
-              void (async () => {
-                setBusy(true);
-                setError(null);
-                const result = await apiPost<{ code: string; expiresAt: string }>(
-                  `/api/admin/groups/${group.groupId}/invite`,
-                );
-                setBusy(false);
-                if (result.ok) setIssued(result.data);
-                else setError(result.message);
-              })()
-            }
-          >
-            {busy ? "발급 중…" : "주선자 초대 코드 받기"}
-          </Button>
-        )}
-        <FormError>{error}</FormError>
+        <GroupInviteIssuer
+          groupId={group.groupId}
+          buttonLabel="주선자 초대 코드 받기"
+          compact
+        />
       </Panel>
     </>
   );

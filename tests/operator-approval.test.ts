@@ -5,6 +5,8 @@
  * 지켜야 하는 성질은 **승인 없이는 모임도 소속도 생기지 않는다**는 것과, 관리자만
  * 다루는 테이블이 런타임 롤에서 열리지 않는다는 것이다.
  *
+ * 초대 코드 여러 번 쓰기는 **켜기는 소급하지 않고 끄기는 바로 걸린다**는 성질을 본다.
+ *
  * 설정은 전역 한 줄이라 다른 테스트 파일에도 걸린다. 파일은 순차로 돌고, 이 파일은
  * 끝날 때 처음 값으로 되돌린다.
  */
@@ -13,8 +15,10 @@ import { closePools, withOwner, withRls } from "@bolsaram/db";
 import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
 import {
   cancelGroupCreationRequest,
+  consumeGroupInvite,
   createGroupForAdmin,
   decideGroupCreationRequest,
+  issueGroupInvite,
   readMyGroupRequests,
   readMyGroups,
   requestGroupCreation,
@@ -22,7 +26,7 @@ import {
 import {
   listGroupCreationRequests,
   readOperatorSettings,
-  setGroupCreationApproval,
+  updateOperatorSettings,
 } from "../apps/web/src/server/auth/operator";
 import { loginWithOAuth } from "../apps/web/src/server/auth/oauth";
 import { runTag } from "./tags";
@@ -49,14 +53,21 @@ async function membershipCount(userId: string): Promise<number> {
 
 let operatorId = "";
 let initialApproval = false;
+let initialInviteReusable = false;
 
 beforeAll(async () => {
-  initialApproval = (await readOperatorSettings()).groupCreationRequiresApproval;
+  const initial = await readOperatorSettings();
+  initialApproval = initial.groupCreationRequiresApproval;
+  initialInviteReusable = initial.groupInviteReusable;
   operatorId = await newAdmin("관리자");
 });
 
 afterAll(async () => {
-  await setGroupCreationApproval({ operatorId, enabled: initialApproval });
+  await updateOperatorSettings({
+    operatorId,
+    groupCreationRequiresApproval: initialApproval,
+    groupInviteReusable: initialInviteReusable,
+  });
   await withOwner(async (sql) => {
     await sql.query(`DELETE FROM users WHERE display_name LIKE $1`, [`${TAG}%`]);
     await sql.query(`DELETE FROM groups WHERE name LIKE $1`, [`${TAG}%`]);
@@ -66,7 +77,7 @@ afterAll(async () => {
 
 describe("승인이 꺼져 있으면", () => {
   it("모임이 바로 만들어진다", async () => {
-    await setGroupCreationApproval({ operatorId, enabled: false });
+    await updateOperatorSettings({ operatorId, groupCreationRequiresApproval: false });
     const admin = await newAdmin("바로");
     const result = await requestGroupCreation({
       userId: admin,
@@ -80,7 +91,7 @@ describe("승인이 꺼져 있으면", () => {
 
 describe("승인이 켜져 있으면", () => {
   beforeAll(async () => {
-    await setGroupCreationApproval({ operatorId, enabled: true });
+    await updateOperatorSettings({ operatorId, groupCreationRequiresApproval: true });
   });
 
   it("요청만 남고 모임도 소속도 생기지 않는다", async () => {
@@ -217,6 +228,75 @@ describe("승인이 켜져 있으면", () => {
     ).rejects.toMatchObject({ code: "CONFLICT" });
     expect(await membershipCount(admin)).toBe(MAX_GROUPS_PER_ADMIN);
     expect((await readMyGroupRequests(admin)).map((r) => r.status)).toEqual(["PENDING"]);
+  });
+});
+
+describe("초대 코드 여러 번 쓰기", () => {
+  let owner = "";
+  let groupId = "";
+
+  beforeAll(async () => {
+    await updateOperatorSettings({ operatorId, groupCreationRequiresApproval: false });
+    owner = await newAdmin("코드주인");
+    ({ groupId } = await createGroupForAdmin({ userId: owner, name: `${TAG}-코드` }));
+  });
+
+  it("꺼져 있으면 1회용이다", async () => {
+    await updateOperatorSettings({ operatorId, groupInviteReusable: false });
+    const issued = await issueGroupInvite({ groupId, createdBy: owner });
+    expect(issued.reusable).toBe(false);
+    await consumeGroupInvite({ code: issued.code, userId: await newAdmin("한번") });
+    await expect(
+      consumeGroupInvite({ code: issued.code, userId: await newAdmin("두번") }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("켜져 있을 때 발급한 코드는 여러 명이 쓰고, 쓴 횟수를 센다", async () => {
+    await updateOperatorSettings({ operatorId, groupInviteReusable: true });
+    const issued = await issueGroupInvite({ groupId, createdBy: owner });
+    expect(issued.reusable).toBe(true);
+    const joiners = [await newAdmin("여럿1"), await newAdmin("여럿2"), await newAdmin("여럿3")];
+    for (const userId of joiners) await consumeGroupInvite({ code: issued.code, userId });
+    for (const userId of joiners) expect(await membershipCount(userId)).toBe(1);
+    const row = await withOwner((sql) =>
+      sql.query<{ use_count: number }>(
+        `SELECT use_count FROM group_invite_codes
+          WHERE group_id = $1 AND reusable ORDER BY created_at DESC LIMIT 1`,
+        [groupId],
+      ),
+    );
+    expect(row.rows[0]?.use_count).toBe(3);
+  });
+
+  it("켜도 이미 나간 1회용 코드는 1회용으로 남는다", async () => {
+    await updateOperatorSettings({ operatorId, groupInviteReusable: false });
+    const issued = await issueGroupInvite({ groupId, createdBy: owner });
+    await updateOperatorSettings({ operatorId, groupInviteReusable: true });
+    await consumeGroupInvite({ code: issued.code, userId: await newAdmin("소급1") });
+    await expect(
+      consumeGroupInvite({ code: issued.code, userId: await newAdmin("소급2") }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("끄면 이미 쓰인 여러 번 코드는 그 순간 막힌다", async () => {
+    await updateOperatorSettings({ operatorId, groupInviteReusable: true });
+    const issued = await issueGroupInvite({ groupId, createdBy: owner });
+    await consumeGroupInvite({ code: issued.code, userId: await newAdmin("끄기전") });
+    await updateOperatorSettings({ operatorId, groupInviteReusable: false });
+    await expect(
+      consumeGroupInvite({ code: issued.code, userId: await newAdmin("끈뒤") }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("새로 발급하면 이미 쓰인 여러 번 코드도 더는 쓸 수 없다", async () => {
+    await updateOperatorSettings({ operatorId, groupInviteReusable: true });
+    const first = await issueGroupInvite({ groupId, createdBy: owner });
+    await consumeGroupInvite({ code: first.code, userId: await newAdmin("이전코드") });
+    const second = await issueGroupInvite({ groupId, createdBy: owner });
+    await expect(
+      consumeGroupInvite({ code: first.code, userId: await newAdmin("이전코드2") }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await consumeGroupInvite({ code: second.code, userId: await newAdmin("새코드") });
   });
 });
 
