@@ -48,8 +48,10 @@ export default async function HostHomePage() {
           WHERE group_id IS NOT DISTINCT FROM $1 AND status = 'ACTIVE')::int AS "profilesActive",
         (SELECT count(*) FROM profiles
           WHERE group_id IS NOT DISTINCT FROM $1)::int AS "profilesTotal",
+        -- 초대는 등록한 주선자만 보내므로 담당분만 센다(초대 화면과 같은 숫자).
         (SELECT count(*) FROM profiles
-          WHERE group_id IS NOT DISTINCT FROM $1 AND user_id IS NULL)::int AS "profilesUnclaimed",
+          WHERE group_id IS NOT DISTINCT FROM $1 AND user_id IS NULL
+            AND app_can_edit_profile(id))::int AS "profilesUnclaimed",
         (SELECT count(*) FROM match_requests r
           WHERE r.status = 'REQUESTED' AND EXISTS (
             SELECT 1 FROM profiles p WHERE p.id = r.requester_profile_id
@@ -156,10 +158,10 @@ export default async function HostHomePage() {
           href="/profiles?status=ACTIVE"
         />
         <Stat
-          label="들어온 멤버"
-          value={kpi.membersTotal}
-          hint={`초대를 기다리는 프로필 ${kpi.profilesUnclaimed}개`}
-          href="/members"
+          label="초대를 기다리는 분"
+          value={kpi.profilesUnclaimed}
+          hint={`들어온 멤버 ${kpi.membersTotal}명`}
+          href="/invites"
         />
       </div>
 
@@ -243,8 +245,8 @@ export default async function HostHomePage() {
               description="멤버에게 안 보이는 분을 확인하고 활성으로 바꿉니다."
             />
             <QuickLink
-              href="/members"
-              title="초대 링크 · 입장코드 보내기"
+              href="/invites"
+              title="초대 보내기"
               description="멤버는 이 링크로만 들어옵니다."
             />
             <QuickLink

@@ -55,7 +55,7 @@ curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' \
 
 - 인증 화면: `/` `/enter`(멤버 입장코드) `/login`(주선자 소셜 로그인) `/claim/<토큰>`
 - 멤버 화면: `/discover` `/discover/<id>` `/signals` `/favorites` `/me`
-- 주선자 화면: `/home` `/imports` `/profiles` `/requests` `/members` `/group`
+- 주선자 화면: `/home` `/imports` `/profiles` `/requests` `/invites` `/group`
 - 권한: 쿠키 없이 호출해 401, 멤버 쿠키로 `/home` 호출해 `/discover` 리다이렉트인지
 - 정보 공개: 연결되지 않은 상대의 상세에 `realName` 키가 **없는지**
 

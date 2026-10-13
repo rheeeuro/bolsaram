@@ -27,7 +27,7 @@ export const HOST_LINKS: HostLink[] = [
   // 카카오톡에서 받자마자 폰으로 올리는 일이 가장 잦다 — 하단 탭 가운데, 엄지 자리에 둔다.
   { href: "/imports", label: "가져오기", primary: true },
   { href: "/requests", label: "신청", primary: true },
-  { href: "/members", label: "멤버" },
+  { href: "/invites", label: "초대" },
 ];
 
 export function isHostLinkActive(link: HostLink, pathname: string): boolean {
@@ -108,21 +108,24 @@ export function HostNavIcon({ name }: { name: string }) {
           />
         </svg>
       );
-    case "/members":
+    case "/invites":
       return (
         <svg {...SVG} aria-hidden>
-          <circle cx="7.8" cy="7.4" r="2.6" stroke="currentColor" strokeWidth="1.3" />
-          <path
-            d="M2.8 16.2c0-2.5 2.2-4 5-4s5 1.5 5 4"
+          <rect
+            x="3"
+            y="4.8"
+            width="14"
+            height="10.4"
+            rx="1.9"
             stroke="currentColor"
             strokeWidth="1.3"
-            strokeLinecap="round"
           />
           <path
-            d="M13.6 5.2a2.4 2.4 0 0 1 0 4.5M14.6 16.2c0-1.9-.6-3.1-1.7-3.8"
+            d="m3.6 6 6.4 4.6L16.4 6"
             stroke="currentColor"
             strokeWidth="1.3"
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
       );

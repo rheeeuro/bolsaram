@@ -104,7 +104,10 @@ export function InviteRow({
   );
 }
 
-/** 발급 이력 상태. 만료 여부는 화면에서 계산한다. */
+/**
+ * 발급 이력 상태. 만료 여부는 화면에서 계산한다.
+ * 미발급은 그리지 않는다 — 초대 화면이 「아직 보내지 않은 분」으로 이미 묶어 보여준다.
+ */
 function State({
   expiresAt,
   claimedAt,
@@ -112,8 +115,8 @@ function State({
   expiresAt: string | null;
   claimedAt: string | null;
 }) {
-  if (!expiresAt) return <Badge tone="neutral">미발급</Badge>;
-  if (claimedAt) return <Badge tone="active">사용됨</Badge>;
+  if (!expiresAt) return null;
+  if (claimedAt) return <Badge tone="danger">사용됨</Badge>;
   const expires = new Date(expiresAt);
   if (expires.getTime() < Date.now()) return <Badge tone="danger">만료</Badge>;
   return (

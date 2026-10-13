@@ -51,6 +51,7 @@ export function HostProfileDetail({
   canEdit,
   status,
   claimed,
+  lastVisitAt,
   createdAt,
   bump,
   invite,
@@ -61,6 +62,8 @@ export function HostProfileDetail({
   canEdit: boolean;
   status: string;
   claimed: boolean;
+  /** 본인 계정의 마지막 방문. 담당이 아니거나 아직 들어온 적이 없으면 null. */
+  lastVisitAt: string | null;
   /** 등록 시각(ISO). */
   createdAt: string;
   /** 마지막 끌어올림·다음 가능 시각(ISO)과 지금 못 하는 이유. */
@@ -189,6 +192,16 @@ export function HostProfileDetail({
             {canEdit ? (
               <span className="text-[12.5px] text-[var(--surface-text-muted)]">
                 · {claimed ? "본인 계정 연결됨" : "아직 초대하지 않았습니다"}
+                {claimed ? (
+                  lastVisitAt ? (
+                    <>
+                      {" · "}
+                      <time dateTime={lastVisitAt}>{formatDateTime(lastVisitAt)}</time> 방문
+                    </>
+                  ) : (
+                    " · 방문 전"
+                  )
+                ) : null}
               </span>
             ) : null}
           </div>

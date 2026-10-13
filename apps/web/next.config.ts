@@ -21,15 +21,19 @@ const config: NextConfig = {
   serverExternalPackages: ["pg"],
   poweredByHeader: false,
   async redirects() {
+    // 주선자가 즐겨찾기해 둔 옛 화면 주소. 화면 이름이 바뀌어도 들어오던 길은 남긴다.
+    const renamed = [{ source: "/members", destination: "/invites", permanent: false }];
+
     // 같은 화면이 다른 주소(www·http)로도 열리면 canonical 이 있어도 검색엔진이
     // 「대체 페이지」로 따로 센다. 공개 도메인 하나로 영구 이동시킨다.
     // 로컬(http://localhost)과 감시기·헬스체크가 부르는 localhost 는 건드리지 않는다.
     const raw = process.env.APP_ORIGIN;
-    if (!raw?.startsWith("https://")) return [];
+    if (!raw?.startsWith("https://")) return renamed;
     const origin = new URL(raw).origin;
     const host = new URL(raw).host;
     const destination = `${origin}/:path*`;
     return [
+      ...renamed,
       ...(host.startsWith("www.")
         ? []
         : [

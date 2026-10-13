@@ -29,6 +29,8 @@ export type HostProfileData = {
    */
   status: string;
   claimed: boolean;
+  /** 본인 계정의 마지막 방문. 담당이고 계정이 이어졌을 때만 읽는다. */
+  lastVisitAt: string | null;
   /** 등록 시각. 운영 정보라 담당이 아니어도 보인다. */
   createdAt: string;
   /**
@@ -74,6 +76,13 @@ export async function loadHostProfile(
         )
       : null;
     const latest = invite?.rows[0];
+    const visit =
+      canEdit && profile.userId
+        ? await sql.query<{ last_login_at: Date | null }>(
+            `SELECT last_login_at FROM users WHERE id = $1`,
+            [profile.userId],
+          )
+        : null;
     const source = canEdit ? (await sourceTextsFor(sql, [profile.id])).get(profile.id) : null;
     const memo = canEdit ? await findProfileMemo(sql, profile.id) : null;
 
@@ -82,6 +91,7 @@ export async function loadHostProfile(
       view: toDetailView(profile, level),
       status: profile.status,
       claimed: profile.userId != null,
+      lastVisitAt: visit?.rows[0]?.last_login_at?.toISOString() ?? null,
       createdAt: profile.createdAt.toISOString(),
       bump: {
         lastAt: profile.bumpedAt?.toISOString() ?? null,

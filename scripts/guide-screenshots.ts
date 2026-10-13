@@ -609,8 +609,8 @@ async function shoot(browser: Browser, fixtures: Fixtures): Promise<void> {
     // 발급 직후 화면이 한 번 새로 그려지므로 주소는 찍기 직전에 바꾼다.
     await shotPanel(page, "멤버 화면 열기", "invite", () => showPublicOrigin(page));
 
-    await open(page, "/members");
-    await shot(page, "members");
+    await open(page, "/invites");
+    await shot(page, "invites");
 
     await open(page, "/requests");
     await shot(page, "requests");
