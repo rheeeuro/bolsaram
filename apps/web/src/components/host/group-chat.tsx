@@ -5,8 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GROUP_MESSAGE_MAX_LENGTH } from "@bolsaram/schemas";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { useChatStream, type ChatMessage } from "@/components/host/chat-stream";
-import { Button } from "@/components/ui/button";
-import { FormError, Textarea } from "@/components/ui/field";
+import { FormError } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { groupSystemMessageParts } from "@/lib/labels";
 
@@ -26,6 +25,9 @@ import { groupSystemMessageParts } from "@/lib/labels";
  *
  * 보이는 범위는 **들어온 시점부터**다(0045). 화면이 자르는 것이 아니라 정책이 막으므로
  * 여기서는 따로 다루지 않는다 — 새로 합류한 사람에게는 자기 입장 기록이 첫 줄이 된다.
+ *
+ * `compact` 는 오른쪽 아래 떠 있는 패널(`HostChatPanel`) 안에 들어갈 때의 배치다.
+ * 패널이 이미 카드이므로 테두리를 두르지 않고 주어진 높이를 채운다.
  */
 
 export type { ChatMessage };
@@ -35,11 +37,13 @@ export function GroupChat({
   viewerId,
   initialMessages,
   telegramNotify,
+  compact = false,
 }: {
   groupId: string;
   viewerId: string;
   initialMessages: ChatMessage[];
   telegramNotify: boolean;
+  compact?: boolean;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
@@ -53,6 +57,7 @@ export function GroupChat({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   /** 이미 읽음으로 찍은 시각. 같은 값을 두 번 보내지 않는다. */
   const markedRef = useRef<string | null>(null);
 
@@ -97,14 +102,26 @@ export function GroupChat({
     [groupId, subscribe, append],
   );
 
-  // 새 메시지가 쌓이면 바닥으로 따라가고 읽음을 찍는다.
+  // 패널은 열자마자 쓰는 곳이다. 넓은 화면에서만 입력칸에 커서를 둔다 — 폰에서는
+  // 키보드가 올라와 읽으려던 대화를 가린다.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    if (compact && window.matchMedia("(min-width: 1024px)").matches) inputRef.current?.focus();
+  }, [compact]);
+
+  // 새 메시지가 쌓이면 바닥으로 따라가고 읽음을 찍는다. 떠 있는 패널은 자기 안에서만
+  // 내린다 — `scrollIntoView` 는 뒤에 깔린 화면까지 움직인다.
+  useEffect(() => {
+    if (compact) {
+      const box = scrollRef.current;
+      if (box) box.scrollTop = box.scrollHeight;
+    } else {
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    }
     if (latestAt && markedRef.current !== latestAt) {
       markedRef.current = latestAt;
       markRead(groupId, latestAt);
     }
-  }, [groupId, latestAt, markRead]);
+  }, [compact, groupId, latestAt, markRead]);
 
   async function loadOlder() {
     const oldest = messages[0]?.createdAt;
@@ -166,11 +183,20 @@ export function GroupChat({
   }
 
   return (
-    <div className="grid max-w-3xl gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[12.5px] text-[var(--surface-text-muted)]">
-          지운 메시지는 자리만 남고 내용은 사라집니다. 고칠 수는 없습니다.
-        </p>
+    <div className={compact ? "flex h-full min-h-0 flex-col" : "grid max-w-3xl gap-3"}>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2",
+          compact
+            ? "justify-end border-b border-[var(--surface-border)] px-4 py-2"
+            : "justify-between",
+        )}
+      >
+        {compact ? null : (
+          <p className="text-[12.5px] text-[var(--surface-text-muted)]">
+            지운 메시지는 자리만 남고 내용은 사라집니다. 고칠 수는 없습니다.
+          </p>
+        )}
         <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-[var(--surface-text-muted)]">
           <input
             type="checkbox"
@@ -185,9 +211,14 @@ export function GroupChat({
       <div
         ref={scrollRef}
         className={cn(
-          "flex h-[58vh] min-h-80 flex-col gap-0.5 overflow-y-auto",
-          "rounded-[var(--radius-card)] border border-[var(--surface-border)]",
-          "bg-[var(--surface-card)] px-4 py-4 shadow-[var(--shadow-card)]",
+          "flex flex-col gap-0.5 overflow-y-auto overscroll-contain",
+          compact
+            ? "min-h-0 flex-1 px-4 py-3"
+            : [
+                "h-[58vh] min-h-80",
+                "rounded-[var(--radius-card)] border border-[var(--surface-border)]",
+                "bg-[var(--surface-card)] px-4 py-4 shadow-[var(--shadow-card)]",
+              ],
         )}
       >
         {messages.length === 0 ? (
@@ -229,27 +260,76 @@ export function GroupChat({
         <div ref={bottomRef} />
       </div>
 
-      <FormError>{error}</FormError>
+      {compact ? (
+        error ? (
+          <div className="px-4 pb-1">
+            <FormError>{error}</FormError>
+          </div>
+        ) : null
+      ) : (
+        <FormError>{error}</FormError>
+      )}
 
-      <div className="flex items-end gap-2">
-        <Textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            // Enter 로 보내고 Shift+Enter 로 줄을 바꾼다. 조합 중(한글)에는 보내지 않는다.
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              void send();
-            }
-          }}
-          maxLength={GROUP_MESSAGE_MAX_LENGTH}
-          rows={2}
-          placeholder="메시지를 입력하세요. Enter 로 보내고 Shift+Enter 로 줄을 바꿉니다."
-          className="min-h-[52px] flex-1"
-        />
-        <Button onClick={() => void send()} disabled={sending || draft.trim().length === 0}>
-          보내기
-        </Button>
+      {/* 입력칸과 보내기를 한 상자에 담는다. 글은 위에 쓰고, 아래 줄 오른쪽 끝에서 보낸다. */}
+      <div className={cn(compact && "border-t border-[var(--surface-border)] p-3")}>
+        <div
+          className={cn(
+            "rounded-2xl border border-[var(--surface-border)] bg-white px-3.5 pb-2 pt-3",
+            "transition-colors duration-[var(--duration-quick)]",
+            // 안쪽 입력칸의 포커스 링을 지운 대신 상자가 포커스를 드러낸다.
+            "focus-within:border-[var(--color-rose-400)] focus-within:ring-1 focus-within:ring-[var(--color-rose-400)]",
+          )}
+        >
+          <textarea
+            ref={inputRef}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter 로 보내고 Shift+Enter 로 줄을 바꾼다. 조합 중(한글)에는 보내지 않는다.
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                void send();
+              }
+            }}
+            maxLength={GROUP_MESSAGE_MAX_LENGTH}
+            rows={2}
+            aria-label="메시지"
+            placeholder="메시지를 입력하세요"
+            className={cn(
+              "block max-h-40 min-h-12 w-full resize-none bg-transparent field-sizing-content",
+              "text-[14px] leading-relaxed placeholder:text-[var(--color-ink-500)]",
+              "focus-visible:outline-none",
+            )}
+          />
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-[11.5px] text-[var(--surface-text-muted)]">
+              Enter 보내기 · Shift+Enter 줄바꿈
+            </p>
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={sending || draft.trim().length === 0}
+              aria-label="보내기"
+              title="보내기"
+              className={cn(
+                "grid size-9 shrink-0 place-items-center rounded-full",
+                "bg-[var(--color-rose-600)] text-white",
+                "transition-colors duration-[var(--duration-quick)] enabled:hover:bg-[var(--color-burgundy-700)]",
+                "disabled:bg-[var(--surface-muted)] disabled:text-[var(--color-ink-500)]",
+              )}
+            >
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
+                <path
+                  d="M10 15.5v-11M5.5 9 10 4.5 14.5 9"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -96,6 +96,26 @@
     }
   }
 
+  /* 채팅 버튼을 누르면 같은 모서리에 뜨는 패널. 좁은 화면에서는 하단 탭 위를
+     거의 다 쓰고, 넓은 화면에서는 오른쪽 아래에 말풍선처럼 떠 있다. */
+  .host-chat-panel {
+    left: 0.75rem;
+    right: 0.75rem;
+    top: calc(env(safe-area-inset-top) + 0.75rem);
+    bottom: calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 0.75rem);
+  }
+
+  @media (min-width: 1024px) {
+    .host-chat-panel {
+      left: auto;
+      top: auto;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      width: 26rem;
+      height: min(40rem, calc(100dvh - 3rem));
+    }
+  }
+
   /* 스크롤바를 숨기되 스크롤은 유지한다(필터 칩 가로 스크롤). */
   .no-scrollbar {
     scrollbar-width: none;

@@ -636,7 +636,11 @@ async function shoot(browser: Browser, fixtures: Fixtures): Promise<void> {
     await page.waitForLoadState("networkidle");
     await shot(page, "import-review");
 
-    await open(page, "/chat");
+    // 채팅은 보던 화면 위에 패널로 뜬다. 멤버 목록 위에 연 모습을 찍는다.
+    await open(page, "/profiles");
+    await page.locator(CHAT_FAB).click();
+    await page.getByRole("dialog", { name: `${GROUP_NAME} 채팅` }).locator("textarea").waitFor();
+    await page.waitForLoadState("networkidle");
     await shot(page, "chat");
 
     await context.close();

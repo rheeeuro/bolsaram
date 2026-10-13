@@ -71,8 +71,13 @@ export default async function HostLayout({ children }: { children: React.ReactNo
             {children}
           </main>
         </div>
-        {/* 채팅은 내비게이션 목록이 아니라 어느 화면에서나 같은 자리에 떠 있다. */}
-        <HostChatFab activeGroupId={viewer.groupId} />
+        {/* 채팅은 내비게이션 목록이 아니라 어느 화면에서나 같은 자리에 떠 있다.
+            누르면 그 자리에 패널로 열린다. */}
+        <HostChatFab
+          activeGroupId={viewer.groupId}
+          groupName={viewer.groups.find((g) => g.id === viewer.groupId)?.name ?? "모임"}
+          viewerId={viewer.userId}
+        />
       </ChatStreamProvider>
     </div>
   );
