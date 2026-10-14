@@ -15,6 +15,7 @@
  *
  * 텔레그램 대화는 찍을 수 없어서 봇의 실제 문구(`server/telegram/messages.ts`)로
  * 대화창을 그려 넣는다.
+ * 카카오톡에서 봇으로 공유하는 순서도 같은 방식으로, 지어낸 대화방으로 그린다.
  *
  * 이 호스트처럼 Chromium 이 쓰는 시스템 라이브러리나 한글 폰트가 없으면, 패키지를
  * 설치하지 않고 `.deb` 를 풀어 둔 위치를 알려준다(`scripts/README.md` 참고).
@@ -665,6 +666,7 @@ async function shoot(browser: Browser, fixtures: Fixtures): Promise<void> {
   }
 
   await shootTelegram(browser);
+  await shootKakaoShare(browser);
 }
 
 // ── 텔레그램 대화 그림 ───────────────────────────────────────
@@ -769,6 +771,163 @@ async function shootTelegram(browser: Browser): Promise<void> {
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(OUT_DIR, "telegram-bot.jpg"), type: "jpeg", quality: 85, fullPage: true });
   console.info("  telegram-bot.jpg");
+  await page.close();
+}
+
+// ── 카카오톡 → 텔레그램 공유 그림 ────────────────────────────
+
+/** 대화방·친구 이름은 모두 지어낸 것이다. 실제 대화방을 찍어 싣지 않는다. */
+async function shootKakaoShare(browser: Browser): Promise<void> {
+  const uri = (svg: string) => `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  const [p0, p1, p2] = [
+    portraitSvg(IMPORT_PERSON.look),
+    sceneSvg(IMPORT_PERSON.look),
+    portraitSvg(PEOPLE[3]!.look),
+  ].map(uri);
+  const person = (name: string, color: string, mark = false) =>
+    `<div class="who${mark ? " mark" : ""}"><i style="background:${color}">${name.slice(0, 1)}</i><span>${name}</span></div>`;
+  const plane = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M3 11.5 20 4.5l-3 15-5.5-4-2.5 3v-4.5l8-7.5-10 6z" fill="#fff"/></svg>`;
+  const shareIcon = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4M6 12v7h12v-7"/></svg>`;
+  const status = `<div class="status"><span>9:41</span><span>▮▮▮</span></div>`;
+  const chatBehind = `<div class="kbar"><b>‹</b><span>프로필 공유방</span><em>4</em></div>`;
+
+  const screens = [
+    {
+      caption: "대화방에서 사진 옆 <b>공유</b> 버튼",
+      html: `<div class="screen kakao">${status}${chatBehind}
+        <div class="chat"><div class="msg"><i class="face" style="background:#9fb3c8">수</i><div>
+          <small>수진</small>
+          <div class="album-row">
+            <div class="album"><div class="a big" style="background-image:url('${p0}')"></div>
+              <div class="a" style="background-image:url('${p1}')"></div>
+              <div class="a" style="background-image:url('${p2}')"></div></div>
+            <span class="share mark">${shareIcon}</span>
+          </div>
+          <div class="kbubble">97/163/약사/성남 거주\n클라이밍, 전시 보기를 좋아해요</div>
+        </div></div></div>
+        <div class="input">메시지 입력</div></div>`,
+    },
+    {
+      caption: "공유 창 맨 아래 <b>더보기</b>",
+      html: `<div class="screen kakao">${status}${chatBehind}<div class="shade"></div>
+        <div class="sheet ksheet"><div class="grab"></div>
+          <div class="search">⌕ 공유할 친구, 채팅방 검색</div>
+          <div class="chips"><span class="on">전체</span><span>친구</span><span>최근 공유</span></div>
+          <ul>${[
+            ["민지", "#b9a6e0"],
+            ["가족", "#e3b7a0"],
+            ["독서 모임", "#a5c7b1"],
+            ["지현", "#9fb3c8"],
+          ]
+            .map(([name, color]) => `<li><i style="background:${color}">${name!.slice(0, 1)}</i><b>${name}</b><em></em></li>`)
+            .join("")}</ul>
+          <div class="foot"><div class="act"><i>나</i><span>나에게</span></div>
+            <div class="act mark"><i>···</i><span>더보기</span></div></div>
+        </div></div>`,
+    },
+    {
+      caption: "휴대폰 공유 창에서 <b>텔레그램</b>",
+      html: `<div class="screen kakao">${status}${chatBehind}<div class="shade"></div>
+        <div class="sheet isheet">
+          <div class="ihead"><div class="thumb" style="background-image:url('${p0}')"></div>
+            <div><b>3개의 이미지</b><small>1.7MB</small></div></div>
+          <div class="people">${person("민지", "#b9a6e0")}${person("가족", "#e3b7a0")}${person("지현", "#9fb3c8")}${person("서연", "#a5c7b1")}</div>
+          <div class="apps">
+            <div class="app"><i style="background:#3fc35a">✉</i><span>메시지</span></div>
+            <div class="app"><i style="background:#3d8bf2">@</i><span>메일</span></div>
+            <div class="app mark"><i style="background:#2aa3de">${plane}</i><span>텔레그램</span></div>
+            <div class="app"><i style="background:#f4c542">✎</i><span>메모</span></div>
+          </div>
+          <div class="actions"><span>복사</span><span>이미지 저장</span><span>더 보기</span></div>
+        </div></div>`,
+    },
+    {
+      caption: "<b>볼사람</b> 봇을 골라 보내기",
+      html: `<div class="screen kakao">${status}${chatBehind}<div class="shade"></div>
+        <div class="sheet tsheet">
+          <div class="thead"><span>⌕</span><div><b>공유하기</b><small>대화방 선택</small></div></div>
+          <div class="grid">${person("저장한 메시지", "#2aa3de")}${person("볼사람", "#b0545f", true)}${person("민지", "#b9a6e0")}${person("가족", "#e3b7a0")}${person("독서 모임", "#a5c7b1")}${person("지현", "#9fb3c8")}</div>
+          <div class="cancel">취소</div>
+        </div></div>`,
+    },
+  ];
+
+  const css = `
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--font-clean-sans), sans-serif; background: #fbf7f1; color: #1d2329; }
+    .steps { display: grid; grid-template-columns: repeat(2, 260px); gap: 26px 30px; padding: 26px 28px; width: max-content; }
+    figure { margin: 0; }
+    figcaption { margin-top: 10px; font-size: 14px; text-align: center; color: #3b3f45; }
+    figcaption em { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 6px; border-radius: 50%; background: #b0545f; color: #fff; font-style: normal; font-size: 12.5px; font-weight: 700; }
+    .screen { position: relative; height: 470px; overflow: hidden; border: 7px solid #22262b; border-radius: 34px; display: flex; flex-direction: column; }
+    .kakao { background: #b8c9d9; }
+    .status { display: flex; justify-content: space-between; padding: 8px 22px 2px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+    .kbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px 8px; font-size: 13px; font-weight: 600; }
+    .kbar b { font-size: 20px; font-weight: 400; } .kbar em { color: #5e6e7d; font-style: normal; font-size: 12px; }
+    .chat { flex: 1; padding: 6px 10px; }
+    .msg { display: flex; gap: 7px; }
+    .face { flex: none; width: 30px; height: 30px; border-radius: 11px; display: grid; place-items: center; color: #fff; font-size: 12px; font-style: normal; }
+    .msg small { font-size: 10.5px; color: #3e4c59; }
+    .album-row { display: flex; align-items: center; gap: 8px; margin: 3px 0 6px; }
+    .album { display: grid; grid-template-columns: 74px 74px; grid-template-rows: 60px 60px; gap: 2px; border-radius: 10px; overflow: hidden; }
+    .a { background-size: cover; background-position: center; } .a.big { grid-row: span 2; }
+    .share { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(40,48,56,.45); }
+    .kbubble { max-width: 172px; padding: 7px 9px; border-radius: 4px 12px 12px 12px; background: #fff; font-size: 11px; line-height: 1.45; white-space: pre-wrap; }
+    .input { margin: 8px; padding: 8px 12px; border-radius: 18px; background: #fff; color: #9aa4ad; font-size: 11px; }
+    .shade { position: absolute; inset: 0; background: rgba(20,24,28,.38); }
+    .sheet { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px 18px 0 0; background: #fff; padding: 8px 12px 14px; }
+    .grab { width: 34px; height: 4px; margin: 0 auto 10px; border-radius: 2px; background: #d4d7db; }
+    .search { padding: 8px 10px; border-radius: 9px; background: #f1f2f4; color: #8b949c; font-size: 11px; }
+    .chips { display: flex; gap: 5px; margin: 9px 0 4px; }
+    .chips span { padding: 4px 9px; border-radius: 13px; border: 1px solid #dfe2e5; font-size: 10.5px; }
+    .chips .on { background: #22262b; border-color: #22262b; color: #fff; }
+    ul { margin: 0; padding: 0; list-style: none; }
+    li { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 12px; }
+    li i { width: 30px; height: 30px; border-radius: 11px; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 12px; }
+    li b { flex: 1; font-weight: 600; } li em { width: 17px; height: 17px; border-radius: 50%; border: 1.5px solid #c5cad0; }
+    .foot { display: flex; gap: 18px; margin-top: 8px; padding: 10px 6px 0; border-top: 1px solid #eceef0; }
+    .act { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10.5px; }
+    .act i { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #f1f2f4; font-style: normal; font-weight: 700; }
+    .isheet { background: #f2f2f6; }
+    .ihead { display: flex; gap: 10px; align-items: center; padding: 6px 2px 12px; border-bottom: 1px solid #dedee3; }
+    .ihead b { display: block; font-size: 12.5px; } .ihead small { color: #8a8a90; font-size: 10.5px; }
+    .thumb { width: 42px; height: 42px; border-radius: 8px; background-size: cover; background-position: center; }
+    .people, .apps, .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 4px; padding: 12px 0 4px; }
+    .who, .app { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 10px; text-align: center; }
+    .who i { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 15px; font-weight: 700; }
+    .app i { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 19px; font-weight: 700; }
+    .actions { display: flex; gap: 5px; margin-top: 12px; }
+    .actions span { flex: 1; padding: 8px 2px; border-radius: 10px; background: #fff; font-size: 10px; text-align: center; }
+    .tsheet { padding-top: 14px; }
+    .thead { display: grid; grid-template-columns: 24px 1fr 24px; align-items: center; text-align: center; color: #8b949c; }
+    .thead b { display: block; color: #1d2329; font-size: 14px; } .thead small { font-size: 10px; }
+    .grid { grid-template-columns: repeat(3, 1fr); gap: 14px 4px; padding: 16px 0 8px; }
+    .cancel { margin-top: 8px; padding: 10px; border-radius: 12px; background: #f1f2f4; text-align: center; font-size: 12.5px; font-weight: 600; }
+    .mark { position: relative; }
+    .mark::after { content: ""; position: absolute; inset: -7px; border: 3px solid #e0473f; border-radius: 999px; }
+    .act.mark::after, .who.mark::after, .app.mark::after { inset: -6px -4px; border-radius: 22px; }
+  `;
+  const html = `<div class="steps">${screens
+    .map((s, i) => `<figure>${s.html}<figcaption><em>${i + 1}</em>${s.caption}</figcaption></figure>`)
+    .join("")}</div>`;
+
+  // 텔레그램 대화 그림과 같은 이유로 앱 페이지의 웹폰트를 빌려 그린다.
+  const page = await browser.newPage({ viewport: { width: 640, height: 600 }, deviceScaleFactor: 2 });
+  await open(page, "/privacy");
+  await page.evaluate(
+    ({ css, html }) => {
+      const style = document.createElement("style");
+      style.textContent = css;
+      document.head.append(style);
+      document.body.className = "";
+      document.body.innerHTML = html;
+    },
+    { css, html },
+  );
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(300);
+  await page.locator(".steps").screenshot({ path: path.join(OUT_DIR, "kakao-share.jpg"), type: "jpeg", quality: 85 });
+  console.info("  kakao-share.jpg");
   await page.close();
 }
 
