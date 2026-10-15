@@ -68,7 +68,7 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
           {/* 사진이 왼쪽, 원문이 오른쪽. 좁은 화면에서는 사진 아래로 글이 내려온다. */}
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             {item.images.length > 0 ? (
-              <PhotoAlbum profileId={item.id} images={item.images} />
+              <PhotoAlbum profileId={item.id} images={item.images} muted={!item.visible} />
             ) : (
               // 사진이 없어도 자리는 같게 둔다 — 줄마다 글 시작점이 달라지면 훑기 어렵다.
               <div className="flex aspect-3/4 w-40 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-ivory-200)] text-[12px] text-[var(--color-ink-700)] sm:w-52">
@@ -123,9 +123,12 @@ function fallbackNote(item: RawListItem): string {
 function PhotoAlbum({
   profileId,
   images,
+  muted,
 }: {
   profileId: string;
   images: { id: string; url: string }[];
+  /** 비활성 프로필 — 사진을 흑백으로 둔다. */
+  muted: boolean;
 }) {
   const shown = images.slice(0, 4);
   const rest = images.length - shown.length;
@@ -158,7 +161,10 @@ function PhotoAlbum({
             src={image.url}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.03]"
+            className={cn(
+              "h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.03]",
+              muted && "grayscale",
+            )}
           />
           {rest > 0 && index === shown.length - 1 ? (
             <span className="absolute inset-0 flex items-center justify-center bg-[var(--color-ink-900)]/55 text-[15px] font-medium text-white">

@@ -180,7 +180,11 @@ export default async function HostProfilesPage({
                       src={view.primaryImage.url}
                       alt=""
                       loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.02]"
+                      className={cn(
+                        "h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.02]",
+                        // 비활성은 멤버에게 안 보인다 — 훑을 때 배지보다 먼저 눈에 걸리게 흑백으로 둔다.
+                        !visible && "grayscale",
+                      )}
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-700)]">

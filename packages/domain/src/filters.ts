@@ -156,34 +156,49 @@ export const HAS_PHOTO_SQL =
 export const PROFILE_LISTED_AT_SQL = "COALESCE(p.bumped_at, p.created_at)";
 
 /**
- * 목록 정렬. 사진 없는 프로필을 뒤로 민다 — 카드 그리드가 빈 회색으로 시작하면
- * 첫 화면이 못 쓰게 된다. 사진 유무 안에서는 올라온 순(끌어올림 포함)이다.
- * 세 키 모두 DESC 라 커서는 튜플 비교 하나로 이어진다(boolean 은 false < true).
+ * 활성 판정식. 멤버 목록은 활성만 걸러 오므로 언제나 참이고, 주선자 목록에서만
+ * 비활성을 뒤로 미는 키가 된다.
  */
-export const PROFILE_ORDER_BY = `${HAS_PHOTO_SQL} DESC, ${PROFILE_LISTED_AT_SQL} DESC, p.id DESC`;
-
-/** 커서가 정렬 키와 같은 튜플을 보는 비교식. 값 자리 셋을 받는다. */
-export function profileCursorClause(hasPhoto: string, listedAt: string, id: string): string {
-  return `(${HAS_PHOTO_SQL}, ${PROFILE_LISTED_AT_SQL}, p.id) < (${hasPhoto}, ${listedAt}, ${id})`;
-}
-
-export type ProfileCursor = { hasPhoto: boolean; listedAt: Date; id: string };
+export const IS_ACTIVE_SQL = "(p.status = 'ACTIVE')";
 
 /**
- * 커서 페이지네이션. 정렬 키와 같은 순서로 `<0|1>|<iso8601>|<uuid>` 를 싣는다.
+ * 목록 정렬. 비활성을 맨 뒤로, 그 앞에서 사진 없는 프로필을 뒤로 민다 — 카드 그리드가
+ * 빈 회색이나 흑백으로 시작하면 첫 화면이 못 쓰게 된다. 그 안에서는 올라온 순(끌어올림 포함)이다.
+ * 네 키 모두 DESC 라 커서는 튜플 비교 하나로 이어진다(boolean 은 false < true).
+ */
+export const PROFILE_ORDER_BY = `${IS_ACTIVE_SQL} DESC, ${HAS_PHOTO_SQL} DESC, ${PROFILE_LISTED_AT_SQL} DESC, p.id DESC`;
+
+/** 커서가 정렬 키와 같은 튜플을 보는 비교식. 값 자리 넷을 받는다. */
+export function profileCursorClause(
+  active: string,
+  hasPhoto: string,
+  listedAt: string,
+  id: string,
+): string {
+  return `(${IS_ACTIVE_SQL}, ${HAS_PHOTO_SQL}, ${PROFILE_LISTED_AT_SQL}, p.id) < (${active}, ${hasPhoto}, ${listedAt}, ${id})`;
+}
+
+export type ProfileCursor = { active: boolean; hasPhoto: boolean; listedAt: Date; id: string };
+
+/**
+ * 커서 페이지네이션. 정렬 키와 같은 순서로 `<0|1>|<0|1>|<iso8601>|<uuid>` 를 싣는다.
  * 잘못된 값은 무시하고 첫 페이지를 준다.
  */
 export function encodeCursor(row: ProfileCursor): string {
-  return `${row.hasPhoto ? "1" : "0"}|${row.listedAt.toISOString()}|${row.id}`;
+  return `${row.active ? "1" : "0"}|${row.hasPhoto ? "1" : "0"}|${row.listedAt.toISOString()}|${row.id}`;
 }
 
 export function decodeCursor(cursor: string | undefined): ProfileCursor | null {
   if (!cursor) return null;
   const parts = cursor.split("|");
-  if (parts.length !== 3) return null;
-  const [flag, iso, id] = parts as [string, string, string];
-  if (flag !== "0" && flag !== "1") return null;
+  if (parts.length !== 4) return null;
+  const [active, photo, iso, id] = parts as [string, string, string, string];
+  if (!isFlag(active) || !isFlag(photo)) return null;
   const listedAt = new Date(iso);
   if (Number.isNaN(listedAt.getTime()) || id.length === 0) return null;
-  return { hasPhoto: flag === "1", listedAt, id };
+  return { active: active === "1", hasPhoto: photo === "1", listedAt, id };
+}
+
+function isFlag(value: string): boolean {
+  return value === "0" || value === "1";
 }

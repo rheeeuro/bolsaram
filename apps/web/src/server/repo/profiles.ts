@@ -8,6 +8,7 @@ import type { Sql } from "@bolsaram/db";
 import {
   DomainError,
   HAS_PHOTO_SQL,
+  IS_ACTIVE_SQL,
   PROFILE_BUMP_COOLDOWN_HOURS,
   PROFILE_LISTED_AT_SQL,
   PROFILE_ORDER_BY,
@@ -70,9 +71,9 @@ type ProfileRow = {
  * 목록 쿼리는 정렬 키(사진 유무·올라온 시각)를 함께 뽑는다. 커서에 실어야 다음 페이지가
  * 같은 자리에서 이어진다.
  */
-type ProfileListRow = ProfileRow & { has_photo: boolean; listed_at: Date };
+type ProfileListRow = ProfileRow & { is_active: boolean; has_photo: boolean; listed_at: Date };
 
-const LIST_COLUMNS = `${PROFILE_COLUMNS}, ${HAS_PHOTO_SQL} AS has_photo, ${PROFILE_LISTED_AT_SQL} AS listed_at`;
+const LIST_COLUMNS = `${PROFILE_COLUMNS}, ${IS_ACTIVE_SQL} AS is_active, ${HAS_PHOTO_SQL} AS has_photo, ${PROFILE_LISTED_AT_SQL} AS listed_at`;
 
 export type ProfileRecord = FullProfile & {
   userId: string | null;
@@ -233,8 +234,9 @@ export async function findDiscoverProfiles(
   let clause = where.text;
   const cursor = decodeCursor(query.cursor);
   if (cursor) {
-    values.push(cursor.hasPhoto, cursor.listedAt, cursor.id);
-    clause += ` AND ${profileCursorClause(`$${values.length - 2}`, `$${values.length - 1}`, `$${values.length}`)}`;
+    values.push(cursor.active, cursor.hasPhoto, cursor.listedAt, cursor.id);
+    const n = values.length;
+    clause += ` AND ${profileCursorClause(`$${n - 3}`, `$${n - 2}`, `$${n - 1}`, `$${n}`)}`;
   }
   values.push(query.limit + 1);
 
@@ -262,6 +264,7 @@ export async function findDiscoverProfiles(
     nextCursor:
       hasMore && last
         ? encodeCursor({
+            active: last.is_active,
             hasPhoto: last.has_photo,
             listedAt: last.listed_at,
             id: last.id,
@@ -620,8 +623,9 @@ export async function findAdminProfiles(
   let clause = where;
   const cursor = decodeCursor(query.cursor);
   if (cursor) {
-    values.push(cursor.hasPhoto, cursor.listedAt, cursor.id);
-    clause += ` AND ${profileCursorClause(`$${values.length - 2}`, `$${values.length - 1}`, `$${values.length}`)}`;
+    values.push(cursor.active, cursor.hasPhoto, cursor.listedAt, cursor.id);
+    const n = values.length;
+    clause += ` AND ${profileCursorClause(`$${n - 3}`, `$${n - 2}`, `$${n - 1}`, `$${n}`)}`;
   }
   values.push(query.limit + 1);
 
@@ -647,6 +651,7 @@ export async function findAdminProfiles(
     nextCursor:
       hasMore && last
         ? encodeCursor({
+            active: last.is_active,
             hasPhoto: last.has_photo,
             listedAt: last.listed_at,
             id: last.id,

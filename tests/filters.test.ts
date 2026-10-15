@@ -6,6 +6,7 @@ import {
   buildDiscoverWhere,
   HAS_PHOTO_SQL,
   PROFILE_LISTED_AT_SQL,
+  IS_ACTIVE_SQL,
   PROFILE_ORDER_BY,
   decodeCursor,
   encodeCursor,
@@ -152,12 +153,15 @@ describe("buildDiscoverWhere", () => {
 
 describe("커서", () => {
   it("왕복 인코딩이 값을 보존한다", () => {
-    for (const hasPhoto of [true, false]) {
-      const row = { hasPhoto, listedAt: new Date("2026-09-07T01:02:03.456Z"), id: "abc-123" };
-      const decoded = decodeCursor(encodeCursor(row));
-      expect(decoded?.id).toBe("abc-123");
-      expect(decoded?.hasPhoto).toBe(hasPhoto);
-      expect(decoded?.listedAt.toISOString()).toBe(row.listedAt.toISOString());
+    for (const active of [true, false]) {
+      for (const hasPhoto of [true, false]) {
+        const row = { active, hasPhoto, listedAt: new Date("2026-09-07T01:02:03.456Z"), id: "abc-123" };
+        const decoded = decodeCursor(encodeCursor(row));
+        expect(decoded?.id).toBe("abc-123");
+        expect(decoded?.active).toBe(active);
+        expect(decoded?.hasPhoto).toBe(hasPhoto);
+        expect(decoded?.listedAt.toISOString()).toBe(row.listedAt.toISOString());
+      }
     }
   });
 
@@ -166,21 +170,24 @@ describe("커서", () => {
       undefined,
       "",
       "no-separator",
-      "1|not-a-date|id",
-      "1|2026-01-01T00:00:00Z|",
-      // 사진 유무 축이 없는 옛 형식. 정렬이 달라졌으므로 이어붙이지 않고 첫 페이지로 돌린다.
+      "1|1|not-a-date|id",
+      "1|1|2026-01-01T00:00:00Z|",
+      "2|1|2026-01-01T00:00:00Z|abc-123",
+      "1|2|2026-01-01T00:00:00Z|abc-123",
+      // 활성 축이 없는 옛 형식. 정렬이 달라졌으므로 이어붙이지 않고 첫 페이지로 돌린다.
+      "1|2026-01-01T00:00:00Z|abc-123",
       "2026-01-01T00:00:00Z|abc-123",
-      "2|2026-01-01T00:00:00Z|abc-123",
     ]) {
       expect(decodeCursor(bad)).toBeNull();
     }
   });
 
-  it("정렬은 사진 있는 쪽을 먼저, 그 안에서 올라온 순(끌어올림 포함)으로 놓는다", () => {
-    // 커서 튜플 비교가 성립하려면 세 키가 모두 DESC 여야 한다.
+  it("정렬은 활성을 먼저, 그 안에서 사진 있는 쪽, 다시 그 안에서 올라온 순(끌어올림 포함)으로 놓는다", () => {
+    // 커서 튜플 비교가 성립하려면 네 키가 모두 DESC 여야 한다.
     expect(PROFILE_LISTED_AT_SQL).toBe("COALESCE(p.bumped_at, p.created_at)");
+    expect(IS_ACTIVE_SQL).toBe("(p.status = 'ACTIVE')");
     expect(PROFILE_ORDER_BY).toBe(
-      `${HAS_PHOTO_SQL} DESC, ${PROFILE_LISTED_AT_SQL} DESC, p.id DESC`,
+      `${IS_ACTIVE_SQL} DESC, ${HAS_PHOTO_SQL} DESC, ${PROFILE_LISTED_AT_SQL} DESC, p.id DESC`,
     );
   });
 });
