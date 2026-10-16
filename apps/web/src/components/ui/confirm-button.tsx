@@ -38,8 +38,10 @@ export function ConfirmButton({
   }
 
   return (
-    <span className="animate-pop inline-flex flex-wrap items-center gap-2 rounded-[10px] border border-[var(--color-rose-200)] bg-[var(--color-rose-100)] px-3 py-2">
-      <span className="text-[12px] leading-snug text-[var(--color-burgundy-800)]">
+    // 펼친 문장이 부모 폭을 밀어내지 않게 한다. 부모는 shrink-0 이면 안 된다 — 문장 길이만큼
+    // 버티다 좁은 화면에서 페이지 전체가 가로로 넘친다.
+    <span className="animate-pop inline-flex max-w-full flex-wrap items-center gap-2 rounded-[10px] border border-[var(--color-rose-200)] bg-[var(--color-rose-100)] px-3 py-2">
+      <span className="min-w-0 text-[12px] leading-snug text-[var(--color-burgundy-800)]">
         {message}
       </span>
       {/* 확인 단계는 실제로 일이 벌어지는 클릭이다. 먼저 누른 버튼보다 작아지지 않게

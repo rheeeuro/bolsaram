@@ -44,7 +44,13 @@ export function useGroupSwitch(activeGroupId: string | null) {
       const result = await apiPut("/api/admin/groups/active", { groupId });
       if (result.ok) {
         onDone?.();
-        startTransition(() => router.refresh());
+        // 어느 화면에서 바꿨든 홈으로 간다. 상세·검토 화면은 이전 모임의 것이라
+        // 그 자리에 남으면 새 모임에서 볼 수 없는 화면이 된다. 공유 레이아웃(사이드바)은
+        // 이동만으로는 다시 그려지지 않으니 refresh 를 함께 건다.
+        startTransition(() => {
+          router.push("/home");
+          router.refresh();
+        });
       } else {
         setError(result.message);
       }

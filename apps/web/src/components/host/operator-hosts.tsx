@@ -137,7 +137,7 @@ function HostItem({ host }: { host: OperatorHost }) {
           ) : null}
         </div>
         {host.isOperator ? null : (
-          <div className="shrink-0">
+          <div className="min-w-0">
             {host.suspension ? (
               <ConfirmButton
                 label="정지 풀기"

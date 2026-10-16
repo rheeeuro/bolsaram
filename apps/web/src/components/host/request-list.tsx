@@ -132,7 +132,7 @@ export function HostRequestList({
 
                   <PartyCard party={item.target} />
 
-                  <div className="ml-auto flex shrink-0 items-center gap-3">
+                  <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
                     <span className="text-[12px] text-[var(--surface-text-muted)]">
                       {new Date(item.requestedAt).toLocaleString("ko-KR", {
                         month: "numeric",
