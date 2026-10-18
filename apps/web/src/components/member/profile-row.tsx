@@ -6,6 +6,7 @@ import { AiRecommendBadge, ProfileCode } from "@/components/ui/marks";
 import {
   cardLines,
   enterProps,
+  HeightNote,
   profileHref,
   type CardOrigin,
 } from "@/components/member/profile-card";
@@ -61,12 +62,13 @@ export function ProfileRow({
               className="display text-[15px] text-[var(--color-ink-900)]"
             />
             <span className="truncate text-[12.5px] text-[var(--color-ink-700)]">
-              {lines.facts}
+              {lines.birth}
             </span>
             {profile.aiRecommended ? <AiRecommendBadge className="self-center" /> : null}
           </p>
           <p className="mt-0.5 truncate text-[12.5px] text-[var(--color-ink-600)]">
             {lines.work}
+            <HeightNote height={lines.height} after={lines.work} />
           </p>
         </div>
       </Link>

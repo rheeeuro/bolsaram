@@ -15,14 +15,33 @@ export function profileHref(id: string, from?: CardOrigin): string {
   return from ? `/discover/${id}?from=${from}` : `/discover/${id}`;
 }
 
-/** 목록에 싣는 두 줄. 카드와 한 줄 목록이 같은 문장을 쓴다. */
-export function cardLines(profile: ProfileCardView): { facts: string; work: string } {
+/**
+ * 목록에 싣는 조각. 카드와 한 줄 목록이 같은 문장을 쓴다.
+ * 키는 출생연도 옆에 두면 먼저 읽히므로 직업·지역 줄 끝에 `HeightNote` 로 작게 붙인다.
+ */
+export function cardLines(profile: ProfileCardView): {
+  birth: string;
+  height: string | null;
+  work: string;
+} {
   return {
-    facts: `${profile.birthYear}년생${profile.height ? ` · ${profile.height}cm` : ""}`,
+    birth: `${profile.birthYear}년생`,
+    height: profile.height ? `${profile.height}cm` : null,
     work: [label.jobCategory(profile.jobCategory), label.region(profile.residenceRegion)]
       .filter(Boolean)
       .join(" · "),
   };
+}
+
+/** 직업·지역 줄 끝에 붙는 키. 앞 줄이 비어 있으면 구분점 없이 키만 쓴다. */
+export function HeightNote({ height, after }: { height: string | null; after: string }) {
+  if (!height) return null;
+  return (
+    <span className="text-[11.5px] text-[var(--color-ink-500)]">
+      {after ? " · " : ""}
+      {height}
+    </span>
+  );
 }
 
 /**
@@ -95,8 +114,11 @@ export function ProfileCard({
         />
         {/* 사진 위 표시는 접근성 트리에서 감춘 링크 안에 있다. 여기서 한 번 더 읽어 준다. */}
         {profile.aiRecommended ? <span className="sr-only">AI 추천</span> : null}
-        <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">{lines.facts}</p>
-        <p className="text-[12.5px] text-[var(--color-ink-600)]">{lines.work}</p>
+        <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">{lines.birth}</p>
+        <p className="text-[12.5px] text-[var(--color-ink-600)]">
+          {lines.work}
+          <HeightNote height={lines.height} after={lines.work} />
+        </p>
       </Link>
     </article>
   );

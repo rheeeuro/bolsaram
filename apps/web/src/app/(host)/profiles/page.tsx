@@ -219,15 +219,16 @@ export default async function HostProfilesPage({
                   )}
                   <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">
                     {label.birthYear(view.birthYear)}
-                    {view.height ? ` · ${view.height}cm` : ""}
                   </p>
+                  {/* 키는 출생연도 옆에 두면 먼저 읽힌다. 직업·지역 줄 끝에 작게 붙인다. */}
                   <p className="text-[12.5px] text-[var(--color-ink-600)]">
-                    {[
-                      view.jobTitle ?? label.jobCategory(view.jobCategory),
-                      label.region(view.residenceRegion),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    {workLine(view)}
+                    {view.height ? (
+                      <span className="text-[11.5px] text-[var(--color-ink-500)]">
+                        {workLine(view) ? " · " : ""}
+                        {view.height}cm
+                      </span>
+                    ) : null}
                   </p>
                   <p className="mt-1 text-[11.5px] text-[var(--color-ink-500)]">
                     {bumpedAt ? (
@@ -296,6 +297,16 @@ function ViewTab({
       {children}
     </Link>
   );
+}
+
+/** 카드 셋째 줄. 직함이 있으면 직업군보다 먼저 쓴다. */
+function workLine(view: ProfileDetailView): string {
+  return [
+    view.jobTitle ?? label.jobCategory(view.jobCategory),
+    label.region(view.residenceRegion),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /**
