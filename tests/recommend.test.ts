@@ -64,15 +64,14 @@ const person = (patch: Partial<RecommendSubject>): RecommendSubject => ({
   ...patch,
 });
 
-describe("조건 견주기 (도메인)", () => {
-  it("조건마다 맞음·다름·모름을 판정한다", () => {
+describe("AI 추천 규칙 (도메인)", () => {
+  it("조건마다 맞음·다름·모름을 판정하고, 모두 맞아야 만족이다", () => {
     const c = criteria({ heightMin: 175, religions: ["NONE"], regions: ["BUSAN"] });
     const result = evaluateIdeal(c, person({ height: 180, religion: null }));
     const byKey = Object.fromEntries(result.checks.map((x) => [x.key, x.outcome]));
     expect(byKey).toEqual({ height: "met", region: "unmet", religion: "unknown" });
-    // (1 + 0 + 0.5) / 3
-    expect(result.score).toBeCloseTo(0.5);
-    expect(result.blocked).toBe(false);
+    expect(result.meetsAll).toBe(false);
+    expect(evaluateIdeal(criteria({ heightMin: 175 }), person({ height: 180 })).meetsAll).toBe(true);
   });
 
   it("지역은 사는 곳이나 일하는 곳 중 하나가 맞으면 맞다", () => {
@@ -81,57 +80,51 @@ describe("조건 견주기 (도메인)", () => {
     expect(r.checks[0]!.outcome).toBe("met");
   });
 
-  it("키워드는 겹칠 때만 가산하고, 안 겹친다고 깎지 않는다", () => {
-    const c = criteria({ heightMin: 175, keywords: ["운동"] });
-    const hit = evaluateIdeal(c, person({ hashtags: ["운동매니아"] }));
-    expect(hit.keywordHits).toEqual(["운동매니아"]);
-    expect(hit.score).toBe(1);
-    const miss = evaluateIdeal(c, person({ hashtags: ["독서"] }));
-    expect(miss.keywordHits).toEqual([]);
-    expect(miss.score).toBe(1);
-  });
-
-  it("피하는 낱말이 상대 태그·취미와 겹치면 어긋난 조건 하나로 치고, 서로 맞음에서 뺀다", () => {
-    const c = criteria({ heightMin: 175, avoidKeywords: ["문신"] });
-    const tattoo = evaluateIdeal(c, person({ hashtags: ["문신"] }));
-    expect(tattoo.avoidHits).toEqual(["문신"]);
-    expect(tattoo.score).toBe(0.5);
-    expect(tattoo.blocked).toBe(false);
-    expect(evaluateIdeal(c, person({ hashtags: ["등산"] })).score).toBe(1);
-
-    const subject = person({ id: "s", gender: "FEMALE", birthYear: 1995, criteria: c });
-    const both = person({ id: "a", hashtags: ["문신"], criteria: criteria({ birthYearMin: 1993 }) });
-    // 0.5 와 1 의 평균은 넘지만, 이 분 기준(0.5)이 추천 기준에 못 미쳐 빠진다.
-    expect(rankRecommendations(subject, [both])).toEqual([]);
-  });
-
-  it("「꼭」 조건이 다르면 막히고, 「모름」만으로는 추천되지 않는다", () => {
+  it("확실한 조건을 모두 만족하는 사람만 추천한다 — 모름은 만족이 아니다", () => {
     const subject = person({
       id: "s",
       gender: "FEMALE",
-      criteria: criteria({ heightMin: 175, smoking: ["NONE"], required: ["smoking"] }),
+      criteria: criteria({ heightMin: 175, smoking: ["NONE"] }),
     });
-    const smoker = person({ id: "a", smoking: "REGULAR" });
-    const unknown = person({ id: "b", smoking: null });
-    const onlyUnknown = person({ id: "c", height: null, smoking: null });
-    expect(evaluateIdeal(subject.criteria!, smoker).blocked).toBe(true);
-    // 적힌 값이 없는 것은 다른 것이 아니다 — 막지 않는다.
-    expect(evaluateIdeal(subject.criteria!, unknown).blocked).toBe(false);
-    const ids = rankRecommendations(subject, [smoker, unknown, onlyUnknown]).map((r) => r.candidateId);
-    // 「모름」만 있으면 추천 기준(0.75)을 넘지 못한다 — 맞는 조건이 하나는 있어야 한다.
-    expect(ids).toEqual(["b"]);
+    const fits = person({ id: "a", height: 180, smoking: "NONE" });
+    const unknownSmoking = person({ id: "b", height: 180, smoking: null });
+    const short = person({ id: "c", height: 170, smoking: "NONE" });
+    expect(rankRecommendations(subject, [fits, unknownSmoking, short]).map((r) => r.candidateId)).toEqual([
+      "a",
+    ]);
   });
 
-  it("상대 쪽 「꼭」 조건에 이 분이 안 맞아도 뺀다", () => {
-    const subject = person({ id: "s", gender: "FEMALE", birthYear: 1990, criteria: null });
-    const picky = person({
-      id: "a",
-      criteria: criteria({ birthYearMin: 1993, required: ["age"] }),
+  it("성격·취미 키워드와 피하는 낱말은 판정에 쓰지 않는다", () => {
+    const subject = person({
+      id: "s",
+      gender: "FEMALE",
+      criteria: criteria({ heightMin: 175, keywords: ["운동"], avoidKeywords: ["문신"] }),
     });
-    expect(rankRecommendations(subject, [picky])).toEqual([]);
+    const tattoo = person({ id: "a", height: 180, hashtags: ["문신"] });
+    const noSport = person({ id: "b", height: 180, hashtags: ["독서"] });
+    expect(rankRecommendations(subject, [tattoo, noSport]).map((r) => r.candidateId).sort()).toEqual([
+      "a",
+      "b",
+    ]);
+    // 키워드만 있는 이상형은 판정할 확실한 조건이 없다.
+    const vague = person({ id: "v", gender: "FEMALE", criteria: criteria({ keywords: ["다정함"] }) });
+    expect(rankRecommendations(vague, [noSport])).toEqual([]);
   });
 
-  it("이 분에게 조건이 없으면 상대의 이상형에 맞는 사람을 고른다", () => {
+  it("상대의 「꼭」 조건에 이 분이 안 맞으면 뺀다", () => {
+    const subject = person({
+      id: "s",
+      gender: "FEMALE",
+      birthYear: 1990,
+      criteria: criteria({ heightMin: 175 }),
+    });
+    const picky = person({ id: "a", criteria: criteria({ birthYearMin: 1993, required: ["age"] }) });
+    const loose = person({ id: "b", criteria: criteria({ birthYearMin: 1993 }) });
+    // 「꼭」이 아니면 상대 쪽이 어긋나도 이 분의 조건으로 정한다.
+    expect(rankRecommendations(subject, [picky, loose]).map((r) => r.candidateId)).toEqual(["b"]);
+  });
+
+  it("이 분에게 확실한 조건이 없으면 상대의 조건을 이 분이 모두 만족하는 사람을 고른다", () => {
     const subject = person({ id: "s", gender: "FEMALE", birthYear: 1995, height: 163 });
     const fits = person({ id: "a", criteria: criteria({ birthYearMin: 1993 }) });
     const nope = person({ id: "b", criteria: criteria({ birthYearMax: 1990 }) });
@@ -139,10 +132,9 @@ describe("조건 견주기 (도메인)", () => {
     const ranked = rankRecommendations(subject, [fits, nope, silent]);
     expect(ranked.map((r) => r.candidateId)).toEqual(["a"]);
     expect(ranked[0]!.forward).toBeNull();
-    expect(ranked[0]!.reverse!.score).toBe(1);
   });
 
-  it("양쪽 다 잘 맞으면 서로 맞는다고 표시하고 앞에 세운다", () => {
+  it("서로 모두 만족하면 서로 맞음으로 앞에 세운다", () => {
     const subject = person({
       id: "s",
       gender: "FEMALE",
@@ -150,27 +142,10 @@ describe("조건 견주기 (도메인)", () => {
       criteria: criteria({ heightMin: 175, regions: ["SEOUL"] }),
     });
     const both = person({ id: "a", criteria: criteria({ birthYearMin: 1993 }) });
-    const oneWay = person({ id: "b", residenceRegion: "SEOUL", height: 176 });
+    const oneWay = person({ id: "b", height: 176 });
     const ranked = rankRecommendations(subject, [oneWay, both]);
     expect(ranked.map((r) => r.candidateId)).toEqual(["a", "b"]);
-    expect(ranked[0]!.mutual).toBe(true);
-    expect(ranked[1]!.mutual).toBe(false);
-  });
-
-  it("이 분의 이상형에 맞으면 상대의 이상형이 어긋나도 넣되, 뒤에 세운다", () => {
-    const subject = person({
-      id: "s",
-      gender: "FEMALE",
-      birthYear: 1995,
-      criteria: criteria({ heightMin: 175 }),
-    });
-    const wantsOlder = person({ id: "a", height: 180, criteria: criteria({ birthYearMax: 1993 }) });
-    const plain = person({ id: "b", height: 176 });
-    const notMyType = person({ id: "c", height: 165, criteria: criteria({ birthYearMin: 1993 }) });
-    const ranked = rankRecommendations(subject, [wantsOlder, plain, notMyType]);
-    // 상대만 이 분을 원하는 경우(c)는 이 분 기준으로 걸러진다.
-    expect(ranked.map((r) => r.candidateId)).toEqual(["b", "a"]);
-    expect(ranked[1]!.reverse!.checks[0]!.outcome).toBe("unmet");
+    expect(ranked.map((r) => r.mutual)).toEqual([true, false]);
   });
 
   it("양쪽 어디에도 조건이 없으면 추천하지 않는다", () => {

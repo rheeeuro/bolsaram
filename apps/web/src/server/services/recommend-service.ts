@@ -47,8 +47,8 @@ export async function recommendedIdsFor(
 }
 
 /**
- * 상세 화면 한 사람에 대한 같은 판정. 풀을 훑지 않고 그 사람만 견준다 — 같은 규칙이라
- * 목록의 표시와 상세의 표시가 갈리지 않는다. 경계(같은 쪽·이성)는 부르는 쪽이 이미 확인했다.
+ * 상세 화면 한 사람에 대한 같은 판정. 규칙이 한 사람씩 견주는 것이라 풀을 훑지 않는다.
+ * 경계(같은 쪽·이성)는 부르는 쪽이 이미 확인했다.
  */
 export async function isRecommendedFor(
   sql: Sql,

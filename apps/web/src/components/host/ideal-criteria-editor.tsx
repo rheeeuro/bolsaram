@@ -50,7 +50,8 @@ function toNumber(raw: string): number | null {
  * 이상형 조건 편집기. 가져오기 검토와 내용 고치기가 함께 쓴다.
  *
  * 값은 AI 가 이상형 글에서 뽑아 두지만 **주선자가 고치는 프로필 항목**이다 — 추천은 이
- * 값만 견준다. 비운 조건은 따지지 않고, 「꼭」을 켠 조건이 다른 분은 추천에서 빠진다.
+ * 값만 견준다. 적힌 확실한 조건을 모두 만족해야 추천이고, 비운 조건은 따지지 않는다.
+ * 「꼭」은 거꾸로 상대 멤버의 화면에서 이 분을 빼는 데 쓰인다. 키워드·피하는 것은 판정에 안 쓴다.
  * 정리(뒤집힌 범위·범위 밖 숫자)는 저장할 때 서버가 한다. 여기서 하면 입력 도중에 값이 튄다.
  */
 export function IdealCriteriaEditor({
@@ -107,7 +108,7 @@ export function IdealCriteriaEditor({
             type="button"
             disabled={disabled || !idealCriterionStated(criteria, k)}
             aria-pressed={criteria.required.includes(k)}
-            title="켜면 이 조건이 다른 분에게는 AI 추천이 붙지 않습니다"
+            title="켜면 이 조건에 맞지 않는 분의 화면에는 이 분이 AI 추천으로 뜨지 않습니다"
             onClick={() => toggleRequired(k)}
             className={cn(
               "rounded-full border px-2 py-0.5 text-[11px] transition-colors duration-[var(--duration-quick)]",
@@ -241,9 +242,9 @@ export function IdealCriteriaEditor({
         ),
       })}
       <p className={cn("text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]")}>
-        비워 둔 조건은 따지지 않습니다. 「꼭」을 켠 조건이 다른 분에게는 AI 추천이 붙지
-        않습니다. 키워드는 상대의 해시태그·취미와 겹치면 더 잘 맞는 것으로, 피하는 것은
-        겹치면 덜 맞는 것으로 봅니다. 흡연·종교처럼 위에서 고를 수 있는 것은 위에서 고르세요.
+        적어 둔 조건을 상대가 모두 만족해야 AI 추천이 붙고, 비워 둔 조건은 따지지 않습니다.
+        「꼭」을 켜면 이 조건에 맞지 않는 분의 화면에는 이 분이 추천으로 뜨지 않습니다.
+        키워드와 피하는 것은 참고로 저장하고 추천 판정에는 쓰지 않습니다.
       </p>
     </div>
   );
