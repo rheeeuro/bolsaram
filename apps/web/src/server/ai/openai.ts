@@ -39,7 +39,8 @@ export class OpenAiExtractionProvider implements ExtractionProvider {
     if (input.text && input.text.trim().length > 0) {
       content.push({
         type: "text",
-        text: `아래는 카카오톡에서 받은 프로필 원문이다.\n\n---\n${input.text}\n---`,
+        // 올해를 함께 준다 — 이상형의 「30대 초반」 같은 나이를 출생연도로 바꾸는 기준이다.
+        text: `올해는 ${new Date().getFullYear()}년이다. 아래는 카카오톡에서 받은 프로필 원문이다.\n\n---\n${input.text}\n---`,
       });
     } else {
       // 원문이 없으면 채울 근거가 없다. 사진은 보내지 않으므로 전부 null 이 나온다.

@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
 import { FavoriteButton } from "@/components/member/favorite-button";
-import { ProfileCode } from "@/components/ui/marks";
+import { AiRecommendBadge, ProfileCode } from "@/components/ui/marks";
 import type { ProfileCardView } from "@/server/views/profile-view";
 
 /** 돌아갈 화면. 상세의 뒤로가기가 이 값을 읽는다. */
@@ -75,6 +75,10 @@ export function ProfileCard({
               사진 준비 중
             </div>
           )}
+          {/* 하트가 오른쪽 위에 있으므로 왼쪽 위에 둔다. */}
+          {profile.aiRecommended ? (
+            <AiRecommendBadge onPhoto className="absolute left-2 top-2" />
+          ) : null}
         </div>
       </Link>
 
@@ -89,6 +93,8 @@ export function ProfileCard({
           code={profile.code}
           className="display text-[15px] text-[var(--color-ink-900)]"
         />
+        {/* 사진 위 표시는 접근성 트리에서 감춘 링크 안에 있다. 여기서 한 번 더 읽어 준다. */}
+        {profile.aiRecommended ? <span className="sr-only">AI 추천</span> : null}
         <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">{lines.facts}</p>
         <p className="text-[12.5px] text-[var(--color-ink-600)]">{lines.work}</p>
       </Link>

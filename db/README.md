@@ -101,6 +101,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0066_group_invite_reusable.sql`  | 모임 초대 코드 여러 번 쓰기 — `operator_settings.group_invite_reusable`, 코드마다 발급 때 설정(`reusable`)과 쓴 횟수(`use_count`). 끄면 이미 나간 코드도 바로 1회용으로 돌아간다 |
 | `0067_host_suspension.sql`        | 주선자 정지(`user_suspensions`, owner 전용 — 주선자만, 관리자 불가를 트리거로)와 모임 만들기 요청을 관리자에게 알리는 `GROUP_CREATION_REQUESTED` 알림 |
 | `0068_group_chat_notify_mode.sql` | 채팅 텔레그램 알림을 세 단계로(`group_chat_notify` — 모든 새 메시지·멘션만·끄기, 기본 멘션만). 알림 행은 텔레그램을 연결한 사람에게만, 「멘션만」은 본문에 `@이름` 이 있을 때만 만든다 |
+| `0069_profile_ideal_criteria.sql` | `profile_ideal_criteria` — 추천을 열 때 AI 로 읽어 채우던 이상형 조건 캐시 (0070 에서 지움) |
+| `0070_profile_ideal_criteria_column.sql` | 이상형 조건을 프로필 항목으로 — `profiles.ideal_criteria`(jsonb, 객체만). 가져오기 추출이 함께 뽑고 주선자가 고친다. 0069 의 캐시 테이블을 지운다 |
 
 ## 테이블
 
@@ -111,7 +113,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `group_messages`                               | 모임 채팅방의 글과 사건(`system_kind`). 고칠 수 없고 사람의 글만 지워진다 | 같은 모임 주선자 중 **들어온 뒤의 것만** (쓰기는 본인 명의·사람의 글만) |
 | `group_chat_prefs`                             | 주선자별 방 상태 — 읽은 위치·텔레그램 알림 단계(`notify`) | 본인 것만                           |
 | `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임, `avatar_key` 는 프로필 사진 | 본인 + 같은 모임 관계자 (삭제는 내가 고칠 수 있는 프로필의 멤버만) |
-| `profiles`                                     | 프로필. `status` 는 활성/비활성뿐, `public_code` 가 화면의 `17번`, `is_seed` 는 합성 표식 | 활성분 + 본인 + 관리자   |
+| `profiles`                                     | 프로필. `status` 는 활성/비활성뿐, `public_code` 가 화면의 `17번`, `is_seed` 는 합성 표식, `ideal_criteria` 는 추천이 견주는 이상형 조건(멤버 화면에 안 나간다) | 활성분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `profile_memos`                                | 주선자 메모. 프로필당 하나, 멤버 화면에 안 나간다  | **등록한 주선자만** (같은 모임 주선자·본인 멤버 불가) |
 | `match_requests`                               | 소개 신청 — **프로필 × 프로필** 관계와 그 상태. 한 사람이 여러 행을 동시에 가진다 | 당사자 + 관리자                     |
@@ -149,6 +151,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `profile_images_limit` 트리거                        | 프로필당 여섯 장째 사진 — 동시 요청도 막힌다  |
 | `profiles.user_id` UNIQUE                            | 한 계정에 프로필 두 개                        |
 | `profile_memos_body_len`                             | 빈 메모·2000자 넘는 메모                      |
+| `profiles_ideal_criteria_shape`                      | 객체가 아닌 이상형 조건(배열·문자열·`null` JSON) |
 | `invites_one_open` (부분 유니크)                     | 프로필당 살아 있는 초대 두 개                 |
 | `import_sessions_idempotency` (부분 유니크)          | 같은 키로 두 번 commit                        |
 | `import_sessions_commit_pair`                       | 짝이 안 맞는 commit 상태                      |

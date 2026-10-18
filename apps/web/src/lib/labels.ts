@@ -57,6 +57,7 @@ export const FIELD_LABELS: Record<string, string> = {
   hashtags: "해시태그",
   bio: "자기소개",
   idealTypeText: "이상형",
+  idealCriteria: "이상형 조건",
   realName: "이름",
   contactNote: "연락 방법",
 };

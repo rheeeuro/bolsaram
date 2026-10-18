@@ -12,6 +12,7 @@ import {
 } from "./enums";
 import { BIRTH_YEAR_MAX, BIRTH_YEAR_MIN, HEIGHT_MAX, HEIGHT_MIN } from "./extraction";
 import { HASHTAG_MAX_COUNT, hashtagListSchema, normalizeHashtags } from "./hashtag";
+import { idealCriteriaSchema, normalizeIdealCriteria } from "./ideal";
 import { imageConfirmSchema, imageSlotSchema, type ImageSlot } from "./image";
 
 export const uuidSchema = z.uuid();
@@ -49,6 +50,11 @@ export const profileWritableSchema = z.object({
   hashtags: hashtagListSchema.default([]),
   bio: nullableTrimmed(2000),
   idealTypeText: nullableTrimmed(2000),
+  /**
+   * 이상형 조건. 추천이 견주는 값이다. default 를 두지 않는다 — Zod 4 는 partial 안에서도
+   * default 를 채우므로, 두면 이 칸을 보내지 않은 수정이 조건을 지운다.
+   */
+  idealCriteria: idealCriteriaSchema.transform(normalizeIdealCriteria).nullable().optional(),
   /** 주선자가 이 분을 소개하는 한마디. 멤버 상세에 그대로 보인다. */
   hostComment: nullableTrimmed(PROFILE_HOST_COMMENT_MAX),
   /** 이름/연락처는 INTRODUCED 이후에만 공개된다(설계문서 §5). */
@@ -124,6 +130,14 @@ export const discoverQuerySchema = z.object({
   // 성별은 필터가 아니다 — 멤버는 이성만 보고, 그 값은 자기 프로필이 정한다.
   ...attributeFilterShape,
   q: z.string().trim().max(60).optional(),
+  /**
+   * `ai=1` 이면 AI 추천인 사람만 — 보는 멤버의 이상형 조건으로 서버가 정한다.
+   * 주선자 목록에는 없다. 추천은 「보는 멤버」가 있어야 뜻이 있다.
+   */
+  ai: z
+    .literal("1")
+    .optional()
+    .transform((v) => v === "1"),
   cursor: z.string().trim().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(60).default(DISCOVER_PAGE_SIZE),
 });

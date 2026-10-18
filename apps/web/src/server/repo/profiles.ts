@@ -21,19 +21,22 @@ import {
   profileCursorClause,
   type FullProfile,
 } from "@bolsaram/domain";
-import type {
-  AdminProfileQuery,
-  DiscoverQuery,
-  Gender,
-  ProfileStatus,
-  ProfileUpdate,
+import {
+  idealCriteriaSchema,
+  normalizeIdealCriteria,
+  type AdminProfileQuery,
+  type DiscoverQuery,
+  type Gender,
+  type IdealCriteria,
+  type ProfileStatus,
+  type ProfileUpdate,
 } from "@bolsaram/schemas";
 
 const PROFILE_COLUMNS = `
   p.id, p.user_id, p.public_code, p.gender, p.birth_year, p.height,
   p.job_title, p.job_category, p.company, p.education,
   p.residence_region, p.workplace_region, p.religion, p.mbti,
-  p.smoking, p.drinking, p.hobbies, p.hashtags, p.bio, p.ideal_type_text,
+  p.smoking, p.drinking, p.hobbies, p.hashtags, p.bio, p.ideal_type_text, p.ideal_criteria,
   p.host_comment, p.real_name, p.contact_note, p.status,
   p.bumped_at, p.created_at, p.updated_at`;
 
@@ -58,6 +61,7 @@ type ProfileRow = {
   hashtags: string[];
   bio: string | null;
   ideal_type_text: string | null;
+  ideal_criteria: unknown;
   host_comment: string | null;
   real_name: string | null;
   contact_note: string | null;
@@ -77,6 +81,11 @@ const LIST_COLUMNS = `${PROFILE_COLUMNS}, ${IS_ACTIVE_SQL} AS is_active, ${HAS_P
 
 export type ProfileRecord = FullProfile & {
   userId: string | null;
+  /**
+   * 이상형 조건. 추천이 견주는 값이고 멤버 화면에는 내보내지 않는다
+   * (`projectProfile` 이 모르는 칸이라 공개 단계를 거치면 빠진다).
+   */
+  idealCriteria: IdealCriteria | null;
   /** 마지막으로 끌어올린 시각. 한 번도 안 했으면 null. */
   bumpedAt: Date | null;
   createdAt: Date;
@@ -113,6 +122,7 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     hashtags: row.hashtags ?? [],
     bio: row.bio,
     idealTypeText: row.ideal_type_text,
+    idealCriteria: readIdealCriteria(row.ideal_criteria),
     hostComment: row.host_comment,
     realName: row.real_name,
     contactNote: row.contact_note,
@@ -122,6 +132,13 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** 저장값도 다시 검증한다. 모양이 어긋난 옛 값은 없는 것으로 본다. */
+function readIdealCriteria(raw: unknown): IdealCriteria | null {
+  if (raw == null) return null;
+  const parsed = idealCriteriaSchema.safeParse(raw);
+  return parsed.success ? normalizeIdealCriteria(parsed.data) : null;
 }
 
 async function imagesFor(
@@ -217,12 +234,18 @@ export async function findDiscoverProfiles(
   sql: Sql,
   query: DiscoverQuery,
   viewerProfileId: string | null,
+  /** 이 id 들로만 좁힌다(「AI 추천만」). 목록·총 인원·커서가 같은 절을 봐야 페이지가 맞는다. */
+  options: { onlyIds?: string[] } = {},
 ): Promise<DiscoverPage> {
   const where = buildDiscoverWhere(query, {
     viewerProfileId,
     viewerGender: viewerProfileId ? await genderOf(sql, viewerProfileId) : null,
     currentYear: new Date().getFullYear(),
   });
+  if (options.onlyIds) {
+    where.values.push(options.onlyIds);
+    where.text += ` AND p.id = ANY($${where.values.length}::uuid[])`;
+  }
 
   const countResult = await sql.query<{ total: number }>(
     `SELECT count(*)::int AS total FROM profiles p WHERE ${where.text}`,
@@ -327,6 +350,7 @@ const UPDATABLE_COLUMNS: Record<keyof ProfileUpdate, string> = {
   hashtags: "hashtags",
   bio: "bio",
   idealTypeText: "ideal_type_text",
+  idealCriteria: "ideal_criteria",
   hostComment: "host_comment",
   realName: "real_name",
   contactNote: "contact_note",

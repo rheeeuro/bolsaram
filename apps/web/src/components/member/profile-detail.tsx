@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { HashtagChip, ProfileCode } from "@/components/ui/marks";
+import { AiRecommendBadge, HashtagChip, ProfileCode } from "@/components/ui/marks";
 import { apiDelete, apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
@@ -184,6 +184,12 @@ export function ProfileDetail({
           <h1 className="display text-[30px] leading-none text-[var(--color-ink-900)]">
             <ProfileCode code={profile.code} />
           </h1>
+          {profile.aiRecommended ? (
+            <p className="mt-2.5 flex items-center gap-2 text-[12.5px] text-[var(--color-ink-600)]">
+              <AiRecommendBadge />
+              내 이상형 조건과 잘 맞는 분이에요
+            </p>
+          ) : null}
           {profile.realName ? (
             <p className="mt-2 text-[15px] text-[var(--color-burgundy-700)]">
               {profile.realName}

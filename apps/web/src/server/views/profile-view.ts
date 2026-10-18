@@ -26,6 +26,8 @@ export type ProfileCardView = {
   residenceRegion: string;
   primaryImage: ProfileImageView | null;
   isFavorited: boolean;
+  /** 보는 멤버의 이상형 조건으로 서버가 고른 「AI 추천」인가. 멤버 탐색에서만 채운다. */
+  aiRecommended: boolean;
 };
 
 export type ProfileDetailView = ProfileCardView & {
@@ -61,7 +63,7 @@ function toImageView(image: {
 
 export function toCardView(
   profile: ProfileRecord,
-  options: { isFavorited?: boolean } = {},
+  options: { isFavorited?: boolean; aiRecommended?: boolean } = {},
 ): ProfileCardView {
   const view = projectProfile(profile, "LIST");
   const images = view.images ?? [];
@@ -76,13 +78,14 @@ export function toCardView(
     residenceRegion: profile.residenceRegion,
     primaryImage: images[0] ? toImageView(images[0]) : null,
     isFavorited: options.isFavorited ?? false,
+    aiRecommended: options.aiRecommended ?? false,
   };
 }
 
 export function toDetailView(
   profile: ProfileRecord,
   level: DisclosureLevel,
-  options: { isFavorited?: boolean } = {},
+  options: { isFavorited?: boolean; aiRecommended?: boolean } = {},
 ): ProfileDetailView {
   const view = projectProfile(profile, level);
   const images = (view.images ?? []).map(toImageView);
@@ -97,6 +100,7 @@ export function toDetailView(
     residenceRegion: profile.residenceRegion,
     primaryImage: images.find((i) => i.isPrimary) ?? images[0] ?? null,
     isFavorited: options.isFavorited ?? false,
+    aiRecommended: options.aiRecommended ?? false,
     disclosure: level,
     images,
     jobTitle: view.jobTitle ?? null,

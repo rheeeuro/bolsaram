@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { normalizeHashtags } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
-import { HashtagChip } from "@/components/ui/marks";
+import { AiRecommendBadge, HashtagChip } from "@/components/ui/marks";
 import { ProfileCard } from "@/components/member/profile-card";
 import { ProfileRow } from "@/components/member/profile-row";
 import { FilterSheet } from "@/components/member/filter-sheet";
@@ -36,6 +36,9 @@ export function DiscoverClient() {
     ...DEFAULT_FILTERS,
     tags: normalizeHashtags((searchParams.get("tags") ?? "").split(",")),
   }));
+  // 「AI 추천만」. 나이·지역 같은 조건과 성격이 달라(서버가 내 이상형으로 고른다) 필터
+  // 시트가 아니라 위 막대에 따로 둔다 — 한 번 눌러 켜고 끄는 것이 자연스럽다.
+  const [aiOnly, setAiOnly] = useState(() => searchParams.get("ai") === "1");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("list");
 
@@ -52,6 +55,7 @@ export function DiscoverClient() {
     async (nextCursor: string | null, replace: boolean) => {
       const generation = replace ? ++loadGeneration.current : loadGeneration.current;
       const params = filtersToParams(filters);
+      if (aiOnly) params.set("ai", "1");
       if (nextCursor) params.set("cursor", nextCursor);
       const result = await apiGet<Page>(`/api/profiles?${params.toString()}`);
       if (generation !== loadGeneration.current) return;
@@ -64,7 +68,7 @@ export function DiscoverClient() {
       setCursor(result.data.nextCursor);
       setItems((prev) => (replace ? result.data.items : [...prev, ...result.data.items]));
     },
-    [filters],
+    [filters, aiOnly],
   );
 
   // 저장된 보기 방식은 mount 뒤에 읽는다 — 서버 렌더 결과와 어긋나면 hydration 이 깨진다.
@@ -86,11 +90,15 @@ export function DiscoverClient() {
     }
   }
 
-  // 태그가 바뀌면 주소도 따라간다. 뒤로 가기 이력을 남기지 않으려고 replace 를 쓴다.
+  // 태그와 「AI 추천만」이 바뀌면 주소도 따라간다 — 상세에서 뒤로 왔을 때 같은 목록이어야 한다.
+  // 뒤로 가기 이력을 남기지 않으려고 replace 를 쓴다.
   useEffect(() => {
-    const next = filters.tags.length > 0 ? `/discover?tags=${filters.tags.join(",")}` : "/discover";
-    router.replace(next, { scroll: false });
-  }, [filters.tags, router]);
+    const params = new URLSearchParams();
+    if (filters.tags.length > 0) params.set("tags", filters.tags.join(","));
+    if (aiOnly) params.set("ai", "1");
+    const query = params.toString().replace(/%2C/g, ",");
+    router.replace(query ? `/discover?${query}` : "/discover", { scroll: false });
+  }, [filters.tags, aiOnly, router]);
 
   // 성별 탭이나 필터가 바뀌면 처음부터 다시 읽는다.
   useEffect(() => {
@@ -111,6 +119,24 @@ export function DiscoverClient() {
       <MemberSubBar>
         {/* 성별 탭은 두지 않는다 — 보이는 사람은 이성뿐이라 고를 것이 없다. */}
         <ViewToggle value={view} onChange={changeView} />
+
+        <button
+          type="button"
+          aria-pressed={aiOnly}
+          onClick={() => setAiOnly((v) => !v)}
+          title="내 이상형 조건과 잘 맞는 분만 봅니다"
+          className={cn(
+            "flex items-center gap-1 rounded-full border px-3 py-1.5 text-[13px] transition-colors",
+            aiOnly
+              ? "border-[var(--color-rose-500)] bg-[var(--color-rose-100)] text-[var(--color-rose-600)]"
+              : "border-[var(--surface-border)] text-[var(--color-ink-700)]",
+          )}
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+            <path d="M8 1.5l1.4 3.9 3.9 1.4-3.9 1.4L8 12.1 6.6 8.2 2.7 6.8l3.9-1.4L8 1.5zM12.8 10.6l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6z" />
+          </svg>
+          AI 추천
+        </button>
 
         <button
           type="button"
@@ -171,6 +197,16 @@ export function DiscoverClient() {
             </Button>
           }
         />
+      ) : items.length === 0 && aiOnly ? (
+        <Empty
+          title="AI 추천에 맞는 분이 아직 없어요"
+          description="내 이상형 조건과 잘 맞는 분이 들어오면 여기에 보여 드려요. 이상형이 바뀌었다면 주선자에게 알려 주세요."
+          action={
+            <Button variant="secondary" onClick={() => setAiOnly(false)}>
+              전체 보기
+            </Button>
+          }
+        />
       ) : items.length === 0 ? (
         <Empty
           title="조건에 맞는 분이 없어요"
@@ -185,7 +221,8 @@ export function DiscoverClient() {
         />
       ) : (
         <>
-          <p role="status" className="pb-3 text-[12px] text-[var(--color-ink-600)]">
+          <p role="status" className="flex items-center gap-1.5 pb-3 text-[12px] text-[var(--color-ink-600)]">
+            {aiOnly ? <AiRecommendBadge /> : null}
             {total}명
           </p>
           {view === "list" ? (

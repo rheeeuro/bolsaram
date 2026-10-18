@@ -100,6 +100,7 @@ pnpm health:test       # 알림 경로 확인 (테스트 메시지 한 통)
 pnpm updates:weekly    # 지난주 업데이트 소식 작성 (평소엔 cron 이 월 09:00 에 돌린다, --dry-run 미리보기)
 pnpm telegram:webhook  # 봇 webhook 등록 상태 (--set 등록, --delete 해제)
 pnpm ai:check          # OpenAI 키·모델 사용 가능 여부
+pnpm ai:backfill-ideal # 비어 있는 이상형 조건 채우기 (기본은 미리보기, --yes 로 AI 호출·저장)
 
 pnpm agents:sync       # 하네스 원본 → 에이전트별 설정 생성
 pnpm agents:check      # 생성 파일 드리프트 검사
@@ -242,7 +243,7 @@ db/migrations/    번호순 SQL. 적용된 파일은 절대 수정하지 않고 
 db/sample/        시드가 읽는 샘플 프로필 (git 제외)
 tests/            vitest. 도메인 단위 + DB 통합
 .agent-config/    에이전트 하네스 원본 (위 참고)
-scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 가동 감시, 점검 세션, 가이드 화면 사진, 업데이트 소식)
+scripts/          운영 스크립트 (DB 백업, 시드 정리, webhook 등록, AI 키 확인, 이상형 조건 채우기, 가동 감시, 점검 세션, 가이드 화면 사진, 업데이트 소식)
 ecosystem.config.cjs  PM2 정의
 var/             private 스토리지 · DB 백업 · PM2 로그 (git 제외, 열람 금지)
 ```
@@ -369,6 +370,9 @@ README 에 이력을 쓰지 않는다. "예전에는 …였는데 …로 바꿨�
 - **사진을 AI 프로바이더에 보내지 않습니다.** 추출 근거는 프로필 원문뿐입니다
   (`ExtractionInput` 에 이미지 필드가 없습니다). 실측에서 사진은 기여가 없었고,
   실제 인물 사진을 외부로 보낼 이유가 없습니다.
+- **추천은 AI 가 정하지 않고, 추천할 때 AI 를 부르지도 않습니다.** 이상형 조건은 가져오기
+  때 추출이 다른 항목과 같은 호출에서 함께 뽑아 프로필 항목(`profiles.ideal_criteria`)으로
+  저장하고 주선자가 고칩니다. 견주기와 순위는 도메인 규칙(`rankRecommendations`)이 합니다.
 - AI 결과를 자동 게시하지 않습니다. 게시 게이트는 UI가 아니라 도메인 레이어(`assertCommittable`)에 있습니다.
 - **알림은 아웃박스로 보냅니다.** 요청 트랜잭션 안에서 텔레그램을 호출하지 않습니다 —
   DB 트리거가 `notifications` 에 남기고 `server/notify/` 가 보냅니다. 알림 문구에는

@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import { rawHashtagListSchema } from "./hashtag";
+import { idealCriteriaSchema } from "./ideal";
 import {
   DRINKING_LEVELS,
   GENDERS,
@@ -47,6 +48,11 @@ export const extractedFieldsSchema = z.object({
   hashtags: rawHashtagListSchema.nullable(),
   bio: z.string().trim().max(2000).nullable(),
   idealTypeText: z.string().trim().max(2000).nullable(),
+  /**
+   * 이상형 글을 조건으로 바꾼 것. 추천이 견주는 값이다. 저장 직전에
+   * `normalizeIdealCriteria` 를 통과한다(범위 밖 숫자·뒤집힌 범위·키워드 형태).
+   */
+  idealCriteria: idealCriteriaSchema.nullable(),
 });
 
 export type ExtractedFields = z.infer<typeof extractedFieldsSchema>;
@@ -78,6 +84,7 @@ export const EXTRACTED_FIELD_REVIEW_ORDER = [
   "hashtags",
   "bio",
   "idealTypeText",
+  "idealCriteria",
 ] as const satisfies readonly (keyof ExtractedFields)[];
 
 /** 필드별 신뢰도 0..1. 값이 null 인 필드는 0 에 가깝게 온다. */

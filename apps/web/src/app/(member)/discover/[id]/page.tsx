@@ -16,6 +16,7 @@ import {
   isOutsidePoolForViewer,
   isSameGenderForViewer,
 } from "@/server/repo/profiles";
+import { isRecommendedFor } from "@/server/services/recommend-service";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 import { ProfileDetail } from "@/components/member/profile-detail";
 
@@ -101,8 +102,12 @@ export default async function ProfileDetailPage({
         }
       : { rejected: false, hiddenBetween: false, iHid: false, pendingSend: false };
 
+    // 멤버 화면에서만 — 주선자 화면에는 「보는 멤버」가 없다.
+    const aiRecommended =
+      isMemberView(viewer) && (await isRecommendedFor(sql, viewer.profileId, profile));
+
     return {
-      view: toDetailView(profile, level, { isFavorited: favorited }),
+      view: toDetailView(profile, level, { isFavorited: favorited, aiRecommended }),
       isSelf: profile.userId === viewer.userId,
       relation,
       existing: existing

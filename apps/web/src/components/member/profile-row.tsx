@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FavoriteButton } from "@/components/member/favorite-button";
-import { ProfileCode } from "@/components/ui/marks";
+import { AiRecommendBadge, ProfileCode } from "@/components/ui/marks";
 import {
   cardLines,
   enterProps,
@@ -63,6 +63,7 @@ export function ProfileRow({
             <span className="truncate text-[12.5px] text-[var(--color-ink-700)]">
               {lines.facts}
             </span>
+            {profile.aiRecommended ? <AiRecommendBadge className="self-center" /> : null}
           </p>
           <p className="mt-0.5 truncate text-[12.5px] text-[var(--color-ink-600)]">
             {lines.work}

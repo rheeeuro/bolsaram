@@ -151,7 +151,7 @@ server/
 │   ├── local.ts              로컬/R2 private 저장소 + signed download/upload URL
 │   └── watermark.ts          보는 사람 표시 합성 — 보이는 층 + 숨은 층 (멤버에게 나가는 남의 프로필 사진)
 ├── ai/
-│   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트 · PROMPT_VERSION
+│   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트(이상형 조건 포함) · PROMPT_VERSION
 │   ├── mock.ts               규칙 기반 추출기 (기본, API 키 불필요)
 │   ├── openai.ts             OpenAI multimodal + Structured Outputs
 │   └── index.ts              AI_PROVIDER 로 선택
@@ -164,6 +164,7 @@ server/
 │   ├── favorites.ts          관심 토글·목록
 │   ├── hides.ts              숨기기 토글·목록 + 양방향 판정
 │   ├── imports.ts            세션·에셋·추출·검토
+│   ├── recommendations.ts    AI 추천의 후보 — 보는 멤버의 탐색 풀(같은 쪽의 활성 이성, 거절·숨김 제외)
 │   ├── group-chat.ts         모임 채팅 — 메시지 목록·작성·지우기, 읽은 위치·안 읽은 수
 │   └── telegram.ts           봇 대화 상태 + 계정 연결 조회/해제
 ├── telegram/                 텔레그램 Import 채널 (Bot API 를 아는 유일한 곳)
@@ -176,6 +177,7 @@ server/
 │   ├── outbox.ts             미발송 알림 선점·기록 (owner)
 │   └── dispatch.ts           발송 루프 + 기동 시 주기 스윕
 ├── services/import-service.ts  분석 실행 + idempotent commit
+├── services/recommend-service.ts  AI 추천 — 보는 멤버에게 추천인 사람 집합·한 사람 판정 (저장된 조건끼리 견주기, AI 호출 없음)
 ├── views/
 │   ├── profile-view.ts       공개 단계 판정·적용 + signed URL 부착
 │   ├── host-profile.ts       주선자 상세·편집이 함께 쓰는 프로필 하나 읽기 (권한·공개 단계·초대)
@@ -227,7 +229,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/auth/oauth/[provider]/callback`     | GET                 | –                 | 소셜 로그인 완료 = 가입·세션 생성    |
 | `/api/auth/logout`                        | POST                | –                 | 세션 폐기                            |
 | `/api/claim`                              | POST                | **초대 토큰**     | 멤버 로그인 (매직 링크) + 최초 계정 생성 |
-| `/api/profiles`                           | GET                 | 멤버              | Discover 목록 (필터·커서)            |
+| `/api/profiles`                           | GET                 | 멤버              | Discover 목록 (필터·커서, 카드마다 AI 추천 여부, `ai=1` 이면 AI 추천만) |
 | `/api/profiles/[id]`                      | GET / PATCH / DELETE | 멤버 / 주선자 / 등록한 주선자 | 상세 조회 / 내용 수정 / 삭제(원본·멤버 계정·파일 포함) |
 | `/api/profiles/[id]/status`               | PATCH               | 주선자            | 활성·비활성 전환                     |
 | `/api/profiles/[id]/memo`                 | PUT                 | 등록한 주선자     | 나만 보는 메모 저장 (빈 글이면 삭제) |
@@ -329,6 +331,25 @@ sharp 가 디코딩하지 못하는 HEIC 는 표시 없이 원본이 나간다.
 `세션 생성 → signed 업로드 → 확정 → 원문 → 분석 → 검토 → commit`.
 commit 은 `idempotency_key` 를 조건부로 선점해 같은 세션에서 프로필이 두 개 생기지 않게 한다.
 분석은 프로바이더 호출이 길어 RLS 트랜잭션 **밖에서** 하고 앞뒤로만 DB 를 만진다.
+
+### AI 추천
+
+```
+가져오기 분석    → AI 추출이 다른 항목과 함께 idealCriteria 를 뽑는다 (같은 호출)
+검토·등록        → 주선자가 고치고, commit 이 profiles.ideal_criteria 에 저장
+내용 고치기      → 주선자가 직접 고친다 (AI 를 다시 부르지 않는다)
+멤버 탐색        → 보는 멤버 + 그 탐색 풀 → domain rankRecommendations → 카드의 aiRecommended
+                   ai=1 이면 같은 집합으로 목록·총 인원·커서를 좁힌다
+멤버 상세        → 그 한 사람만 같은 규칙으로 견준다 (isRecommendedFor)
+```
+
+**표시를 고를 때 AI 를 부르지 않는다.** 조건은 프로필 항목이고 견주기는 규칙이라 요청마다
+바로 계산한다. 후보 프로필을 모델에 보내 어울리는지 묻지 않는다. 보는 멤버의 조건이 비어
+있으면 상대의 이상형에 그 멤버가 맞는 사람을 고른다. 판정은 보는 사람의 프로필이 정하므로
+대행 중에도 그 멤버 기준이고, 멤버 프로필이 없는 주선자 세션에는 표시가 없다.
+이상형 조건 자체는 공개 단계(`projectProfile`)가 모르는 칸이라 멤버 화면으로 나가지 않는다 —
+멤버에게 가는 것은 상대마다의 참·거짓 하나뿐이다. 이상형 글만 고치고 조건을 안 고치면
+둘이 어긋난다 — 편집 화면이 함께 고치라고 안내한다.
 
 ### 텔레그램 Import
 

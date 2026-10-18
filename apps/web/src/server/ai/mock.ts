@@ -8,13 +8,18 @@
 import "server-only";
 import {
   emptyExtractedFields,
+  emptyIdealCriteria,
   extractionResultSchema,
+  isIdealCriteriaEmpty,
+  normalizeIdealCriteria,
   JOB_CATEGORIES,
   MBTI_TYPES,
   normalizeHashtags,
   REGIONS,
   type ExtractedFields,
   type ExtractionConfidence,
+  type IdealCriteria,
+  type IdealCriterionKey,
   type JobCategory,
   type Region,
 } from "@bolsaram/schemas";
@@ -123,6 +128,7 @@ export class MockExtractionProvider implements ExtractionProvider {
     set("hashtags", matchHashtags(text, fields.hobbies), 0.6);
     set("bio", matchLabeled(text, ["자기소개", "소개", "성격"]), 0.55);
     set("idealTypeText", matchLabeled(text, ["이상형", "원하는", "만나고 싶은"]), 0.6);
+    set("idealCriteria", matchIdealCriteria(fields.idealTypeText, fields.birthYear), 0.7);
 
     if (fields.gender == null) notes.push("성별이 명시되어 있지 않습니다. 직접 선택해 주세요.");
     if (fields.birthYear == null) notes.push("나이/출생연도를 찾지 못했습니다.");
@@ -268,4 +274,160 @@ function sliceAfterAny(text: string, labels: string[]): string | null {
     if (index >= 0) return text.slice(index + label.length);
   }
   return null;
+}
+
+// ── 이상형 조건 ──────────────────────────────────────────────
+
+/** 이상형 글에 자주 나오는 취향 낱말. 실제 모델처럼 글에 적힌 것만 키워드로 옮긴다. */
+const IDEAL_KEYWORDS = [
+  "운동",
+  "여행",
+  "독서",
+  "요리",
+  "등산",
+  "캠핑",
+  "반려견",
+  "반려묘",
+  "카페",
+  "영화",
+  "음악",
+  "다정",
+  "자기관리",
+  "유머",
+  "성실",
+];
+
+/** 피하는 쪽에서만 나오는 낱말. 담배·술처럼 열거형으로 옮기는 것은 여기 두지 않는다. */
+const AVOID_ONLY_KEYWORDS = ["문신", "게임"];
+
+/**
+ * 이상형 글 → 조건. 견줄 조건이 하나도 없으면 null 이다.
+ * 상대적 나이(연상·연하·n살 차이)는 이 사람의 출생연도를 알 때만 바꾼다.
+ */
+function matchIdealCriteria(text: string | null, birthYear: number | null): IdealCriteria | null {
+  if (!text) return null;
+  const c = emptyIdealCriteria();
+  const stated = new Map<IdealCriterionKey, string>();
+  const mark = (key: IdealCriterionKey, at: number) => {
+    if (at >= 0 && !stated.has(key)) stated.set(key, clauseAt(text, at));
+  };
+
+  const range = /(\d{2})\s*[~-]\s*(\d{2})\s*년생/.exec(text);
+  const gap = /(\d)\s*살\s*(?:차이|이내)/.exec(text);
+  if (range?.[1] && range[2]) {
+    c.birthYearMin = twoDigitYear(Number(range[1]));
+    c.birthYearMax = twoDigitYear(Number(range[2]));
+    mark("age", range.index);
+  } else if (birthYear != null && gap?.[1]) {
+    c.birthYearMin = birthYear - Number(gap[1]);
+    c.birthYearMax = birthYear + Number(gap[1]);
+    mark("age", gap.index);
+  } else if (birthYear != null && text.includes("연상")) {
+    // 「연상 비선호」는 연상을 피한다는 뜻이다 — 동갑·연하로 뒤집는다.
+    const at = text.indexOf("연상");
+    if (avoided(text, at)) c.birthYearMin = birthYear;
+    else c.birthYearMax = birthYear - 1;
+    mark("age", at);
+  } else if (birthYear != null && text.includes("연하")) {
+    const at = text.indexOf("연하");
+    if (avoided(text, at)) c.birthYearMax = birthYear;
+    else c.birthYearMin = birthYear + 1;
+    mark("age", at);
+  }
+
+  const height = /(1[4-9]\d)\s*(?:cm|센치)?\s*(이상|이하)/.exec(text);
+  if (height?.[1]) {
+    if (height[2] === "이상") c.heightMin = Number(height[1]);
+    else c.heightMax = Number(height[1]);
+    mark("height", height.index);
+  }
+
+  if (text.includes("수도권")) {
+    c.regions.push("SEOUL", "GYEONGGI", "INCHEON");
+    mark("region", text.indexOf("수도권"));
+  }
+  for (const region of REGIONS) {
+    const keyword = REGION_KEYWORDS[region].find((k) => text.includes(k));
+    if (keyword) {
+      c.regions.push(region);
+      mark("region", text.indexOf(keyword));
+    }
+  }
+
+  const smoking = /비\s*흡연|담배\s*(?:안|X|x)/.exec(text) ?? avoidedAt(text, "담배");
+  if (smoking) {
+    c.smoking = ["NONE"];
+    mark("smoking", smoking.index);
+  }
+  const drinking = /술\s*(?:안|못)|비\s*음주/.exec(text);
+  if (drinking) {
+    c.drinking = ["NONE"];
+    mark("drinking", drinking.index);
+  }
+  const religion = RELIGION_RULES.find(([pattern]) => pattern.test(text));
+  if (religion?.[1]) {
+    c.religions = [religion[1]];
+    mark("religion", text.search(religion[0]));
+  }
+  for (const category of JOB_CATEGORIES) {
+    const keyword = JOB_KEYWORDS[category].find((k) => text.includes(k));
+    if (keyword) {
+      c.jobCategories.push(category);
+      mark("job", text.indexOf(keyword));
+    }
+  }
+
+  // 키워드는 바라는 것만이다. 피한다고 적은 낱말을 넣으면 거꾸로 그런 사람을 추천한다.
+  c.keywords = IDEAL_KEYWORDS.filter((k) => text.includes(k) && !avoided(text, text.indexOf(k)));
+  // 피한다고 적은 낱말 가운데 열거형으로 옮기지 못한 것은 따로 남긴다.
+  c.avoidKeywords = [...IDEAL_KEYWORDS, ...AVOID_ONLY_KEYWORDS].filter(
+    (k) => text.includes(k) && avoided(text, text.indexOf(k)),
+  );
+  c.required = [...stated.entries()]
+    .filter(([, line]) => /꼭|필수|무조건|절대/.test(line))
+    .map(([key]) => key);
+
+  const normalized = normalizeIdealCriteria(c);
+  return isIdealCriteriaEmpty(normalized) ? null : normalized;
+}
+
+function twoDigitYear(two: number): number {
+  return two >= 40 ? 1900 + two : 2000 + two;
+}
+
+/** 피하는 표현. 「연상, 담배, 문신 비선호」처럼 나열 끝에 붙으면 앞의 낱말 모두에 걸린다. */
+const AVOID = /비선호|싫|별로|[xX×]\s*$|[xX×](?=[\s,/]|$)|제외|말고|빼고/;
+
+/** 이 위치의 낱말을 피한다고 적었는가 — 같은 구절 안이나, 같은 줄의 나열 끝에 부정이 있으면 그렇다. */
+function avoided(text: string, index: number): boolean {
+  if (index < 0) return false;
+  const clause = clauseAt(text, index);
+  if (AVOID.test(clause)) return true;
+  const lineStart = text.lastIndexOf("\n", index) + 1;
+  const lineEnd = text.indexOf("\n", index);
+  const rest = text.slice(index, lineEnd < 0 ? undefined : lineEnd);
+  // 쉼표로만 이어진 나열의 끝 구절이 부정이면 나열 전체에 걸린다(「연상, 담배, 문신 비선호」).
+  const tail = rest.split("/")[0] ?? "";
+  return lineStart <= index && /,/.test(tail) && AVOID.test(tail.split(",").at(-1) ?? "");
+}
+
+/** 낱말이 있고 그것을 피한다고 적었으면 그 위치를 돌려준다(정규식 결과 모양에 맞춘다). */
+function avoidedAt(text: string, word: string): { index: number } | null {
+  const index = text.indexOf(word);
+  return index >= 0 && avoided(text, index) ? { index } : null;
+}
+
+/** 위치가 속한 구절(줄·쉼표·마침표로 나뉜 조각). 「꼭」이 같은 구절에 있는지 볼 때 쓴다. */
+function clauseAt(text: string, index: number): string {
+  const separators = /[\n,.·/]/g;
+  let start = 0;
+  let end = text.length;
+  for (const m of text.matchAll(separators)) {
+    if (m.index < index) start = m.index + 1;
+    else {
+      end = m.index;
+      break;
+    }
+  }
+  return text.slice(start, end);
 }

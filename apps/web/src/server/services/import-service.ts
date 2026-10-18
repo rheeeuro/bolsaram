@@ -12,9 +12,12 @@ import {
   statusAfterExtraction,
 } from "@bolsaram/domain";
 import {
+  isIdealCriteriaEmpty,
   normalizeHashtags,
+  normalizeIdealCriteria,
   PROFILE_IMAGE_MAX_COUNT,
   type ExtractedFields,
+  type IdealCriteria,
   type ImportStatus,
 } from "@bolsaram/schemas";
 import { extractionProvider } from "../ai/index";
@@ -232,6 +235,13 @@ export async function commitSession(
   });
 }
 
+/** 이상형 조건은 저장 직전에 정리한다. 견줄 것이 하나도 없으면 비워 둔다. */
+function idealCriteriaForSave(raw: ExtractedFields["idealCriteria"]): IdealCriteria | null {
+  if (!raw) return null;
+  const criteria = normalizeIdealCriteria(raw);
+  return isIdealCriteriaEmpty(criteria) ? null : criteria;
+}
+
 async function insertProfile(
   sql: Sql,
   groupId: string | null,
@@ -245,8 +255,9 @@ async function insertProfile(
     `INSERT INTO profiles (
        group_id, gender, birth_year, height, job_title, job_category, company, education,
        residence_region, workplace_region, religion, mbti, smoking, drinking,
-       hobbies, hashtags, bio, ideal_type_text, status, created_by, real_name, contact_note)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+       hobbies, hashtags, bio, ideal_type_text, status, created_by, real_name, contact_note,
+       ideal_criteria)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
      RETURNING id`,
     [
       groupId,
@@ -272,6 +283,7 @@ async function insertProfile(
       createdBy,
       hidden.realName,
       hidden.contactNote,
+      idealCriteriaForSave(fields.idealCriteria),
     ],
   );
   return result.rows[0]!.id;
@@ -301,7 +313,8 @@ async function updateExistingProfile(
        hobbies = CASE WHEN cardinality($15::text[]) > 0 THEN $15::text[] ELSE hobbies END,
        hashtags = CASE WHEN cardinality($16::text[]) > 0 THEN $16::text[] ELSE hashtags END,
        bio = COALESCE($17, bio),
-       ideal_type_text = COALESCE($18, ideal_type_text)
+       ideal_type_text = COALESCE($18, ideal_type_text),
+       ideal_criteria = COALESCE($19, ideal_criteria)
      WHERE id = $1 RETURNING id`,
     [
       profileId,
@@ -322,6 +335,7 @@ async function updateExistingProfile(
       normalizeHashtags(fields.hashtags ?? []),
       fields.bio,
       fields.idealTypeText,
+      idealCriteriaForSave(fields.idealCriteria),
     ],
   );
   const row = result.rows[0];

@@ -120,3 +120,32 @@ export function HashtagChip({
   }
   return <span className={shape}>{body}</span>;
 }
+
+/**
+ * 「AI 추천」 표시. 보는 멤버의 이상형 조건과 잘 맞는다고 서버가 고른 프로필에 붙는다.
+ * 사진 위에 얹을 때(`onPhoto`)는 바탕을 채워 어떤 사진 위에서도 읽히게 한다.
+ */
+export function AiRecommendBadge({
+  onPhoto,
+  className,
+}: {
+  onPhoto?: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-[5px] text-[11px] font-medium leading-none",
+        onPhoto
+          ? "bg-white/92 text-[var(--color-rose-600)] shadow-sm"
+          : "bg-[var(--color-rose-100)] text-[var(--color-rose-600)]",
+        className,
+      )}
+    >
+      <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+        <path d="M8 1.5l1.4 3.9 3.9 1.4-3.9 1.4L8 12.1 6.6 8.2 2.7 6.8l3.9-1.4L8 1.5zM12.8 10.6l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6z" />
+      </svg>
+      AI 추천
+    </span>
+  );
+}

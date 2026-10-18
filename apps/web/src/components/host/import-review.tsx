@@ -18,13 +18,16 @@ import {
   SMOKING_LABELS,
   SMOKING_LEVELS,
   formatHashtag,
+  isIdealCriteriaEmpty,
   parseHashtagInput,
+  type IdealCriteria,
 } from "@bolsaram/schemas";
 import { pickRealName } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { GroupPicker, type GroupChoice } from "@/components/host/group-picker";
+import { IdealCriteriaEditor } from "@/components/host/ideal-criteria-editor";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch, apiPost, uploadFile } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
@@ -88,6 +91,11 @@ const ENUM_OPTIONS: Record<
 };
 
 const LONG_TEXT_FIELDS = new Set(["bio", "idealTypeText"]);
+/**
+ * 묶음 값인 칸. 화면 상태가 문자열 지도라 JSON 글자로 들고, 고쳤는지는 다른 칸처럼
+ * 글자 비교로 판정한다. 편집은 전용 편집기로 한다.
+ */
+const IDEAL_CRITERIA_FIELD = "idealCriteria";
 const NUMBER_FIELDS = new Set(["birthYear", "height"]);
 
 export function ImportReview({
@@ -521,6 +529,7 @@ function FieldRow({
     <div
       className={cn(
         "rounded-md border px-3 py-2.5",
+        field.key === IDEAL_CRITERIA_FIELD && "sm:col-span-2",
         dirty
           ? "border-[var(--surface-accent)] bg-[var(--surface-accent)]/5"
           : field.needsAttention
@@ -565,7 +574,14 @@ function FieldRow({
         )}
       </div>
 
-      {enumOptions ? (
+      {field.key === IDEAL_CRITERIA_FIELD ? (
+        <IdealCriteriaEditor
+          compact
+          value={value ? (JSON.parse(value) as IdealCriteria) : null}
+          disabled={disabled}
+          onChange={(next) => onChange(isIdealCriteriaEmpty(next) ? "" : JSON.stringify(next))}
+        />
+      ) : enumOptions ? (
         <Select
           value={value}
           disabled={disabled}
@@ -657,6 +673,7 @@ function toStringMap(fields: Record<string, unknown> | undefined): Record<string
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(fields)) {
     if (value == null) out[key] = "";
+    else if (key === IDEAL_CRITERIA_FIELD) out[key] = JSON.stringify(value);
     else if (key === "hashtags" && Array.isArray(value)) {
       out[key] = value.map((tag) => formatHashtag(String(tag))).join(" ");
     } else if (Array.isArray(value)) out[key] = value.join(", ");
@@ -669,6 +686,10 @@ function toStringMap(fields: Record<string, unknown> | undefined): Record<string
 function parseFieldValue(key: string, raw: string): unknown {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;
+  if (key === IDEAL_CRITERIA_FIELD) {
+    const criteria = JSON.parse(trimmed) as IdealCriteria;
+    return isIdealCriteriaEmpty(criteria) ? null : criteria;
+  }
   if (NUMBER_FIELDS.has(key)) {
     const value = Number(trimmed);
     return Number.isFinite(value) ? value : null;

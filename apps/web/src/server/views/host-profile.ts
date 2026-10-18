@@ -7,6 +7,7 @@
  */
 import "server-only";
 import { withRls } from "@bolsaram/db";
+import type { IdealCriteria } from "@bolsaram/schemas";
 import { bumpBlockedReason, nextBumpAt } from "@bolsaram/domain";
 import { rlsContextOf, type Viewer } from "../auth/guard";
 import { introducedWithManaged } from "../repo/matches";
@@ -47,6 +48,11 @@ export type HostProfileData = {
   source: { sessionId: string; rawText: string } | null;
   /** 등록한 주선자만 보는 메모. 담당일 때만 읽는다 — RLS 도 남에게는 행을 주지 않는다. */
   memo: ProfileMemo | null;
+  /**
+   * 이상형 조건. 편집 화면이 고칠 값이다. 공개 단계를 거치는 `view` 에는 없는 칸이라
+   * 따로 싣는다 — 이상형 글을 정리한 값이라 글을 볼 수 있는 주선자에게 새로 드러나는 것이 없다.
+   */
+  idealCriteria: IdealCriteria | null;
 };
 
 export async function loadHostProfile(
@@ -103,6 +109,7 @@ export async function loadHostProfile(
         : null,
       source: source?.rawText ? { sessionId: source.sessionId, rawText: source.rawText } : null,
       memo,
+      idealCriteria: profile.idealCriteria,
     };
   });
 }

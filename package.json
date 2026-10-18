@@ -44,6 +44,7 @@
     "agents:test": "python3 .agent-config/guard-cases.py && python3 .agent-config/deploy-cases.py",
     "telegram:webhook": "tsx scripts/telegram-webhook.ts",
     "ai:check": "tsx scripts/ai-check.ts",
+    "ai:backfill-ideal": "tsx --conditions=react-server scripts/backfill-ideal-criteria.ts",
     "health:check": "tsx scripts/health-watch.ts --once",
     "health:watch": "tsx scripts/health-watch.ts",
     "health:test": "tsx scripts/health-watch.ts --test-alert",

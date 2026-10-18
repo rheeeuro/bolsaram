@@ -20,12 +20,15 @@ import {
   SMOKING_LABELS,
   SMOKING_LEVELS,
   formatHashtag,
+  isIdealCriteriaEmpty,
   parseHashtagInput,
+  type IdealCriteria,
 } from "@bolsaram/schemas";
 import { ProfileCode } from "@/components/ui/marks";
 import { cn } from "@/lib/cn";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
+import { IdealCriteriaEditor } from "@/components/host/ideal-criteria-editor";
 import { ProfilePhotos } from "@/components/host/profile-photos";
 import { Field, FormError, Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch } from "@/lib/api-client";
@@ -33,8 +36,17 @@ import type { ProfileDetailView } from "@/server/views/profile-view";
 
 type Draft = Record<string, string>;
 
+/**
+ * 이상형 조건은 묶음 값이라 폼에는 JSON 글자로 든다. 다른 칸과 같은 문자열 비교로
+ * 「고친 것이 있는지」를 판정하기 위해서다.
+ */
+function readCriteria(raw: string | undefined): IdealCriteria | null {
+  if (!raw) return null;
+  return JSON.parse(raw) as IdealCriteria | null;
+}
+
 /** 프로필 레코드 → 폼 초기값. 저장 기준점과 편집값 둘 다 여기서 시작한다. */
-function initialDraft(profile: ProfileDetailView): Draft {
+function initialDraft(profile: ProfileDetailView, idealCriteria: IdealCriteria | null): Draft {
   return {
     gender: profile.gender,
     birthYear: String(profile.birthYear),
@@ -53,6 +65,7 @@ function initialDraft(profile: ProfileDetailView): Draft {
     hashtags: profile.hashtags.map(formatHashtag).join(" "),
     bio: profile.bio ?? "",
     idealTypeText: profile.idealTypeText ?? "",
+    idealCriteria: JSON.stringify(idealCriteria),
     hostComment: profile.hostComment ?? "",
     realName: profile.realName ?? "",
     contactNote: profile.contactNote ?? "",
@@ -68,13 +81,20 @@ function initialDraft(profile: ProfileDetailView): Draft {
  *
  * 사진은 여기 둔다. 고르는 순간 올라가지만 「내용을 고치는 일」의 일부다.
  */
-export function HostProfileEditor({ profile }: { profile: ProfileDetailView }) {
+export function HostProfileEditor({
+  profile,
+  idealCriteria,
+}: {
+  profile: ProfileDetailView;
+  /** 이상형 조건. 공개 단계를 거치는 `profile` 에는 없는 칸이라 따로 받는다. */
+  idealCriteria: IdealCriteria | null;
+}) {
   const router = useRouter();
   const detailHref = `/profiles/${profile.id}`;
   // 저장 기준점. 저장에 성공하면 여기를 지금 값으로 옮긴다 — 그래야 「고친 것이 있는지」를
   // 서버가 돌려준 값이 아니라 화면에서 바로 판정할 수 있다.
-  const [saved, setSaved] = useState<Draft>(() => initialDraft(profile));
-  const [draft, setDraft] = useState<Draft>(() => initialDraft(profile));
+  const [saved, setSaved] = useState<Draft>(() => initialDraft(profile, idealCriteria));
+  const [draft, setDraft] = useState<Draft>(() => initialDraft(profile, idealCriteria));
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,6 +105,10 @@ export function HostProfileEditor({ profile }: { profile: ProfileDetailView }) {
     setMessage(null);
     setDraft((p) => ({ ...p, [key]: value }));
   };
+
+  const criteria = readCriteria(draft.idealCriteria);
+  // 견줄 것이 하나도 없으면 비운 것으로 저장한다 — 추천에서 「조건 없음」으로 다룬다.
+  const criteriaForSave = criteria && !isIdealCriteriaEmpty(criteria) ? criteria : null;
 
   async function save(then?: "back") {
     setBusy(true);
@@ -112,6 +136,7 @@ export function HostProfileEditor({ profile }: { profile: ProfileDetailView }) {
       hashtags: parseHashtagInput(draft.hashtags ?? ""),
       bio: draft.bio,
       idealTypeText: draft.idealTypeText,
+      idealCriteria: criteriaForSave,
       hostComment: draft.hostComment,
       realName: draft.realName,
       contactNote: draft.contactNote,
@@ -326,6 +351,20 @@ export function HostProfileEditor({ profile }: { profile: ProfileDetailView }) {
               </Field>
             </div>
           </Panel>
+
+          <div id="ideal-criteria" className="scroll-mt-6">
+            <Panel title="이상형 조건">
+              <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                멤버 화면의 「AI 추천」 표시를 정할 때 견주는 값입니다. 가져올 때 AI가 이상형
+                글에서 뽑아 두었고, 조건 자체는 멤버에게 보이지 않습니다. 위 이상형 글을
+                고쳤다면 여기도 맞춰 주세요.
+              </p>
+              <IdealCriteriaEditor
+                value={criteria}
+                onChange={(next) => set("idealCriteria")(JSON.stringify(next))}
+              />
+            </Panel>
+          </div>
 
           <Panel title="주선자 코멘트">
             <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">

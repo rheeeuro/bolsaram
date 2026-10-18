@@ -32,7 +32,7 @@ export default async function HostProfileEditPage({
           { label: "내용 고치기" },
         ]}
       />
-      <HostProfileEditor profile={data.view} />
+      <HostProfileEditor profile={data.view} idealCriteria={data.idealCriteria} />
     </>
   );
 }

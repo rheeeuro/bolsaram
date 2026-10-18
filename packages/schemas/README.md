@@ -23,8 +23,9 @@ packages/schemas/src/
 ├── enums.ts        도메인 열거형 + 한글 라벨 (성별·지역·직업군·종교·흡연·음주·상태 등)
 ├── extraction.ts   AI 추출 스키마 · strict JSON Schema 생성 · 신뢰도 기준
 ├── hashtag.ts      해시태그 정규화·상한·표기 (저장과 검색이 같은 형태를 쓴다)
+├── ideal.ts        이상형 조건 — 추출이 함께 뽑아 프로필에 저장하는 값의 모양 · 정리 · 「꼭」 판정
 ├── image.ts        이미지 업로드 두 단계(슬롯·확정) — 프로필·주선자·모임 사진이 함께 쓴다
-├── profile.ts      프로필 읽기/쓰기 · 주선자 메모 · Discover 필터 · 관리자 목록 쿼리 (인적 조건 공유)
+├── profile.ts      프로필 읽기/쓰기 · 주선자 메모 · Discover 필터(AI 추천만 포함) · 관리자 목록 쿼리 (인적 조건 공유)
 ├── match.ts        소개 신청 생성·거절·연결, 관심 토글
 ├── import.ts       Import 세션·에셋·원문·검토·commit
 ├── auth.ts         전화번호 정규화, 주선자 로그인, 초대 링크·모임 코드
@@ -65,6 +66,20 @@ UI 는 라벨 맵을 직접 인덱싱하지 않고 `apps/web/src/lib/labels.ts` 
 - 검토 화면의 항목 순서는 `EXTRACTED_FIELD_REVIEW_ORDER` 다. 저장된 JSONB 의 키 순서는
   길이순으로 섞이므로 그 순서를 쓰지 않는다. 필드를 추가하면 여기에도 넣는다
   (`extraction.test.ts` 가 빠진 필드를 잡는다).
+
+### `ideal.ts` — 이상형 조건
+
+이상형 글을 조건으로 바꾼 값이고, **프로필 항목**(`profiles.ideal_criteria`)으로 저장한다.
+추출 스키마의 `idealCriteria` 칸이 이 정의를 그대로 써서 AI 가 다른 항목과 같은 호출에서
+함께 뽑고, 주선자가 검토·편집 화면에서 고친다(`profile.ts` 의 쓰기 스키마). 조건이 가리키는
+값은 **프로필 항목과 같은 열거형**(지역·종교·흡연·음주·직업군)이라 그대로 견줄 수 있고,
+성격·취미는 해시태그와 같은 형태의 `keywords` 로 둔다. `required` 는 「꼭」이라고 적은 조건이다.
+
+- 추출 스키마에 들어가므로 transform 을 걸지 않는다. 숫자에 범위를 걸지 않아 한 칸이
+  벗어나도 결과 전체를 버리지 않고, `normalizeIdealCriteria` 가 그 칸만 비운다(뒤집힌 범위
+  바로잡기·키워드 정규화·적히지 않은 「꼭」 빼기). 저장 직전과 읽을 때 모두 이 정리를 거친다.
+- 쓰기 스키마의 `idealCriteria` 에는 default 를 두지 않는다. Zod 4 는 partial 안에서도
+  default 를 채우므로, 두면 이 칸을 보내지 않은 수정이 조건을 지운다.
 
 ### `telegram.ts` — 외부에서 들어오는 입력
 
