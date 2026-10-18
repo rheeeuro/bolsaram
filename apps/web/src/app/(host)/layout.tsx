@@ -10,6 +10,7 @@ import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { readMyGroupRequests } from "@/server/auth/group-invite";
 import { countPendingGroupCreationRequests, readOperatorSettings } from "@/server/auth/operator";
 import { unreadByGroup } from "@/server/repo/group-chat";
+import { countHostTodo } from "@/server/repo/host-todo";
 import { imageUrlFor } from "@/server/views/image-url";
 import { HostNav } from "@/components/host/host-nav";
 import { HostChatFab } from "@/components/host/chat-fab";
@@ -24,9 +25,11 @@ export default async function HostLayout({ children }: { children: React.ReactNo
   // 채팅 배지의 첫 값. 이후에는 SSE 가 밀어준다. 센 시각을 함께 넘겨 화면이 뜨고
   // 연결되기까지의 틈을 스트림이 메우게 한다.
   const countedAt = new Date().toISOString();
-  const unread = await withRls(rlsContextOf(viewer), (sql) =>
-    unreadByGroup(sql, viewer.userId),
-  );
+  // 메뉴 배지 — 처리해야 끝나는 일만 단다. 같은 트랜잭션에서 함께 센다.
+  const { unread, todo } = await withRls(rlsContextOf(viewer), async (sql) => ({
+    unread: await unreadByGroup(sql, viewer.userId),
+    todo: await countHostTodo(sql, viewer.groupId),
+  }));
 
   // 모임 만들기가 승인을 거치는지와 내가 기다리는 요청. 모임 목록 아래 「만들기」와
   // 대기 줄을 그리는 데 쓴다. 관리자에게는 처리할 요청 수를 메뉴 배지로 단다.
@@ -58,15 +61,20 @@ export default async function HostLayout({ children }: { children: React.ReactNo
           }))}
           groupApprovalRequired={settings.groupCreationRequiresApproval && !viewer.isOperator}
           operator={viewer.isOperator ? { pending: operatorPending } : null}
+          badges={{
+            "/requests": todo.intentsPending + todo.requestsToRelay,
+            "/imports": todo.importsPending,
+          }}
         />
         {/* 좁은 화면에서는 하단 탭이 본문 위에 떠 있다 — 그만큼 바닥을 비운다.
-            넓은 화면에는 탭이 없고 사이드바가 왼쪽을 차지한다. */}
+            넓은 화면에는 탭이 없고 사이드바가 왼쪽을 차지한다. 오른쪽 아래 채팅
+            버튼(56px + 여백)도 끝까지 내렸을 때 마지막 줄의 버튼을 덮지 않게 더 비운다. */}
         <div className="lg:pl-64">
           <main
             className="mx-auto max-w-6xl px-5 pt-5 lg:pt-7"
             style={{
               paddingBottom:
-                "calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 1.5rem)",
+                "calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 5.5rem)",
             }}
           >
             {children}

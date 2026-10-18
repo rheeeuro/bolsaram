@@ -14,6 +14,7 @@ import { InviteRow } from "@/components/host/invite-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { ProfileCode } from "@/components/ui/marks";
+import { formatDay } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -146,7 +147,7 @@ export default async function HostInvitesPage({
     <>
       <PageHeader
         title="초대"
-        description="등록한 분에게 초대 링크를 보내면 그 링크로 들어옵니다. 아이디와 비밀번호는 없습니다."
+        description="멤버는 초대 링크로만 들어옵니다. 아이디·비밀번호가 없습니다."
         aside={<Count>{listing.total}명</Count>}
       />
 
@@ -234,7 +235,7 @@ export default async function HostInvitesPage({
                         ) : null}
                         <span>
                           {row.last_login_at
-                            ? `${row.last_login_at.toLocaleDateString("ko-KR")} 방문`
+                            ? `${formatDay(row.last_login_at.toISOString())} 방문`
                             : "방문 전"}
                         </span>
                       </div>

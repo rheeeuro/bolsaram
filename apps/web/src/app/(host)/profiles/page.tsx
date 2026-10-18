@@ -114,7 +114,7 @@ export default async function HostProfilesPage({
     <>
       <PageHeader
         title="멤버"
-        description="등록한 분들입니다. 카드를 누르면 상세가 열리고, 내가 등록한 분은 거기서 공개 여부를 정하거나 내용을 고칩니다."
+        description="내가 등록한 분은 카드를 눌러 공개 여부를 정하고 내용을 고칩니다."
         aside={
           <>
             <Count>{page.total}명</Count>
@@ -129,22 +129,28 @@ export default async function HostProfilesPage({
         }
       />
 
+      {/* 아무도 없는 채널에서는 거를 것이 없다 — 조작 줄을 걷고 할 일(가져오기)만 남긴다. */}
+      {page.total === 0 && !filtered ? null : (
+        <>
       <HostProfileFilters statuses={[...PROFILE_STATUSES]} />
 
-      {/* 정리된 카드로 볼지, 카카오톡에서 받은 그대로 볼지. 필터는 양쪽에 그대로 걸린다. */}
-      <div className="mt-3 flex items-center gap-1.5">
+      {/* 정리된 카드로 볼지, 카카오톡에서 받은 그대로 볼지. 필터는 양쪽에 그대로 걸린다.
+          필터 칩과 헷갈리지 않게 밑줄 탭으로 그린다. */}
+      <div className="mt-4 flex items-end gap-5 border-b border-[var(--surface-border)]">
         <ViewTab href={viewHref("card")} active={mode === "card"}>
-          카드
+          카드로 보기
         </ViewTab>
         <ViewTab href={viewHref("raw")} active={mode === "raw"}>
-          원본
+          받은 원본
         </ViewTab>
         {mode === "raw" ? (
-          <p className="ml-1 text-[12px] text-[var(--surface-text-muted)]">
+          <p className="hidden pb-2 text-[12px] text-[var(--surface-text-muted)] sm:block">
             가져올 때 받은 사진과 글 그대로입니다.
           </p>
         ) : null}
       </div>
+        </>
+      )}
 
       {page.items.length === 0 ? (
         <Panel className="mt-5">
@@ -156,7 +162,7 @@ export default async function HostProfilesPage({
             // 조건 없이 비어 있으면 이 방에 아직 아무도 없는 것이다 — 할 일은 가져오기다.
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <p className="text-[13.5px] text-[var(--surface-text-muted)]">
-                이 방에는 아직 등록한 프로필이 없습니다.
+                여기에는 아직 등록한 멤버가 없습니다.
               </p>
               <Link href="/imports" className={buttonClasses({ variant: "secondary" })}>
                 카카오톡 프로필 가져오기
@@ -287,11 +293,11 @@ function ViewTab({
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "rounded-[var(--radius-pill)] border px-3.5 py-1.5 text-[13px]",
+        "-mb-px border-b-2 pb-2 pt-1 text-[13.5px]",
         "transition-colors duration-[var(--duration-quick)]",
         active
-          ? "border-[var(--color-rose-600)] bg-[var(--color-rose-600)] text-white"
-          : "border-[var(--surface-border)] bg-[var(--surface-card)] text-[var(--surface-text-muted)] hover:border-[var(--color-rose-300)]",
+          ? "border-[var(--color-rose-600)] font-medium text-[var(--surface-text)]"
+          : "border-transparent text-[var(--surface-text-muted)] hover:text-[var(--surface-text)]",
       )}
     >
       {children}

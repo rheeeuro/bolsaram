@@ -114,7 +114,7 @@ export function HostProfileFilters({ statuses }: { statuses: readonly ProfileSta
       >
         <Input
           type="search"
-          placeholder="이름 · 직업 · 학교 · 동네 · 원문의 아무 말 · 17번"
+          placeholder="이름·직업·동네·원문·번호로 찾기"
           aria-label="멤버 검색"
           value={q}
           onChange={(e) => setQ(e.target.value)}

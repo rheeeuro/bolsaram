@@ -20,6 +20,11 @@
     font-size: 15px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+    /* 한글은 어절 단위로 줄을 바꾼다. 기본값은 글자마다 끊어 「기다립니/다.」처럼
+       마지막 글자만 다음 줄로 넘어간다. 띄어쓰기 없는 긴 문자열(링크·코드)은
+       칸을 넘지 않게 그 자리에서 끊는다. */
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 
   /* 멤버·주선자 화면의 사진은 길게 눌러 저장·끌어 옮기기를 막는다. 캡처는 막을 수 없어
@@ -48,6 +53,8 @@
   h3 {
     font-weight: 500;
     letter-spacing: -0.01em;
+    /* 제목이 두 줄이 되면 줄 길이를 맞춰 한 단어만 남는 줄을 피한다. */
+    text-wrap: balance;
   }
 
   input,
@@ -83,11 +90,26 @@
     color: var(--surface-text-muted);
   }
 
+  /* 한글 머리 글자. 영문 kicker 의 넓은 자간을 한글에 쓰면 「주 말 독 서」로 흩어진다. */
+  .kicker-ko {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--surface-text-muted);
+  }
+
   /* 주선자 화면 오른쪽 아래에 떠 있는 버튼(채팅).
      좁은 화면에서는 하단 탭 위로 올려야 가려지지 않는다. */
   .host-fab {
     right: 1rem;
     bottom: calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 1rem);
+  }
+
+  /* 화면 아래에 고정된 버튼 줄(가져오기 검토)이 있으면 좁은 화면에서는 그 위로 올라간다.
+     줄이 화면 폭을 다 써야 버튼 셋이 한 줄에 든다. */
+  @media (max-width: 1023px) {
+    .host-surface:has([data-sticky-actions]) .host-fab {
+      bottom: calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 7.5rem);
+    }
   }
 
   @media (min-width: 1024px) {

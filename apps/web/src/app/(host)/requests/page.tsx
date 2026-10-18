@@ -117,7 +117,7 @@ export default async function HostRequestsPage({
     <>
       <PageHeader
         title="신청"
-        description="누가 누구에게 마음을 보냈는지 봅니다. 서로 수락하면 연결이 되고, 만남이 끝나면 종료합니다."
+        description="멤버끼리 보낸 신청입니다. 서로 수락하면 연결되고, 만남이 끝나면 종료합니다."
         aside={<Count>{items.length}건</Count>}
       />
       <HostIntentQueue items={intents} />

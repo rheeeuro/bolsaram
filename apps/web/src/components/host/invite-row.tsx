@@ -9,6 +9,7 @@ import { ProfileCode } from "@/components/ui/marks";
 import { CopyField } from "@/components/ui/copy-field";
 import { Thumb } from "@/components/host/surface";
 import { apiPost } from "@/lib/api-client";
+import { formatDay } from "@/lib/dates";
 
 /**
  * 초대를 기다리는 분 한 줄.
@@ -121,7 +122,7 @@ function State({
   if (expires.getTime() < Date.now()) return <Badge tone="danger">만료</Badge>;
   return (
     <span className="hidden text-[12.5px] text-[var(--surface-text-muted)] sm:inline">
-      {expires.toLocaleDateString("ko-KR")}까지
+      {formatDay(expiresAt)}까지
     </span>
   );
 }

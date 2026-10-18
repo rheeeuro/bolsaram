@@ -40,7 +40,8 @@ export function DiscoverClient() {
   // 시트가 아니라 위 막대에 따로 둔다 — 한 번 눌러 켜고 끄는 것이 자연스럽다.
   const [aiOnly, setAiOnly] = useState(() => searchParams.get("ai") === "1");
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [view, setView] = useState<ViewMode>("list");
+  // 소개팅은 사진이 먼저다 — 처음에는 사진을 크게 깐다. 고른 방식은 기기에 남는다.
+  const [view, setView] = useState<ViewMode>("grid");
 
   const [items, setItems] = useState<ProfileCardView[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);

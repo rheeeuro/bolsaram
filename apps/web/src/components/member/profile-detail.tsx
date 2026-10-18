@@ -208,7 +208,7 @@ export function ProfileDetail({
           </Section>
         ) : null}
 
-        <Section title="ABOUT">
+        <Section title="기본 정보">
           <Rows
             rows={[
               [
@@ -267,7 +267,7 @@ export function ProfileDetail({
         ) : null}
 
         {profile.idealTypeText ? (
-          <Section title="IDEAL TYPE">
+          <Section title="이상형">
             <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--color-ink-800)]">
               {profile.idealTypeText}
             </p>
@@ -458,7 +458,10 @@ function PhotoArrow({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-9">
-      <h2 className="kicker mb-3">{title}</h2>
+      {/* 한글 제목이라 영문 kicker 의 넓은 자간을 쓰지 않는다 — 「자 기 소 개」로 흩어진다. */}
+      <h2 className="mb-3 text-[12.5px] font-medium tracking-[0.02em] text-[var(--surface-text-muted)]">
+        {title}
+      </h2>
       {children}
     </section>
   );

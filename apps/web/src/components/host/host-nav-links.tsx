@@ -30,6 +30,12 @@ export const HOST_LINKS: HostLink[] = [
   { href: "/invites", label: "초대" },
 ];
 
+/**
+ * 메뉴에 다는 처리할 일의 수. 경로가 키다. 조회용 숫자(멤버 수 등)는 달지 않는다 —
+ * 배지가 「눌러서 끝낼 것이 있다」만 뜻해야 무시되지 않는다.
+ */
+export type HostNavBadges = Partial<Record<string, number>>;
+
 export function isHostLinkActive(link: HostLink, pathname: string): boolean {
   return link.exact ? pathname === link.href : pathname.startsWith(link.href);
 }

@@ -12,6 +12,7 @@ import {
   HOST_LINKS,
   HostNavIcon,
   isHostLinkActive,
+  type HostNavBadges,
 } from "@/components/host/host-nav-links";
 import { useChatStream } from "@/components/host/chat-stream";
 import type { GroupRequestChoice } from "@/components/host/group-requests";
@@ -48,6 +49,7 @@ export function HostNav({
   groupRequests,
   groupApprovalRequired,
   operator,
+  badges,
 }: {
   displayName: string | null;
   /** 내 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
@@ -59,6 +61,7 @@ export function HostNav({
   /** 지금 「새 모임 만들기」가 관리자 승인을 거치는가. */
   groupApprovalRequired: boolean;
   operator: OperatorNav;
+  badges: HostNavBadges;
 }) {
   return (
     <>
@@ -70,6 +73,7 @@ export function HostNav({
         groupRequests={groupRequests}
         groupApprovalRequired={groupApprovalRequired}
         operator={operator}
+        badges={badges}
       />
       <HostMobileNav
         displayName={displayName}
@@ -79,6 +83,7 @@ export function HostNav({
         groupRequests={groupRequests}
         groupApprovalRequired={groupApprovalRequired}
         operator={operator}
+        badges={badges}
       />
     </>
   );
@@ -92,6 +97,7 @@ function HostSidebar({
   groupRequests,
   groupApprovalRequired,
   operator,
+  badges,
 }: {
   displayName: string | null;
   avatarUrl: string | null;
@@ -100,6 +106,7 @@ function HostSidebar({
   groupRequests: GroupRequestChoice[];
   groupApprovalRequired: boolean;
   operator: OperatorNav;
+  badges: HostNavBadges;
 }) {
   const pathname = usePathname();
   // 모임별 안 읽음은 SSE 가 밀어주는 값이다(`ChatStreamProvider`). 여기서 따로 묻지
@@ -140,13 +147,11 @@ function HostSidebar({
               {activeName}
             </p>
           )}
-          <p className="mt-1 px-2 text-[11px] text-[var(--surface-text-muted)]">
-            {activeGroupId
-              ? operator
-                ? "관리자로 보는 중 · 이름을 눌러 설정·초대"
-                : "이름을 눌러 설정·초대·나가기"
-              : "전체공개 프로필을 함께 살펴보세요"}
-          </p>
+          {activeGroupId && operator ? (
+            <p className="mt-1 px-2 text-[11px] text-[var(--surface-text-muted)]">
+              관리자로 보는 중
+            </p>
+          ) : null}
         </div>
 
         <nav aria-label="모임 안의 화면" className="flex flex-col gap-1 py-3">
@@ -168,7 +173,8 @@ function HostSidebar({
                 <span className="shrink-0 opacity-90">
                   <HostNavIcon name={link.href} />
                 </span>
-                {link.label}
+                <span className="flex-1">{link.label}</span>
+                <NavCount count={badges[link.href] ?? 0} inverted={active} />
               </Link>
             );
           })}
@@ -211,5 +217,23 @@ function HostSidebar({
         </div>
       </div>
     </aside>
+  );
+}
+
+/** 사이드바 메뉴 옆 처리할 일의 수. 0 이면 그리지 않는다. */
+function NavCount({ count, inverted }: { count: number; inverted: boolean }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn(
+        "grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-medium leading-none",
+        inverted
+          ? "bg-white text-[var(--color-rose-600)]"
+          : "bg-[var(--color-rose-600)] text-white",
+      )}
+    >
+      {count > 99 ? "99+" : count}
+      <span className="sr-only">건 처리할 일</span>
+    </span>
   );
 }

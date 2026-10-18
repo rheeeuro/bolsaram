@@ -23,6 +23,7 @@ import { label } from "@/lib/labels";
 import { cn } from "@/lib/cn";
 import { NewImportPanel } from "@/components/host/new-import-panel";
 import { TelegramImportNote } from "@/components/host/telegram-import-note";
+import { formatWhen } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export default async function ImportInboxPage({
     <>
       <PageHeader
         title="가져오기"
-        description="카카오톡에서 받은 사진과 글을 올리면 AI가 프로필 항목을 채웁니다. 공개는 언제나 주선자가 검토한 뒤에만 이루어집니다."
+        description="카카오톡에서 받은 사진과 글을 올리면 AI가 항목을 채웁니다. 공개는 검토한 뒤에만 됩니다."
       />
 
       {registered ? (
@@ -156,12 +157,7 @@ function InboxRow({ item }: { item: InboxItem }) {
 
       <div className="shrink-0 text-right">
         <p className="text-[12px] text-[var(--surface-text-muted)]">
-          {when.toLocaleString("ko-KR", {
-            month: "numeric",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
+          {formatWhen(when.toISOString())}
         </p>
         <p className="mt-1 text-[12.5px] text-[var(--color-rose-600)]">
           {registered ? "프로필" : "검토하기"}

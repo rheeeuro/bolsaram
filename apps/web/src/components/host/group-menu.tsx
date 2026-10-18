@@ -9,6 +9,7 @@ import { FormError } from "@/components/ui/field";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { apiDelete, apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { formatWhen } from "@/lib/dates";
 
 /**
  * 보고 있는 모임의 이름 — 누르면 그 모임에서 할 수 있는 일이 열린다.
@@ -42,16 +43,20 @@ export function GroupMenu({
           <span
             title={groupName}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors",
-              open ? "bg-[var(--color-ivory-200)]" : "hover:bg-[var(--color-ivory-200)]",
+              // 눌린다는 것이 글 없이도 보이게 칸 모양을 입힌다.
+              "flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors",
+              open
+                ? "border-[var(--color-rose-300)] bg-white"
+                : "border-[var(--surface-border)] bg-white/60 hover:border-[var(--color-rose-300)] hover:bg-white",
             )}
           >
             <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
               {groupName}
             </span>
+            <span className="shrink-0 text-[11.5px] text-[var(--surface-text-muted)]">관리</span>
             <span
               aria-hidden
-              className="shrink-0 text-[10px] text-[var(--surface-text-muted)]"
+              className="shrink-0 text-[9px] text-[var(--surface-text-muted)]"
             >
               {open ? "▲" : "▼"}
             </span>
@@ -155,7 +160,7 @@ export function GroupInviteIssuer({
               : "1회용 코드입니다. 한 사람만 참여할 수 있습니다."}
           </p>
           <p className="text-[11.5px] text-[var(--surface-text-muted)]">
-            {new Date(issued.expiresAt).toLocaleString("ko-KR")} 까지 · 이 창을 닫으면 다시 볼
+            {formatWhen(issued.expiresAt)}까지 · 이 창을 닫으면 다시 볼
             수 없습니다
           </p>
         </div>

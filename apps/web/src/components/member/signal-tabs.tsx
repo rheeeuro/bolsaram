@@ -69,12 +69,17 @@ export function SignalTabs({
   initialTab,
   groups,
 }: {
-  initialTab: string;
+  /** 주소로 고른 탭. 없으면 받은 → 이어짐 → 보낸 순서로 내용이 있는 첫 탭을 연다. */
+  initialTab: string | null;
   groups: Record<string, SignalItem[]>;
 }) {
-  const [direction, setDirection] = useState(
-    TABS.some((tab) => tab.key === initialTab) ? initialTab : "incoming",
-  );
+  const [direction, setDirection] = useState(() => {
+    if (initialTab && TABS.some((tab) => tab.key === initialTab)) return initialTab;
+    return (
+      ["incoming", "connected", "outgoing"].find((key) => (groups[key]?.length ?? 0) > 0) ??
+      "incoming"
+    );
+  });
   const items = groups[direction] ?? [];
 
   function select(next: string) {
@@ -107,6 +112,9 @@ export function SignalTabs({
               )}
             >
               {tab.label}
+              {(groups[tab.key]?.length ?? 0) > 0 ? (
+                <span className="ml-1 tabular-nums opacity-70">{groups[tab.key]!.length}</span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -120,7 +128,19 @@ export function SignalTabs({
         aria-labelledby={`signal-tab-${direction}`}
       >
         {items.length === 0 ? (
-          <Empty {...(EMPTY_COPY[direction] ?? EMPTY_COPY.incoming!)} />
+          <Empty
+            {...(EMPTY_COPY[direction] ?? EMPTY_COPY.incoming!)}
+            action={
+              direction === "connected" ? null : (
+                <Link
+                  href="/discover"
+                  className="rounded-full border border-[var(--surface-border)] bg-white px-4 py-2 text-[13px] text-[var(--color-ink-700)] transition-colors hover:border-[var(--color-rose-300)]"
+                >
+                  둘러보기
+                </Link>
+              )
+            }
+          />
         ) : (
           <ul className="flex flex-col gap-2.5 pb-8">
             {items.map((item, index) => (

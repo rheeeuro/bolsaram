@@ -50,7 +50,7 @@ export function HostChatPanel({
     >
       <header className="flex items-center gap-1 border-b border-[var(--surface-border)] py-2 pl-4 pr-2">
         <div className="min-w-0 flex-1">
-          <p className="kicker leading-none">채팅</p>
+          <p className="kicker-ko leading-none">채팅</p>
           <h2 className="display mt-1 truncate text-[17px] leading-tight">{groupName}</h2>
         </div>
         <Link

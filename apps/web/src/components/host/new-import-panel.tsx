@@ -149,7 +149,7 @@ export function NewImportPanel({
 
   return (
     <Panel title="새로 가져오기">
-      <Field label="등록할 모임" hint="여기 고른 방에 프로필이 만들어집니다">
+      <Field label="등록할 모임" hint="고른 모임에 프로필이 만들어집니다">
         <GroupPicker
           groups={groups}
           value={groupId}

@@ -77,7 +77,7 @@ export function PageHeader({
   return (
     <header className="animate-fade mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        {kicker ? <p className="kicker mb-2">{kicker}</p> : null}
+        {kicker ? <p className="kicker-ko mb-2">{kicker}</p> : null}
         <h1 className="display text-[26px] leading-tight text-[var(--surface-text)]">
           {title}
         </h1>

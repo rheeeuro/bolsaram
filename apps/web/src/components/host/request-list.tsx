@@ -13,6 +13,7 @@ import { CopyField } from "@/components/ui/copy-field";
 import { apiPost } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { label } from "@/lib/labels";
+import { formatWhen } from "@/lib/dates";
 
 type Party = {
   id: string;
@@ -134,12 +135,7 @@ export function HostRequestList({
 
                   <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
                     <span className="text-[12px] text-[var(--surface-text-muted)]">
-                      {new Date(item.requestedAt).toLocaleString("ko-KR", {
-                        month: "numeric",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatWhen(item.requestedAt)}
                     </span>
                     {connected ? (
                       <ConfirmButton

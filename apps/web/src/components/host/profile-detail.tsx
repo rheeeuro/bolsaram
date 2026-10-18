@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
+import { formatWhen } from "@/lib/dates";
 
 /** 어느 버튼에서 난 실패인가. 한 곳에 모아 두면 무엇이 실패했는지 짝을 잃는다. */
 type Scope = "status" | "bump" | "acting" | "invite" | "delete";
@@ -459,37 +460,27 @@ export function HostProfileDetail({
               </div>
               <p className="mt-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
                 {visible
-                  ? "같은 쪽 멤버의 목록에 보이고 마음을 받을 수 있습니다. 여러 분과 동시에 신청을 주고받을 수 있습니다."
-                  : "멤버에게 보이지 않습니다. 이미 주고받은 신청은 그대로 남습니다."}
+                  ? "같은 쪽 멤버 목록에 보이고 마음을 받을 수 있습니다."
+                  : "멤버에게 보이지 않습니다. 주고받은 신청은 남습니다."}
               </p>
               {/* 실패를 말해주지 않으면 값이 되돌아간 이유를 알 수 없다. */}
               <FormError>{messageFor(error, "status")}</FormError>
             </Panel>
 
             <Panel title="멤버 화면 열기">
-              <p className="mb-4 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                이 분이 멤버 화면을 보는 길은 둘입니다. 본인이 직접 보는 것이 기본이고,
-                휴대폰 쓰기를 꺼리는 분은 주선자가 대신 봅니다.
-              </p>
-
               <section>
                 <h3 className="text-[13px] font-semibold text-[var(--surface-text)]">
                   본인에게 보내기
                 </h3>
                 <p className="mb-3 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
                   {claimed
-                    ? "본인 계정에 연결되어 있습니다. 보낸 링크를 다시 누르면 언제든 들어옵니다. 링크를 잃어버렸거나 다른 사람에게 갔을 때만 새로 발급하세요."
-                    : "멤버는 아이디·비밀번호가 없습니다. 이 링크가 곧 로그인이고, 한 번 열면 그분의 입장 링크로 계속 쓰입니다."}
+                    ? "본인 계정에 연결됐습니다. 링크를 잃어버렸을 때만 새로 발급하세요."
+                    : "이 링크가 곧 로그인입니다. 한 번 열면 그분의 입장 링크로 계속 쓰입니다."}
                 </p>
                 {invite && !invite.claimed ? (
                   <p className="mb-3 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
-                    발급된 초대가 있습니다 (처음 열기 기한{" "}
-                    {new Date(invite.expiresAt).toLocaleString("ko-KR", {
-                      month: "numeric",
-                      day: "numeric",
-                      hour: "2-digit",
-                    })}
-                    ). 새로 발급하면 기존 링크와 입장코드는 무효가 됩니다.
+                    보낸 초대는 {formatWhen(invite.expiresAt)}까지 열 수 있습니다. 새로 발급하면
+                    이전 링크와 입장코드는 무효가 됩니다.
                   </p>
                 ) : null}
 
@@ -517,14 +508,13 @@ export function HostProfileDetail({
                 {issued ? (
                   <div className="mt-3.5 flex flex-col gap-2.5 rounded-[12px] bg-[var(--color-ivory-100)] p-3">
                     <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                      지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요. 받은 분은 이
-                      메시지를 지우지 말고 들어올 때마다 다시 누르면 됩니다.
+                      지금만 보입니다. 복사해서 카카오톡으로 보내세요. 받은 분은 들어올 때마다
+                      이 링크를 다시 누릅니다.
                     </p>
                     <CopyField label="초대 링크" value={issued.url} />
                     <CopyField label="입장코드" value={issued.code} />
                     <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                      둘은 같은 것입니다. 링크를 못 여는 경우에만 코드를 보내고, 멤버는
-                      입장 화면에서 코드를 넣습니다.
+                      링크를 못 열 때만 입장코드를 보냅니다. 입장 화면에 넣으면 같습니다.
                     </p>
                   </div>
                 ) : null}
@@ -535,8 +525,8 @@ export function HostProfileDetail({
                   대신 둘러보기
                 </h3>
                 <p className="mb-3 mt-1.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                  주선자가 자기 폰으로 대신 봅니다. 초대 링크는 건드리지 않고 주선자 로그인도
-                  그대로 유지됩니다.
+                  휴대폰을 잘 안 쓰는 분이면 주선자가 대신 봅니다. 화면 아래 띠에서 언제든
+                  주선자로 돌아옵니다.
                 </p>
                 <Button
                   variant="secondary"
@@ -561,14 +551,9 @@ export function HostProfileDetail({
                   이 분으로 둘러보기
                 </Button>
                 <FormError>{messageFor(error, "acting")}</FormError>
-                <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                  대행 중에는 화면 아래에 띠가 뜨고, 거기서 언제든 주선자로 돌아옵니다.
-                  끝내지 않으면 로그아웃할 때까지 이어집니다.
-                </p>
                 {claimed ? (
                   <p className="mt-2.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                    본인 계정이 연결된 분입니다. 본인도 같은 화면을 직접 볼 수 있으니, 대신
-                    누르기 전에 확인해 주세요.
+                    본인도 직접 들어오는 분입니다. 대신 누르기 전에 확인해 주세요.
                   </p>
                 ) : null}
               </section>
@@ -577,8 +562,8 @@ export function HostProfileDetail({
             {/* 맨 아래에 둔다. 쉬고 싶은 분은 비활성이면 충분하다는 것을 먼저 읽게 한다. */}
             <Panel title="삭제">
               <p className="mb-3 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-                본인이 내려 달라고 하면 지웁니다. 잠시 쉬는 분은 위에서 비활성으로 두세요.
-                이미 연결된 상대가 받아 둔 이름과 연락처는 되돌릴 수 없습니다.
+                본인이 원할 때만 지웁니다. 쉬는 분은 비활성으로 두세요. 이미 연결된 상대가 받은
+                이름과 연락처는 되돌릴 수 없습니다.
               </p>
               <ConfirmButton
                 variant="danger"

@@ -114,7 +114,8 @@ export default async function SignalsPage({
 
   return (
     <PageShell>
-      <SignalTabs initialTab={direction} groups={groups} />
+      {/* 탭을 고르고 들어온 것이 아니면 내용이 있는 탭부터 연다. */}
+      <SignalTabs initialTab={tab ? direction : null} groups={groups} />
     </PageShell>
   );
 }

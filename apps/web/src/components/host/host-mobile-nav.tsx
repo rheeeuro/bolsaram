@@ -15,6 +15,7 @@ import {
   HOST_LINKS,
   HostNavIcon,
   isHostLinkActive,
+  type HostNavBadges,
 } from "@/components/host/host-nav-links";
 import type { GroupChoice } from "@/components/host/group-switcher";
 import { GroupRequestRows, type GroupRequestChoice } from "@/components/host/group-requests";
@@ -42,6 +43,7 @@ export function HostMobileNav({
   groupRequests,
   groupApprovalRequired,
   operator,
+  badges,
 }: {
   displayName: string | null;
   /** 내 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
@@ -51,6 +53,7 @@ export function HostMobileNav({
   groupRequests: GroupRequestChoice[];
   groupApprovalRequired: boolean;
   operator: OperatorNav;
+  badges: HostNavBadges;
 }) {
   const pathname = usePathname();
   const { unread } = useChatStream();
@@ -71,6 +74,7 @@ export function HostMobileNav({
 
   const primary = HOST_LINKS.filter((link) => link.primary);
   const secondary = HOST_LINKS.filter((link) => !link.primary);
+  const secondaryCount = secondary.reduce((sum, link) => sum + (badges[link.href] ?? 0), 0);
   // 계정 설정도 「더보기」 안에 있다 — 그 화면에 있으면 탭도 함께 켠다.
   const moreActive =
     secondary.some((link) => isHostLinkActive(link, pathname)) ||
@@ -124,7 +128,12 @@ export function HostMobileNav({
                       : "text-[var(--surface-text-muted)]",
                   )}
                 >
-                  <HostNavIcon name={link.href} />
+                  <span className="relative">
+                    <HostNavIcon name={link.href} />
+                    {(badges[link.href] ?? 0) > 0 ? (
+                      <UnreadBadge count={badges[link.href]!} label="건 처리할 일" floating />
+                    ) : null}
+                  </span>
                   {link.label}
                 </Link>
               </li>
@@ -145,7 +154,12 @@ export function HostMobileNav({
                   : "text-[var(--surface-text-muted)]",
               )}
             >
-              <HostNavIcon name="more" />
+              <span className="relative">
+                <HostNavIcon name="more" />
+                {secondaryCount > 0 ? (
+                  <UnreadBadge count={secondaryCount} label="건 처리할 일" floating />
+                ) : null}
+              </span>
               더보기
             </button>
           </li>

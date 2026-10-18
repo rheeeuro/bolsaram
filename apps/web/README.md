@@ -160,6 +160,7 @@ server/
 │   ├── profiles.ts           Discover·상세·주선자 목록·수정
 │   ├── matches.ts            신청 생성·전이·시그널 목록·연결 상대
 │   ├── match-intents.ts      멤버가 낸 요청(주선자 확인 대기) — 승인해야 신청이 된다
+│   ├── host-todo.ts          주선자가 처리할 일의 개수 — 홈 「오늘 할 일」과 메뉴 배지 (각 화면과 같은 범위)
 │   ├── profile-images.ts     사진 추가·삭제·대표 지정 (순서와 대표 불변식)
 │   ├── favorites.ts          관심 토글·목록
 │   ├── hides.ts              숨기기 토글·목록 + 양방향 판정

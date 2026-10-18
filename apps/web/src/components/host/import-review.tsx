@@ -29,7 +29,7 @@ import {
 } from "@bolsaram/schemas";
 import { pickRealName } from "@bolsaram/domain";
 import { Badge, toneForStatus } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { GroupPicker, type GroupChoice } from "@/components/host/group-picker";
 import { IdealCriteriaEditor } from "@/components/host/ideal-criteria-editor";
@@ -37,6 +37,7 @@ import { Input, Select, Textarea } from "@/components/ui/field";
 import { apiPatch, apiPost, uploadFile } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { FIELD_LABELS, label } from "@/lib/labels";
+import { formatWhen } from "@/lib/dates";
 
 type FieldReview = {
   key: string;
@@ -163,7 +164,11 @@ export function ImportReview({
     const district = values.residenceDistrict ?? "";
     const dropDistrict =
       key === "residenceRegion" && isDistrict(district) && districtRegion(district) !== value;
-    setValues((prev) => ({ ...prev, [key]: value, ...(dropDistrict ? { residenceDistrict: "" } : {}) }));
+    setValues((prev) => ({
+      ...prev,
+      [key]: value,
+      ...(dropDistrict ? { residenceDistrict: "" } : {}),
+    }));
     setDirty((prev) => {
       const next = new Set(prev).add(key);
       if (dropDistrict) next.add("residenceDistrict");
@@ -264,15 +269,13 @@ export function ImportReview({
   // 아직 남은 확인거리. 손댄 칸은 사람이 본 것이므로 빼되, 필수 칸을 비워 두었다면 남긴다.
   const attention =
     extraction?.review.filter((f) =>
-      dirty.has(f.key)
-        ? f.required && (values[f.key] ?? "").trim() === ""
-        : f.needsAttention,
+      dirty.has(f.key) ? f.required && (values[f.key] ?? "").trim() === "" : f.needsAttention,
     ) ?? [];
 
   return (
     <div className="grid gap-5 lg:grid-cols-[400px_1fr]">
-      {/* 원본 */}
-      <div className="flex flex-col gap-5">
+      {/* 원본. 넓은 화면에서는 오른쪽 칸을 내려가며 고치는 동안 원문을 계속 옆에 둔다. */}
+      <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto">
         <Panel
           tight
           title="원본"
@@ -294,9 +297,8 @@ export function ImportReview({
 
           {session.telegram ? (
             <p className="mb-2 text-[12px] text-[var(--surface-text-muted)]">
-              봇 대화 {session.telegram.state} · 시작{" "}
-              {new Date(session.telegram.startedAt).toLocaleString("ko-KR")} · 마지막 메시지{" "}
-              {new Date(session.telegram.lastActivityAt).toLocaleString("ko-KR")}
+              봇 대화 {session.telegram.state} · 시작 {formatWhen(session.telegram.startedAt)} ·
+              마지막 메시지 {formatWhen(session.telegram.lastActivityAt)}
             </p>
           ) : null}
 
@@ -371,7 +373,7 @@ export function ImportReview({
           <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
             {committed
               ? "이미 등록했습니다. 옮기려면 「멤버」 메뉴에서 다뤄야 합니다."
-              : "여기서 고른 방에 프로필이 만들어집니다. 방을 바꾸면 이 건은 그 방의 가져오기 목록으로 옮겨 갑니다."}
+              : "고른 모임에 프로필이 만들어집니다. 바꾸면 이 건은 그 모임의 가져오기 목록으로 옮겨 갑니다."}
           </p>
         </Panel>
 
@@ -426,27 +428,27 @@ export function ImportReview({
                       (values.residenceDistrict ?? "") !== "",
                   )
                   .map((field) => (
-                  <FieldRow
-                    key={field.key}
-                    field={field}
-                    options={
-                      field.key === "residenceDistrict"
-                        ? districtsOf(values.residenceRegion ?? "")
-                        : undefined
-                    }
-                    value={values[field.key] ?? ""}
-                    touched={
-                      !dirty.has(field.key)
-                        ? null
-                        : (values[field.key] ?? "") === (original[field.key] ?? "")
-                          ? "confirmed"
-                          : "edited"
-                    }
-                    disabled={committed}
-                    onChange={(v) => edit(field.key, v)}
-                    onConfirm={() => confirm(field.key)}
-                  />
-                ))}
+                    <FieldRow
+                      key={field.key}
+                      field={field}
+                      options={
+                        field.key === "residenceDistrict"
+                          ? districtsOf(values.residenceRegion ?? "")
+                          : undefined
+                      }
+                      value={values[field.key] ?? ""}
+                      touched={
+                        !dirty.has(field.key)
+                          ? null
+                          : (values[field.key] ?? "") === (original[field.key] ?? "")
+                            ? "confirmed"
+                            : "edited"
+                      }
+                      disabled={committed}
+                      onChange={(v) => edit(field.key, v)}
+                      onConfirm={() => confirm(field.key)}
+                    />
+                  ))}
               </div>
             </Panel>
 
@@ -481,47 +483,67 @@ export function ImportReview({
               </Panel>
             ) : null}
 
-            {error ? <p className="text-[13px] text-[var(--color-danger)]">{error}</p> : null}
-            {message ? (
-              <p className="text-[13px] text-[var(--color-success)]">{message}</p>
-            ) : null}
-
             {committed ? (
-              <div className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-3 text-[13px]">
-                이미 프로필로 등록된 세션입니다.
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  disabled={busy != null || attention.length > 0}
-                  onClick={() => void commit(true)}
-                >
-                  {busy === "commit" ? "등록 중…" : "등록하고 공개"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={busy != null}
-                  onClick={() => void commit(false)}
-                >
-                  비공개로 등록
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy != null || dirty.size === 0}
-                  onClick={() => void saveReview()}
-                >
-                  {busy === "review" ? "저장 중…" : "저장만 하기"}
-                </Button>
-
-                {attention.length > 0 ? (
-                  <span className="text-[12px] text-[var(--color-warning)]">
-                    강조된 칸 {attention.length}개를 확인하면 바로 공개할 수 있습니다.
-                  </span>
-                ) : dirty.size > 0 ? (
-                  <span className="text-[12px] text-[var(--surface-text-muted)]">
-                    고친 내용은 등록할 때 함께 저장됩니다.
-                  </span>
+              <>
+                {error ? (
+                  <p className="text-[13px] text-[var(--color-danger)]">{error}</p>
                 ) : null}
+                {message ? (
+                  <p className="text-[13px] text-[var(--color-success)]">{message}</p>
+                ) : null}
+                <div className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-3 text-[13px]">
+                  이미 프로필로 등록된 세션입니다.
+                </div>
+              </>
+            ) : (
+              // 검토 칸이 길어 버튼이 화면 밖에 있으면 무엇이 남았는지 모른 채 내려가야 한다.
+              // 아래에 붙여 두고 남은 칸 수를 같이 보여준다. 넓은 화면은 오른쪽 끝을 채팅
+              // 버튼 자리로 비우고, 좁은 화면은 채팅 버튼이 이 줄 위로 올라간다(globals.css).
+              <div
+                data-sticky-actions
+                className="sticky bottom-[calc(var(--host-tabbar-h)+env(safe-area-inset-bottom)+0.75rem)] z-20 flex flex-col gap-2 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-white/95 px-4 py-3 shadow-[var(--shadow-card)] backdrop-blur lg:bottom-6 lg:pr-24"
+              >
+                {error ? (
+                  <p className="text-[13px] text-[var(--color-danger)]">{error}</p>
+                ) : null}
+                {message ? (
+                  <p className="text-[13px] text-[var(--color-success)]">{message}</p>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    className={COMPACT_ON_PHONE}
+                    disabled={busy != null || attention.length > 0}
+                    onClick={() => void commit(true)}
+                  >
+                    {busy === "commit" ? "등록 중…" : "등록하고 공개"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className={COMPACT_ON_PHONE}
+                    disabled={busy != null}
+                    onClick={() => void commit(false)}
+                  >
+                    비공개로 등록
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className={COMPACT_ON_PHONE}
+                    disabled={busy != null || dirty.size === 0}
+                    onClick={() => void saveReview()}
+                  >
+                    {busy === "review" ? "저장 중…" : "저장만 하기"}
+                  </Button>
+
+                  {attention.length > 0 ? (
+                    <span className="text-[12px] text-[var(--color-warning)]">
+                      강조된 칸 {attention.length}개를 확인하면 공개할 수 있습니다.
+                    </span>
+                  ) : dirty.size > 0 ? (
+                    <span className="text-[12px] text-[var(--surface-text-muted)]">
+                      고친 내용은 등록할 때 함께 저장됩니다.
+                    </span>
+                  ) : null}
+                </div>
               </div>
             )}
           </>
@@ -530,6 +552,9 @@ export function ImportReview({
     </div>
   );
 }
+
+/** 고정 버튼 줄의 버튼 셋이 폰 폭에서 한 줄에 들어가도록 한 단 줄인다. */
+const COMPACT_ON_PHONE = "max-sm:h-9 max-sm:px-3 max-sm:text-[13px]";
 
 function FieldRow({
   field,
@@ -654,45 +679,59 @@ function RetryUpload({ sessionId, nextOrder }: { sessionId: string; nextOrder: n
 
   return (
     <div>
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-        multiple
-        disabled={busy}
-        className="w-full text-[12px] file:mr-2 file:rounded file:border file:border-[var(--surface-border)] file:bg-white file:px-2 file:py-1 file:text-[12px]"
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          if (files.length === 0) return;
-          void (async () => {
-            setBusy(true);
-            setError(null);
-            for (const [index, file] of files.entries()) {
-              const slot = await apiPost<{ assetId: string; uploadUrl: string }>(
-                `/api/imports/${sessionId}/assets`,
-                {
-                  type: "IMAGE",
-                  filename: file.name,
-                  mimeType: file.type,
-                  size: file.size,
-                  order: nextOrder + index,
-                },
-              );
-              if (!slot.ok) {
-                setError(slot.message);
-                break;
+      {/* 브라우저 기본 파일 버튼은 언어·모양이 제각각이다. 가져오기 화면의 「사진 고르기」와
+          같은 버튼 모양을 입히고 실제 입력은 감춘다. */}
+      <label
+        className={buttonClasses({
+          variant: "secondary",
+          size: "sm",
+          className: cn("cursor-pointer", busy && "pointer-events-none opacity-60"),
+        })}
+      >
+        {busy ? "올리는 중…" : "＋ 사진 더 넣기"}
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          multiple
+          disabled={busy}
+          className="sr-only"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            if (files.length === 0) return;
+            void (async () => {
+              setBusy(true);
+              setError(null);
+              for (const [index, file] of files.entries()) {
+                const slot = await apiPost<{ assetId: string; uploadUrl: string }>(
+                  `/api/imports/${sessionId}/assets`,
+                  {
+                    type: "IMAGE",
+                    filename: file.name,
+                    mimeType: file.type,
+                    size: file.size,
+                    order: nextOrder + index,
+                  },
+                );
+                if (!slot.ok) {
+                  setError(slot.message);
+                  break;
+                }
+                const uploaded = await uploadFile(slot.data.uploadUrl, file);
+                if (!uploaded.ok) {
+                  setError(uploaded.message);
+                  break;
+                }
+                await apiPost(`/api/imports/${sessionId}/assets`, {
+                  confirm: slot.data.assetId,
+                });
               }
-              const uploaded = await uploadFile(slot.data.uploadUrl, file);
-              if (!uploaded.ok) {
-                setError(uploaded.message);
-                break;
-              }
-              await apiPost(`/api/imports/${sessionId}/assets`, { confirm: slot.data.assetId });
-            }
-            setBusy(false);
-            router.refresh();
-          })();
-        }}
-      />
+              setBusy(false);
+              e.target.value = "";
+              router.refresh();
+            })();
+          }}
+        />
+      </label>
       {error ? <p className="mt-1 text-[11.5px] text-[var(--color-danger)]">{error}</p> : null}
     </div>
   );
@@ -738,4 +777,3 @@ function parseFieldValue(key: string, raw: string): unknown {
   }
   return trimmed;
 }
-

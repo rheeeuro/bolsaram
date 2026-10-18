@@ -25,7 +25,7 @@ export default async function HostGroupIndexPage() {
     <>
       <PageHeader
         title="모임 설정"
-        description="전체공개는 설정할 것이 없는 공용 방입니다. 고칠 모임을 고르세요."
+        description="전체공개는 따로 설정할 것이 없습니다. 고칠 모임을 고르세요."
       />
       {groups.length === 0 ? (
         <Panel>

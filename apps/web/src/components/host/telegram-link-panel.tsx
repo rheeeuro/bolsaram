@@ -12,6 +12,7 @@ import {
   type GroupChoice,
 } from "@/components/host/group-picker";
 import { apiDelete, apiPatch, apiPost } from "@/lib/api-client";
+import { formatWhen } from "@/lib/dates";
 
 type Issued = { code: string; expiresAt: string; deepLink: string | null };
 
@@ -106,7 +107,7 @@ export function TelegramLinkPanel({
             연결됨
             {lastSeenAt ? (
               <span className="ml-2 text-[var(--surface-text-muted)]">
-                마지막 사용 {new Date(lastSeenAt).toLocaleString("ko-KR")}
+                마지막 사용 {formatWhen(lastSeenAt)}
               </span>
             ) : null}
           </p>

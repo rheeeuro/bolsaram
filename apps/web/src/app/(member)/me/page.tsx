@@ -96,7 +96,7 @@ export default async function MePage() {
 
             {profile.hashtags.length > 0 ? (
               <section className="mt-8">
-                <h2 className="kicker mb-2">해시태그</h2>
+                <h2 className="kicker-ko mb-2 font-medium">해시태그</h2>
                 <div className="flex flex-wrap gap-1.5">
                   {profile.hashtags.map((tag) => (
                     <HashtagChip key={tag} tag={tag} />
@@ -107,7 +107,7 @@ export default async function MePage() {
 
             {profile.bio ? (
               <section className="mt-8">
-                <h2 className="kicker mb-2">자기소개</h2>
+                <h2 className="kicker-ko mb-2 font-medium">자기소개</h2>
                 <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--color-ink-800)]">
                   {profile.bio}
                 </p>

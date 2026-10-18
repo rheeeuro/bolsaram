@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ProfileCode } from "@/components/ui/marks";
 import { Panel, Thumb } from "@/components/host/surface";
 import { apiPost } from "@/lib/api-client";
+import { formatWhen } from "@/lib/dates";
 
 type Party = {
   id: string;
@@ -85,12 +86,7 @@ export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
               </span>
               <Who party={item.to} />
               <span className="ml-auto text-[12px] text-[var(--surface-text-muted)]">
-                {new Date(item.createdAt).toLocaleString("ko-KR", {
-                  month: "numeric",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {formatWhen(item.createdAt)}
               </span>
             </div>
 
