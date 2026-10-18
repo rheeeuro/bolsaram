@@ -24,6 +24,7 @@ import {
 import {
   idealCriteriaSchema,
   normalizeIdealCriteria,
+  reconcileResidence,
   type AdminProfileQuery,
   type DiscoverQuery,
   type Gender,
@@ -35,7 +36,7 @@ import {
 const PROFILE_COLUMNS = `
   p.id, p.user_id, p.public_code, p.gender, p.birth_year, p.height,
   p.job_title, p.job_category, p.company, p.education,
-  p.residence_region, p.workplace_region, p.religion, p.mbti,
+  p.residence_region, p.residence_district, p.workplace_region, p.religion, p.mbti,
   p.smoking, p.drinking, p.hobbies, p.hashtags, p.bio, p.ideal_type_text, p.ideal_criteria,
   p.host_comment, p.real_name, p.contact_note, p.status,
   p.bumped_at, p.created_at, p.updated_at`;
@@ -52,6 +53,7 @@ type ProfileRow = {
   company: string | null;
   education: string | null;
   residence_region: string;
+  residence_district: string | null;
   workplace_region: string | null;
   religion: string | null;
   mbti: string | null;
@@ -113,6 +115,7 @@ function toRecord(row: ProfileRow, images: FullProfile["images"]): ProfileRecord
     company: row.company,
     education: row.education,
     residenceRegion: row.residence_region,
+    residenceDistrict: row.residence_district,
     workplaceRegion: row.workplace_region,
     religion: row.religion,
     mbti: row.mbti,
@@ -341,6 +344,7 @@ const UPDATABLE_COLUMNS: Record<keyof ProfileUpdate, string> = {
   company: "company",
   education: "education",
   residenceRegion: "residence_region",
+  residenceDistrict: "residence_district",
   workplaceRegion: "workplace_region",
   religion: "religion",
   mbti: "mbti",
@@ -399,10 +403,24 @@ export async function updateProfile(
 ): Promise<boolean> {
   const sets: string[] = [];
   const values: unknown[] = [];
+  // 광역과 구·시·군은 함께 맞춘다. 둘 다 오면 어긋난 구·시·군을 버리고, 광역만 오면
+  // 저장된 구·시·군이 새 광역에 속할 때만 남긴다(DB 제약 `profiles_residence_district_region`).
+  if (patch.residenceRegion !== undefined && "residenceDistrict" in patch) {
+    patch = {
+      ...patch,
+      residenceDistrict: reconcileResidence(patch.residenceRegion, patch.residenceDistrict).district,
+    };
+  }
   for (const [key, column] of Object.entries(UPDATABLE_COLUMNS)) {
     if (!(key in patch)) continue;
     values.push(patch[key as keyof ProfileUpdate]);
     sets.push(`${column} = $${values.length}`);
+  }
+  if (patch.residenceRegion !== undefined && !("residenceDistrict" in patch)) {
+    values.push(patch.residenceRegion);
+    sets.push(
+      `residence_district = CASE WHEN split_part(residence_district::text, '_', 1) = $${values.length}::text THEN residence_district END`,
+    );
   }
   if (sets.length === 0) return false;
   values.push(id);

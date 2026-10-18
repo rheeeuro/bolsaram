@@ -105,6 +105,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0070_profile_ideal_criteria_column.sql` | 이상형 조건을 프로필 항목으로 — `profiles.ideal_criteria`(jsonb, 객체만). 가져오기 추출이 함께 뽑고 주선자가 고친다. 0069 의 캐시 테이블을 지운다 |
 | `0071_import_raw_text_key.sql` | 가져오기 원문 비교 키 — `import_sessions.raw_text_key`(생성 칼럼, `import_raw_text_key()`). 공백·제로폭 문자·카카오톡 말머리를 뺀 원문의 md5, 20자 미만은 NULL. 앱이 같은 키의 가져오기가 이미 있으면 업로드·원문 수정을 거부한다 |
 | `0072_import_raw_text_taken.sql` | `app_import_raw_text_taken(raw, except)` — 남이 올린 가져오기까지 같은 원문이 있는지 **있다/없다만** 답한다(SECURITY DEFINER, 주선자만). 누구의 어느 프로필인지는 돌려주지 않는다 |
+| `0073_profile_residence_district.sql` | 서울·경기 거주지의 구·시·군 — `district` enum(서울 25 · 경기 31) + `profiles.residence_district`. 값 앞부분이 광역 코드이고 `profiles_residence_district_region` 이 거주 광역과 맞는지 막는다. 필터 권역은 저장하지 않고 앱의 표가 묶는다 |
 
 ## 테이블
 
@@ -115,7 +116,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `group_messages`                               | 모임 채팅방의 글과 사건(`system_kind`). 고칠 수 없고 사람의 글만 지워진다 | 같은 모임 주선자 중 **들어온 뒤의 것만** (쓰기는 본인 명의·사람의 글만) |
 | `group_chat_prefs`                             | 주선자별 방 상태 — 읽은 위치·텔레그램 알림 단계(`notify`) | 본인 것만                           |
 | `users`                                        | 계정. `active_group_id` 는 주선자가 보고 있는 모임, `avatar_key` 는 프로필 사진 | 본인 + 같은 모임 관계자 (삭제는 내가 고칠 수 있는 프로필의 멤버만) |
-| `profiles`                                     | 프로필. `status` 는 활성/비활성뿐, `public_code` 가 화면의 `17번`, `is_seed` 는 합성 표식, `ideal_criteria` 는 추천이 견주는 이상형 조건(멤버 화면에 안 나간다) | 활성분 + 본인 + 관리자   |
+| `profiles`                                     | 프로필. `status` 는 활성/비활성뿐, `public_code` 가 화면의 `17번`, `is_seed` 는 합성 표식, `ideal_criteria` 는 추천이 견주는 이상형 조건(멤버 화면에 안 나간다), `residence_district` 는 서울·경기의 구·시·군(거주 광역과 짝, 멤버 화면에 안 나간다) | 활성분 + 본인 + 관리자   |
 | `profile_images`                               | 사진 메타데이터 (`storage_key` 만, URL 저장 안 함) | 부모 프로필을 읽을 수 있으면        |
 | `profile_memos`                                | 주선자 메모. 프로필당 하나, 멤버 화면에 안 나간다  | **등록한 주선자만** (같은 모임 주선자·본인 멤버 불가) |
 | `match_requests`                               | 소개 신청 — **프로필 × 프로필** 관계와 그 상태. 한 사람이 여러 행을 동시에 가진다 | 당사자 + 관리자                     |

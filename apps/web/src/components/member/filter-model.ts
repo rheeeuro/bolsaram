@@ -1,4 +1,8 @@
 import {
+  AREA_LABELS,
+  areaRegion,
+  areasOf,
+  isArea,
   DRINKING_LABELS,
   JOB_CATEGORY_LABELS,
   REGION_LABELS,
@@ -21,7 +25,10 @@ export type Filters = {
   ageMax: number;
   heightMin: number;
   heightMax: number;
+  /** 광역 전체. 서울·경기를 여기 넣으면 세부 지역이 비어 있는 사람까지 들어간다. */
   regions: string[];
+  /** 서울·경기 권역. 같은 광역이 `regions` 에 있으면 함께 두지 않는다(`toggleRegion`·`toggleArea`). */
+  areas: string[];
   jobCategories: string[];
   religions: string[];
   smoking: string[];
@@ -40,6 +47,7 @@ export const DEFAULT_FILTERS: Filters = {
   heightMin: HEIGHT_RANGE.min,
   heightMax: HEIGHT_RANGE.max,
   regions: [],
+  areas: [],
   jobCategories: [],
   religions: [],
   smoking: [],
@@ -73,6 +81,7 @@ export function filtersToParams(filters: Filters): URLSearchParams {
   for (const key of CHIP_KEYS) {
     if (filters[key].length > 0) params.set(key, filters[key].join(","));
   }
+  if (filters.areas.length > 0) params.set("areas", filters.areas.join(","));
   return params;
 }
 
@@ -82,7 +91,8 @@ export function activeFilterCount(filters: Filters): number {
   if (filters.ageMin > AGE_RANGE.min || filters.ageMax < AGE_RANGE.max) count += 1;
   if (filters.heightMin > HEIGHT_RANGE.min || filters.heightMax < HEIGHT_RANGE.max) count += 1;
   for (const key of CHIP_KEYS) {
-    if (filters[key].length > 0) count += 1;
+    // 지역은 광역과 권역을 합쳐 조건 하나로 센다.
+    if (filters[key].length > 0 || (key === "regions" && filters.areas.length > 0)) count += 1;
   }
   return count;
 }
@@ -134,6 +144,7 @@ export function filtersFromParams(params: URLSearchParams): Filters {
     heightMin: bound("heightMin", HEIGHT_RANGE.min, HEIGHT_RANGE),
     heightMax: bound("heightMax", HEIGHT_RANGE.max, HEIGHT_RANGE),
     regions: list("regions"),
+    areas: list("areas").filter(isArea),
     jobCategories: list("jobCategories"),
     religions: list("religions"),
     smoking: list("smoking"),
@@ -201,6 +212,12 @@ export function filterSummary(filters: Filters, currentYear: number): FilterSumm
   }
   for (const key of CHIP_KEYS) {
     const values = filters[key];
+    if (key === "regions") {
+      if (values.length > 0 || filters.areas.length > 0) {
+        items.push({ key, label: regionSummary(filters) });
+      }
+      continue;
+    }
     if (values.length === 0) continue;
     const label =
       key === "tags"
@@ -211,11 +228,79 @@ export function filterSummary(filters: Filters, currentYear: number): FilterSumm
   return items;
 }
 
+/**
+ * 지역 칩 문구. 권역은 광역 이름을 앞에 붙여 묶는다 — 「부산·대구 · 서울 강남·서초, 잠실·강동」.
+ * 권역 이름에 이미 「·」 가 들어 있어 권역 사이는 쉼표로 가른다.
+ */
+function regionSummary(filters: Filters): string {
+  const whole = filters.regions.map((r) => CHIP_LABELS.regions[r] ?? r).join("·");
+  const parts = whole ? [whole] : [];
+  const byRegion = new Map<string, string[]>();
+  for (const area of filters.areas) {
+    if (!isArea(area)) continue;
+    const region = areaRegion(area);
+    byRegion.set(region, [...(byRegion.get(region) ?? []), AREA_LABELS[area]]);
+  }
+  for (const [region, names] of byRegion) {
+    parts.push(`${CHIP_LABELS.regions[region] ?? region} ${names.join(", ")}`);
+  }
+  return parts.join(" · ");
+}
+
+/** 광역 칩이 지금 어떤 상태인가 — 전체 선택, 권역 일부 선택, 선택 없음. */
+export function regionSelection(filters: Filters, region: string): "all" | "some" | "none" {
+  if (filters.regions.includes(region)) return "all";
+  return filters.areas.some((a) => isArea(a) && areaRegion(a) === region) ? "some" : "none";
+}
+
+/**
+ * 광역 칩을 누른다. **누르면 그 광역 전체**다 — 권역을 일부 골라 둔 상태여도 전체로
+ * 바꾸고, 이미 전체면 푼다. 권역은 칩 옆 「+」 로 펼쳐서 고른다.
+ */
+export function toggleRegion(filters: Filters, region: string): Filters {
+  const areas = filters.areas.filter((a) => !isArea(a) || areaRegion(a) !== region);
+  if (filters.regions.includes(region)) {
+    return { ...filters, regions: filters.regions.filter((r) => r !== region), areas };
+  }
+  return { ...filters, regions: [...filters.regions, region], areas };
+}
+
+/**
+ * 권역 칩을 누른다.
+ *  - 그 광역이 전체로 골라져 있으면 이 권역 하나로 좁힌다.
+ *  - 아니면 이 권역을 넣거나 뺀다. 권역을 전부 고르면 광역 전체로 접는다 — 전체는
+ *    구·시·군이 비어 있는 사람까지 넣으므로 「다 고른 것」보다 넓고, 사람이 기대하는 쪽도 그것이다.
+ */
+export function toggleArea(filters: Filters, area: string): Filters {
+  if (!isArea(area)) return filters;
+  const region = areaRegion(area);
+  if (filters.regions.includes(region)) {
+    return {
+      ...filters,
+      regions: filters.regions.filter((r) => r !== region),
+      areas: [...filters.areas, area],
+    };
+  }
+  const areas = filters.areas.includes(area)
+    ? filters.areas.filter((a) => a !== area)
+    : [...filters.areas, area];
+  const all = areasOf(region);
+  if (all.every((a) => areas.includes(a))) {
+    return {
+      ...filters,
+      regions: [...filters.regions, region],
+      areas: areas.filter((a) => !isArea(a) || areaRegion(a) !== region),
+    };
+  }
+  return { ...filters, areas };
+}
+
 /** 조건 하나를 지운다. 칩의 ✕ 가 부른다. */
 export function clearFilter(filters: Filters, key: FilterSummaryItem["key"]): Filters {
   if (key === "age") return { ...filters, ageMin: AGE_RANGE.min, ageMax: AGE_RANGE.max };
   if (key === "height") {
     return { ...filters, heightMin: HEIGHT_RANGE.min, heightMax: HEIGHT_RANGE.max };
   }
+  if (key === "regions") return { ...filters, regions: [], areas: [] };
   return { ...filters, [key]: [] };
 }

@@ -2,7 +2,7 @@
  * Discover 필터를 SQL 조각으로 바꾼다.
  * 필터 의미를 한 곳에 모아 테스트 가능하게 하고, 값은 항상 파라미터로만 넘긴다.
  */
-import type { DiscoverQuery, Gender } from "@bolsaram/schemas";
+import { districtsOfAreas, type DiscoverQuery, type Gender } from "@bolsaram/schemas";
 import { oppositeGender } from "./visibility";
 
 export type SqlFragment = { text: string; values: unknown[] };
@@ -42,6 +42,7 @@ export type ProfileAttributeFilter = Pick<
   | "heightMin"
   | "heightMax"
   | "regions"
+  | "areas"
   | "jobCategories"
   | "religions"
   | "smoking"
@@ -68,8 +69,18 @@ export function buildAttributeClauses(
   if (query.heightMin != null) clauses.push(`p.height >= ${push(query.heightMin)}`);
   if (query.heightMax != null) clauses.push(`p.height <= ${push(query.heightMax)}`);
 
-  if (query.regions?.length) {
+  // 지역은 광역 전체(`regions`)와 서울·경기 권역(`areas`)을 함께 고를 수 있다 — 「부산」과
+  // 「강남·서초」를 고르면 둘 중 하나에 사는 사람이다. 광역 전체는 세부 지역이 비어 있는
+  // 사람까지 넣고, 권역은 그 권역의 구·시·군을 가진 사람만 넣는다.
+  const districts = query.areas?.length ? districtsOfAreas(query.areas) : [];
+  if (query.regions?.length && districts.length) {
+    clauses.push(
+      `(p.residence_region = ANY(${push(query.regions)}) OR p.residence_district = ANY(${push(districts)}))`,
+    );
+  } else if (query.regions?.length) {
     clauses.push(`p.residence_region = ANY(${push(query.regions)})`);
+  } else if (districts.length) {
+    clauses.push(`p.residence_district = ANY(${push(districts)})`);
   }
   if (query.jobCategories?.length) {
     clauses.push(`p.job_category = ANY(${push(query.jobCategories)})`);

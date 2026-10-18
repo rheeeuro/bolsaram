@@ -26,8 +26,11 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  matchDistrict,
   normalizeHashtags,
+  reconcileResidence,
   REGION_LABELS,
+  type District,
   type Gender,
   type JobCategory,
   type Region,
@@ -182,6 +185,16 @@ function parseRegion(raw: string | undefined, where: string): Region {
   return matched[0];
 }
 
+/** 거주지 → 광역과 구·시·군. 「서울 송파」처럼 동네까지 적혀 있으면 구·시·군도 채운다. */
+function residenceOf(
+  raw: string | undefined,
+  where: string,
+): { residenceRegion: Region; residenceDistrict: District | null } {
+  const region = parseRegion(raw, where);
+  const { district } = reconcileResidence(region, matchDistrict(raw ?? ""));
+  return { residenceRegion: region, residenceDistrict: district };
+}
+
 function parseJobCategory(jobTitle: string | null): JobCategory | null {
   if (!jobTitle) return null;
   return JOB_RULES.find(([pattern]) => pattern.test(jobTitle))?.[1] ?? "OTHER";
@@ -224,6 +237,7 @@ type SampleFields = {
   company: string | null;
   education: string | null;
   residenceRegion: Region;
+  residenceDistrict: District | null;
   workplaceRegion: null;
   religion: null;
   mbti: null;
@@ -247,7 +261,7 @@ function fieldsOf(sample: SampleProfile): SampleFields {
     jobCategory: parseJobCategory(jobTitle),
     company: sample.fields["직장"] ?? null,
     education: sample.fields["학력"] ?? null,
-    residenceRegion: parseRegion(sample.fields["거주지"], where),
+    ...residenceOf(sample.fields["거주지"], where),
     // 샘플 글에 없는 항목. 운영에서는 AI 가 뽑거나 주선자가 검토 화면에서 채운다.
     workplaceRegion: null,
     religion: null,
@@ -406,8 +420,8 @@ async function main(): Promise<void> {
         `INSERT INTO profiles (
            group_id, gender, birth_year, height, job_title, job_category, company, education,
            residence_region, hobbies, hashtags, bio, ideal_type_text, real_name, contact_note,
-           status, created_by, is_seed)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'ACTIVE',$16,
+           status, created_by, residence_district, is_seed)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'ACTIVE',$16,$17,
                  -- 합성 데이터라는 표식. 실데이터와 섞였을 때
                  -- pnpm db:purge-seed 가 이걸 보고 걷어낸다.
                  true)
@@ -430,6 +444,7 @@ async function main(): Promise<void> {
           // 연락처는 연결된 뒤에만 보인다. 샘플에 없으면 합성 값을 넣어 그 화면을 확인할 수 있게 한다.
           sample.fields["연락처"] ?? `카카오톡 ID: sample_${String(1000 + sample.number)}`,
           createdBy,
+          fields.residenceDistrict,
         ],
       );
       const profileId = inserted.rows[0]!.id;

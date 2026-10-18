@@ -303,7 +303,7 @@ function ViewTab({
 function workLine(view: ProfileDetailView): string {
   return [
     view.jobTitle ?? label.jobCategory(view.jobCategory),
-    label.region(view.residenceRegion),
+    label.residence(view.residenceRegion, view.residenceDistrict),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -353,7 +353,7 @@ function summaryText(view: ProfileDetailView): string | null {
     ["키", view.height ? `${view.height}cm` : null],
     ["직업", job || null],
     ["학력", view.education],
-    ["사는 곳", label.region(view.residenceRegion)],
+    ["사는 곳", label.residence(view.residenceRegion, view.residenceDistrict)],
     ["직장 지역", label.region(view.workplaceRegion)],
     ["종교", label.religion(view.religion)],
     ["MBTI", view.mbti],

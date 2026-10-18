@@ -51,6 +51,8 @@ export type ProfileDetailView = ProfileCardView & {
   /** INTRODUCED 이후에만 채워진다. */
   realName?: string | null;
   contactNote?: string | null;
+  /** 서울·경기의 구·시·군. 주선자·본인 단계에서만 채운다. */
+  residenceDistrict?: string | null;
   status?: string;
   /** AI 추천 이유. 멤버 상세에서 추천일 때만 채운다. */
   aiMatch: AiMatch | null;
@@ -127,6 +129,7 @@ export function toDetailView(
     base.contactNote = view.contactNote ?? null;
   }
   if (level === "ADMIN" || level === "OWNER") {
+    base.residenceDistrict = profile.residenceDistrict;
     base.status = profile.status;
   }
   return base;

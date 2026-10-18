@@ -24,6 +24,7 @@ const SHEET_KEYS = [
   "heightMin",
   "heightMax",
   "regions",
+  "areas",
   "jobCategories",
   "religions",
   "smoking",

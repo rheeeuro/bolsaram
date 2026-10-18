@@ -23,6 +23,11 @@ export type FullProfile = {
   company: string | null;
   education: string | null;
   residenceRegion: string;
+  /**
+   * 서울·경기의 구·시·군. 주선자와 본인만 본다 — 멤버 단계(LIST·DETAIL)에는 넣지 않는다.
+   * 멤버는 필터의 권역으로만 이 값을 쓴다.
+   */
+  residenceDistrict: string | null;
   workplaceRegion: string | null;
   religion: string | null;
   mbti: string | null;

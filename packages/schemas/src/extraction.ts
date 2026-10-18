@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import { rawHashtagListSchema } from "./hashtag";
+import { DISTRICTS } from "./district";
 import { idealCriteriaSchema } from "./ideal";
 import {
   DRINKING_LEVELS,
@@ -34,6 +35,8 @@ export const extractedFieldsSchema = z.object({
   company: z.string().trim().max(120).nullable(),
   education: z.string().trim().max(200).nullable(),
   residenceRegion: z.enum(REGIONS).nullable(),
+  /** 서울·경기의 구·시·군. 광역과 어긋나면 저장 직전에 버린다(`reconcileResidence`). */
+  residenceDistrict: z.enum(DISTRICTS).nullable(),
   workplaceRegion: z.enum(REGIONS).nullable(),
   religion: z.enum(RELIGIONS).nullable(),
   mbti: z.enum(MBTI_TYPES).nullable(),
@@ -71,6 +74,7 @@ export const EXTRACTED_FIELD_REVIEW_ORDER = [
   "birthYear",
   "height",
   "residenceRegion",
+  "residenceDistrict",
   "jobTitle",
   "jobCategory",
   "company",

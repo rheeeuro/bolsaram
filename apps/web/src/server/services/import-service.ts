@@ -16,6 +16,7 @@ import {
   normalizeHashtags,
   normalizeIdealCriteria,
   PROFILE_IMAGE_MAX_COUNT,
+  reconcileResidenceFields,
   type ExtractedFields,
   type IdealCriteria,
   type ImportStatus,
@@ -56,10 +57,13 @@ export async function analyzeSession(
       text: normalizeRawText(prepared.rawText),
     });
 
+    // 「분당 거주」처럼 구·시·군만 적힌 글이면 광역을 거기서 채운다. 어긋나면 광역을 믿는다.
+    const fields = reconcileResidenceFields(result.fields);
+
     return await withRls(ctx, async (sql) => {
       await imports.saveExtraction(sql, {
         sessionId,
-        fields: result.fields,
+        fields,
         confidence: result.confidence,
         notes: result.notes,
         model: result.model,
@@ -67,7 +71,7 @@ export async function analyzeSession(
         raw: result.raw,
       });
       // AI 결과는 자동 게시하지 않는다. 항상 사람 검토 단계로 넘어간다.
-      const next = statusAfterExtraction(result.fields, result.confidence);
+      const next = statusAfterExtraction(fields, result.confidence);
       await imports.setStatus(sql, sessionId, next);
       await writeAudit(sql, {
         actorUserId: ctx.userId,
@@ -256,8 +260,8 @@ async function insertProfile(
        group_id, gender, birth_year, height, job_title, job_category, company, education,
        residence_region, workplace_region, religion, mbti, smoking, drinking,
        hobbies, hashtags, bio, ideal_type_text, status, created_by, real_name, contact_note,
-       ideal_criteria)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+       ideal_criteria, residence_district)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      RETURNING id`,
     [
       groupId,
@@ -284,6 +288,8 @@ async function insertProfile(
       hidden.realName,
       hidden.contactNote,
       idealCriteriaForSave(fields.idealCriteria),
+      // 예전 추출 결과에는 이 칸이 없다.
+      fields.residenceDistrict ?? null,
     ],
   );
   return result.rows[0]!.id;
@@ -305,6 +311,11 @@ async function updateExistingProfile(
        company = COALESCE($7, company),
        education = COALESCE($8, education),
        residence_region = COALESCE($9, residence_region),
+       -- 구·시·군은 광역과 짝이다. 새 값이 있으면 쓰고, 없으면 저장된 값이 (바뀐) 광역에
+       -- 속할 때만 남긴다(DB 제약 profiles_residence_district_region).
+       residence_district = COALESCE($20::district, CASE
+         WHEN split_part(residence_district::text, '_', 1) = COALESCE($9, residence_region)::text
+         THEN residence_district END),
        workplace_region = COALESCE($10, workplace_region),
        religion = COALESCE($11, religion),
        mbti = COALESCE($12, mbti),
@@ -336,6 +347,7 @@ async function updateExistingProfile(
       fields.bio,
       fields.idealTypeText,
       idealCriteriaForSave(fields.idealCriteria),
+      fields.residenceDistrict ?? null,
     ],
   );
   const row = result.rows[0];

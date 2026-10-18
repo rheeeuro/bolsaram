@@ -12,6 +12,11 @@ import {
   LOW_CONFIDENCE_THRESHOLD,
   MBTI_TYPES,
   REGIONS,
+  DISTRICTS,
+  DISTRICT_LABELS,
+  districtRegion,
+  districtsOf,
+  isDistrict,
   REGION_LABELS,
   RELIGIONS,
   RELIGION_LABELS,
@@ -83,6 +88,7 @@ const ENUM_OPTIONS: Record<
   gender: { values: GENDERS, labels: GENDER_LABELS },
   jobCategory: { values: JOB_CATEGORIES, labels: JOB_CATEGORY_LABELS },
   residenceRegion: { values: REGIONS, labels: REGION_LABELS },
+  residenceDistrict: { values: DISTRICTS, labels: DISTRICT_LABELS },
   workplaceRegion: { values: REGIONS, labels: REGION_LABELS },
   religion: { values: RELIGIONS, labels: RELIGION_LABELS },
   smoking: { values: SMOKING_LEVELS, labels: SMOKING_LABELS },
@@ -153,8 +159,16 @@ export function ImportReview({
   }
 
   function edit(key: string, value: string) {
-    setValues((prev) => ({ ...prev, [key]: value }));
-    setDirty((prev) => new Set(prev).add(key));
+    // 거주 광역을 바꾸면 그 광역에 없는 구·시·군은 함께 비운다 — 서버도 등록할 때 버린다.
+    const district = values.residenceDistrict ?? "";
+    const dropDistrict =
+      key === "residenceRegion" && isDistrict(district) && districtRegion(district) !== value;
+    setValues((prev) => ({ ...prev, [key]: value, ...(dropDistrict ? { residenceDistrict: "" } : {}) }));
+    setDirty((prev) => {
+      const next = new Set(prev).add(key);
+      if (dropDistrict) next.add("residenceDistrict");
+      return next;
+    });
   }
 
   async function saveText() {
@@ -403,10 +417,23 @@ export function ImportReview({
               </p>
 
               <div className="grid gap-2.5 sm:grid-cols-2">
-                {extraction.review.map((field) => (
+                {extraction.review
+                  // 구·시·군은 서울·경기에만 있다. 다른 광역이면 비어 있는 칸을 늘어놓지 않는다.
+                  .filter(
+                    (field) =>
+                      field.key !== "residenceDistrict" ||
+                      districtsOf(values.residenceRegion ?? "").length > 0 ||
+                      (values.residenceDistrict ?? "") !== "",
+                  )
+                  .map((field) => (
                   <FieldRow
                     key={field.key}
                     field={field}
+                    options={
+                      field.key === "residenceDistrict"
+                        ? districtsOf(values.residenceRegion ?? "")
+                        : undefined
+                    }
                     value={values[field.key] ?? ""}
                     touched={
                       !dirty.has(field.key)
@@ -506,6 +533,7 @@ export function ImportReview({
 
 function FieldRow({
   field,
+  options,
   value,
   touched,
   disabled,
@@ -513,6 +541,8 @@ function FieldRow({
   onConfirm,
 }: {
   field: FieldReview;
+  /** 고를 수 있는 값을 좁힐 때. 거주 구·시·군은 고른 광역의 것만 늘어놓는다. */
+  options?: readonly string[] | undefined;
   value: string;
   /** 손댄 칸이면 어떻게 손댔는지. 값을 바꿨는지, 그대로 두고 확인만 했는지. */
   touched: "edited" | "confirmed" | null;
@@ -590,7 +620,7 @@ function FieldRow({
           className="h-8 py-0 text-[12.5px]"
         >
           <option value="">선택 안 함</option>
-          {enumOptions.values.map((option) => (
+          {(options ?? enumOptions.values).map((option) => (
             <option key={option} value={option}>
               {enumOptions.labels[option] ?? option}
             </option>

@@ -14,6 +14,7 @@ import {
   normalizeIdealCriteria,
   JOB_CATEGORIES,
   MBTI_TYPES,
+  matchDistrict,
   normalizeHashtags,
   REGIONS,
   type ExtractedFields,
@@ -116,6 +117,7 @@ export class MockExtractionProvider implements ExtractionProvider {
     set("height", matchHeight(text), 0.9);
     set("mbti", matchMbti(text), 0.95);
     set("residenceRegion", matchRegion(text, ["거주", "지역", "살", "사는"]), 0.7);
+    set("residenceDistrict", matchResidenceDistrict(text), 0.6);
     set("workplaceRegion", matchRegion(text, ["직장", "근무", "회사"]), 0.6);
     set("jobTitle", matchLabeled(text, ["직업", "하는 일", "직군"]), 0.7);
     set("company", matchLabeled(text, ["회사", "직장"]), 0.6);
@@ -213,6 +215,16 @@ function matchRegion(text: string, hints: string[]): ExtractedFields["residenceR
     }
   }
   return null;
+}
+
+/**
+ * 거주 줄에서만 구·시·군을 찾는다 — 직장 위치를 거주지로 읽지 않게. 「송파 거주」처럼
+ * 지명이 낱말 앞에 오기도 해서 낱말 뒤가 아니라 그 줄 전체를 본다.
+ */
+function matchResidenceDistrict(text: string): ExtractedFields["residenceDistrict"] {
+  const hints = ["거주", "사는 곳", "사는곳", "자취", "살아요", "살고"];
+  const line = text.split("\n").find((l) => hints.some((hint) => l.includes(hint)));
+  return line ? matchDistrict(line) : null;
 }
 
 function matchJobCategory(text: string): ExtractedFields["jobCategory"] {

@@ -10,6 +10,7 @@ import {
   RELIGIONS,
   SMOKING_LEVELS,
 } from "./enums";
+import { AREAS, DISTRICTS } from "./district";
 import { BIRTH_YEAR_MAX, BIRTH_YEAR_MIN, HEIGHT_MAX, HEIGHT_MIN } from "./extraction";
 import { HASHTAG_MAX_COUNT, hashtagListSchema, normalizeHashtags } from "./hashtag";
 import { idealCriteriaSchema, normalizeIdealCriteria } from "./ideal";
@@ -40,6 +41,8 @@ export const profileWritableSchema = z.object({
   company: nullableTrimmed(120),
   education: nullableTrimmed(200),
   residenceRegion: z.enum(REGIONS),
+  /** 서울·경기의 구·시·군. 광역과 맞아야 한다(DB 제약 `profiles_residence_district_region`). */
+  residenceDistrict: z.enum(DISTRICTS).nullable(),
   workplaceRegion: z.enum(REGIONS).nullable(),
   religion: z.enum(RELIGIONS).nullable(),
   mbti: z.enum(MBTI_TYPES).nullable(),
@@ -118,6 +121,8 @@ const attributeFilterShape = {
   heightMin: intParam(HEIGHT_MIN, HEIGHT_MAX),
   heightMax: intParam(HEIGHT_MIN, HEIGHT_MAX),
   regions: csv(REGIONS),
+  /** 서울·경기 권역. 광역(`regions`)과 함께 주면 둘 중 하나에 들면 남는다. */
+  areas: csv(AREAS),
   jobCategories: csv(JOB_CATEGORIES),
   religions: csv(RELIGIONS),
   smoking: csv(SMOKING_LEVELS),

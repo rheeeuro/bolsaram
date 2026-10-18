@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  AREA_DISTRICTS,
+  AREA_LABELS,
+  DISTRICT_LABELS,
+  areasOf,
+  isArea,
   DRINKING_LABELS,
   DRINKING_LEVELS,
   JOB_CATEGORIES,
@@ -20,6 +25,7 @@ import { Chip } from "@/components/ui/chip";
 import { HashtagChip, TagIcon } from "@/components/ui/marks";
 import { Dialog, DialogClose } from "@/components/ui/dialog";
 import { apiGet } from "@/lib/api-client";
+import { cn } from "@/lib/cn";
 import {
   AGE_RANGE,
   DEFAULT_FILTERS,
@@ -27,6 +33,9 @@ import {
   birthYearLabel,
   filtersToParams,
   rangeLabel,
+  regionSelection,
+  toggleArea,
+  toggleRegion,
   type Filters,
 } from "./filter-model";
 
@@ -117,13 +126,12 @@ export function FilterSheet({
           note="키가 적혀 있지 않은 분은 키 조건을 걸면 나오지 않습니다."
         />
 
-        <ChipGroup
-          title="지역"
-          values={REGIONS}
-          labels={REGION_LABELS}
-          selected={draft.regions}
-          onToggle={(v) => toggle("regions", v)}
-          onClear={() => setDraft((p) => ({ ...p, regions: [] }))}
+        <RegionGroup
+          open={open}
+          filters={draft}
+          onToggleRegion={(region) => setDraft((p) => toggleRegion(p, region))}
+          onToggleArea={(area) => setDraft((p) => toggleArea(p, area))}
+          onClear={() => setDraft((p) => ({ ...p, regions: [], areas: [] }))}
         />
         <ChipGroup
           title="직업군"
@@ -240,6 +248,163 @@ function TagGroup({
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * 지역. 서울·경기 칩은 둘로 나뉜다 — 이름을 누르면 **그 광역 전체**, 옆의 「+」 는 권역
+ * 줄을 펼치고 접는다. 권역을 일부만 고르면 광역 칩은 테두리만 칠한 「일부」 상태가 된다.
+ * 선택 규칙은 filter-model(`toggleRegion`·`toggleArea`)에 있다.
+ */
+function RegionGroup({
+  open,
+  filters,
+  onToggleRegion,
+  onToggleArea,
+  onClear,
+}: {
+  open: boolean;
+  filters: Filters;
+  onToggleRegion: (region: string) => void;
+  onToggleArea: (area: string) => void;
+  onClear: () => void;
+}) {
+  const [expanded, setExpanded] = useState<string[]>([]);
+  // 시트를 열 때 권역을 골라 둔 광역은 펼친 채로 보여준다 — 무엇이 걸렸는지 바로 보이게.
+  useEffect(() => {
+    if (!open) return;
+    setExpanded(REGIONS.filter((r) => regionSelection(filters, r) === "some"));
+    // 시트를 연 순간의 값으로만 정한다. 고르는 도중에 저절로 접히면 안 된다.
+  }, [open]);
+
+  const flip = (region: string) =>
+    setExpanded((prev) =>
+      prev.includes(region) ? prev.filter((r) => r !== region) : [...prev, region],
+    );
+  const nothing = filters.regions.length === 0 && filters.areas.length === 0;
+
+  return (
+    <section className="mb-6">
+      <h3 className="mb-2.5 text-[13px] font-medium text-[var(--color-ink-800)]">지역</h3>
+      <div className="flex flex-wrap gap-1.5">
+        <Chip label="전체" selected={nothing} onClick={onClear} />
+        {REGIONS.map((region) =>
+          areasOf(region).length > 0 ? (
+            <SplitChip
+              key={region}
+              label={REGION_LABELS[region]}
+              state={regionSelection(filters, region)}
+              expanded={expanded.includes(region)}
+              onSelect={() => onToggleRegion(region)}
+              onExpand={() => flip(region)}
+            />
+          ) : (
+            <Chip
+              key={region}
+              label={REGION_LABELS[region]}
+              selected={filters.regions.includes(region)}
+              onClick={() => onToggleRegion(region)}
+            />
+          ),
+        )}
+      </div>
+
+      {REGIONS.filter((r) => expanded.includes(r)).map((region) => {
+        const whole = filters.regions.includes(region);
+        const picked = areasOf(region).filter((a) => filters.areas.includes(a));
+        return (
+          <div
+            key={region}
+            id={`region-areas-${region}`}
+            className="mt-2.5 rounded-lg border border-[var(--surface-border)] bg-[var(--surface-page)] px-3 py-2.5"
+          >
+            <p className="mb-2 text-[12px] text-[var(--surface-text-muted)]">
+              {REGION_LABELS[region]} 권역
+              {picked.length > 0 ? ` · ${picked.length}곳` : ""}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {/* 광역 칩 이름을 누른 것과 같다 — 전체를 고르고, 다시 누르면 푼다. */}
+              <Chip label="전체" selected={whole} onClick={() => onToggleRegion(region)} />
+              {areasOf(region).map((area) => (
+                <Chip
+                  key={area}
+                  label={AREA_LABELS[area]}
+                  selected={filters.areas.includes(area)}
+                  onClick={() => onToggleArea(area)}
+                />
+              ))}
+            </div>
+            {picked.length > 0 ? (
+              <p className="mt-2 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
+                {picked
+                  .flatMap((a) => AREA_DISTRICTS[a])
+                  .map((d) => DISTRICT_LABELS[d])
+                  .join(" · ")}
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
+      {filters.areas.some(isArea) ? (
+        <p className="mt-2 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+          권역으로 고르면 사는 구·시가 적혀 있지 않은 분은 나오지 않습니다.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * 이름과 「+」 가 붙은 칩. 이름은 광역 전체를 고르고, 「+」 는 권역을 펼친다.
+ * 둘은 서로 다른 버튼이다 — 펼치기만 해도 선택이 바뀌면 안 된다.
+ */
+function SplitChip({
+  label,
+  state,
+  expanded,
+  onSelect,
+  onExpand,
+}: {
+  label: string;
+  state: "all" | "some" | "none";
+  expanded: boolean;
+  onSelect: () => void;
+  onExpand: () => void;
+}) {
+  const filled = state === "all";
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-stretch overflow-hidden rounded-full border text-[13px] transition-colors",
+        "duration-[var(--duration-quick)]",
+        filled
+          ? "border-[var(--color-rose-600)] bg-[var(--color-rose-600)] text-white"
+          : state === "some"
+            ? "border-[var(--color-rose-600)] bg-[var(--color-rose-100)] text-[var(--color-rose-600)]"
+            : "border-[var(--surface-border)] bg-white text-[var(--surface-text-muted)] hover:border-[var(--color-rose-300)]",
+      )}
+    >
+      <button
+        type="button"
+        aria-pressed={filled}
+        onClick={onSelect}
+        className="py-1.5 pr-2 pl-3"
+      >
+        {label}
+      </button>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={`${label} 권역 ${expanded ? "접기" : "펼치기"}`}
+        onClick={onExpand}
+        className={cn(
+          "flex w-7 items-center justify-center border-l pr-0.5 text-[15px] leading-none",
+          filled ? "border-white/35" : "border-current/25",
+        )}
+      >
+        {expanded ? "−" : "+"}
+      </button>
+    </span>
   );
 }
 

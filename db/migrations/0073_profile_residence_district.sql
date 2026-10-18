@@ -1,0 +1,32 @@
+-- 0073: 서울·경기 거주지의 구·시·군
+--
+-- 필터가 서울·경기를 권역(강남·서초, 분당·용인 …)으로 나눠 고를 수 있게, 프로필에 구·시·군을
+-- 저장한다. 권역은 저장하지 않는다 — 구·시·군을 어느 권역으로 묶을지는 앱의 표
+-- (`packages/schemas/src/district.ts`)가 정하므로 경계를 옮겨도 데이터는 그대로다.
+--
+-- 값의 앞부분이 광역 코드다. 광역과 어긋난 값은 제약이 막는다 — 서울 구를 가진 채로
+-- 거주 광역만 부산으로 바뀌는 일이 없게 한다. 비어 있어도 된다(광역만 아는 경우).
+-- 새 칸일 뿐 행 접근 규칙은 그대로라 RLS 정책은 바꾸지 않는다.
+
+CREATE TYPE district AS ENUM
+  (
+   'SEOUL_JONGNO','SEOUL_JUNG','SEOUL_YONGSAN','SEOUL_SEONGDONG','SEOUL_GWANGJIN',
+   'SEOUL_DONGDAEMUN','SEOUL_JUNGNANG','SEOUL_SEONGBUK','SEOUL_GANGBUK','SEOUL_DOBONG',
+   'SEOUL_NOWON','SEOUL_EUNPYEONG','SEOUL_SEODAEMUN','SEOUL_MAPO','SEOUL_YANGCHEON',
+   'SEOUL_GANGSEO','SEOUL_GURO','SEOUL_GEUMCHEON','SEOUL_YEONGDEUNGPO','SEOUL_DONGJAK',
+   'SEOUL_GWANAK','SEOUL_SEOCHO','SEOUL_GANGNAM','SEOUL_SONGPA','SEOUL_GANGDONG',
+   'GYEONGGI_SUWON','GYEONGGI_SEONGNAM','GYEONGGI_UIJEONGBU','GYEONGGI_ANYANG','GYEONGGI_BUCHEON',
+   'GYEONGGI_GWANGMYEONG','GYEONGGI_PYEONGTAEK','GYEONGGI_DONGDUCHEON','GYEONGGI_ANSAN','GYEONGGI_GOYANG',
+   'GYEONGGI_GWACHEON','GYEONGGI_GURI','GYEONGGI_NAMYANGJU','GYEONGGI_OSAN','GYEONGGI_SIHEUNG',
+   'GYEONGGI_GUNPO','GYEONGGI_UIWANG','GYEONGGI_HANAM','GYEONGGI_YONGIN','GYEONGGI_PAJU',
+   'GYEONGGI_ICHEON','GYEONGGI_ANSEONG','GYEONGGI_GIMPO','GYEONGGI_HWASEONG','GYEONGGI_GWANGJU',
+   'GYEONGGI_YANGJU','GYEONGGI_POCHEON','GYEONGGI_YEOJU','GYEONGGI_YEONCHEON','GYEONGGI_GAPYEONG',
+   'GYEONGGI_YANGPYEONG'
+  );
+
+ALTER TABLE profiles ADD COLUMN residence_district district;
+
+ALTER TABLE profiles ADD CONSTRAINT profiles_residence_district_region CHECK (
+  residence_district IS NULL
+  OR split_part(residence_district::text, '_', 1) = residence_region::text
+);

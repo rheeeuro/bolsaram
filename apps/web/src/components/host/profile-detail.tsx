@@ -132,7 +132,7 @@ export function HostProfileDetail({
     label.birthYear(profile.birthYear),
     profile.height ? `${profile.height}cm` : null,
     profile.jobTitle ?? label.jobCategory(profile.jobCategory),
-    label.region(profile.residenceRegion),
+    label.residence(profile.residenceRegion, profile.residenceDistrict),
   ]
     .filter(Boolean)
     .join(" · ");

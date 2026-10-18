@@ -21,6 +21,7 @@ Zod 스키마와 도메인 열거형의 **단일 원본**. 웹 앱·도메인 �
 ```
 packages/schemas/src/
 ├── enums.ts        도메인 열거형 + 한글 라벨 (성별·지역·직업군·종교·흡연·음주·상태 등)
+├── district.ts     서울·경기 구·시·군(DB enum `district`)과 필터 권역 표 · 광역과 맞추기 · 원문에서 찾기
 ├── extraction.ts   AI 추출 스키마 · strict JSON Schema 생성 · 신뢰도 기준
 ├── hashtag.ts      해시태그 정규화·상한·표기 (저장과 검색이 같은 형태를 쓴다)
 ├── ideal.ts        이상형 조건 — 추출이 함께 뽑아 프로필에 저장하는 값의 모양 · 정리 · 「꼭」 판정

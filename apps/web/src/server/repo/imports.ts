@@ -14,6 +14,7 @@ import {
 import {
   emptyExtractedFields,
   extractedFieldsSchema,
+  reconcileResidenceFields,
   type ExtractedFields,
   type ExtractionConfidence,
   type ImportSource,
@@ -592,10 +593,16 @@ export async function saveReview(
   }
 }
 
-/** AI 결과 + 관리자 수정본을 합친 최종 값. commit 은 항상 이 값을 쓴다. */
+/**
+ * AI 결과 + 관리자 수정본을 합친 최종 값. commit 은 항상 이 값을 쓴다.
+ * 광역을 고쳤는데 구·시·군이 남아 어긋나면 구·시·군을 버린다.
+ */
 export function effectiveFields(extraction: ImportExtractionRecord | null): ExtractedFields {
   if (!extraction) return emptyExtractedFields();
-  return { ...extraction.fields, ...(extraction.reviewedFields ?? {}) };
+  return reconcileResidenceFields({
+    ...extraction.fields,
+    ...(extraction.reviewedFields ?? {}),
+  });
 }
 
 export { statusAfterExtraction, normalizeRawText, assertCommittable, extractedFieldsSchema };

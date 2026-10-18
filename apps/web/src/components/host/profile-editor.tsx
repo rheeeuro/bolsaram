@@ -15,6 +15,10 @@ import {
   PROFILE_HOST_COMMENT_MAX,
   REGIONS,
   REGION_LABELS,
+  DISTRICT_LABELS,
+  districtRegion,
+  districtsOf,
+  isDistrict,
   RELIGIONS,
   RELIGION_LABELS,
   SMOKING_LABELS,
@@ -56,6 +60,7 @@ function initialDraft(profile: ProfileDetailView, idealCriteria: IdealCriteria |
     company: profile.company ?? "",
     education: profile.education ?? "",
     residenceRegion: profile.residenceRegion,
+    residenceDistrict: profile.residenceDistrict ?? "",
     workplaceRegion: profile.workplaceRegion ?? "",
     religion: profile.religion ?? "",
     mbti: profile.mbti ?? "",
@@ -123,6 +128,7 @@ export function HostProfileEditor({
       company: draft.company,
       education: draft.education,
       residenceRegion: draft.residenceRegion,
+      residenceDistrict: draft.residenceDistrict || null,
       workplaceRegion: draft.workplaceRegion || null,
       religion: draft.religion || null,
       mbti: draft.mbti || null,
@@ -275,7 +281,18 @@ export function HostProfileEditor({
               <Field label="거주 지역">
                 <Select
                   value={draft.residenceRegion}
-                  onChange={(e) => set("residenceRegion")(e.target.value)}
+                  onChange={(e) => {
+                    const region = e.target.value;
+                    // 다른 광역으로 옮기면 그 광역에 없는 구·시·군은 비운다.
+                    const district = draft.residenceDistrict ?? "";
+                    setMessage(null);
+                    setDraft((p) => ({
+                      ...p,
+                      residenceRegion: region,
+                      residenceDistrict:
+                        isDistrict(district) && districtRegion(district) === region ? district : "",
+                    }));
+                  }}
                 >
                   {REGIONS.map((r) => (
                     <option key={r} value={r}>
@@ -284,6 +301,21 @@ export function HostProfileEditor({
                   ))}
                 </Select>
               </Field>
+              {districtsOf(draft.residenceRegion ?? "").length > 0 ? (
+                <Field label="거주 구·시" hint="조건 설정에서 권역(강남·서초, 분당·용인 …)으로 찾을 때 씁니다.">
+                  <Select
+                    value={draft.residenceDistrict}
+                    onChange={(e) => set("residenceDistrict")(e.target.value)}
+                  >
+                    <option value="">선택 안 함</option>
+                    {districtsOf(draft.residenceRegion ?? "").map((d) => (
+                      <option key={d} value={d}>
+                        {DISTRICT_LABELS[d]}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              ) : null}
               <Field label="직장 지역">
                 <Select
                   value={draft.workplaceRegion}

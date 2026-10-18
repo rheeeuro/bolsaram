@@ -5,6 +5,7 @@
 import { formatPublicCode } from "@bolsaram/domain";
 import type { GroupMessagePayload, GroupMessageSystemKind } from "@bolsaram/schemas";
 import {
+  DISTRICT_LABELS,
   DRINKING_LABELS,
   GENDER_LABELS,
   IMPORT_SOURCE_LABELS,
@@ -25,6 +26,11 @@ function lookup(map: Record<string, string>, value: string | null | undefined): 
 export const label = {
   gender: (v: string | null | undefined) => lookup(GENDER_LABELS, v),
   region: (v: string | null | undefined) => lookup(REGION_LABELS, v),
+  district: (v: string | null | undefined) => lookup(DISTRICT_LABELS, v),
+  /** 「서울 송파구」. 구·시·군이 없으면 광역만. */
+  residence: (region: string | null | undefined, district?: string | null) =>
+    [lookup(REGION_LABELS, region), lookup(DISTRICT_LABELS, district)].filter(Boolean).join(" ") ||
+    null,
   jobCategory: (v: string | null | undefined) => lookup(JOB_CATEGORY_LABELS, v),
   religion: (v: string | null | undefined) => lookup(RELIGION_LABELS, v),
   smoking: (v: string | null | undefined) => lookup(SMOKING_LABELS, v),
@@ -48,6 +54,7 @@ export const FIELD_LABELS: Record<string, string> = {
   company: "회사",
   education: "학력",
   residenceRegion: "거주 지역",
+  residenceDistrict: "거주 구·시",
   workplaceRegion: "직장 지역",
   religion: "종교",
   mbti: "MBTI",
