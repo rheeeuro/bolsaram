@@ -126,8 +126,9 @@ export async function createSession(
  * 같은 원문이다. 짧은 글(키가 NULL)은 견주지 않는다. 등록 전 가져오기와 프로필이 남아 있는
  * 등록된 가져오기가 대상이다.
  *
- * 경계는 RLS 그대로다 — 내가 볼 수 있는 가져오기끼리만 견준다(관리자는 전부). 남이 같은 글을
- * 올렸는지 알려주면 그 자체가 남의 원문이 있다는 정보가 된다.
+ * **주선자를 가리지 않는다.** 내가 볼 수 있는 가져오기(RLS)에서 찾으면 그 프로필·검토
+ * 화면을 알려주고, 없으면 `app_import_raw_text_taken`(0072)에 남이 올린 것까지 있는지만
+ * 묻는다 — 남의 것이면 누구의 어느 프로필인지는 알려주지 않는다.
  *
  * 같은 글을 동시에 두 번 보내도 둘 다 통과하지 않도록 키 단위로 트랜잭션 잠금을 잡는다.
  * 검사는 SQL 오류 없이 던지므로 호출부가 잡아도 트랜잭션은 계속 쓸 수 있다.
@@ -161,7 +162,16 @@ async function assertNoDuplicateRawText(
     [key, exceptSessionId],
   );
   const dup = found.rows[0];
-  if (!dup) return;
+  if (!dup) {
+    const taken = await sql.query<{ taken: boolean }>(
+      `SELECT app_import_raw_text_taken($1, $2) AS taken`,
+      [rawText, exceptSessionId],
+    );
+    if (taken.rows[0]?.taken) {
+      throw new DomainError("CONFLICT", "다른 주선자가 이미 올린 프로필 글입니다.");
+    }
+    return;
+  }
   throw new DomainError(
     "CONFLICT",
     dup.profile_id

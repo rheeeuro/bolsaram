@@ -1,6 +1,6 @@
 /**
  * 가져오기 원문 중복 차단 통합 테스트.
- * 같은 원문(보이는 글자 기준)은 두 번 받지 않고, 남의 가져오기와는 견주지 않는다.
+ * 같은 원문(보이는 글자 기준)은 주선자를 가리지 않고 두 번 받지 않는다.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
@@ -130,11 +130,28 @@ describe("원문 중복 차단", () => {
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
   });
 
-  it("같은 모임이어도 남이 올린 가져오기와는 견주지 않는다", async () => {
-    // 가져오기는 올린 주선자만 본다(import_sessions_admin). 거절이 남의 원문이 있다는
-    // 사실을 알려주는 우회 경로가 되면 안 된다.
+  it("다른 주선자가 올린 글도 막되, 누구의 무엇인지는 알려주지 않는다", async () => {
+    // 가져오기는 올린 주선자만 본다(import_sessions_admin). 거절은 하되 그 세션·프로필을
+    // 가리키는 값이 응답에 실리면 남의 데이터로 가는 길이 된다.
     const text = `${SAMPLE}\n남의 것`;
-    await upload(owner, text);
-    await expect(upload(other, text)).resolves.toEqual(expect.any(String));
+    const theirs = await upload(owner, text);
+    const rejected = await upload(other, text).catch((error: unknown) => error);
+    expect(rejected).toMatchObject({ code: "CONFLICT", message: "다른 주선자가 이미 올린 프로필 글입니다." });
+    expect((rejected as { details?: unknown }).details).toBeUndefined();
+    expect(JSON.stringify(rejected)).not.toContain(theirs);
+    // 원문을 고쳐 같게 만드는 길도 같다.
+    const mine = await upload(other, `${SAMPLE}\n남의 것 아님`);
+    await expect(withRls(other, (sql) => updateRawText(sql, mine, text))).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+  });
+
+  it("같은 글 확인 함수는 주선자만 부른다", async () => {
+    const member: RlsContext = { userId: other.userId, role: "MEMBER" };
+    await expect(
+      withRls(member, (sql) =>
+        sql.query(`SELECT app_import_raw_text_taken($1, NULL)`, [`${SAMPLE}\n남의 것`]),
+      ),
+    ).rejects.toThrow(/주선자만/);
   });
 });
