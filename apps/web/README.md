@@ -340,7 +340,7 @@ commit 은 `idempotency_key` 를 조건부로 선점해 같은 세션에서 프�
 내용 고치기      → 주선자가 직접 고친다 (AI 를 다시 부르지 않는다)
 멤버 탐색        → 보는 멤버 + 그 탐색 풀 → domain rankRecommendations → 카드의 aiRecommended
                    ai=1 이면 같은 집합으로 목록·총 인원·커서를 좁힌다
-멤버 상세        → 그 한 사람만 같은 규칙으로 견준다 (isRecommendedFor)
+멤버 상세        → 그 한 사람만 같은 규칙으로 견주고 이유를 싣는다 (aiMatchFor — 이상형 / 공통점)
 ```
 
 **표시를 고를 때 AI 를 부르지 않는다.** 조건은 프로필 항목이고 견주기는 규칙이라 요청마다

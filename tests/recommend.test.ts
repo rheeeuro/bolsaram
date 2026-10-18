@@ -30,10 +30,7 @@ import {
 } from "@bolsaram/schemas";
 import { MockExtractionProvider } from "../apps/web/src/server/ai/mock";
 import { analyzeSession, commitSession } from "../apps/web/src/server/services/import-service";
-import {
-  isRecommendedFor,
-  recommendedIdsFor,
-} from "../apps/web/src/server/services/recommend-service";
+import { aiMatchFor, recommendedIdsFor } from "../apps/web/src/server/services/recommend-service";
 import {
   findDiscoverProfiles,
   findProfileById,
@@ -146,6 +143,45 @@ describe("AI 추천 규칙 (도메인)", () => {
     const ranked = rankRecommendations(subject, [oneWay, both]);
     expect(ranked.map((r) => r.candidateId)).toEqual(["a", "b"]);
     expect(ranked.map((r) => r.mutual)).toEqual([true, false]);
+  });
+
+  it("공통점이 많으면 이상형과 별개로 추천한다 — 같은 지역이고 무교끼리는 세지 않는다", () => {
+    const me = person({ id: "s", gender: "FEMALE", hashtags: ["등산", "카페투어"], religion: "NONE" });
+    const twoTags = person({ id: "a", hashtags: ["주말등산", "카페투어"], religion: "NONE" });
+    const oneTagSameFaith = person({ id: "b", hashtags: ["등산"] });
+    const far = person({ id: "c", hashtags: ["등산", "카페투어"], residenceRegion: "BUSAN" });
+    const ranked = rankRecommendations(me, [twoTags, oneTagSameFaith, far]);
+    expect(ranked.map((r) => r.candidateId)).toEqual(["a"]);
+    expect(ranked[0]!.idealMatch).toBe(false);
+    expect(ranked[0]!.common.tags).toEqual(["등산", "카페투어"]);
+
+    // 같은 종교는 공통점 하나로 센다(무교 제외).
+    const faithful = person({ id: "s2", gender: "FEMALE", hashtags: ["등산"], religion: "CHRISTIAN" });
+    const sameFaith = person({ id: "d", hashtags: ["등산"], religion: "CHRISTIAN" });
+    expect(rankRecommendations(faithful, [sameFaith])[0]?.common.religion).toBe("CHRISTIAN");
+  });
+
+  it("공통점이 많아도 어느 쪽 조건과 어긋나거나 피하는 낱말에 걸리면 뺀다", () => {
+    const tags = ["등산", "캠핑"];
+    const me = person({
+      id: "s",
+      gender: "FEMALE",
+      hashtags: tags,
+      // 「담배 비선호」는 비흡연 조건으로 저장된다. 키는 적혀 있지 않아도 된다(모름은 괜찮다).
+      criteria: criteria({ smoking: ["NONE"], avoidKeywords: ["문신"] }),
+    });
+    const smoker = person({ id: "a", hashtags: tags, smoking: "REGULAR" });
+    const tattoo = person({ id: "b", hashtags: [...tags, "문신"], smoking: null });
+    const unknown = person({ id: "c", hashtags: tags, smoking: null });
+    const avoidsMe = person({
+      id: "d",
+      hashtags: tags,
+      smoking: null,
+      criteria: criteria({ birthYearMin: 1995 }),
+    });
+    expect(rankRecommendations(me, [smoker, tattoo, unknown, avoidsMe]).map((r) => r.candidateId)).toEqual([
+      "c",
+    ]);
   });
 
   it("양쪽 어디에도 조건이 없으면 추천하지 않는다", () => {
@@ -392,12 +428,13 @@ describe("AI 추천 — 멤버 탐색", () => {
     expect(all.total).toBe(3);
   });
 
-  it("상세의 표시도 같은 판정이다", async () => {
+  it("상세의 표시도 같은 판정이고, 이유를 함께 준다", async () => {
     const result = await withRls(member, async (sql) => ({
-      match: await isRecommendedFor(sql, ids.subject!, (await findProfileById(sql, ids.match!))!),
-      smoker: await isRecommendedFor(sql, ids.subject!, (await findProfileById(sql, ids.smoker!))!),
+      match: await aiMatchFor(sql, ids.subject!, (await findProfileById(sql, ids.match!))!),
+      smoker: await aiMatchFor(sql, ids.subject!, (await findProfileById(sql, ids.smoker!))!),
     }));
-    expect(result).toEqual({ match: true, smoker: false });
+    expect(result.match).toMatchObject({ ideal: true });
+    expect(result.smoker).toBeNull();
   });
 
   it("숨긴 사이는 추천에서도 빠진다", async () => {

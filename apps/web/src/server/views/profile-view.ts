@@ -11,6 +11,7 @@ import {
   type DisclosureLevel,
 } from "@bolsaram/domain";
 import type { ProfileRecord } from "../repo/profiles";
+import type { AiMatch } from "../services/recommend-service";
 import { signDownloadUrl } from "../storage/local";
 
 export type ProfileImageView = { id: string; url: string; isPrimary: boolean };
@@ -51,6 +52,8 @@ export type ProfileDetailView = ProfileCardView & {
   realName?: string | null;
   contactNote?: string | null;
   status?: string;
+  /** AI 추천 이유. 멤버 상세에서 추천일 때만 채운다. */
+  aiMatch: AiMatch | null;
 };
 
 function toImageView(image: {
@@ -85,7 +88,7 @@ export function toCardView(
 export function toDetailView(
   profile: ProfileRecord,
   level: DisclosureLevel,
-  options: { isFavorited?: boolean; aiRecommended?: boolean } = {},
+  options: { isFavorited?: boolean; aiMatch?: AiMatch | null } = {},
 ): ProfileDetailView {
   const view = projectProfile(profile, level);
   const images = (view.images ?? []).map(toImageView);
@@ -100,7 +103,8 @@ export function toDetailView(
     residenceRegion: profile.residenceRegion,
     primaryImage: images.find((i) => i.isPrimary) ?? images[0] ?? null,
     isFavorited: options.isFavorited ?? false,
-    aiRecommended: options.aiRecommended ?? false,
+    aiRecommended: options.aiMatch != null,
+    aiMatch: options.aiMatch ?? null,
     disclosure: level,
     images,
     jobTitle: view.jobTitle ?? null,

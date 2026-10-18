@@ -46,17 +46,23 @@ export async function recommendedIdsFor(
   return new Set(ranked.map((r) => r.candidateId));
 }
 
+/** 상세 화면이 보여 주는 추천 이유. 공통점은 둘 다 이미 볼 수 있는 값(태그·종교)이다. */
+export type AiMatch = { ideal: boolean; commonTags: string[]; commonReligion: string | null };
+
 /**
- * 상세 화면 한 사람에 대한 같은 판정. 규칙이 한 사람씩 견주는 것이라 풀을 훑지 않는다.
- * 경계(같은 쪽·이성)는 부르는 쪽이 이미 확인했다.
+ * 상세 화면 한 사람에 대한 같은 판정과 그 이유. 규칙이 한 사람씩 견주는 것이라 풀을
+ * 훑지 않는다. 경계(같은 쪽·이성)는 부르는 쪽이 이미 확인했다.
  */
-export async function isRecommendedFor(
+export async function aiMatchFor(
   sql: Sql,
   viewerProfileId: string | null,
   target: ProfileRecord,
-): Promise<boolean> {
-  if (!viewerProfileId || viewerProfileId === target.id) return false;
+): Promise<AiMatch | null> {
+  if (!viewerProfileId || viewerProfileId === target.id) return null;
   const viewer = await findProfileById(sql, viewerProfileId);
-  if (!viewer) return false;
-  return rankRecommendations(toSubject(viewer), [toSubject(target)]).length > 0;
+  if (!viewer) return null;
+  const [hit] = rankRecommendations(toSubject(viewer), [toSubject(target)]);
+  return hit
+    ? { ideal: hit.idealMatch, commonTags: hit.common.tags, commonReligion: hit.common.religion }
+    : null;
 }

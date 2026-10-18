@@ -184,12 +184,7 @@ export function ProfileDetail({
           <h1 className="display text-[30px] leading-none text-[var(--color-ink-900)]">
             <ProfileCode code={profile.code} />
           </h1>
-          {profile.aiRecommended ? (
-            <p className="mt-2.5 flex items-center gap-2 text-[12.5px] text-[var(--color-ink-600)]">
-              <AiRecommendBadge />
-              내 이상형 조건과 잘 맞는 분이에요
-            </p>
-          ) : null}
+          {profile.aiMatch ? <AiMatchLine match={profile.aiMatch} /> : null}
           {profile.realName ? (
             <p className="mt-2 text-[15px] text-[var(--color-burgundy-700)]">
               {profile.realName}
@@ -482,5 +477,29 @@ function Rows({ rows }: { rows: [string, string | null | undefined][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/**
+ * AI 추천 이유 한 줄. 이상형 조건을 모두 만족했는지, 공통점이 많아서인지를 가른다.
+ * 공통점은 둘 다 이미 볼 수 있는 값(내 태그·상대 태그·종교)이라 그대로 보여 준다.
+ */
+function AiMatchLine({ match }: { match: NonNullable<ProfileDetailView["aiMatch"]> }) {
+  const common = [
+    ...match.commonTags.map((tag) => `#${tag}`),
+    ...(match.commonReligion ? [`같은 종교(${label.religion(match.commonReligion)})`] : []),
+  ];
+  return (
+    <div className="mt-2.5 flex flex-col gap-1.5">
+      <p className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink-600)]">
+        <AiRecommendBadge />
+        {match.ideal ? "내 이상형 조건과 잘 맞는 분이에요" : "나와 공통점이 많은 분이에요"}
+      </p>
+      {common.length > 0 ? (
+        <p className="text-[12px] text-[var(--color-ink-600)]">
+          <span className="text-[var(--color-ink-500)]">공통점</span> {common.join(" · ")}
+        </p>
+      ) : null}
+    </div>
   );
 }

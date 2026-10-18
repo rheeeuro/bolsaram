@@ -12,6 +12,11 @@
  *
  * 이 분의 이상형에 확실한 조건이 없으면 거꾸로 본다 — 상대가 적은 확실한 조건을 이 분이
  * 모두 만족하면 추천이다. 어느 쪽이든 상대가 「꼭」이라고 적은 조건에 이 분이 안 맞으면 뺀다.
+ *
+ * 이상형과 별개로 **공통점이 많은 사람**도 추천이다 — **같은 지역**(사는 곳·일하는 곳 중
+ * 하나)이면서, 서로 겹치는 해시태그·취미와 같은 종교(무교 제외)가 `RECOMMEND_COMMON_MIN` 개
+ * 이상이고, 양쪽 어느 조건과도 어긋나지 않고 피하는 낱말에 걸리지 않을 때다. 「담배 비선호」는 비흡연 조건으로 저장되므로, 조건과
+ * 어긋나지 않아야 비선호도 함께 지켜진다(모름은 어긋난 것이 아니다).
  */
 import {
   IDEAL_CRITERION_KEYS,
@@ -62,8 +67,21 @@ export type DirectionResult = {
   avoidHits: string[];
 };
 
+/** 두 사람의 공통점. 해시태그·취미는 정규화한 태그로, 종교는 열거형 값으로 싣는다. */
+export type CommonPoints = {
+  tags: string[];
+  /** 둘 다 같은 종교일 때 그 값. 무교끼리는 공통점으로 세지 않는다. */
+  religion: string | null;
+};
+
+/** 공통점이 많다고 부르는 개수. 운영 데이터에서 1개는 풀의 40% 가 넘어 「많다」가 아니다. */
+export const RECOMMEND_COMMON_MIN = 2;
+
 export type Recommendation = {
   candidateId: string;
+  /** 이상형의 확실한 조건을 모두 만족해서 추천인가. 아니면 공통점으로 추천된 것이다. */
+  idealMatch: boolean;
+  common: CommonPoints;
   /** 이 분의 이상형 → 상대. 이 분에게 조건이 없으면 null. */
   forward: DirectionResult | null;
   /** 상대의 이상형 → 이 분. 상대에게 조건이 없으면 null. */
@@ -143,6 +161,47 @@ export function evaluateIdeal(criteria: IdealCriteria, target: RecommendSubject)
   };
 }
 
+function tagsOf(person: RecommendSubject): string[] {
+  return [
+    ...new Set(
+      [...person.hashtags, ...person.hobbies]
+        .map((tag) => normalizeHashtag(tag))
+        .filter((tag): tag is string => tag != null),
+    ),
+  ];
+}
+
+/** 두 사람의 공통점. 「등산」과 「주말등산」처럼 한쪽이 다른 쪽을 품으면 겹친다고 본다. */
+export function commonPoints(a: RecommendSubject, b: RecommendSubject): CommonPoints {
+  const theirs = tagsOf(b);
+  return {
+    tags: tagsOf(a).filter((tag) => theirs.some((t) => t.includes(tag) || tag.includes(t))),
+    religion: a.religion && a.religion !== "NONE" && a.religion === b.religion ? a.religion : null,
+  };
+}
+
+/**
+ * 같은 지역인가 — 사는 곳·일하는 곳 중 하나라도 겹치면 만날 수 있는 거리다.
+ * 공통점 추천의 전제이고, 개수로는 세지 않는다(풀 대부분이 같은 지역이라 세면 뜻이 없다).
+ */
+function sameArea(a: RecommendSubject, b: RecommendSubject): boolean {
+  const areas = (p: RecommendSubject) =>
+    [p.residenceRegion, p.workplaceRegion].filter((r): r is string => r != null);
+  return areas(a).some((r) => areas(b).includes(r));
+}
+
+function commonCount(common: CommonPoints): number {
+  return common.tags.length + (common.religion ? 1 : 0);
+}
+
+/** 그 사람이 적은 조건과 어긋나지 않고 피하는 낱말에도 걸리지 않는가. 조건이 없으면 걸릴 것이 없다. */
+function noConflict(result: DirectionResult | null): boolean {
+  return (
+    result == null ||
+    (result.avoidHits.length === 0 && result.checks.every((c) => c.outcome !== "unmet"))
+  );
+}
+
 /** 확실한 조건이 하나라도 적혀 있는가. 키워드만 있는 이상형은 판정에 쓸 수 없다. */
 function hasDefiniteCriteria(criteria: IdealCriteria | null): criteria is IdealCriteria {
   return criteria != null && IDEAL_CRITERION_KEYS.some((key) => idealCriterionStated(criteria, key));
@@ -154,7 +213,8 @@ function hasDefiniteCriteria(criteria: IdealCriteria | null): criteria is IdealC
  * 후보는 이미 「같은 쪽의 활성 이성」으로 좁혀서 넘긴다 — 여기서는 견주기만 한다.
  * 이 분에게 확실한 조건이 있으면 그것을 모두 만족하는 사람, 없으면 상대의 확실한 조건을
  * 이 분이 모두 만족하는 사람이다. 상대의 「꼭」 조건에 이 분이 안 맞으면 어느 쪽이든 뺀다.
- * 순서는 서로 맞는 사람이 앞, 그다음 맞은 조건이 많은 사람이 앞이다.
+ * 여기에 공통점이 많고 양쪽 조건·피하는 낱말에 걸리지 않는 사람을 더한다.
+ * 순서는 서로 맞는 사람, 이상형으로 추천된 사람, 맞은 조건·공통점이 많은 사람 순이다.
  */
 export function rankRecommendations(
   subject: RecommendSubject,
@@ -162,7 +222,7 @@ export function rankRecommendations(
 ): Recommendation[] {
   const own = hasDefiniteCriteria(subject.criteria) ? subject.criteria : null;
 
-  const picked: (Recommendation & { metCount: number })[] = [];
+  const picked: (Recommendation & { metCount: number; commonCount: number })[] = [];
   for (const candidate of candidates) {
     if (candidate.id === subject.id) continue;
     const forward = own ? evaluateIdeal(own, candidate) : null;
@@ -172,17 +232,33 @@ export function rankRecommendations(
     if (reverse?.blocked) continue;
 
     const decisive = own ? forward : reverse;
-    if (!decisive?.meetsAll) continue;
+    const idealMatch = decisive?.meetsAll ?? false;
+    const common = commonPoints(subject, candidate);
+    const commonMatch =
+      sameArea(subject, candidate) &&
+      commonCount(common) >= RECOMMEND_COMMON_MIN &&
+      noConflict(forward) &&
+      noConflict(reverse);
+    if (!idealMatch && !commonMatch) continue;
 
     picked.push({
       candidateId: candidate.id,
+      idealMatch,
+      common,
       forward,
       reverse,
       mutual: Boolean(forward?.meetsAll && reverse?.meetsAll),
-      metCount: decisive.checks.length,
+      metCount: idealMatch && decisive ? decisive.checks.length : 0,
+      commonCount: commonCount(common),
     });
   }
 
-  picked.sort((a, b) => Number(b.mutual) - Number(a.mutual) || b.metCount - a.metCount);
-  return picked.map(({ metCount: _metCount, ...rest }) => rest);
+  picked.sort(
+    (a, b) =>
+      Number(b.mutual) - Number(a.mutual) ||
+      Number(b.idealMatch) - Number(a.idealMatch) ||
+      b.metCount - a.metCount ||
+      b.commonCount - a.commonCount,
+  );
+  return picked.map(({ metCount: _m, commonCount: _c, ...rest }) => rest);
 }

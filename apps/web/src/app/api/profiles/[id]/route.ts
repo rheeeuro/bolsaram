@@ -17,7 +17,7 @@ import {
 } from "@/server/repo/profiles";
 import { isMemberView } from "@/server/auth/guard";
 import { deleteObject } from "@/server/storage/local";
-import { isRecommendedFor } from "@/server/services/recommend-service";
+import { aiMatchFor } from "@/server/services/recommend-service";
 import { disclosureFor, toDetailView } from "@/server/views/profile-view";
 
 export const dynamic = "force-dynamic";
@@ -70,8 +70,8 @@ export const GET = route(async (_request: Request, { params }: Params) => {
       canEdit: editable.has(profile.id),
     });
     const favorited = await isFavorited(sql, viewer.userId, profile.id);
-    const aiRecommended = memberView && (await isRecommendedFor(sql, viewer.profileId, profile));
-    return ok(toDetailView(profile, level, { isFavorited: favorited, aiRecommended }));
+    const aiMatch = memberView ? await aiMatchFor(sql, viewer.profileId, profile) : null;
+    return ok(toDetailView(profile, level, { isFavorited: favorited, aiMatch }));
   });
 });
 
