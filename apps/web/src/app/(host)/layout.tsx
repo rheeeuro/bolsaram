@@ -14,6 +14,7 @@ import { imageUrlFor } from "@/server/views/image-url";
 import { HostNav } from "@/components/host/host-nav";
 import { HostChatFab } from "@/components/host/chat-fab";
 import { ChatStreamProvider } from "@/components/host/chat-stream";
+import { PhotoGuard } from "@/components/ui/photo-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,7 @@ export default async function HostLayout({ children }: { children: React.ReactNo
           viewerId={viewer.userId}
         />
       </ChatStreamProvider>
+      <PhotoGuard />
     </div>
   );
 }

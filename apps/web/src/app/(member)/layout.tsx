@@ -10,7 +10,7 @@ import { rlsContextOf } from "@/server/auth/guard";
 import { countPendingIncoming } from "@/server/repo/matches";
 import { MemberNav } from "@/components/member/member-nav";
 import { ActingBanner } from "@/components/member/acting-banner";
-import { PhotoGuard } from "@/components/member/photo-guard";
+import { PhotoGuard } from "@/components/ui/photo-guard";
 
 export const dynamic = "force-dynamic";
 
