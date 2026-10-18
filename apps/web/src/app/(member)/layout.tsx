@@ -47,11 +47,15 @@ export default async function MemberLayout({ children }: { children: React.React
     <div
       className="member-surface min-h-dvh bg-[var(--surface-page)]"
       // 대행 띠는 하단 탭 위에 겹쳐 뜨므로 그만큼 바닥을 더 비운다.
-      style={{
-        paddingBottom: actingCode
-          ? "calc(120px + env(safe-area-inset-bottom))"
-          : "calc(64px + env(safe-area-inset-bottom))",
-      }}
+      // 페이지의 sticky 하단 바도 같은 높이(--member-bottom) 위에 붙는다.
+      style={
+        {
+          "--member-bottom": actingCode
+            ? "calc(120px + env(safe-area-inset-bottom))"
+            : "calc(64px + env(safe-area-inset-bottom))",
+          paddingBottom: "var(--member-bottom)",
+        } as React.CSSProperties
+      }
     >
       {children}
       <PhotoGuard />
