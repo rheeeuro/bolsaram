@@ -320,16 +320,14 @@ function RegionGroup({
           >
             <p className="mb-2 text-[12px] text-[var(--surface-text-muted)]">
               {REGION_LABELS[region]} 권역
-              {picked.length > 0 ? ` · ${picked.length}곳` : ""}
+              {whole ? " · 전체 선택됨" : picked.length > 0 ? ` · ${picked.length}곳` : ""}
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {/* 광역 칩 이름을 누른 것과 같다 — 전체를 고르고, 다시 누르면 푼다. */}
-              <Chip label="전체" selected={whole} onClick={() => onToggleRegion(region)} />
               {areasOf(region).map((area) => (
                 <Chip
                   key={area}
                   label={AREA_LABELS[area]}
-                  selected={filters.areas.includes(area)}
+                  selected={whole || filters.areas.includes(area)}
                   onClick={() => onToggleArea(area)}
                 />
               ))}
