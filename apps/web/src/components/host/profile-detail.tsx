@@ -11,6 +11,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { CopyField } from "@/components/ui/copy-field";
 import { FormError } from "@/components/ui/field";
 import { HashtagChip, ProfileCode } from "@/components/ui/marks";
+import { PhotoViewer } from "@/components/ui/photo-viewer";
 import { ProfileMemo } from "@/components/host/profile-memo";
 import { Panel } from "@/components/host/surface";
 import { apiDelete, apiPatch, apiPost } from "@/lib/api-client";
@@ -21,6 +22,10 @@ import type { ProfileDetailView } from "@/server/views/profile-view";
 
 /** 어느 버튼에서 난 실패인가. 한 곳에 모아 두면 무엇이 실패했는지 짝을 잃는다. */
 type Scope = "status" | "bump" | "acting" | "invite" | "delete";
+
+/** 누르면 크게 열리는 썸네일. 눌러진다는 것을 손가락 모양과 살짝 어두워지는 것으로 알린다. */
+const THUMB_BUTTON =
+  "relative block cursor-zoom-in overflow-hidden rounded-[12px] bg-[var(--color-ivory-200)] outline-none transition-[filter] hover:brightness-95 focus-visible:ring-2 focus-visible:ring-[var(--color-rose-600)]";
 
 function messageFor(
   error: { scope: Scope; message: string } | null,
@@ -82,6 +87,8 @@ export function HostProfileDetail({
   const [issued, setIssued] = useState<{ url: string; code: string } | null>(null);
   // 끌어올린 직후 한 번 말해준다. 새로고침으로 버튼이 잠기는 것만으로는 됐는지 알기 어렵다.
   const [bumped, setBumped] = useState(false);
+  // 크게 보고 있는 사진. 썸네일만으로는 얼굴·분위기를 확인하기 어렵다.
+  const [viewing, setViewing] = useState<number | null>(null);
 
   async function changeStatus(next: ProfileStatus) {
     if (next === status) return;
@@ -160,18 +167,28 @@ export function HostProfileDetail({
       ) : null}
 
       <section className="flex flex-wrap items-center gap-5 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-card)]">
-        <div className="h-32 w-24 shrink-0 overflow-hidden rounded-[12px] bg-[var(--color-ivory-200)]">
-          {profile.images[0] ? (
-            // signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면 URL 이
-            // 캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다.
-            // eslint-disable-next-line @next/next/no-img-element
+        {profile.images[0] ? (
+          <button
+            type="button"
+            aria-label="사진 크게 보기"
+            onClick={() => setViewing(0)}
+            className={THUMB_BUTTON + " h-32 w-24 shrink-0"}
+          >
+            {/* signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면 URL 이
+                캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={profile.images[0].url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="grid h-full place-items-center text-[11.5px] text-[var(--color-ink-700)]">
-              사진 없음
-            </div>
-          )}
-        </div>
+            {profile.images.length > 1 ? (
+              <span className="absolute bottom-1 right-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                {profile.images.length}장
+              </span>
+            ) : null}
+          </button>
+        ) : (
+          <div className="grid h-32 w-24 shrink-0 place-items-center rounded-[12px] bg-[var(--color-ivory-200)] text-[11.5px] text-[var(--color-ink-700)]">
+            사진 없음
+          </div>
+        )}
 
         <div className="min-w-48 flex-1">
           {/* 이름은 담당일 때만 온다. 주선자는 번호보다 이름으로 기억한다. */}
@@ -274,23 +291,27 @@ export function HostProfileDetail({
           {profile.images.length > 1 ? (
             <Panel title={`사진 ${profile.images.length}장`}>
               <ul className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-                {profile.images.map((image) => (
-                  <li
-                    key={image.id}
-                    className="relative aspect-3/4 overflow-hidden rounded-[12px] bg-[var(--color-ivory-200)]"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={image.url}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                    {image.isPrimary ? (
-                      <span className="absolute left-1 top-1 rounded bg-[var(--color-burgundy-900)]/75 px-1.5 py-0.5 text-[10px] text-white">
-                        대표
-                      </span>
-                    ) : null}
+                {profile.images.map((image, index) => (
+                  <li key={image.id}>
+                    <button
+                      type="button"
+                      aria-label={`${index + 1}번째 사진 크게 보기`}
+                      onClick={() => setViewing(index)}
+                      className={THUMB_BUTTON + " aspect-3/4 w-full"}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image.url}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                      {image.isPrimary ? (
+                        <span className="absolute left-1 top-1 rounded bg-[var(--color-burgundy-900)]/75 px-1.5 py-0.5 text-[10px] text-white">
+                          대표
+                        </span>
+                      ) : null}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -587,6 +608,12 @@ export function HostProfileDetail({
           </aside>
         ) : null}
       </div>
+
+      <PhotoViewer
+        photos={profile.images}
+        openIndex={viewing}
+        onClose={() => setViewing(null)}
+      />
     </div>
   );
 }
