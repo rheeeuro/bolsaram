@@ -108,6 +108,7 @@ export async function createSession(
   sql: Sql,
   input: { groupId: string | null; createdBy: string; source: ImportSource; rawText?: string },
 ): Promise<ImportSessionRecord> {
+  await assertNoDuplicateRawText(sql, input.rawText ?? null, null);
   // group_id 가 null 이면 전체공개 세션이다. RLS 는 그 경우 만든 사람만 통과시킨다.
   const result = await sql.query<SessionRow>(
     `INSERT INTO import_sessions (group_id, created_by, source, raw_text)
@@ -115,6 +116,59 @@ export async function createSession(
     [input.groupId, input.createdBy, input.source, input.rawText ?? null],
   );
   return toSession(result.rows[0]!);
+}
+
+/**
+ * **같은 원문이 이미 있으면 받지 않는다.** 웹 업로드·검토 화면의 원문 수정·텔레그램 봇이
+ * 모두 `createSession`·`updateRawText` 를 지나므로 여기 한 곳에서 막는다.
+ *
+ * 비교는 `raw_text_key`(0071)로 한다 — 공백·카카오톡 말머리를 뺀 보이는 글자가 같으면
+ * 같은 원문이다. 짧은 글(키가 NULL)은 견주지 않는다. 등록 전 가져오기와 프로필이 남아 있는
+ * 등록된 가져오기가 대상이다.
+ *
+ * 경계는 RLS 그대로다 — 내가 볼 수 있는 가져오기끼리만 견준다(관리자는 전부). 남이 같은 글을
+ * 올렸는지 알려주면 그 자체가 남의 원문이 있다는 정보가 된다.
+ *
+ * 같은 글을 동시에 두 번 보내도 둘 다 통과하지 않도록 키 단위로 트랜잭션 잠금을 잡는다.
+ * 검사는 SQL 오류 없이 던지므로 호출부가 잡아도 트랜잭션은 계속 쓸 수 있다.
+ */
+async function assertNoDuplicateRawText(
+  sql: Sql,
+  rawText: string | null,
+  exceptSessionId: string | null,
+): Promise<void> {
+  if (!rawText) return;
+  const keyed = await sql.query<{ key: string | null }>(
+    `SELECT import_raw_text_key($1) AS key`,
+    [rawText],
+  );
+  const key = keyed.rows[0]?.key;
+  if (!key) return;
+  await sql.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [key]);
+  const found = await sql.query<{
+    id: string;
+    profile_id: string | null;
+    profile_code: number | null;
+  }>(
+    `SELECT d.id, p.id AS profile_id, p.public_code AS profile_code
+       FROM import_sessions d
+       LEFT JOIN profiles p ON p.id = d.committed_profile_id
+      WHERE d.raw_text_key = $1
+        AND d.id IS DISTINCT FROM $2
+        AND (d.status <> 'IMPORTED' OR p.id IS NOT NULL)
+      ORDER BY (p.id IS NULL), d.created_at
+      LIMIT 1`,
+    [key, exceptSessionId],
+  );
+  const dup = found.rows[0];
+  if (!dup) return;
+  throw new DomainError(
+    "CONFLICT",
+    dup.profile_id
+      ? `같은 프로필 글로 이미 등록된 분이 있습니다 — ${dup.profile_code}번 프로필.`
+      : "같은 프로필 글이 이미 가져오기 검토 대기에 있습니다.",
+    { duplicateSessionId: dup.id, duplicateProfileId: dup.profile_id },
+  );
 }
 
 export async function findSession(sql: Sql, id: string): Promise<ImportSessionRecord | null> {
@@ -291,6 +345,7 @@ export async function updateRawText(
   id: string,
   rawText: string,
 ): Promise<ImportSessionRecord> {
+  await assertNoDuplicateRawText(sql, rawText, id);
   const result = await sql.query<SessionRow>(
     `UPDATE import_sessions SET raw_text = $2 WHERE id = $1 RETURNING ${SESSION_COLUMNS}`,
     [id, rawText],

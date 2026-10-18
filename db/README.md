@@ -103,6 +103,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0068_group_chat_notify_mode.sql` | 채팅 텔레그램 알림을 세 단계로(`group_chat_notify` — 모든 새 메시지·멘션만·끄기, 기본 멘션만). 알림 행은 텔레그램을 연결한 사람에게만, 「멘션만」은 본문에 `@이름` 이 있을 때만 만든다 |
 | `0069_profile_ideal_criteria.sql` | `profile_ideal_criteria` — 추천을 열 때 AI 로 읽어 채우던 이상형 조건 캐시 (0070 에서 지움) |
 | `0070_profile_ideal_criteria_column.sql` | 이상형 조건을 프로필 항목으로 — `profiles.ideal_criteria`(jsonb, 객체만). 가져오기 추출이 함께 뽑고 주선자가 고친다. 0069 의 캐시 테이블을 지운다 |
+| `0071_import_raw_text_key.sql` | 가져오기 원문 비교 키 — `import_sessions.raw_text_key`(생성 칼럼, `import_raw_text_key()`). 공백·제로폭 문자·카카오톡 말머리를 뺀 원문의 md5, 20자 미만은 NULL. 앱이 같은 키의 가져오기가 이미 있으면 업로드·원문 수정을 거부한다(볼 수 있는 가져오기끼리) |
 
 ## 테이블
 

@@ -522,15 +522,22 @@ async function handlePhoto(
     // 사진 설명은 글이 아직 없을 때만 원문으로 쓴다(§5.4).
     let hasText = (session.rawText?.trim().length ?? 0) > 0;
     let captionStored = false;
+    // 같은 글이 이미 있으면 설명만 받지 않는다 — 사진까지 되돌리면 저장소에 올린 파일이 남는다.
+    let captionRejected: string | null = null;
     if (intent.caption) {
       const merged = mergeRawText(session.rawText, {
         source: "caption",
         value: intent.caption,
       });
       if (merged.changed) {
-        await imports.updateRawText(sql, conversation.importSessionId, merged.rawText);
-        hasText = true;
-        captionStored = true;
+        try {
+          await imports.updateRawText(sql, conversation.importSessionId, merged.rawText);
+          hasText = true;
+          captionStored = true;
+        } catch (error) {
+          if (!(error instanceof DomainError && error.code === "CONFLICT")) throw error;
+          captionRejected = error.message;
+        }
       }
     }
 
@@ -550,7 +557,7 @@ async function handlePhoto(
       lastMediaGroupId: intent.mediaGroupId,
     });
 
-    return { uploadedCount, announce, captionStored, hasText };
+    return { uploadedCount, announce, captionStored, captionRejected, hasText };
   });
 
   // 봇이 무엇을 답했는지 남긴다. 안내가 장수만큼 나가는 회귀를 데이터로 잡을 수 있어야 한다
@@ -567,6 +574,9 @@ async function handlePhoto(
     if (result.captionStored) {
       await sendMessage(identity.telegramChatId, messages.captionStored);
     }
+  }
+  if (result.captionRejected) {
+    await sendMessage(identity.telegramChatId, result.captionRejected);
   }
 }
 

@@ -163,7 +163,7 @@ server/
 │   ├── profile-images.ts     사진 추가·삭제·대표 지정 (순서와 대표 불변식)
 │   ├── favorites.ts          관심 토글·목록
 │   ├── hides.ts              숨기기 토글·목록 + 양방향 판정
-│   ├── imports.ts            세션·에셋·추출·검토
+│   ├── imports.ts            세션·에셋·추출·검토. 세션 생성·원문 수정은 같은 원문(`raw_text_key`)이 이미 있으면 409 — 웹·봇 공통
 │   ├── recommendations.ts    AI 추천의 후보 — 보는 멤버의 탐색 풀(같은 쪽의 활성 이성, 거절·숨김 제외)
 │   ├── group-chat.ts         모임 채팅 — 메시지 목록·작성·지우기, 읽은 위치·안 읽은 수
 │   └── telegram.ts           봇 대화 상태 + 계정 연결 조회/해제

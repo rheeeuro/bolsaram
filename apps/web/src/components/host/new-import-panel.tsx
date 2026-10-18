@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { PROFILE_IMAGE_MAX_COUNT } from "@bolsaram/schemas";
@@ -42,6 +43,8 @@ export function NewImportPanel({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 같은 글이 이미 있어 거절됐을 때 그쪽으로 가는 주소. 사진은 올라가기 전에 막힌다.
+  const [duplicateHref, setDuplicateHref] = useState<string | null>(null);
 
   // 붙여넣기 리스너는 한 번 붙여 두므로 최신 장수를 ref 로 읽는다.
   const countRef = useRef(0);
@@ -92,6 +95,7 @@ export function NewImportPanel({
   async function submit() {
     setBusy(true);
     setError(null);
+    setDuplicateHref(null);
     try {
       setProgress("세션 만드는 중…");
       const created = await apiPost<Created>("/api/imports", {
@@ -107,6 +111,7 @@ export function NewImportPanel({
       });
       if (!created.ok) {
         setError(created.message);
+        if (created.code === "CONFLICT") setDuplicateHref(duplicateTarget(created.details));
         return;
       }
 
@@ -190,7 +195,19 @@ export function NewImportPanel({
         </Field>
       </div>
 
-      {error ? <p className="mt-3 text-[12.5px] text-[var(--color-danger)]">{error}</p> : null}
+      {error ? (
+        <p className="mt-3 text-[12.5px] text-[var(--color-danger)]">
+          {error}
+          {duplicateHref ? (
+            <>
+              {" "}
+              <Link href={duplicateHref} className="whitespace-nowrap underline underline-offset-2">
+                열어 보기
+              </Link>
+            </>
+          ) : null}
+        </p>
+      ) : null}
       {progress ? (
         <p className="mt-3 text-[12.5px] text-[var(--surface-text-muted)]">{progress}</p>
       ) : null}
@@ -330,4 +347,13 @@ function PhotoDrop({
       )}
     </div>
   );
+}
+
+/** 중복으로 거절된 응답의 details 에서 이미 있는 쪽 주소를 만든다. 모양이 다르면 null. */
+function duplicateTarget(details: unknown): string | null {
+  if (typeof details !== "object" || details === null) return null;
+  const { duplicateProfileId, duplicateSessionId } = details as Record<string, unknown>;
+  if (typeof duplicateProfileId === "string") return `/profiles/${duplicateProfileId}`;
+  if (typeof duplicateSessionId === "string") return `/imports/${duplicateSessionId}`;
+  return null;
 }

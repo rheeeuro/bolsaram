@@ -4,7 +4,8 @@
  * 오류를 삼키지 않고 항상 판별 가능한 결과를 돌려준다.
  */
 export type ApiResult<T> =
-  { ok: true; data: T } | { ok: false; code: string; message: string; status: number };
+  | { ok: true; data: T }
+  | { ok: false; code: string; message: string; status: number; details?: unknown };
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<ApiResult<T>> {
   let response: Response;
@@ -31,12 +32,15 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   }
 
   if (!response.ok) {
-    const error = (payload as { error?: { code?: string; message?: string } } | null)?.error;
+    const error = (
+      payload as { error?: { code?: string; message?: string; details?: unknown } } | null
+    )?.error;
     return {
       ok: false,
       code: error?.code ?? "UNKNOWN",
       message: error?.message ?? "요청을 처리하지 못했습니다.",
       status: response.status,
+      ...(error?.details !== undefined ? { details: error.details } : {}),
     };
   }
   return { ok: true, data: payload as T };
