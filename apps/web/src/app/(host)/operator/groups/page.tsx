@@ -2,7 +2,8 @@
  * 관리자 메뉴 › 모임 설정 — 모임 만들기 승인·초대 코드 여러 번 쓰기 켜기·끄기와
  * 들어온 요청 처리.
  */
-import { requireOperatorPage } from "@/server/auth/guard";
+import { withRls } from "@bolsaram/db";
+import { requireOperatorPage, rlsContextOf } from "@/server/auth/guard";
 import { listGroupCreationRequests, readOperatorSettings } from "@/server/auth/operator";
 import { Breadcrumb, PageHeader } from "@/components/host/surface";
 import {
@@ -13,6 +14,8 @@ import {
   type OperatorGroupRequest,
 } from "@/components/host/operator-settings";
 import type { GroupCreationRequestRow } from "@/server/auth/operator";
+import { isTelegramEnabled } from "@/server/env";
+import { findConnectionForUser } from "@/server/repo/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +36,14 @@ function serialize(row: GroupCreationRequestRow): OperatorGroupRequest {
 }
 
 export default async function OperatorGroupsPage() {
-  await requireOperatorPage("/operator/groups");
+  const viewer = await requireOperatorPage("/operator/groups");
   const settings = await readOperatorSettings();
   const { pending, recent } = await listGroupCreationRequests();
+  // 요청 알림은 관리자 본인의 봇 연결로 간다. 연결이 없으면 알림이 쌓이기만 한다.
+  const telegramConnected =
+    isTelegramEnabled() &&
+    (await withRls(rlsContextOf(viewer), (sql) => findConnectionForUser(sql, viewer.userId))) !==
+      null;
 
   return (
     <>
@@ -49,6 +57,7 @@ export default async function OperatorGroupsPage() {
         <GroupApprovalPanel
           enabled={settings.groupCreationRequiresApproval}
           pendingCount={pending.length}
+          telegramConnected={telegramConnected}
         />
         <GroupInviteReusePanel enabled={settings.groupInviteReusable} />
         <GroupRequestQueue pending={pending.map(serialize)} />

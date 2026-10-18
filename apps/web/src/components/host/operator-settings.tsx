@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MAX_GROUPS_PER_ADMIN } from "@bolsaram/schemas";
@@ -45,9 +46,11 @@ const STATUS_LABEL: Record<OperatorGroupRequest["status"], string> = {
 export function GroupApprovalPanel({
   enabled,
   pendingCount,
+  telegramConnected,
 }: {
   enabled: boolean;
   pendingCount: number;
+  telegramConnected: boolean;
 }) {
   const { on, busy, error, toggle } = useSettingSwitch(enabled, "groupCreationRequiresApproval");
 
@@ -67,6 +70,20 @@ export function GroupApprovalPanel({
             <p className="mt-1.5 text-[12px] text-[var(--color-rose-600)]">
               꺼도 이미 들어온 요청 {pendingCount}건은 남아 있습니다. 아래에서 처리하세요.
             </p>
+          ) : null}
+          {on ? (
+            telegramConnected ? (
+              <p className="mt-1.5 text-[12px] text-[var(--surface-text-muted)]">
+                요청이 들어오면 텔레그램으로 알려 드립니다.
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[12px] text-[var(--color-rose-600)]">
+                텔레그램이 연결되지 않아 요청 알림을 받지 못합니다.{" "}
+                <Link href="/account" className="underline underline-offset-2">
+                  내 계정에서 연결
+                </Link>
+              </p>
+            )
           ) : null}
         </div>
         <Switch
