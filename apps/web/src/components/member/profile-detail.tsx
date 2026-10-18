@@ -62,7 +62,7 @@ export function ProfileDetail({
   }
 
   return (
-    <main className="pb-8">
+    <main className={isSelf ? "pb-8" : undefined}>
       {/* 큰 인물 사진 (UI 컨셉 04).
           모바일은 화면을 꽉 채우고, 데스크톱은 본문 폭보다 좁은 세로 카드로 둔다 —
           전체폭을 유지하면 넓은 화면에서 사진만 한 화면을 다 먹는다. */}
@@ -283,13 +283,27 @@ export function ProfileDetail({
         ) : null}
       </div>
 
+      {/* 액션 바보다 먼저 둔다 — 바가 본문의 마지막이어야 끝까지 내렸을 때 하단 탭에 붙는다.
+          숨기기는 프로필이 연결된 멤버만 할 수 있다. 연결된 상대는 새로 숨기지 않는다 —
+          연락처를 이미 주고받은 뒤라 화면에서 지우는 것으로 해결되지 않는다.
+          **이미 숨긴 상대는 상태와 무관하게 해제할 수 있어야 한다** — 해제 버튼을
+          상태로 가리면 되돌릴 수 없는 숨김이 남는다. */}
+      {!isSelf && canRequest && (relation.iHid || existing?.status !== "INTRODUCED") ? (
+        <HideAction
+          profileId={profile.id}
+          code={profile.code}
+          hidden={relation.iHid}
+          onChanged={() => router.refresh()}
+        />
+      ) : null}
+
       {/* 액션 바 */}
       {isSelf ? (
         <p className="mx-auto mt-10 max-w-2xl px-5 text-[13px] text-[var(--color-ink-600)]">
           내 프로필입니다. 수정이 필요하면 주선자에게 알려주세요.
         </p>
       ) : (
-        <div className="sticky bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 mt-10 border-t border-[var(--surface-border)] bg-white/95 px-5 py-3 backdrop-blur">
+        <div className="sticky bottom-[var(--member-bottom)] z-20 mt-10 border-t border-[var(--surface-border)] bg-white/95 px-5 py-3 backdrop-blur">
           <div className="mx-auto flex max-w-2xl gap-2">
             <Button
               variant="secondary"
@@ -319,19 +333,6 @@ export function ProfileDetail({
           </div>
         </div>
       )}
-
-      {/* 숨기기는 프로필이 연결된 멤버만 할 수 있다. 연결된 상대는 새로 숨기지 않는다 —
-          연락처를 이미 주고받은 뒤라 화면에서 지우는 것으로 해결되지 않는다.
-          **이미 숨긴 상대는 상태와 무관하게 해제할 수 있어야 한다** — 해제 버튼을
-          상태로 가리면 되돌릴 수 없는 숨김이 남는다. */}
-      {!isSelf && canRequest && (relation.iHid || existing?.status !== "INTRODUCED") ? (
-        <HideAction
-          profileId={profile.id}
-          code={profile.code}
-          hidden={relation.iHid}
-          onChanged={() => router.refresh()}
-        />
-      ) : null}
 
       <RequestModal
         open={modalOpen}
