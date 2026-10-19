@@ -6,6 +6,8 @@
  *
  *   보이는 층   작은 글씨를 넓은 간격으로 비스듬히. 「표시가 있다」는 것 자체로 억제한다.
  *              밝은 글자와 어두운 테두리를 아주 옅게 겹쳐 어느 바탕에서나 눈에 띄지 않게 한다.
+ *   표기        오른쪽 아래에 반투명 띠를 깔고 또렷하게 한 줄. 찍기 전에 「내 번호가 찍힌다」를
+ *              보게 하는 억지용이다. 카드가 사진을 잘라 보여줘도 남는 자리에 둔다.
  *   숨은 층     큰 글씨를 촘촘히, 밝기만 몇 단계 낮춘다. 맨눈으로는 보이지 않지만 얼굴만
  *              잘라도 몇 줄은 남고, 지우기 어렵다. 판독은 주선자 화면 「캡처본 확인」이
  *              주변 밝기를 빼고 차이를 키워서 한다(`lib/trace-enhance.ts`).
@@ -32,6 +34,13 @@ const HIDDEN_FONT_RATIO = 0.05;
 const HIDDEN_DEPTH = 2;
 /** 숨은 글자 가장자리를 흐리는 정도 = 글씨 크기 × 이 비율. 경계가 날카로우면 윤곽이 비친다. */
 const HIDDEN_SOFTEN_RATIO = 0.03;
+/** 표기 글씨 = 짧은 변 × 이 비율. 1280px 사진에서 약 32px, 폰 상세 화면에서 10px 남짓이다. */
+const BADGE_FONT_RATIO = 0.025;
+/**
+ * 화면이 사진을 자르는 비율(가로/세로) — 카드 3:4, 멤버 상세 4:5. 표기는 이 둘로 가운데를
+ * 잘라도 남는 영역의 오른쪽 아래에 둔다.
+ */
+const CROP_ASPECTS = [3 / 4, 4 / 5];
 
 export type ViewerMark = {
   /** 보이는 층. `BOLSARAM No.17 26.10.13` */
@@ -89,7 +98,10 @@ export async function watermarkImage(input: Buffer, mark: ViewerMark): Promise<B
     }
 
     return await sharp(data, { raw: { width, height, channels } })
-      .composite([{ input: Buffer.from(visibleSvg(width, height, mark.visible)), top: 0, left: 0 }])
+      .composite([
+        { input: Buffer.from(visibleSvg(width, height, mark.visible)), top: 0, left: 0 },
+        ...(await badgeLayers(width, height, mark.visible)),
+      ])
       .jpeg({ quality: 88 })
       .toBuffer();
   } catch {
@@ -118,6 +130,50 @@ function visibleSvg(width: number, height: number, label: string): string {
   </defs>
   <rect width="100%" height="100%" fill="url(#m)"/>
 </svg>`;
+}
+
+/** 화면이 어느 비율로 잘라도 남는 가운데 영역. */
+export function cropSafeBox(width: number, height: number) {
+  const w = Math.min(width, ...CROP_ASPECTS.map((a) => height * a));
+  const h = Math.min(height, ...CROP_ASPECTS.map((a) => width / a));
+  return { left: (width - w) / 2, top: (height - h) / 2, width: w, height: h };
+}
+
+/**
+ * 오른쪽 아래 표기 — 띠와 글자 두 장. 글자를 먼저 그려 잉크가 실제로 차지하는 상자를
+ * 잰 뒤 그 둘레에 여백을 고르게 둔다. 글자 폭은 표기(대문자·숫자 비율)마다 달라서
+ * 어림하면 한쪽 여백이 붙는다.
+ */
+async function badgeLayers(width: number, height: number, label: string) {
+  const font = fontFor(width, height, BADGE_FONT_RATIO, 11, 48);
+  const text = await sharp(
+    Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${label.length * font}" height="${font * 2}">
+  <text x="${font / 2}" y="${font * 1.4}" font-family="DejaVu Sans, Arial, sans-serif" font-size="${font}"
+        letter-spacing="${(font * 0.04).toFixed(2)}" fill="#ffffff" fill-opacity="0.88">${escapeXml(label)}</text>
+</svg>`),
+  )
+    .trim({ threshold: 1 })
+    .png()
+    .toBuffer({ resolveWithObject: true });
+  const inkW = text.info.width;
+  const inkH = text.info.height;
+
+  // 잉크 기준 위아래 여백과, 둥근 끝이 먹는 만큼 더한 좌우 여백.
+  const padY = Math.round(font * 0.42);
+  const padX = Math.round(font * 0.42 + inkH * 0.3);
+  const boxW = inkW + padX * 2;
+  const boxH = inkH + padY * 2;
+  const margin = Math.round(font * 0.8);
+  const safe = cropSafeBox(width, height);
+  const left = Math.max(0, Math.round(safe.left + safe.width - margin - boxW));
+  const top = Math.max(0, Math.round(safe.top + safe.height - margin - boxH));
+  const pill = `<svg xmlns="http://www.w3.org/2000/svg" width="${boxW}" height="${boxH}">
+  <rect width="${boxW}" height="${boxH}" rx="${boxH / 2}" fill="#000000" fill-opacity="0.38"/>
+</svg>`;
+  return [
+    { input: Buffer.from(pill), left, top },
+    { input: text.data, left: left + padX, top: top + padY },
+  ];
 }
 
 function hiddenSvg(width: number, height: number, font: number, label: string): string {

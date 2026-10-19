@@ -6,7 +6,7 @@
  */
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { viewerMark, watermarkImage } from "../apps/web/src/server/storage/watermark";
+import { cropSafeBox, viewerMark, watermarkImage } from "../apps/web/src/server/storage/watermark";
 import { defaultEnhanceOptions, enhanceTrace } from "../apps/web/src/lib/trace-enhance";
 import { hostViewerCode, parseTraceCode } from "../apps/web/src/lib/viewer-code";
 
@@ -111,6 +111,44 @@ describe("합성", () => {
 
   it("열 수 없는 파일이면 null — 부르는 쪽이 원본을 낼지 정한다", async () => {
     expect(await watermarkImage(Buffer.from("not an image"), MARK)).toBeNull();
+  });
+});
+
+describe("오른쪽 아래 표기", () => {
+  it("3:4·4:5 어느 비율로 가운데를 잘라도 남는 영역", () => {
+    // 세로로 긴 폰 캡처 — 위아래가 잘린다. 4:5 가 더 많이 자른다.
+    expect(cropSafeBox(900, 1600)).toEqual({ left: 0, top: 237.5, width: 900, height: 1125 });
+    // 가로 사진 — 양옆이 잘린다. 3:4 가 더 많이 자른다.
+    expect(cropSafeBox(1600, 900)).toEqual({ left: 462.5, top: 0, width: 675, height: 900 });
+  });
+
+  it.each([
+    [900, 1600],
+    [1600, 900],
+    [960, 1280],
+  ])("%ix%i 사진을 카드처럼 잘라도 오른쪽 아래에 또렷하게 보인다", async (width, height) => {
+    const input = await sharp({
+      create: { width, height, channels: 3, background: { r: 230, g: 230, b: 230 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const output = (await watermarkImage(input, MARK))!;
+    const safe = cropSafeBox(width, height);
+    // 잘린 영역의 오른쪽 아래 1/4 너비·1/8 높이 안에서 크게 어두워진 점을 센다.
+    const w = Math.round(safe.width / 4);
+    const h = Math.round(safe.height / 8);
+    const corner = await sharp(output)
+      .extract({
+        left: Math.round(safe.left + safe.width - w),
+        top: Math.round(safe.top + safe.height - h),
+        width: w,
+        height: h,
+      })
+      .raw()
+      .toBuffer();
+    let dark = 0;
+    for (let i = 0; i < corner.length; i += 3) if (corner[i]! < 170) dark += 1;
+    expect(dark / (corner.length / 3)).toBeGreaterThan(0.15);
   });
 });
 
