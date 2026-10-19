@@ -12,6 +12,7 @@ import { FilterSheet } from "@/components/member/filter-sheet";
 import { MemberSubBar } from "@/components/member/member-header";
 import { CardGridSkeleton, CardRowsSkeleton } from "@/components/member/card-grid-skeleton";
 import { LoadingLabel } from "@/components/ui/skeleton";
+import { LoadMore } from "@/components/ui/load-more";
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -49,6 +50,8 @@ export function DiscoverClient() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 이어 불러오기 실패는 이미 받은 목록을 지우지 않고 목록 아래에만 알린다.
+  const [moreError, setMoreError] = useState<string | null>(null);
   // 조건이 바뀐 뒤 늦게 도착한 이전 응답이 새 목록을 덮지 못하게 한다.
   const loadGeneration = useRef(0);
 
@@ -61,10 +64,12 @@ export function DiscoverClient() {
       const result = await apiGet<Page>(`/api/profiles?${params.toString()}`);
       if (generation !== loadGeneration.current) return;
       if (!result.ok) {
-        setError(result.message);
+        if (replace) setError(result.message);
+        else setMoreError(result.message);
         return;
       }
       setError(null);
+      setMoreError(null);
       setTotal(result.data.total);
       setCursor(result.data.nextCursor);
       setItems((prev) => (replace ? result.data.items : [...prev, ...result.data.items]));
@@ -240,22 +245,16 @@ export function DiscoverClient() {
             </div>
           )}
 
-          {cursor ? (
-            <div className="flex justify-center py-8">
-              <Button
-                variant="secondary"
-                disabled={loadingMore}
-                onClick={() => {
-                  setLoadingMore(true);
-                  void load(cursor, false).finally(() => setLoadingMore(false));
-                }}
-              >
-                {loadingMore ? "불러오는 중…" : "더 보기"}
-              </Button>
-            </div>
-          ) : (
-            <div className="h-8" />
-          )}
+          <LoadMore
+            hasMore={cursor !== null}
+            loading={loadingMore}
+            error={moreError}
+            onLoad={() => {
+              if (!cursor || loadingMore) return;
+              setLoadingMore(true);
+              void load(cursor, false).finally(() => setLoadingMore(false));
+            }}
+          />
         </>
       )}
 

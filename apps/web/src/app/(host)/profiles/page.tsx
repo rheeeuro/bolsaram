@@ -2,20 +2,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
-import { isDiscoverable } from "@bolsaram/domain";
 import { adminProfileQuerySchema, PROFILE_STATUSES } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { buttonClasses } from "@/components/ui/button";
-import { ProfileCode } from "@/components/ui/marks";
 import { Count, PageHeader, Panel } from "@/components/host/surface";
-import { introducedWithManaged } from "@/server/repo/matches";
-import { canEditProfiles, findAdminProfiles } from "@/server/repo/profiles";
-import { sourceTextsFor } from "@/server/repo/imports";
-import { disclosureFor, toDetailView, type ProfileDetailView } from "@/server/views/profile-view";
-import { formatDay } from "@/lib/dates";
-import { label } from "@/lib/labels";
+import { loadHostProfilePage } from "@/server/views/host-profile-list";
 import { HostProfileFilters } from "@/components/host/profile-filters";
-import { ProfileRawList, type RawListItem } from "@/components/host/profile-raw-list";
+import { HostProfileList } from "@/components/host/profile-list";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
@@ -38,74 +31,26 @@ export default async function HostProfilesPage({
     ([key, value]) => key !== "view" && key !== "cursor" && typeof value === "string" && value !== "",
   );
 
-  const page = await withRls(rlsContextOf(viewer), async (sql) => {
-    const result = await findAdminProfiles(sql, query, { groupId: viewer.groupId });
-    // 전체공개 풀에는 남이 등록한 프로필도 함께 있다. 담당이 아니면 이름·연락처를
-    // 가린다 — 판정은 멤버 경로와 같은 함수가 한다.
-    const editable = await canEditProfiles(
-      sql,
-      result.items.map((p) => p.id),
-    );
-    const introducedWith = await introducedWithManaged(sql);
-    // 원본은 볼 때만 읽는다. 카드 보기에는 쓰지 않는 값이고, 프로필 수만큼의
-    // 원문을 매번 끌어올 이유가 없다.
-    const sources =
-      mode === "raw"
-        ? await sourceTextsFor(
-            sql,
-            result.items.map((p) => p.id),
-          )
-        : null;
-    return {
-      total: result.total,
-      nextCursor: result.nextCursor,
-      items: result.items.map((profile) => ({
-        view: toDetailView(
-          profile,
-          disclosureFor({
-            profile,
-            viewerRole: "ADMIN",
-            viewerUserId: viewer.userId,
-            introducedWith,
-            canEdit: editable.has(profile.id),
-          }),
-        ),
-        canEdit: editable.has(profile.id),
-        // 운영 상태는 개인정보가 아니라 담당이 아니어도 보인다. 공개 단계가 낮아지면
-        // view 에서 빠지므로 레코드에서 직접 싣는다.
-        status: profile.status,
-        // 상태와 노출은 직교한다 — 「공개」인데 안 보이는 조합이 있으므로
-        // 두 값을 따로 읽게 두지 않고 결론을 낸다.
-        visible: isDiscoverable({ status: profile.status }),
-        source: sources?.get(profile.id) ?? null,
-        // 등록 시각은 개인정보가 아니라 담당이 아니어도 보인다.
-        createdAt: profile.createdAt.toISOString(),
-        // 목록은 끌어올린 순서로 선다. 날짜가 순서와 어긋나 보이지 않게 함께 싣는다.
-        bumpedAt: profile.bumpedAt?.toISOString() ?? null,
-      })),
-    };
-  });
+  // 첫 화면은 늘 처음부터 그린다. 다음 페이지는 스크롤이 끝에 닿을 때 목록이 이어 붙인다 —
+  // 옛 주소에 남은 커서는 쓰지 않는다.
+  const page = await withRls(rlsContextOf(viewer), (sql) =>
+    loadHostProfilePage(sql, viewer, { ...query, cursor: undefined }, mode),
+  );
 
-  /** 지금 조건을 유지한 채 보기만 바꾼 주소. 커서는 버린다 — 보기를 바꾸면 처음부터 본다. */
-  function viewHref(next: "card" | "raw"): string {
+  /** 지금 조건(커서·보기 제외). 보기 전환 주소와 다음 페이지 요청이 함께 쓴다. */
+  const listQuery = (() => {
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(raw)) {
       if (key === "cursor" || key === "view") continue;
       if (typeof value === "string") search.set(key, value);
     }
-    if (next === "raw") search.set("view", "raw");
-    const qs = search.toString();
-    return qs ? `/profiles?${qs}` : "/profiles";
-  }
+    return search.toString();
+  })();
 
-  /** 지금 조건을 유지한 채 커서만 바꾼 주소. 필터를 잃지 않고 넘긴다. */
-  function pageHref(cursor: string | null): string {
-    const search = new URLSearchParams();
-    for (const [key, value] of Object.entries(raw)) {
-      if (key === "cursor") continue;
-      if (typeof value === "string") search.set(key, value);
-    }
-    if (cursor) search.set("cursor", cursor);
+  /** 지금 조건을 유지한 채 보기만 바꾼 주소. 보기를 바꾸면 처음부터 본다. */
+  function viewHref(next: "card" | "raw"): string {
+    const search = new URLSearchParams(listQuery);
+    if (next === "raw") search.set("view", "raw");
     const qs = search.toString();
     return qs ? `/profiles?${qs}` : "/profiles";
   }
@@ -170,110 +115,14 @@ export default async function HostProfilesPage({
             </div>
           )}
         </Panel>
-      ) : mode === "raw" ? (
-        <ProfileRawList items={page.items.map(toRawItem)} />
       ) : (
-        <ul className="stagger mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-          {page.items.map(({ view, visible, createdAt, bumpedAt }) => (
-            <li key={view.id}>
-              <Link href={`/profiles/${view.id}`} className="lift-move group block">
-                <div className="lift-shadow relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
-                  {view.primaryImage ? (
-                    // signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면
-                    // URL 이 캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={view.primaryImage.url}
-                      alt=""
-                      loading="lazy"
-                      className={cn(
-                        "h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.02]",
-                        // 비활성은 멤버에게 안 보인다 — 훑을 때 배지보다 먼저 눈에 걸리게 흑백으로 둔다.
-                        !visible && "grayscale",
-                      )}
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-700)]">
-                      사진 없음
-                    </div>
-                  )}
-
-                  {/* 상태는 둘뿐이고 활성이 평소 모습이다 — 예외인 비활성만 사진 위에 띄운다. */}
-                  {!visible ? (
-                    <span className="absolute left-2.5 top-2.5 rounded-[var(--radius-pill)] bg-[var(--color-ink-900)]/70 px-2.5 py-1 text-[11.5px] text-white backdrop-blur">
-                      비활성 · 멤버에게 안 보임
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="mt-2.5">
-                  {/* 주선자는 번호가 아니라 이름으로 기억한다. 이름은 담당일 때만 온다. */}
-                  {view.realName ? (
-                    <p className="display truncate text-[15px] text-[var(--color-ink-900)]">
-                      {view.realName}
-                      <span className="ml-2 font-sans text-[12px] text-[var(--color-ink-500)]">
-                        {view.code} · {label.gender(view.gender)}
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="display text-[15px] text-[var(--color-ink-900)]">
-                      <ProfileCode code={view.code} />
-                      <span className="ml-2 font-sans text-[12px] text-[var(--color-ink-500)]">
-                        {label.gender(view.gender)}
-                      </span>
-                    </p>
-                  )}
-                  <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-700)]">
-                    {label.birthYear(view.birthYear)}
-                  </p>
-                  {/* 키는 출생연도 옆에 두면 먼저 읽힌다. 직업·지역 줄 끝에 작게 붙인다. */}
-                  <p className="text-[12.5px] text-[var(--color-ink-600)]">
-                    {workLine(view)}
-                    {view.height ? (
-                      <span className="text-[11.5px] text-[var(--color-ink-500)]">
-                        {workLine(view) ? " · " : ""}
-                        {view.height}cm
-                      </span>
-                    ) : null}
-                  </p>
-                  <p className="mt-1 text-[11.5px] text-[var(--color-ink-500)]">
-                    {bumpedAt ? (
-                      <>
-                        <time dateTime={bumpedAt}>{formatDay(bumpedAt)}</time> 끌어올림
-                      </>
-                    ) : (
-                      <>
-                        <time dateTime={createdAt}>{formatDay(createdAt)}</time> 등록
-                      </>
-                    )}
-                  </p>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        // 조건·보기가 바뀌면 처음부터 다시 쌓는다 — 이어 붙인 페이지는 이전 조건의 것이다.
+        <HostProfileList
+          key={`${mode}?${listQuery}`}
+          initial={page}
+          query={listQuery}
+        />
       )}
-
-      {page.nextCursor || query.cursor ? (
-        <div className="mt-7 flex items-center justify-center gap-3">
-          {query.cursor ? (
-            <Link
-              href={pageHref(null)}
-              className="rounded-[var(--radius-pill)] border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-2 text-[13px] text-[var(--surface-text-muted)] transition-colors hover:border-[var(--color-rose-300)]"
-            >
-              처음으로
-            </Link>
-          ) : null}
-          {page.nextCursor ? (
-            <Link
-              href={pageHref(page.nextCursor)}
-              className="rounded-[var(--radius-pill)] border border-[var(--color-rose-300)] bg-[var(--surface-card)] px-4 py-2 text-[13px] text-[var(--color-rose-600)] transition-colors hover:bg-[var(--color-rose-100)]"
-            >
-              다음 {query.limit}명
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
     </>
   );
 }
@@ -303,79 +152,4 @@ function ViewTab({
       {children}
     </Link>
   );
-}
-
-/** 카드 셋째 줄. 직함이 있으면 직업군보다 먼저 쓴다. */
-function workLine(view: ProfileDetailView): string {
-  return [
-    view.jobTitle ?? label.jobCategory(view.jobCategory),
-    label.residence(view.residenceRegion, view.residenceDistrict),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-/**
- * 목록 항목을 원본 보기의 한 줄로 옮긴다.
- * 사진은 공개 단계가 이미 걸러 준 것만 쓴다 — 담당이 아닌 프로필은 대표 한 장이다.
- */
-function toRawItem(item: {
-  view: ProfileDetailView;
-  canEdit: boolean;
-  visible: boolean;
-  source: { source: string; rawText: string | null; committedAt: Date | null } | null;
-}): RawListItem {
-  const images = item.view.images ?? (item.view.primaryImage ? [item.view.primaryImage] : []);
-  return {
-    id: item.view.id,
-    code: item.view.code,
-    name: item.view.realName ?? null,
-    gender: item.view.gender,
-    birthYear: item.view.birthYear,
-    visible: item.visible,
-    images: images.map((image) => ({ id: image.id, url: image.url })),
-    rawText: item.source?.rawText ?? null,
-    // 가져오기 원본은 올린 주선자만 읽는다(RLS). 같은 모임이어도 남이 올린 건
-    // 원문이 오지 않으므로, 「글이 없다」가 아니라 「볼 수 없다」로 안내한다.
-    sourceHidden: !item.canEdit,
-    summary: summaryText(item.view),
-    source: item.source?.source ?? null,
-    at: item.source?.committedAt?.toISOString() ?? null,
-  };
-}
-
-/**
- * 원문이 없을 때 대신 보여줄 줄글. 카카오톡 프로필처럼 「항목: 값」 줄로 쓴다.
- *
- * view 는 공개 단계를 이미 통과한 값이라 담당이 아니면 이름·연락처가 들어 있지 않다 —
- * 그래서 남이 올린 원문을 열지 않고도 같은 내용을 훑을 수 있다. 여기서 더 걸러내지 않는다.
- */
-function summaryText(view: ProfileDetailView): string | null {
-  const job = [view.jobTitle ?? label.jobCategory(view.jobCategory), view.company]
-    .filter(Boolean)
-    .join(" · ");
-  const lines: [string, string | null][] = [
-    ["나이", label.birthYear(view.birthYear)],
-    ["키", view.height ? `${view.height}cm` : null],
-    ["직업", job || null],
-    ["학력", view.education],
-    ["사는 곳", label.residence(view.residenceRegion, view.residenceDistrict)],
-    ["직장 지역", label.region(view.workplaceRegion)],
-    ["종교", label.religion(view.religion)],
-    ["MBTI", view.mbti],
-    ["흡연", label.smoking(view.smoking)],
-    ["음주", label.drinking(view.drinking)],
-    ["취미", view.hobbies.length > 0 ? view.hobbies.join(", ") : null],
-    ["이상형", view.idealTypeText],
-  ];
-  const blocks = [
-    lines
-      .filter(([, value]) => value)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join("\n"),
-    view.bio,
-    view.hostComment ? `주선자 한마디: ${view.hostComment}` : null,
-    view.hashtags.length > 0 ? view.hashtags.map((tag) => `#${tag}`).join(" ") : null,
-  ].filter((block): block is string => Boolean(block?.trim()));
-  return blocks.length > 0 ? blocks.join("\n\n") : null;
 }

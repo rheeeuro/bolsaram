@@ -77,7 +77,7 @@ apps/web/src/
 │   │   └── operator/         관리자 메뉴 (관리자 계정만) — 메뉴 목록 + groups/ 모임 설정(모임 만들기 승인·초대 코드 여러 번 쓰기·요청 처리) + hosts/ 주선자 목록·정지
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·photo-viewer·global-progress)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·load-more·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·photo-viewer·global-progress)
 │   ├── member/               멤버 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널·스켈레톤 블록
 ├── lib/
@@ -182,6 +182,7 @@ server/
 ├── views/
 │   ├── profile-view.ts       공개 단계 판정·적용 + signed URL 부착
 │   ├── host-profile.ts       주선자 상세·편집이 함께 쓰는 프로필 하나 읽기 (권한·공개 단계·초대·등록한 주선자)
+│   ├── host-profile-list.ts  주선자 프로필 목록 한 페이지 (카드·원본) — 첫 화면과 이어 불러오기가 함께 쓴다
 │   ├── group-message.ts      채팅 메시지 → 화면 모양 (작성자 사진 키 → 단기 signed URL)
 │   └── image-url.ts          사진 하나짜리 저장 키 → 단기 signed URL (주선자·모임 사진)
 └── http/
@@ -239,6 +240,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/match-requests`                     | GET / POST          | 멤버(프로필 필요) | 시그널 목록 / 소개 신청              |
 | `/api/match-requests/[id]/[action]`       | POST                | 당사자            | accept · reject · cancel             |
 | `/api/admin/profiles`                     | GET                 | 주선자            | 목록 조건에 맞는 사람 수 (조건 시트의 「N명 보기」) |
+| `/api/admin/profiles/list`                | GET                 | 주선자            | 프로필 목록 다음 페이지 (무한 스크롤, `cursor`·`view`) |
 | `/api/admin/match-requests/[id]/[action]` | POST                | 주선자            | 당사자 대신 accept · reject · cancel · close |
 | `/api/admin/me`                           | PATCH               | 주선자            | 내 표시 이름 바꾸기                  |
 | `/api/admin/me/avatar`                    | POST / DELETE       | 주선자            | 내 프로필 사진 올리기(슬롯·확정) / 지우기 |
