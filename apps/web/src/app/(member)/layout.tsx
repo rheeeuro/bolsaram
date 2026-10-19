@@ -58,7 +58,8 @@ export default async function MemberLayout({ children }: { children: React.React
       }
     >
       {children}
-      <PhotoGuard />
+      {/* 멤버 화면만 자리를 비우면 사진을 가린다. 주선자는 카카오톡과 나란히 두고 일한다. */}
+      <PhotoGuard hideWhenAway />
       {actingCode ? <ActingBanner code={actingCode} /> : null}
       <MemberNav claimed={profileId != null} pendingSignals={pending} />
     </div>
