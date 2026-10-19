@@ -5,11 +5,15 @@
  * 어긋나거나 손으로 고친 문장이 지워지거나 내부 용어가 새는 일을 여기서 막는다.
  */
 import { describe, expect, it } from "vitest";
-import { updateItemsSchema, UPDATE_ITEMS_MAX } from "@bolsaram/schemas";
+import { commitPredicateAnswerSchema, updateItemsSchema, UPDATE_ITEMS_MAX } from "@bolsaram/schemas";
 import {
+  INTERNAL_COMMIT_MARK,
+  INTERNAL_COMMIT_THRESHOLD,
   addWeekItems,
   headingStart,
   keepItem,
+  markInternalCommits,
+  nothingToAnnounce,
   weekHeading,
   weekItems,
   weekOf,
@@ -110,5 +114,41 @@ describe("거름", () => {
       updateItemsSchema.safeParse({ items: Array.from({ length: UPDATE_ITEMS_MAX + 1 }, () => "항목") })
         .success,
     ).toBe(false);
+  });
+});
+
+/**
+ * 커밋마다 「알아챌 변경인가」를 따로 판정해 내부 작업으로 보이는 커밋에 표시만 단다.
+ * 빼지 않는다 — 화면이 생긴 커밋도 메시지가 문서 위주면 낮게 나온다.
+ */
+describe("내부 작업 표시", () => {
+  const commits = ["- [10/13] feat: 채팅 태그", "- [10/14] test: DB 분리\n  본문", "- [10/15] feat: 시작 가이드"];
+
+  it("기준선 아래 커밋에만 날짜 뒤에 표시를 단다", () => {
+    const { lines, internal } = markInternalCommits(commits, [0.97, 0.01, INTERNAL_COMMIT_THRESHOLD]);
+    expect(internal).toBe(1);
+    expect(lines[0]).toBe(commits[0]);
+    expect(lines[1]).toBe(`- [10/14] ${INTERNAL_COMMIT_MARK} test: DB 분리\n  본문`);
+    // 기준선과 같으면 표시하지 않는다.
+    expect(lines[2]).toBe(commits[2]);
+  });
+
+  it("판정이 없으면 표시하지 않는다 — 판정 실패나 AI_DECISIONS=off", () => {
+    expect(markInternalCommits(commits, [])).toEqual({ lines: commits, internal: 0 });
+    expect(markInternalCommits(commits, [null, 0.01, null]).internal).toBe(1);
+  });
+
+  it("모두 내부 작업으로 보이고 가이드 변경도 없을 때만 쓰지 않는다", () => {
+    expect(nothingToAnnounce(3, 3, "")).toBe(true);
+    expect(nothingToAnnounce(3, 3, "새 화면 안내")).toBe(false);
+    expect(nothingToAnnounce(3, 2, "")).toBe(false);
+    expect(nothingToAnnounce(0, 0, "")).toBe(false);
+  });
+
+  it("판정 답은 하나씩 검증한다 — 형식이 다른 답은 그 커밋만 버린다", () => {
+    expect(commitPredicateAnswerSchema.safeParse({ type: "predicate", name: "c3", probability: 0.4 }).success).toBe(true);
+    expect(commitPredicateAnswerSchema.safeParse({ type: "refusal", name: "c3" }).success).toBe(false);
+    expect(commitPredicateAnswerSchema.safeParse({ type: "predicate", name: "c0", probability: 0.4 }).success).toBe(false);
+    expect(commitPredicateAnswerSchema.safeParse({ type: "predicate", name: "c1", probability: 1.2 }).success).toBe(false);
   });
 });

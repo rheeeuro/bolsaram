@@ -123,3 +123,32 @@ export function keepItem(text: string): boolean {
   if (BANNED_WORDS.some((word) => text.includes(word))) return false;
   return !CODE_LIKE.some((pattern) => pattern.test(text));
 }
+
+/**
+ * 커밋마다 「멤버·주선자가 알아챌 변경인가」를 따로 판정한 확률(Decisions API)로
+ * 내부 작업으로 보이는 커밋에 표시를 단다. **빼지 않는다** — 화면이 생긴 커밋도 메시지가
+ * 문서·테스트 위주면 낮게 나온다(「Add start guide」 0.06, 실측). 쓰기 모델이 표시를 보고
+ * 가이드 변경분과 견줘 고른다.
+ */
+export const INTERNAL_COMMIT_THRESHOLD = 0.5;
+export const INTERNAL_COMMIT_MARK = "(내부 작업으로 보임)";
+
+/** 판정이 없는 커밋(`null`)은 표시하지 않는다. 커밋 줄은 `- [날짜] 제목` 모양이다. */
+export function markInternalCommits(
+  commits: readonly string[],
+  probabilities: readonly (number | null)[],
+): { lines: string[]; internal: number } {
+  let internal = 0;
+  const lines = commits.map((line, i) => {
+    const p = probabilities[i];
+    if (p == null || p >= INTERNAL_COMMIT_THRESHOLD) return line;
+    internal += 1;
+    return line.replace(/^(- \[[^\]]*\] )/, `$1${INTERNAL_COMMIT_MARK} `);
+  });
+  return { lines, internal };
+}
+
+/** 모든 커밋이 내부 작업으로 보이고 가이드에 더해진 줄도 없으면 쓸 것이 없다(모델을 부르지 않는다). */
+export function nothingToAnnounce(commitCount: number, internal: number, guide: string): boolean {
+  return commitCount > 0 && internal === commitCount && guide.trim().length === 0;
+}

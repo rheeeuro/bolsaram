@@ -23,3 +23,15 @@ export const updateItemsJsonSchema = {
   required: ["items"],
   additionalProperties: false,
 } as const;
+
+/**
+ * 커밋 판정(Decisions API predicate) 응답. 주간 작업이 「내부 작업으로 보임」 표시를 다는 데만
+ * 쓴다. 답은 하나씩 `commitPredicateAnswerSchema` 로 본다 — 거절 등 맞지 않는 답은 그 커밋만
+ * 판정 없이 둔다.
+ */
+export const commitVisibilityResponseSchema = z.object({ answers: z.array(z.unknown()) });
+export const commitPredicateAnswerSchema = z.object({
+  type: z.literal("predicate"),
+  name: z.string().regex(/^c[1-9][0-9]*$/),
+  probability: z.number().min(0).max(1),
+});

@@ -6,9 +6,10 @@
  * 빌드 없이 반영된다. 고칠 것이 있으면 문서를 직접 고친다 — 이미 있는 주에는 새 항목만
  * 덧붙이므로 손으로 고친 문장은 지워지지 않는다.
  *
- * 거름은 두 겹이다. 프롬프트가 내부 작업을 빼라고 하고, 응답은 Zod 로 검증한 뒤
- * `keepItem` 이 코드 이름·내부 용어가 섞인 항목을 버린다. 실린 항목은
- * `OPS_TELEGRAM_CHAT_ID` 로 알린다.
+ * 거름은 세 겹이다. 먼저 커밋마다 「알아챌 변경인가」를 Decisions API 로 따로 판정해
+ * 내부 작업으로 보이는 커밋에 표시를 단다(빼지는 않는다 — `markInternalCommits`). 프롬프트가
+ * 내부 작업을 빼라고 하고, 응답은 Zod 로 검증한 뒤 `keepItem` 이 코드 이름·내부 용어가 섞인
+ * 항목을 버린다. 실린 항목은 `OPS_TELEGRAM_CHAT_ID` 로 알린다.
  *
  * 모델에는 커밋 메시지와 가이드 문서 변경분만 보낸다 — 둘 다 개발자가 쓴 글이고 멤버
  * 정보는 들어 있지 않다. DB 에는 붙지 않는다.
@@ -22,9 +23,25 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 import path from "node:path";
-import { updateItemsJsonSchema, updateItemsSchema, UPDATE_ITEMS_MAX } from "@bolsaram/schemas";
+import {
+  commitPredicateAnswerSchema,
+  commitVisibilityResponseSchema,
+  updateItemsJsonSchema,
+  updateItemsSchema,
+  UPDATE_ITEMS_MAX,
+} from "@bolsaram/schemas";
 import { loadDotEnv } from "../packages/db/src/cli/dotenv";
-import { addWeekItems, keepItem, weekHeading, weekItems, weekOf, type Week } from "./updates-doc";
+import {
+  INTERNAL_COMMIT_MARK,
+  addWeekItems,
+  keepItem,
+  markInternalCommits,
+  nothingToAnnounce,
+  weekHeading,
+  weekItems,
+  weekOf,
+  type Week,
+} from "./updates-doc";
 
 // 해외 API 는 TCP 연결이 250ms(Node 기본값)를 넘어 완료 직전에 취소된다.
 setDefaultAutoSelectFamilyAttemptTimeout(2_000);
@@ -66,7 +83,8 @@ const SYSTEM_PROMPT = `너는 소개팅 서비스 「볼사람」의 업데이�
 - 입력에 없는 내용을 지어내지 않는다. 과장·홍보 문구·이모지를 쓰지 않는다.
 - 사람 이름이나 개인 정보를 쓰지 않는다.
 - 항목은 0~${UPDATE_ITEMS_MAX}개. 작은 변경은 묶는다. 알릴 변경이 없으면 빈 목록을 낸다.
-- [이미 실린 항목]과 같은 내용은 다시 쓰지 않는다. 그 목록에 없는 새 변경만 낸다.`;
+- [이미 실린 항목]과 같은 내용은 다시 쓰지 않는다. 그 목록에 없는 새 변경만 낸다.
+- ${INTERNAL_COMMIT_MARK} 가 붙은 커밋은 [사용자 가이드에 더해진 줄]이 같은 변경을 설명할 때만 쓴다.`;
 
 type Options = { week: Week; dryRun: boolean; notify: boolean };
 
@@ -181,6 +199,54 @@ async function writeItems(input: string): Promise<string[]> {
   return validated.data.items;
 }
 
+/** Decisions API 한 번에 묻는 질문 상한(API 가 받는 1..200). */
+const DECISIONS_MAX_QUESTIONS = 200;
+
+/**
+ * 커밋마다 「멤버·주선자가 알아챌 변경인가」의 확률. 표시를 달 근거일 뿐이라 실패하면
+ * null 을 돌려주고 표시 없이 쓴다(AI_DECISIONS=off 도 같다).
+ */
+async function judgeCommits(commits: string[]): Promise<(number | null)[] | null> {
+  const key = process.env.OPENAI_API_KEY;
+  if (process.env.AI_DECISIONS === "off" || !key) return null;
+  const model = process.env.OPENAI_DECISIONS_MODEL || "gpt-6-luna";
+  const result: (number | null)[] = commits.map(() => null);
+  try {
+    for (let start = 0; start < commits.length; start += DECISIONS_MAX_QUESTIONS) {
+      const batch = commits.slice(start, start + DECISIONS_MAX_QUESTIONS);
+      const response = await fetch("https://api.openai.com/v1/decisions", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          input: batch.map((line, i) => `[커밋 ${i + 1}] ${line.replace(/^- /, "")}`).join("\n\n"),
+          questions: batch.map((_, i) => ({
+            type: "predicate",
+            name: `c${i + 1}`,
+            instructions:
+              `[커밋 ${i + 1}] 이 소개팅 서비스를 쓰는 멤버나 주선자가 화면·봇·알림에서 알아챌 수 있는 변경을 담고 있다. ` +
+              "테스트·하네스·배포·서버 내부·데이터베이스 구조·문서 정리·리팩터링만 바꾼 커밋이면 거짓이다.",
+          })),
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const validated = commitVisibilityResponseSchema.safeParse(await response.json());
+      if (!validated.success) throw new Error("응답 형식이 맞지 않습니다");
+      for (const raw of validated.data.answers) {
+        const answer = commitPredicateAnswerSchema.safeParse(raw);
+        if (!answer.success) continue;
+        const index = Number(answer.data.name.slice(1)) - 1;
+        if (index < batch.length) result[start + index] = answer.data.probability;
+      }
+    }
+    return result;
+  } catch (error) {
+    console.warn(`커밋 판정을 건너뜁니다 — 표시 없이 씁니다: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
+    return null;
+  }
+}
+
 async function notify(text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.OPS_TELEGRAM_CHAT_ID;
@@ -215,9 +281,16 @@ async function main(): Promise<void> {
   const doc = readFileSync(DOC, "utf8");
   const existing = weekItems(doc, heading);
   const guide = readGuideAdditions(options.week);
+  const judged = await judgeCommits(commits);
+  const marked = markInternalCommits(commits, judged ?? []);
+  if (judged) console.info(`${heading}: 커밋 ${commits.length}개 중 내부 작업으로 보이는 것 ${marked.internal}개`);
+  if (nothingToAnnounce(commits.length, marked.internal, guide)) {
+    console.info(`${heading}: 알릴 변경이 없습니다 — 그대로 둡니다.`);
+    return;
+  }
   const input = [
     `[기간] ${heading}`,
-    `[커밋 메시지]\n${commits.join("\n")}`,
+    `[커밋 메시지]\n${marked.lines.join("\n")}`,
     `[사용자 가이드에 더해진 줄]\n${guide || "(없음)"}`,
     `[이미 실린 항목]\n${existing.map((item) => `- ${item}`).join("\n") || "(없음)"}`,
   ].join("\n\n");
