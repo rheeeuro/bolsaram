@@ -107,6 +107,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0072_import_raw_text_taken.sql` | `app_import_raw_text_taken(raw, except)` — 남이 올린 가져오기까지 같은 원문이 있는지 **있다/없다만** 답한다(SECURITY DEFINER, 주선자만). 누구의 어느 프로필인지는 돌려주지 않는다 |
 | `0073_profile_residence_district.sql` | 서울·경기 거주지의 구·시·군 — `district` enum(서울 25 · 경기 31) + `profiles.residence_district`. 값 앞부분이 광역 코드이고 `profiles_residence_district_region` 이 거주 광역과 맞는지 막는다. 필터 권역은 저장하지 않고 앱의 표가 묶는다 |
 | `0074_profile_registrar.sql` | `app_profile_registrar(profile)` — 프로필을 등록한 주선자의 표시 이름·사진 키만 돌려준다(SECURITY DEFINER). 그 프로필을 주선자로서 볼 수 있을 때만 답하고, 신원 칼럼은 열지 않는다 |
+| `0075_job_category_engineering.sql` | `job_category` 에 `ENGINEERING`(연구·엔지니어) 추가 — 반도체·전자·자동차·화학·제약·제조 회사의 연구·생산·설비·품질 직군. 소프트웨어 개발은 IT |
 
 ## 테이블
 

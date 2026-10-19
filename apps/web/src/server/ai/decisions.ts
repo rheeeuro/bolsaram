@@ -43,7 +43,9 @@ const QUESTIONS: Record<JudgedField, { instructions: string; labels: Record<stri
     labels: GENDER_LABELS,
   },
   jobCategory: {
-    instructions: "프로필 주인공의 직업이 속한 직업군. 직업이 적혀 있지 않으면 고르지 않는다.",
+    instructions:
+      "프로필 주인공의 직업이 속한 직업군. 직무가 적혀 있으면 직무로, 회사만 적혀 있으면 그 회사의 업종으로 고른다" +
+      "(반도체·전자·자동차·화학·제약 등 제조 회사 = 연구·엔지니어, 은행·증권·보험 = 금융). 직장·직업이 전혀 없을 때만 고르지 않는다.",
     labels: JOB_CATEGORY_LABELS,
   },
   residenceRegion: {

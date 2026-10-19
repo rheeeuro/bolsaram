@@ -69,6 +69,7 @@ const GENDER_RANGES: [from: number, to: number, gender: Gender][] = [
  * **순서가 판정이다** — 먼저 걸리는 규칙이 이긴다(「헤어 디자이너」는 디자인이 아니라 서비스).
  */
 const JOB_RULES: [RegExp, JobCategory][] = [
+  [/반도체|공정|설비|품질|생산|제조|하드웨어|연구원/u, "ENGINEERING"],
   [/개발|엔지니어|데이터|보안|프로그래|서버|IT|PM|프로덕트/u, "IT"],
   [/의사|전문의|간호|약사|병원|한의|수의/u, "MEDICAL"],
   [/교사|교수|강사|교육|유치원|어린이집/u, "EDUCATION"],
@@ -77,7 +78,7 @@ const JOB_RULES: [RegExp, JobCategory][] = [
   [/디자이너|디자인|디렉터/u, "DESIGN"],
   [/크리에이터|작가|음악|영상|배우|공연|예술|아트/u, "ART"],
   [/마케|MD|홍보|광고|브랜드|콘텐츠 전략/u, "MARKETING"],
-  [/변호사|변리사|세무사|노무사|컨설턴트|연구원/u, "PROFESSIONAL"],
+  [/변호사|변리사|세무사|노무사|컨설턴트/u, "PROFESSIONAL"],
   [/대표|창업|기획|영업|경영|사업|운영/u, "BUSINESS"],
   [/공무원|주무관|공공|공단|공사/u, "PUBLIC"],
 ];

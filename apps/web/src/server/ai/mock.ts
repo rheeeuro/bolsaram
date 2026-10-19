@@ -53,7 +53,8 @@ const REGION_KEYWORDS: Record<Region, string[]> = {
 };
 
 const JOB_KEYWORDS: Record<JobCategory, string[]> = {
-  IT: ["개발자", "엔지니어", "프로그래머", "IT", "백엔드", "프론트엔드", "데이터"],
+  IT: ["개발자", "프로그래머", "IT", "백엔드", "프론트엔드", "데이터"],
+  ENGINEERING: ["엔지니어", "연구원", "반도체", "공정", "설비", "품질", "생산", "제조"],
   FINANCE: ["금융", "은행", "증권", "자산운용", "회계사", "애널리스트"],
   PROFESSIONAL: ["변호사", "회계사", "세무사", "변리사", "감정평가사"],
   PUBLIC: ["공무원", "공기업", "공사", "주무관"],

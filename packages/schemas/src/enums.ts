@@ -35,6 +35,7 @@ export const PROFILE_STATUS_LABELS: Record<ProfileStatus, string> = {
 
 export const JOB_CATEGORIES = [
   "IT",
+  "ENGINEERING",
   "FINANCE",
   "PROFESSIONAL",
   "PUBLIC",
@@ -50,6 +51,7 @@ export const JOB_CATEGORIES = [
 export type JobCategory = (typeof JOB_CATEGORIES)[number];
 export const JOB_CATEGORY_LABELS: Record<JobCategory, string> = {
   IT: "IT",
+  ENGINEERING: "연구·엔지니어",
   FINANCE: "금융",
   PROFESSIONAL: "전문직",
   PUBLIC: "공기업·공무원",
