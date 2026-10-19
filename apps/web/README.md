@@ -9,7 +9,10 @@ Next.js 16 App Router 단일 앱. 프론트엔드와 API 가 한 프로세스에
 >
 > **불변식 2: private 이미지의 영구 URL 을 만들지 않는다.**
 > 응답마다 단기 signed URL 을 새로 발급한다. 그래서 `next/image` 최적화를 쓰지 않는다
-> (캐시된 URL 이 만료되면 사진이 깨진다).
+> (캐시된 URL 이 만료되면 사진이 깨진다). 만료 시각은 TTL 구간 끝에 맞춰(`alignedExpiry`)
+> 같은 구간 안에서는 URL 이 같고, `/api/files` 는 그 만료까지(서울 자정을 넘기지 않게)
+> `private, max-age` + `Vary: Cookie` 로 내보낸다 — 보는 사람의 브라우저에만 남고
+> Cloudflare 같은 공유 캐시에는 남지 않는다. 로그아웃 응답이 `Clear-Site-Data: "cache"` 로 비운다.
 >
 > **불변식 3: 공개 범위를 화면에서 넓히지 않는다.**
 > 무엇을 보여줄지는 `@bolsaram/domain` 의 `projectProfile` 이 정한다.

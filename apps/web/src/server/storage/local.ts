@@ -12,10 +12,11 @@ import {
   putR2Object,
   r2ObjectSize,
   openR2Object,
+  readR2Object,
   deleteR2Object,
 } from "@bolsaram/db/r2";
 import { createReadStream } from "node:fs";
-import { mkdir, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { env } from "../env";
 import { b64url, hmac, randomToken, safeEqual } from "../crypto";
@@ -131,6 +132,17 @@ export async function openObject(key: string): Promise<NodeJS.ReadableStream> {
   return createReadStream(resolveSafe(key));
 }
 
+/** 객체 전체를 읽는다. 없으면 null. 크기를 따로 묻지 않아 R2 왕복이 한 번이다. */
+export async function readObject(key: string): Promise<Buffer | null> {
+  if (isR2Key(key)) return readR2Object(key);
+  try {
+    return await readFile(resolveSafe(key));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return null;
+  }
+}
+
 export async function deleteObject(key: string): Promise<void> {
   if (isR2Key(key)) return deleteR2Object(key);
   try {
@@ -152,13 +164,34 @@ function signaturePayload(purpose: SignedPurpose, key: string, expiresAt: number
 /**
  * 단기 다운로드 URL. 기본 TTL 은 STORAGE_SIGNED_URL_TTL(초).
  * 반환값은 상대 경로이며 로그에 남기지 않는다.
+ *
+ * 만료 시각을 TTL 구간 끝에 맞춘다 — 같은 구간 안에서는 같은 사진이 같은 URL 이 되어
+ * 브라우저가 받아 둔 사진을 다시 쓸 수 있다(`/api/files` 의 캐시 헤더 참고).
  */
 export function signDownloadUrl(key: string, ttlSeconds?: number): string {
   const ttl = ttlSeconds ?? env().STORAGE_SIGNED_URL_TTL;
-  const exp = Math.floor(Date.now() / 1000) + ttl;
+  const exp = alignedExpiry(Math.floor(Date.now() / 1000), ttl);
   const sig = hmac(env().STORAGE_SECRET, signaturePayload("download", key, exp));
   const params = new URLSearchParams({ key, exp: String(exp), sig });
   return `/api/files?${params.toString()}`;
+}
+
+/**
+ * 구간에 맞춘 만료 시각. 지금이 속한 TTL 구간의 다음 구간 끝이므로, 발급된 URL 은
+ * 최소 TTL, 최대 TTL 의 두 배 동안 유효하다.
+ */
+export function alignedExpiry(nowSeconds: number, ttlSeconds: number): number {
+  return (Math.floor(nowSeconds / ttlSeconds) + 2) * ttlSeconds;
+}
+
+/**
+ * 받은 사진을 브라우저가 다시 써도 되는 시간(초). URL 이 만료될 때까지이되, 서울 기준
+ * 자정을 넘기지 않는다 — 워터마크에 그날 날짜가 찍히기 때문이다.
+ */
+export function privateCacheSeconds(expiresAt: number, nowSeconds: number): number {
+  const seoulOffset = 9 * 3600;
+  const untilMidnight = 86400 - ((nowSeconds + seoulOffset) % 86400);
+  return Math.max(0, Math.min(expiresAt - nowSeconds, untilMidnight));
 }
 
 /**

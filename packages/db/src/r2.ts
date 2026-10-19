@@ -62,10 +62,7 @@ export async function r2ObjectSize(key: string): Promise<number | null> {
     const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
     return result.ContentLength ?? null;
   } catch (error) {
-    if (
-      (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404
-    )
-      return null;
+    if (isNotFound(error)) return null;
     throw error;
   }
 }
@@ -75,6 +72,23 @@ export async function openR2Object(key: string): Promise<Readable> {
   const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   if (!result.Body) throw new Error("R2 응답 본문이 없습니다.");
   return result.Body as Readable;
+}
+
+/** 객체 전체를 읽는다. 없으면 null — 크기 확인(HEAD) 없이 한 번의 왕복으로 끝낸다. */
+export async function readR2Object(key: string): Promise<Buffer | null> {
+  const { client, bucket } = connection(key);
+  try {
+    const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    if (!result.Body) throw new Error("R2 응답 본문이 없습니다.");
+    return Buffer.from(await result.Body.transformToByteArray());
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+}
+
+function isNotFound(error: unknown): boolean {
+  return (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404;
 }
 
 export async function deleteR2Object(key: string): Promise<void> {

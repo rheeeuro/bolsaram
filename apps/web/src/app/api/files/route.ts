@@ -2,7 +2,8 @@
  * private 스토리지 다운로드. signed URL 로만 접근할 수 있다.
  *
  * 서명 검증에 더해 로그인도 요구한다 — 서명 URL 이 유출되어도 외부인이 쓸 수 없게 한다.
- * 서명 URL 은 짧게 만료되며 캐시를 금지한다.
+ * 서명 URL 은 짧게 만료된다. 응답은 그 사이에만, 보는 사람의 브라우저에만 남는다
+ * (`private` + `Vary: Cookie`). 로그아웃하면 브라우저 캐시를 비운다.
  *
  * 프로필 사진에는 보는 사람 표시를 합성해 내보낸다(`server/storage/watermark.ts`) —
  * 주선자는 전부, 멤버는 자기 사진을 뺀 전부.
@@ -18,6 +19,8 @@ import {
   isHostOnlyKey,
   objectSize,
   openObject,
+  privateCacheSeconds,
+  readObject,
   verifySignature,
 } from "@/server/storage/local";
 import { viewerMark, watermarkImage } from "@/server/storage/watermark";
@@ -59,9 +62,6 @@ export const GET = route(async (request: Request) => {
     return fail("FORBIDDEN", "잘못된 링크입니다.", 403);
   }
 
-  const size = await objectSize(key);
-  if (size == null) return fail("NOT_FOUND", "파일을 찾을 수 없습니다.", 404);
-
   // 웹에서는 캡처를 막을 수 없으므로 프로필 사진에는 보는 사람 표시를 합성한다.
   // 주선자는 화면 어디서 보든(가져오기 원본·대행 포함) 주선자 코드가 찍히고, 멤버는
   // 자기 사진만 빠진다. 디코딩하지 못하는 형식(HEIC)은 원본 그대로 나간다.
@@ -73,53 +73,57 @@ export const GET = route(async (request: Request) => {
       : member && member.owner !== user.profileId
         ? viewerMark({ role: "MEMBER", userId: user.userId, publicCode: member.viewerCode })
         : null;
+  const headers = privateImageHeaders(privateCacheSeconds(Number(exp), nowSeconds()));
   if (mark) {
-    const original = await readAll(await openObject(key));
+    const original = await readObject(key);
+    if (!original) return fail("NOT_FOUND", "파일을 찾을 수 없습니다.", 404);
     const marked = await watermarkImage(original, mark);
     if (marked) {
       return new NextResponse(new Uint8Array(marked), {
-        headers: { ...PRIVATE_IMAGE_HEADERS, "content-type": "image/jpeg" },
+        headers: { ...headers, "content-type": "image/jpeg" },
       });
     }
     return new NextResponse(new Uint8Array(original), {
-      headers: { ...PRIVATE_IMAGE_HEADERS, "content-type": contentTypeFor(key) },
+      headers: { ...headers, "content-type": contentTypeFor(key) },
     });
   }
 
+  const size = await objectSize(key);
+  if (size == null) return fail("NOT_FOUND", "파일을 찾을 수 없습니다.", 404);
   const contentType = contentTypeFor(key);
   const stream = Readable.toWeb(
     (await openObject(key)) as Readable,
   ) as WebReadableStream<Uint8Array>;
   return new NextResponse(stream as unknown as ReadableStream, {
     headers: {
-      ...PRIVATE_IMAGE_HEADERS,
+      ...headers,
       "content-type": contentType,
       "content-length": String(size),
     },
   });
 });
 
-const PRIVATE_IMAGE_HEADERS = {
-  // 서명 URL 이 캐시에 남지 않게 한다.
-  "cache-control": "private, no-store",
-  "content-disposition": "inline",
-  "x-content-type-options": "nosniff",
-  // SVG 는 스크립트를 담을 수 있다. 업로드로는 받지 않지만(local.ts 의 허용 목록 참고)
-  // 시드가 만든 자리표시 이미지가 SVG 이므로 서빙 시 샌드박스로 무력화한다.
-  "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-};
+function privateImageHeaders(maxAge: number): Record<string, string> {
+  return {
+    // 보는 사람마다 워터마크가 다르므로 공유 캐시(Cloudflare)에는 남기지 않고, 같은
+    // 브라우저라도 다른 계정으로 들어오면(쿠키가 바뀌면) 다시 받는다.
+    "cache-control": maxAge > 0 ? `private, max-age=${maxAge}` : "private, no-store",
+    vary: "Cookie",
+    "content-disposition": "inline",
+    "x-content-type-options": "nosniff",
+    // SVG 는 스크립트를 담을 수 있다. 업로드로는 받지 않지만(local.ts 의 허용 목록 참고)
+    // 시드가 만든 자리표시 이미지가 SVG 이므로 서빙 시 샌드박스로 무력화한다.
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+  };
+}
+
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
 
 /** 프로필 사진이 들어 있는 영역(가져오기 원본 포함). 주선자·모임 사진은 아니다. */
 function isProfilePhotoKey(key: string): boolean {
   return key.startsWith("profile/") || key.startsWith("import/");
-}
-
-async function readAll(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  }
-  return Buffer.concat(chunks);
 }
 
 function contentTypeFor(key: string): string {
