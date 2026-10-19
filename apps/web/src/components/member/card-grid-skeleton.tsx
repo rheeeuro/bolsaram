@@ -34,3 +34,23 @@ export function CardRowsSkeleton({ count = 8 }: { count?: number }) {
     </div>
   );
 }
+
+/** 원본으로 볼 때의 스켈레톤. 사진 묶음 폭과 글 상자를 `ProfileRawRow` 와 맞춘다. */
+export function RawRowsSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: count }, (_, i) => (
+        <div
+          key={i}
+          className="rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-white p-3.5"
+        >
+          <Skeleton className="h-3.5 w-28" />
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <Skeleton className="aspect-square w-44 shrink-0 rounded-[var(--radius-card)] sm:w-48" />
+            <Skeleton className="h-40 flex-1 rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

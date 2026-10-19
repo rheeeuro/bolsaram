@@ -80,7 +80,7 @@ apps/web/src/
 │   │   └── operator/         관리자 메뉴 (관리자 계정만) — 메뉴 목록 + groups/ 모임 설정(모임 만들기 승인·초대 코드 여러 번 쓰기·요청 처리) + hosts/ 주선자 목록·정지
 │   └── api/                  Route Handler (아래 표)
 ├── components/
-│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·load-more·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·photo-viewer·global-progress)
+│   ├── ui/                   공용 primitive (button·field·chip·badge·empty·dialog·menu·skeleton·load-more·auth-shell·markdown·brand-logo·provider-mark·marks·avatar·image-cropper·photo-viewer·photo-album·global-progress)
 │   ├── member/               멤버 화면
 │   └── host/                 주선자 화면 — 공통 표면·목록·패널·스켈레톤 블록
 ├── lib/

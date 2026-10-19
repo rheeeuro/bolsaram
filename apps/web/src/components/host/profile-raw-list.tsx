@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ProfileCode } from "@/components/ui/marks";
+import { PhotoAlbum } from "@/components/ui/photo-album";
 import { formatWhen } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import { cn } from "@/lib/cn";
@@ -68,7 +69,12 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
           {/* 사진이 왼쪽, 원문이 오른쪽. 좁은 화면에서는 사진 아래로 글이 내려온다. */}
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             {item.images.length > 0 ? (
-              <PhotoAlbum profileId={item.id} images={item.images} muted={!item.visible} />
+              <PhotoAlbum
+                href={`/profiles/${item.id}`}
+                images={item.images}
+                muted={!item.visible}
+                className="w-40 sm:w-52"
+              />
             ) : (
               // 사진이 없어도 자리는 같게 둔다 — 줄마다 글 시작점이 달라지면 훑기 어렵다.
               <div className="flex aspect-3/4 w-40 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-ivory-200)] text-[12px] text-[var(--color-ink-700)] sm:w-52">
@@ -111,68 +117,4 @@ function fallbackNote(item: RawListItem): string {
       ? "사진만 받았고 글은 없습니다."
       : "가져온 원본이 없습니다.";
   return item.summary ? `${reason} 정리된 내용입니다.` : `${reason} 정리된 내용은 프로필에서 봅니다.`;
-}
-
-/**
- * 사진 묶음. 카카오톡에서 여러 장을 한 번에 보냈을 때처럼 **한 덩어리**로 붙인다 —
- * 장수에 따라 칸이 갈리고(1·2·3·4), 다섯 장부터는 마지막 칸에 남은 수를 얹는다.
- * 나머지 사진은 상세에 전부 있으므로 여기서는 묶음의 모양을 지키는 쪽을 택한다.
- *
- * 어느 칸을 눌러도 그 사람의 상세로 간다 — 원본을 보다가 할 일은 언제나 상세다.
- */
-function PhotoAlbum({
-  profileId,
-  images,
-  muted,
-}: {
-  profileId: string;
-  images: { id: string; url: string }[];
-  /** 비활성 프로필 — 사진을 흑백으로 둔다. */
-  muted: boolean;
-}) {
-  const shown = images.slice(0, 4);
-  const rest = images.length - shown.length;
-  const count = shown.length;
-
-  return (
-    <div
-      className={cn(
-        "grid shrink-0 gap-[3px] overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]",
-        "w-40 sm:w-52",
-        // 한 장은 사람 사진 비율 그대로, 여러 장은 정사각 덩어리가 된다.
-        count === 1 ? "aspect-3/4 grid-cols-1" : "aspect-square grid-cols-2",
-        count === 3 ? "grid-rows-2" : null,
-        count >= 4 ? "grid-rows-2" : null,
-      )}
-    >
-      {shown.map((image, index) => (
-        <Link
-          key={image.id}
-          href={`/profiles/${profileId}`}
-          className={cn(
-            "group relative block overflow-hidden bg-[var(--color-ivory-200)]",
-            // 세 장이면 첫 장이 왼쪽을 세로로 차지한다.
-            count === 3 && index === 0 ? "row-span-2" : null,
-          )}
-        >
-          {/* signed URL 은 응답마다 새로 발급된다 — next/image 최적화를 태우지 않는다. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={image.url}
-            alt=""
-            loading="lazy"
-            className={cn(
-              "h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.03]",
-              muted && "grayscale",
-            )}
-          />
-          {rest > 0 && index === shown.length - 1 ? (
-            <span className="absolute inset-0 flex items-center justify-center bg-[var(--color-ink-900)]/55 text-[15px] font-medium text-white">
-              +{rest}
-            </span>
-          ) : null}
-        </Link>
-      ))}
-    </div>
-  );
 }

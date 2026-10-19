@@ -13,6 +13,7 @@ import {
 import type { ProfileRecord } from "../repo/profiles";
 import type { AiMatch } from "../services/recommend-service";
 import { signDownloadUrl } from "../storage/local";
+import { label } from "../../lib/labels";
 
 export type ProfileImageView = { id: string; url: string; isPrimary: boolean };
 
@@ -84,6 +85,29 @@ export function toCardView(
     primaryImage: images[0] ? toImageView(images[0]) : null,
     isFavorited: options.isFavorited ?? false,
     aiRecommended: options.aiRecommended ?? false,
+  };
+}
+
+/**
+ * 멤버 탐색의 「원본으로 보기」 한 줄. 카드 값에 사진 전체와 정리된 줄글을 더한다.
+ *
+ * 상세 화면과 같은 `DETAIL` 단계로 고정한다 — 목록은 익명 탐색이라 연결된 상대여도
+ * 이름·연락처를 싣지 않는다. 가져올 때 받은 원문은 이름·연락처가 섞여 있어 쓰지 않는다.
+ */
+export type ProfileRawView = ProfileCardView & {
+  images: ProfileImageView[];
+  summary: string | null;
+};
+
+export function toRawView(
+  profile: ProfileRecord,
+  options: { isFavorited?: boolean; aiRecommended?: boolean } = {},
+): ProfileRawView {
+  const detail = toDetailView(profile, "DETAIL");
+  return {
+    ...toCardView(profile, options),
+    images: detail.images,
+    summary: profileSummaryText(detail),
   };
 }
 
@@ -169,4 +193,41 @@ export function disclosureFor(input: {
   if (input.profile.userId === input.viewerUserId) return "OWNER";
   if (input.introducedWith.has(input.profile.id)) return "INTRODUCED";
   return "DETAIL";
+}
+
+/**
+ * 원본 보기에 싣는 줄글. 카카오톡 프로필처럼 「항목: 값」 줄로 쓴다.
+ * 주선자 「받은 원본」은 원문이 없을 때, 멤버 「원본으로 보기」는 늘 이것을 쓴다.
+ *
+ * view 는 공개 단계를 이미 통과한 값이라 담당이 아니면 이름·연락처가 들어 있지 않다 —
+ * 그래서 남이 올린 원문을 열지 않고도 같은 내용을 훑을 수 있다. 여기서 더 걸러내지 않는다.
+ */
+export function profileSummaryText(view: ProfileDetailView): string | null {
+  const job = [view.jobTitle ?? label.jobCategory(view.jobCategory), view.company]
+    .filter(Boolean)
+    .join(" · ");
+  const lines: [string, string | null][] = [
+    ["나이", label.birthYear(view.birthYear)],
+    ["키", view.height ? `${view.height}cm` : null],
+    ["직업", job || null],
+    ["학력", view.education],
+    ["사는 곳", label.residence(view.residenceRegion, view.residenceDistrict)],
+    ["직장 지역", label.region(view.workplaceRegion)],
+    ["종교", label.religion(view.religion)],
+    ["MBTI", view.mbti],
+    ["흡연", label.smoking(view.smoking)],
+    ["음주", label.drinking(view.drinking)],
+    ["취미", view.hobbies.length > 0 ? view.hobbies.join(", ") : null],
+    ["이상형", view.idealTypeText],
+  ];
+  const blocks = [
+    lines
+      .filter(([, value]) => value)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("\n"),
+    view.bio,
+    view.hostComment ? `주선자 한마디: ${view.hostComment}` : null,
+    view.hashtags.length > 0 ? view.hashtags.map((tag) => `#${tag}`).join(" ") : null,
+  ].filter((block): block is string => Boolean(block?.trim()));
+  return blocks.length > 0 ? blocks.join("\n\n") : null;
 }
