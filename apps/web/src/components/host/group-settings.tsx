@@ -9,6 +9,7 @@ import {
   GROUP_NAME_MAX_LENGTH,
   type GroupChatNotifyMode,
 } from "@bolsaram/schemas";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { GroupInviteIssuer } from "@/components/host/group-menu";
@@ -37,7 +38,13 @@ import { cn } from "@/lib/cn";
  * 같은 판정을 다시 한다.
  */
 
-type Admin = { userId: string; displayName: string | null; isOwner: boolean };
+type Admin = {
+  userId: string;
+  displayName: string | null;
+  isOwner: boolean;
+  /** 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
+  avatarUrl: string | null;
+};
 export type Group = {
   groupId: string;
   name: string;
@@ -285,14 +292,21 @@ function AdminRow({ group, admin, isMe }: { group: Group; admin: Admin; isMe: bo
   return (
     <li className="rounded-[10px] border border-[var(--surface-border)] px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[12.5px] text-[var(--surface-text)]">
-          {name}
-          {admin.isOwner ? (
-            <span className="ml-1.5 text-[11.5px] text-[var(--surface-text-muted)]">모임장</span>
-          ) : null}
-          {isMe ? (
-            <span className="ml-1.5 text-[11.5px] text-[var(--surface-text-muted)]">나</span>
-          ) : null}
+        <span className="flex min-w-0 items-center gap-2.5 text-[12.5px] text-[var(--surface-text)]">
+          <Avatar
+            src={admin.avatarUrl}
+            name={admin.displayName}
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--color-ivory-200)] text-[12px] font-semibold text-[var(--color-ink-600)]"
+          />
+          <span className="min-w-0">
+            {name}
+            {admin.isOwner ? (
+              <span className="ml-1.5 text-[11.5px] text-[var(--surface-text-muted)]">모임장</span>
+            ) : null}
+            {isMe ? (
+              <span className="ml-1.5 text-[11.5px] text-[var(--surface-text-muted)]">나</span>
+            ) : null}
+          </span>
         </span>
 
         {canManage ? (

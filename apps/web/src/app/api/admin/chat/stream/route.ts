@@ -21,6 +21,7 @@ import { GROUP_MESSAGE_PAGE_SIZE } from "@bolsaram/schemas";
 import { requireAdmin, rlsContextOf, type Viewer } from "@/server/auth/guard";
 import { subscribeGroupChat } from "@/server/chat/broadcast";
 import { listMessagesSince, readMessage } from "@/server/repo/group-chat";
+import { toMessageView } from "@/server/views/group-message";
 import { route } from "@/server/http/respond";
 
 export const dynamic = "force-dynamic";
@@ -77,7 +78,7 @@ export const GET = route(async (request: Request) => {
               readMessage(sql, event.messageId),
             );
             if (!message) return;
-            sendEvent(event.kind === "deleted" ? "deleted" : "message", event.at, message);
+            sendEvent(event.kind === "deleted" ? "deleted" : "message", event.at, toMessageView(message));
           })
           .catch((error: unknown) => {
             // 한 건이 실패해도 연결은 유지한다. 다음 사건은 그대로 간다.
@@ -143,7 +144,7 @@ async function catchUp(
     sendEvent(
       message.deleted ? "deleted" : "message",
       message.createdAt.toISOString(),
-      message,
+      toMessageView(message),
     );
   }
 }

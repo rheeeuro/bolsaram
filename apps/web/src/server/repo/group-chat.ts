@@ -26,6 +26,8 @@ export type GroupMessageRecord = {
   authorUserId: string | null;
   /** 작성자 이름. 계정이 지워졌으면 null 이다. */
   authorName: string | null;
+  /** 작성자 프로필 사진의 저장 키. 화면으로 보내기 전에 단기 signed URL 로 바꾼다. */
+  authorAvatarKey: string | null;
   body: string;
   createdAt: Date;
   deleted: boolean;
@@ -53,6 +55,7 @@ type Row = {
   group_id: string;
   author_user_id: string | null;
   author_name: string | null;
+  author_avatar_key: string | null;
   body: string;
   created_at: Date;
   deleted_at: Date | null;
@@ -105,6 +108,7 @@ const HOST_LINKS = `LEFT JOIN LATERAL (
                       ) hosts ON true`;
 
 const SELECT_MESSAGE = `SELECT m.id, m.group_id, m.author_user_id, u.display_name AS author_name,
+                               u.avatar_key AS author_avatar_key,
                                m.body, m.created_at, m.deleted_at, m.system_kind, m.payload,
                                links.ids AS profile_ids, hosts.ids AS host_ids
                           FROM group_messages m
@@ -122,6 +126,7 @@ function toRecord(row: Row): GroupMessageRecord {
     groupId: row.group_id,
     authorUserId: row.author_user_id,
     authorName: row.author_name,
+    authorAvatarKey: row.author_avatar_key,
     // 지운 메시지의 본문은 DB 에도 없다. 화면에서 자리만 남긴다.
     body: row.deleted_at ? "" : row.body,
     createdAt: row.created_at,

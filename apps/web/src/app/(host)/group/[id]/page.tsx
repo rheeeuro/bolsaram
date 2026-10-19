@@ -40,7 +40,14 @@ export default async function HostGroupSettingsPage({
         description="이 모임에만 적용됩니다. 다른 모임을 고치려면 그 모임으로 옮겨 간 뒤 여기로 옵니다."
       />
       <GroupSettings
-        group={{ ...group, imageUrl: imageUrlFor(group.imageKey) }}
+        group={{
+          ...group,
+          imageUrl: imageUrlFor(group.imageKey),
+          admins: group.admins.map(({ avatarKey, ...admin }) => ({
+            ...admin,
+            avatarUrl: imageUrlFor(avatarKey),
+          })),
+        }}
         viewerUserId={viewer.userId}
       />
     </>

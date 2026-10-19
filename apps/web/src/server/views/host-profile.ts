@@ -16,8 +16,10 @@ import {
   canEditProfiles,
   findProfileById,
   findProfileMemo,
+  findProfileRegistrar,
   type ProfileMemo,
 } from "../repo/profiles";
+import { imageUrlFor } from "./image-url";
 import { disclosureFor, toDetailView, type ProfileDetailView } from "./profile-view";
 
 export type HostProfileData = {
@@ -34,6 +36,11 @@ export type HostProfileData = {
   lastVisitAt: string | null;
   /** 등록 시각. 운영 정보라 담당이 아니어도 보인다. */
   createdAt: string;
+  /**
+   * 등록한 주선자 — 이름과 사진만. 담당이 그 사람뿐이라 무엇을 물을지 아는 사람이다.
+   * 계정이 지워졌으면 null 이다.
+   */
+  registrar: { userId: string; name: string | null; avatarUrl: string | null } | null;
   /**
    * 끌어올리기. 마지막 시각은 목록 순서를 설명하는 운영 정보라 담당이 아니어도 보인다.
    * 할 수 있는지(`blockedReason`·`nextAt`)는 담당일 때만 뜻이 있다.
@@ -91,6 +98,7 @@ export async function loadHostProfile(
         : null;
     const source = canEdit ? (await sourceTextsFor(sql, [profile.id])).get(profile.id) : null;
     const memo = canEdit ? await findProfileMemo(sql, profile.id) : null;
+    const registrar = await findProfileRegistrar(sql, profile.id);
 
     return {
       canEdit,
@@ -99,6 +107,13 @@ export async function loadHostProfile(
       claimed: profile.userId != null,
       lastVisitAt: visit?.rows[0]?.last_login_at?.toISOString() ?? null,
       createdAt: profile.createdAt.toISOString(),
+      registrar: registrar
+        ? {
+            userId: registrar.userId,
+            name: registrar.displayName,
+            avatarUrl: imageUrlFor(registrar.avatarKey),
+          }
+        : null,
       bump: {
         lastAt: profile.bumpedAt?.toISOString() ?? null,
         nextAt: nextBumpAt(profile.bumpedAt)?.toISOString() ?? null,

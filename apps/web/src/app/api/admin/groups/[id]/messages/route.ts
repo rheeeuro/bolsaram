@@ -13,6 +13,7 @@ import { groupMessageCreateSchema, groupMessageQuerySchema } from "@bolsaram/sch
 import { requireGroupAdmin, rlsContextOf } from "@/server/auth/guard";
 import { withRls } from "@bolsaram/db";
 import { createMessage, listMessages } from "@/server/repo/group-chat";
+import { toMessageView } from "@/server/views/group-message";
 import { scheduleDispatch } from "@/server/notify/dispatch";
 import { ok, readJson, readQuery, route } from "@/server/http/respond";
 
@@ -25,7 +26,7 @@ export const GET = route(async (request: Request, { params }: Params) => {
   const query = readQuery(request, groupMessageQuerySchema);
   const viewer = await requireGroupAdmin(id);
   const messages = await withRls(rlsContextOf(viewer), (sql) => listMessages(sql, id, query));
-  return ok({ messages });
+  return ok({ messages: messages.map(toMessageView) });
 });
 
 export const POST = route(async (request: Request, { params }: Params) => {
@@ -37,5 +38,5 @@ export const POST = route(async (request: Request, { params }: Params) => {
   );
   // 알림을 켜 둔 동료가 있으면 DB 트리거가 아웃박스에 남겨 두었다. 응답을 막지 않는다.
   scheduleDispatch();
-  return ok({ message }, { status: 201 });
+  return ok({ message: toMessageView(message) }, { status: 201 });
 });

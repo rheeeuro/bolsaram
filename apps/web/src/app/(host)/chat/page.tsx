@@ -11,6 +11,7 @@ import { withRls } from "@bolsaram/db";
 import { GROUP_MESSAGE_PAGE_SIZE } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { listMessages, readPrefs } from "@/server/repo/group-chat";
+import { toMessageView } from "@/server/views/group-message";
 import { PageHeader } from "@/components/host/surface";
 import { Empty } from "@/components/ui/empty";
 import { GroupChat } from "@/components/host/group-chat";
@@ -58,7 +59,10 @@ export default async function HostChatPage() {
       <GroupChat
         groupId={groupId}
         viewerId={viewer.userId}
-        initialMessages={messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))}
+        initialMessages={messages.map((m) => ({
+          ...toMessageView(m),
+          createdAt: m.createdAt.toISOString(),
+        }))}
         notify={prefs.notify}
         telegramLinked={prefs.telegramLinked}
       />

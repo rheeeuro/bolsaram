@@ -443,7 +443,13 @@ export type GroupSummary = {
   importCount: number;
   /** 내가 이 모임에 등록한 활성 프로필 수. 나가면 모두 비활성이 된다(0056). */
   myActiveCount: number;
-  admins: { userId: string; displayName: string | null; isOwner: boolean }[];
+  /** `avatarKey` 는 저장 키다. 화면으로 보내기 전에 단기 signed URL 로 바꾼다. */
+  admins: {
+    userId: string;
+    displayName: string | null;
+    isOwner: boolean;
+    avatarKey: string | null;
+  }[];
   /** 이 방의 채팅 텔레그램 알림(0068). 사람마다 따로 고르고, 기본은 멘션만이다. */
   chatNotify: GroupChatNotifyMode;
   /** 텔레그램을 연결했는가. 연결해야 채팅 알림을 고를 수 있다. 모임과 상관없이 같다. */
@@ -497,8 +503,9 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
       user_id: string;
       display_name: string | null;
       is_owner: boolean;
+      avatar_key: string | null;
     }>(
-      `SELECT ga.group_id, ga.user_id, u.display_name, ga.is_owner
+      `SELECT ga.group_id, ga.user_id, u.display_name, ga.is_owner, u.avatar_key
          FROM group_admins ga JOIN users u ON u.id = ga.user_id
         WHERE ga.group_id = ANY($1) ORDER BY ga.added_at`,
       [groups.rows.map((g) => g.group_id)],
@@ -522,6 +529,7 @@ export async function readMyGroups(userId: string): Promise<GroupSummary[]> {
           userId: a.user_id,
           displayName: a.display_name,
           isOwner: a.is_owner,
+          avatarKey: a.avatar_key,
         })),
     }));
   });

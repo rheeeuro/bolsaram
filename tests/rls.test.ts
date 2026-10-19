@@ -483,6 +483,45 @@ describe("모임 소속(group_admins)", () => {
   });
 });
 
+describe("등록한 주선자(app_profile_registrar)", () => {
+  const registrar = (ctx: RlsContext, profileId: string) =>
+    withRls(ctx, (sql) =>
+      // 이름은 앞 테스트가 바꾸므로 누구인지는 id 로 본다.
+      sql.query<{ user_id: string }>(
+        `SELECT user_id FROM app_profile_registrar($1)`,
+        [profileId],
+      ),
+    );
+
+  it("같은 모임 주선자는 등록한 사람을 받는다", async () => {
+    const result = await registrar(fx.admin, fx.p1);
+    expect(result.rows).toEqual([{ user_id: fx.adminId }]);
+  });
+
+  it("다른 모임 주선자는 그 모임 프로필의 등록자를 받지 못한다", async () => {
+    expect((await registrar(fx.strangerAdmin, fx.p1)).rowCount).toBe(0);
+  });
+
+  it("멤버는 등록자를 받지 못한다 — 자기 프로필이어도", async () => {
+    expect((await registrar(fx.member1, fx.p1)).rowCount).toBe(0);
+    expect((await registrar(fx.member2, fx.p1)).rowCount).toBe(0);
+  });
+
+  it("전체공개 프로필은 모르는 주선자도 등록자를 받는다", async () => {
+    const pPublic = await withOwner(async (sql) => {
+      const result = await sql.query<{ id: string }>(
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region, status,
+                               real_name, created_by)
+         VALUES (NULL,'MALE',1993,'SEOUL','ACTIVE',$1,$2) RETURNING id`,
+        [`${TAG}-이름`, fx.adminId],
+      );
+      return result.rows[0]!.id;
+    });
+    const result = await registrar(fx.strangerAdmin, pPublic);
+    expect(result.rows).toEqual([{ user_id: fx.adminId }]);
+  });
+});
+
 describe("favorites 정책", () => {
   it("남의 이름으로 관심을 저장할 수 없다", async () => {
     await expect(

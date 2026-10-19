@@ -16,6 +16,7 @@ import {
   MentionText,
   useMentionPicker,
 } from "@/components/host/chat-mention";
+import { Avatar } from "@/components/ui/avatar";
 import { FormError } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { groupSystemMessageParts } from "@/lib/labels";
@@ -464,50 +465,63 @@ function MessageRow({
   onDelete: () => void;
 }) {
   return (
-    <div className={cn("animate-enter group px-1", grouped ? "pt-0.5" : "pt-3")}>
-      {grouped ? null : (
-        <div className="flex items-baseline gap-2">
-          <span className="text-[12.5px] font-medium text-[var(--surface-text)]">
-            {mine ? "나" : (message.authorName ?? "나간 주선자")}
-          </span>
-          <time
-            dateTime={message.createdAt}
-            className="text-[11.5px] text-[var(--surface-text-muted)]"
-          >
-            {formatTime(message.createdAt)}
-          </time>
-        </div>
-      )}
-
-      <div className="flex items-start gap-2">
-        {message.deleted ? (
-          <p className="text-[13.5px] italic text-[var(--surface-text-muted)]">
-            지운 메시지입니다.
-          </p>
-        ) : (
-          <p
-            className={cn(
-              "whitespace-pre-wrap break-words text-[13.5px] leading-relaxed",
-              mine ? "text-[var(--color-burgundy-700)]" : "text-[var(--surface-text)]",
-            )}
-          >
-            <MentionText
-              body={message.body}
-              profileIds={message.profileIds}
-              hostIds={message.hostIds}
-              viewerId={viewerId}
-            />
-          </p>
+    <div className={cn("animate-enter group flex gap-2.5 px-1", grouped ? "pt-0.5" : "pt-3")}>
+      {/* 이어 쓴 줄은 사진 자리를 비워 둔다 — 글의 왼쪽 끝이 한 줄로 맞는다. */}
+      <div className="w-8 shrink-0">
+        {grouped ? null : (
+          <Avatar
+            src={message.authorAvatarUrl}
+            name={message.authorName}
+            className="mt-0.5 grid size-8 place-items-center rounded-full bg-[var(--color-ivory-200)] text-[12px] font-semibold text-[var(--color-ink-600)]"
+          />
         )}
-        {mine && !message.deleted ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="shrink-0 text-[11.5px] text-[var(--surface-text-muted)] opacity-0 transition-opacity hover:text-[var(--color-danger)] focus-visible:opacity-100 group-hover:opacity-100"
-          >
-            지우기
-          </button>
-        ) : null}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        {grouped ? null : (
+          <div className="flex items-baseline gap-2">
+            <span className="text-[12.5px] font-medium text-[var(--surface-text)]">
+              {mine ? "나" : (message.authorName ?? "나간 주선자")}
+            </span>
+            <time
+              dateTime={message.createdAt}
+              className="text-[11.5px] text-[var(--surface-text-muted)]"
+            >
+              {formatTime(message.createdAt)}
+            </time>
+          </div>
+        )}
+
+        <div className="flex items-start gap-2">
+          {message.deleted ? (
+            <p className="text-[13.5px] italic text-[var(--surface-text-muted)]">
+              지운 메시지입니다.
+            </p>
+          ) : (
+            <p
+              className={cn(
+                "whitespace-pre-wrap break-words text-[13.5px] leading-relaxed",
+                mine ? "text-[var(--color-burgundy-700)]" : "text-[var(--surface-text)]",
+              )}
+            >
+              <MentionText
+                body={message.body}
+                profileIds={message.profileIds}
+                hostIds={message.hostIds}
+                viewerId={viewerId}
+              />
+            </p>
+          )}
+          {mine && !message.deleted ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="shrink-0 text-[11.5px] text-[var(--surface-text-muted)] opacity-0 transition-opacity hover:text-[var(--color-danger)] focus-visible:opacity-100 group-hover:opacity-100"
+            >
+              지우기
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

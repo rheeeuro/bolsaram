@@ -32,6 +32,8 @@ export default async function HostProfileDetailPage({
         claimed={data.claimed}
         lastVisitAt={data.lastVisitAt}
         createdAt={data.createdAt}
+        registrar={data.registrar}
+        viewerUserId={viewer.userId}
         bump={data.bump}
         invite={data.invite}
         source={data.source}

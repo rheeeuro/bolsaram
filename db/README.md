@@ -106,6 +106,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0071_import_raw_text_key.sql` | 가져오기 원문 비교 키 — `import_sessions.raw_text_key`(생성 칼럼, `import_raw_text_key()`). 공백·제로폭 문자·카카오톡 말머리를 뺀 원문의 md5, 20자 미만은 NULL. 앱이 같은 키의 가져오기가 이미 있으면 업로드·원문 수정을 거부한다 |
 | `0072_import_raw_text_taken.sql` | `app_import_raw_text_taken(raw, except)` — 남이 올린 가져오기까지 같은 원문이 있는지 **있다/없다만** 답한다(SECURITY DEFINER, 주선자만). 누구의 어느 프로필인지는 돌려주지 않는다 |
 | `0073_profile_residence_district.sql` | 서울·경기 거주지의 구·시·군 — `district` enum(서울 25 · 경기 31) + `profiles.residence_district`. 값 앞부분이 광역 코드이고 `profiles_residence_district_region` 이 거주 광역과 맞는지 막는다. 필터 권역은 저장하지 않고 앱의 표가 묶는다 |
+| `0074_profile_registrar.sql` | `app_profile_registrar(profile)` — 프로필을 등록한 주선자의 표시 이름·사진 키만 돌려준다(SECURITY DEFINER). 그 프로필을 주선자로서 볼 수 있을 때만 답하고, 신원 칼럼은 열지 않는다 |
 
 ## 테이블
 

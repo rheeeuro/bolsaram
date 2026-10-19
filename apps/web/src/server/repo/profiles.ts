@@ -548,6 +548,35 @@ export async function deleteProfile(sql: Sql, profileId: string): Promise<Delete
   return { storageKeys: keys.rows.map((r) => r.storage_key), memberDeleted };
 }
 
+// ── 등록한 주선자 ─────────────────────────────────────────────
+
+export type ProfileRegistrar = {
+  userId: string;
+  displayName: string | null;
+  /** 프로필 사진의 저장 키. 화면으로 보내기 전에 단기 signed URL 로 바꾼다. */
+  avatarKey: string | null;
+};
+
+/**
+ * 프로필을 등록한 주선자. 전체공개 프로필은 모르는 주선자가 등록했을 수 있어 `users`
+ * 를 직접 읽지 못하므로 이름·사진만 주는 함수를 지난다(0074). 볼 수 없는 프로필이거나
+ * 등록한 계정이 지워졌으면 `null` 이다.
+ */
+export async function findProfileRegistrar(
+  sql: Sql,
+  profileId: string,
+): Promise<ProfileRegistrar | null> {
+  const result = await sql.query<{
+    user_id: string;
+    display_name: string | null;
+    avatar_key: string | null;
+  }>(`SELECT user_id, display_name, avatar_key FROM app_profile_registrar($1)`, [profileId]);
+  const row = result.rows[0];
+  return row
+    ? { userId: row.user_id, displayName: row.display_name, avatarKey: row.avatar_key }
+    : null;
+}
+
 // ── 주선자 메모 ───────────────────────────────────────────────
 
 export type ProfileMemo = { body: string; updatedAt: string };

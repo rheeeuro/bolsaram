@@ -32,6 +32,8 @@ export type ChatMessage = {
   authorUserId: string | null;
   /** 작성자 이름. 계정이 지워졌으면 null 이다. */
   authorName: string | null;
+  /** 작성자 프로필 사진의 단기 signed URL. 없으면 이름의 앞글자를 그린다. */
+  authorAvatarUrl: string | null;
   body: string;
   /** 서버에서 ISO 문자열로 내려온다 — 재연결 커서로 그대로 쓴다. */
   createdAt: string;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PROFILE_STATUSES, PROFILE_STATUS_LABELS, type ProfileStatus } from "@bolsaram/schemas";
 import { isDiscoverable } from "@bolsaram/domain";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -59,6 +60,8 @@ export function HostProfileDetail({
   claimed,
   lastVisitAt,
   createdAt,
+  registrar,
+  viewerUserId,
   bump,
   invite,
   source,
@@ -72,6 +75,10 @@ export function HostProfileDetail({
   lastVisitAt: string | null;
   /** 등록 시각(ISO). */
   createdAt: string;
+  /** 등록한 주선자. 계정이 지워졌으면 null 이다. */
+  registrar: { userId: string; name: string | null; avatarUrl: string | null } | null;
+  /** 보고 있는 사람. 내가 등록했으면 이름 대신 「나」로 적는다. */
+  viewerUserId: string;
   /** 마지막 끌어올림·다음 가능 시각(ISO)과 지금 못 하는 이유. */
   bump: { lastAt: string | null; nextAt: string | null; blockedReason: string | null };
   invite: { expiresAt: string; claimed: boolean } | null;
@@ -134,6 +141,8 @@ export function HostProfileDetail({
   }
 
   const visible = isDiscoverable({ status: status as ProfileStatus });
+  const registrarName = registrar?.name ?? "이름 없는 주선자";
+  const registeredByMe = registrar?.userId === viewerUserId;
 
   const summary = [
     label.gender(profile.gender),
@@ -163,7 +172,8 @@ export function HostProfileDetail({
     <div className="flex flex-col gap-5">
       {!canEdit ? (
         <p className="rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-3 text-[13px] leading-relaxed text-[var(--surface-text-muted)]">
-          다른 주선자가 등록한 분입니다. 내용 고치기·초대·대신 둘러보기는 등록한 주선자만 합니다.
+          {registrar ? `${registrarName} 님이` : "다른 주선자가"} 등록한 분입니다. 내용
+          고치기·초대·대신 둘러보기는 등록한 주선자만 합니다.
         </p>
       ) : null}
 
@@ -223,7 +233,19 @@ export function HostProfileDetail({
               </span>
             ) : null}
           </div>
-          <p className="mt-2 text-[12px] text-[var(--color-ink-500)]">
+          <p className="mt-2 flex flex-wrap items-center gap-x-1 text-[12px] text-[var(--color-ink-500)]">
+            {registrar ? (
+              <span className="mr-0.5 inline-flex items-center gap-1.5">
+                <Avatar
+                  src={registrar.avatarUrl}
+                  name={registrar.name}
+                  className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-ivory-200)] text-[10px] font-semibold text-[var(--color-ink-600)]"
+                />
+                <span className="text-[var(--color-ink-700)]">
+                  {registeredByMe ? "내가" : `${registrarName} 님이`}
+                </span>
+              </span>
+            ) : null}
             <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> 등록
             {bump.lastAt ? (
               <>
