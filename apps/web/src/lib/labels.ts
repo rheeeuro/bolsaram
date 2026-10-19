@@ -84,6 +84,27 @@ export type GroupSystemMessagePart =
   /** 멤버 공개 번호. `code` 가 null 이면 payload 에 없던 것이라 링크를 달 수 없다. */
   | { kind: "code"; text: string; code: number | null };
 
+/**
+ * 사건의 갈래. 화면이 갈래마다 색을 달리해 대화 사이에서 한눈에 가른다 —
+ * 주선자 일은 `@주선자` 멘션과, 멤버 일은 `#멤버` 멘션과 같은 색 계열이다.
+ */
+export type GroupSystemMessageTone = "host" | "member" | "request" | "match";
+
+/** 사건 앞에 붙는 짧은 꼬리표와 갈래. */
+export const GROUP_SYSTEM_MESSAGE_TAGS: Record<
+  GroupMessageSystemKind,
+  { tag: string; tone: GroupSystemMessageTone }
+> = {
+  ADMIN_JOINED: { tag: "입장", tone: "host" },
+  ADMIN_LEFT: { tag: "퇴장", tone: "host" },
+  ADMIN_REMOVED: { tag: "내보냄", tone: "host" },
+  OWNER_TRANSFERRED: { tag: "모임장", tone: "host" },
+  PROFILE_REGISTERED: { tag: "등록", tone: "member" },
+  PROFILE_BUMPED: { tag: "끌어올림", tone: "member" },
+  MATCH_REQUESTED: { tag: "신청", tone: "request" },
+  MATCH_INTRODUCED: { tag: "연결", tone: "match" },
+};
+
 export function groupSystemMessageParts(
   kind: GroupMessageSystemKind,
   payload: GroupMessagePayload,

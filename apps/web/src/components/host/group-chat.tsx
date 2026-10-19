@@ -19,7 +19,11 @@ import {
 import { Avatar } from "@/components/ui/avatar";
 import { FormError } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
-import { groupSystemMessageParts } from "@/lib/labels";
+import {
+  GROUP_SYSTEM_MESSAGE_TAGS,
+  groupSystemMessageParts,
+  type GroupSystemMessageTone,
+} from "@/lib/labels";
 
 /**
  * 모임 채팅방 (마이그레이션 0040).
@@ -401,6 +405,9 @@ export function GroupChat({
  * 모임에서 일어난 일. 말풍선도 이름도 없이 가운데 한 줄로 흐른다 — 읽히되 대화를
  * 끊지 않는 자리다. 지울 수 없으므로 지우기 버튼도 없다.
  *
+ * 갈래(주선자·멤버·신청·연결)마다 옅은 색 테두리와 꼬리표를 달아 종류가 한눈에
+ * 갈린다. 바탕은 아주 옅게만 물들여 사람의 글보다 앞에 나서지 않게 한다.
+ *
  * 멤버 번호는 그 프로필로 가는 링크가 된다. 볼 수 없는 번호(지워졌거나 담당 채널을
  * 벗어난 것)는 id 가 오지 않으므로 글자로만 남는다 — 죽은 링크를 만들지 않는다.
  */
@@ -409,34 +416,61 @@ function SystemRow({
 }: {
   message: ChatMessage & { systemKind: NonNullable<ChatMessage["systemKind"]> };
 }) {
+  const { tag, tone } = GROUP_SYSTEM_MESSAGE_TAGS[message.systemKind];
   return (
-    <div className="animate-fade flex items-center gap-2.5 px-1 py-2">
-      <span aria-hidden className="h-px flex-1 bg-[var(--surface-border)]" />
-      <span className="text-center text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
-        {groupSystemMessageParts(message.systemKind, message.payload).map((part, index) => {
-          const profileId = part.kind === "code" && part.code != null
-            ? message.profileIds[String(part.code)]
-            : undefined;
-          if (!profileId) return <span key={index}>{part.text}</span>;
-          return (
-            <Link
-              key={index}
-              href={`/profiles/${profileId}`}
-              className="underline decoration-dotted underline-offset-2 transition-colors hover:text-[var(--color-rose-600)]"
-            >
-              <span className="sr-only">멤버 번호 </span>
-              {part.text}
-            </Link>
-          );
-        })}
-        <time dateTime={message.createdAt} className="ml-1.5 text-[11px] opacity-80">
+    <div
+      className="animate-fade flex items-center gap-2.5 px-1 py-2"
+      style={{ "--tone": SYSTEM_TONE_COLORS[tone] } as React.CSSProperties}
+    >
+      <span aria-hidden className="h-px min-w-3 flex-1 bg-[var(--surface-border)]" />
+      <span
+        className={cn(
+          "inline-flex max-w-[92%] flex-wrap items-baseline justify-center gap-x-1.5 gap-y-0.5",
+          "rounded-full border px-2.5 py-1 text-center text-[12px] leading-relaxed",
+          "border-[color-mix(in_srgb,var(--tone)_22%,transparent)]",
+          "bg-[color-mix(in_srgb,var(--tone)_5%,white)] text-[var(--color-ink-600)]",
+        )}
+      >
+        <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--tone)_14%,white)] px-1.5 text-[11px] font-semibold text-[var(--tone)]">
+          {tag}
+        </span>
+        <span>
+          {groupSystemMessageParts(message.systemKind, message.payload).map((part, index) => {
+            const profileId = part.kind === "code" && part.code != null
+              ? message.profileIds[String(part.code)]
+              : undefined;
+            if (!profileId) return <span key={index}>{part.text}</span>;
+            return (
+              <Link
+                key={index}
+                href={`/profiles/${profileId}`}
+                className="font-medium text-[var(--surface-text)] underline decoration-dotted underline-offset-2 transition-colors hover:text-[var(--color-rose-600)]"
+              >
+                <span className="sr-only">멤버 번호 </span>
+                {part.text}
+              </Link>
+            );
+          })}
+        </span>
+        <time
+          dateTime={message.createdAt}
+          className="shrink-0 text-[11px] text-[var(--surface-text-muted)]"
+        >
           {formatTime(message.createdAt)}
         </time>
       </span>
-      <span aria-hidden className="h-px flex-1 bg-[var(--surface-border)]" />
+      <span aria-hidden className="h-px min-w-3 flex-1 bg-[var(--surface-border)]" />
     </div>
   );
 }
+
+/** 사건 갈래의 색. 주선자·멤버는 멘션 색(`MENTION_COLORS`)과 같은 계열이다. */
+const SYSTEM_TONE_COLORS: Record<GroupSystemMessageTone, string> = {
+  host: "var(--color-info)",
+  member: "var(--color-rose-600)",
+  request: "var(--color-warning)",
+  match: "var(--color-success)",
+};
 
 /** 입력창과 그 뒤의 층이 함께 쓰는 글자 모양. 한쪽만 바꾸면 커서가 글자와 어긋난다. */
 const INPUT_TEXT = "whitespace-pre-wrap break-words text-[14px] leading-relaxed";
