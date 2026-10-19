@@ -37,12 +37,14 @@
     user-select: none;
   }
 
-  /* 멤버가 탭·창을 벗어난 동안 사진을 검게 덮는다(PhotoGuard hideWhenAway).
+  /* 탭·창을 벗어난 동안 사진을 검게 덮는다(PhotoGuard 가 data-photo-away 를 단다).
      돌아올 때만 천천히 걷어 내고, 가릴 때는 바로 가린다. */
-  .member-surface img {
+  .member-surface img,
+  .host-surface img {
     transition: filter 160ms ease-out;
   }
-  html[data-photo-away] .member-surface img {
+  html[data-photo-away] .member-surface img,
+  html[data-photo-away] .host-surface img {
     filter: brightness(0);
     transition: none;
   }

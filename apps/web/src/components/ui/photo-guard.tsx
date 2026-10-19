@@ -8,11 +8,11 @@ import { useEffect } from "react";
  * 캡처를 막는 장치가 아니다 — 원본 파일을 손쉽게 가져가는 길만 닫는다. 캡처에는
  * 서버가 합성한 보는 사람 표시가 남는다. 사진이 아닌 곳의 메뉴(글자 복사 등)는 그대로 둔다.
  *
- * `hideWhenAway` 면 탭을 떠나거나 창이 포커스를 잃는 동안 `<html data-photo-away>` 를
- * 달아 사진을 검게 덮는다(`globals.css`). 캡처 도구가 창을 가져가는 경우와 화면 녹화
+ * 탭을 떠나거나 창이 포커스를 잃는 동안에는 `<html data-photo-away>` 를 달아 사진을
+ * 검게 덮는다(`globals.css`). 캡처 도구가 창을 가져가는 경우와 화면 녹화
  * 중 다른 창으로 옮기는 경우만 걸린다 — 단축키 캡처는 웹에서 알 수 없다.
  */
-export function PhotoGuard({ hideWhenAway = false }: { hideWhenAway?: boolean }) {
+export function PhotoGuard() {
   useEffect(() => {
     const block = (event: Event) => {
       if (event.target instanceof HTMLImageElement) event.preventDefault();
@@ -26,7 +26,6 @@ export function PhotoGuard({ hideWhenAway = false }: { hideWhenAway?: boolean })
   }, []);
 
   useEffect(() => {
-    if (!hideWhenAway) return;
     const root = document.documentElement;
     const setAway = (away: boolean) => {
       if (away) root.dataset.photoAway = "";
@@ -47,7 +46,7 @@ export function PhotoGuard({ hideWhenAway = false }: { hideWhenAway?: boolean })
       window.removeEventListener("focus", onFocus);
       setAway(false);
     };
-  }, [hideWhenAway]);
+  }, []);
 
   return null;
 }
