@@ -2,8 +2,14 @@
  * Import commit 통합 테스트 (부트스트랩 §12 「commit idempotency」).
  * 실제 DB 에 붙어 같은 세션이 프로필을 두 개 만들지 않는지 확인한다.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
+import { JUDGED_FIELDS, normalizeRawText } from "@bolsaram/domain";
+import {
+  MockExtractionProvider,
+  setFieldJudge,
+  type FieldJudgeOutput,
+} from "../apps/web/src/server/ai/index";
 import { commitSession, analyzeSession } from "../apps/web/src/server/services/import-service";
 import {
   countInbox,
@@ -112,6 +118,70 @@ describe("analyze", () => {
     );
     // 이력은 쌓이되 최신 하나만 유효하다.
     expect(rows.rows[0]!.count).toBe(2);
+  });
+});
+
+/**
+ * 열거형 항목 재판정(Decisions API)이 분석에 끼는 자리. 외부 호출 없이 재판정기를 갈아끼운다.
+ * 추출 값은 그대로이고 신뢰도·검토 안내·상태만 달라진다.
+ */
+describe("analyze — 재판정 보정", () => {
+  afterEach(() => setFieldJudge(undefined));
+
+  const agreeing = async (): Promise<FieldJudgeOutput> => {
+    const { fields } = await new MockExtractionProvider().extract({
+      text: normalizeRawText(SAMPLE_TEXT),
+    });
+    const judgements: FieldJudgeOutput["judgements"] = {};
+    for (const field of JUDGED_FIELDS) {
+      const value = fields[field] ?? null;
+      judgements[field] = { choice: value, probabilities: [{ value, probability: 0.93 }] };
+    }
+    return { model: "judge-test", judgements };
+  };
+
+  it("재판정이 맞으면 그 확률이 신뢰도가 되고 안내는 늘지 않는다", async () => {
+    const output = await agreeing();
+    setFieldJudge({ judge: async () => output });
+    const id = await newSession(SAMPLE_TEXT);
+    await analyzeSession(admin, id);
+
+    const extraction = await withRls(admin, (sql) => latestExtraction(sql, id));
+    expect(extraction?.confidence.gender).toBe(0.93);
+    expect(extraction?.notes.some((n) => n.includes("다시 보니"))).toBe(false);
+  });
+
+  it("엇갈리면 값은 두고 안내를 앞에 싣고 검토 단계로 보낸다", async () => {
+    const output = await agreeing();
+    output.judgements.religion = {
+      choice: "CHRISTIAN",
+      probabilities: [
+        { value: "CHRISTIAN", probability: 0.82 },
+        { value: "NONE", probability: 0.1 },
+      ],
+    };
+    setFieldJudge({ judge: async () => output });
+    const id = await newSession(SAMPLE_TEXT);
+    const result = await analyzeSession(admin, id);
+
+    expect(result.status).toBe("REVIEW_REQUIRED");
+    const extraction = await withRls(admin, (sql) => latestExtraction(sql, id));
+    expect(extraction?.fields.religion).toBe("NONE");
+    expect(extraction?.confidence.religion).toBe(0.1);
+    expect(extraction?.notes[0]).toBe("종교 「무교」 — 다시 보니 「기독교」일 수 있습니다.");
+  });
+
+  it("재판정이 실패해도 분석은 끝난다 — 추출 신뢰도로 검토한다", async () => {
+    setFieldJudge({
+      judge: async () => {
+        throw new Error("decisions down");
+      },
+    });
+    const id = await newSession(SAMPLE_TEXT);
+    const result = await analyzeSession(admin, id);
+    expect(["READY", "REVIEW_REQUIRED"]).toContain(result.status);
+    const extraction = await withRls(admin, (sql) => latestExtraction(sql, id));
+    expect(extraction?.fields.gender).toBe("FEMALE");
   });
 });
 

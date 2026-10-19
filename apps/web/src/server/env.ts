@@ -35,6 +35,12 @@ const envSchema = z.object({
   AI_PROVIDER: z.enum(["mock", "openai"]).default("mock"),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
+  /**
+   * 열거형 항목을 Decisions API 로 다시 물어 검토 신뢰도를 보정한다(AI_PROVIDER=openai 일 때만).
+   * 실패해도 분석은 계속된다 — 그때는 추출 모델이 매긴 신뢰도를 쓴다.
+   */
+  AI_DECISIONS: z.enum(["on", "off"]).default("on"),
+  OPENAI_DECISIONS_MODEL: z.string().default("gpt-6-luna"),
 
   /**
    * 텔레그램 Import 채널. 기본은 꺼져 있고, 꺼져 있으면 webhook 이 404 를 준다.

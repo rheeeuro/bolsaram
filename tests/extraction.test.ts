@@ -14,7 +14,12 @@ import {
   parseHashtagInput,
   toStrictJsonSchema,
 } from "@bolsaram/schemas";
-import { reviewFields } from "@bolsaram/domain";
+import {
+  JUDGED_FIELDS,
+  calibrateConfidence,
+  reviewFields,
+  statusAfterExtraction,
+} from "@bolsaram/domain";
 import { MockExtractionProvider } from "../apps/web/src/server/ai/mock";
 
 const provider = new MockExtractionProvider();
@@ -227,5 +232,106 @@ describe("검토 순서", () => {
     const keys = reviewFields(shuffled, {}).map((field) => field.key);
     expect(keys).toEqual([...EXTRACTED_FIELD_REVIEW_ORDER]);
     expect(keys.slice(0, 4)).toEqual(["gender", "birthYear", "height", "residenceRegion"]);
+  });
+});
+
+/**
+ * 열거형 항목 재판정(Decisions API)으로 검토 신뢰도를 보정한다.
+ * 값은 바꾸지 않고, 신뢰도와 「엇갈림」만 돌려준다 — 고치는 것은 주선자다.
+ */
+describe("재판정 보정", () => {
+  const base = () => ({
+    ...emptyExtractedFields(),
+    gender: "FEMALE" as const,
+    birthYear: 1993,
+    residenceRegion: "SEOUL" as const,
+    religion: "NONE" as const,
+  });
+  const judged = (choice: string | null, probability: number) => ({
+    choice,
+    probabilities: [
+      { value: choice, probability },
+      { value: choice === null ? "OTHER" : null, probability: 1 - probability },
+    ],
+  });
+
+  it("값이 있는 항목의 신뢰도를 그 값의 확률로 바꾼다", () => {
+    const { confidence, disputes } = calibrateConfidence(
+      base(),
+      { gender: 0.4, religion: 0.99, birthYear: 0.9 },
+      { gender: judged("FEMALE", 0.97), religion: judged("NONE", 0.5) },
+    );
+    expect(confidence.gender).toBe(0.97);
+    expect(confidence.religion).toBe(0.5);
+    // 재판정하지 않는 항목은 그대로 둔다.
+    expect(confidence.birthYear).toBe(0.9);
+    expect(disputes).toEqual([]);
+  });
+
+  it("다른 값을 기준선 이상으로 고르면 엇갈림으로 돌려준다 — 값은 바꾸지 않는다", () => {
+    const fields = base();
+    const { confidence, disputes } = calibrateConfidence(
+      fields,
+      { religion: 0.95 },
+      {
+        religion: {
+          choice: "CHRISTIAN",
+          probabilities: [
+            { value: "CHRISTIAN", probability: 0.8 },
+            { value: "NONE", probability: 0.15 },
+          ],
+        },
+      },
+    );
+    expect(fields.religion).toBe("NONE");
+    expect(confidence.religion).toBe(0.15);
+    expect(disputes).toEqual([
+      { field: "religion", extracted: "NONE", suggested: "CHRISTIAN", probability: 0.8 },
+    ]);
+  });
+
+  it("빈 항목에 값이 적혀 있다고 보면 엇갈림이고, 빈 칸 신뢰도는 그대로 둔다", () => {
+    const { confidence, disputes } = calibrateConfidence(
+      base(),
+      { smoking: 0.05 },
+      { smoking: judged("NONE", 0.9) },
+    );
+    expect(confidence.smoking).toBe(0.05);
+    expect(disputes.map((d) => [d.field, d.extracted, d.suggested])).toEqual([
+      ["smoking", null, "NONE"],
+    ]);
+  });
+
+  it("값을 채웠는데 원문에 없다고 보면 엇갈림이다", () => {
+    const { disputes } = calibrateConfidence(base(), {}, { gender: judged(null, 0.8) });
+    expect(disputes.map((d) => [d.field, d.extracted, d.suggested])).toEqual([
+      ["gender", "FEMALE", null],
+    ]);
+  });
+
+  it("기준선 아래로 다른 값을 고르면 엇갈림이 아니다", () => {
+    const { disputes } = calibrateConfidence(base(), {}, { religion: judged("CHRISTIAN", 0.5) });
+    expect(disputes).toEqual([]);
+  });
+
+  it("엇갈린 항목이 있으면 다른 항목이 모두 확실해도 검토 단계로 보낸다", () => {
+    const fields = base();
+    const sure = Object.fromEntries(EXTRACTED_FIELD_KEYS.map((k) => [k, 1]));
+    expect(statusAfterExtraction(fields, sure)).toBe("READY");
+    expect(statusAfterExtraction(fields, sure, ["smoking"])).toBe("REVIEW_REQUIRED");
+  });
+
+  it("보기가 정해진 항목만 재판정한다", () => {
+    expect([...JUDGED_FIELDS].sort()).toEqual(
+      [
+        "drinking",
+        "gender",
+        "jobCategory",
+        "religion",
+        "residenceRegion",
+        "smoking",
+        "workplaceRegion",
+      ].sort(),
+    );
   });
 });

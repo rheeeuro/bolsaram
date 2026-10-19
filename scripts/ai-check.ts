@@ -51,4 +51,17 @@ console.info(
     ? `✓ OPENAI_MODEL=${model} 사용 가능`
     : `✗ OPENAI_MODEL=${model} 을 이 키로 쓸 수 없습니다.`,
 );
+
+// 재판정은 실패해도 분석을 막지 않지만, 쓸 수 없으면 「확인 필요」가 보정되지 않는다.
+const decisions = process.env.AI_DECISIONS ?? "on";
+const decisionsModel = process.env.OPENAI_DECISIONS_MODEL || "gpt-6-luna";
+if (decisions === "off") {
+  console.info("AI_DECISIONS=off — 재판정 없이 추출 신뢰도로 검토합니다.");
+} else {
+  console.info(
+    ids.has(decisionsModel)
+      ? `✓ OPENAI_DECISIONS_MODEL=${decisionsModel} 사용 가능`
+      : `✗ OPENAI_DECISIONS_MODEL=${decisionsModel} 을 이 키로 쓸 수 없습니다 (재판정 없이 검토합니다).`,
+  );
+}
 if (!ids.has(model)) process.exit(1);

@@ -154,7 +154,8 @@ server/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트(이상형 조건 포함) · PROMPT_VERSION
 │   ├── mock.ts               규칙 기반 추출기 (기본, API 키 불필요)
 │   ├── openai.ts             OpenAI multimodal + Structured Outputs
-│   └── index.ts              AI_PROVIDER 로 선택
+│   ├── decisions.ts          열거형 항목 재판정 (OpenAI Decisions API) — 검토 신뢰도 보정용
+│   └── index.ts              AI_PROVIDER 로 선택 · 재판정기는 openai + AI_DECISIONS=on 일 때만
 ├── repo/                     SQL 접근 (모두 withRls 트랜잭션 안에서 호출된다)
 │   ├── users.ts              내 계정 — 표시 이름·프로필 사진
 │   ├── profiles.ts           Discover·상세·주선자 목록·수정
@@ -177,7 +178,7 @@ server/
 ├── notify/                   알림 아웃박스 → 텔레그램 발송
 │   ├── outbox.ts             미발송 알림 선점·기록 (owner)
 │   └── dispatch.ts           발송 루프 + 기동 시 주기 스윕
-├── services/import-service.ts  분석 실행 + idempotent commit
+├── services/import-service.ts  분석 실행(추출 ∥ 재판정 → 보정) + idempotent commit
 ├── services/recommend-service.ts  AI 추천 — 보는 멤버에게 추천인 사람 집합·한 사람 판정 (저장된 조건끼리 견주기, AI 호출 없음)
 ├── views/
 │   ├── profile-view.ts       공개 단계 판정·적용 + signed URL 부착

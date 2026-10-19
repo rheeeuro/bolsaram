@@ -68,14 +68,82 @@ export function reviewFields(
   });
 }
 
-/** AI 결과를 곧바로 게시하지 않기 위한 판정: 하나라도 확인 필요면 REVIEW_REQUIRED. */
+/**
+ * AI 결과를 곧바로 게시하지 않기 위한 판정: 하나라도 확인 필요면 REVIEW_REQUIRED.
+ * `disputed` 는 다시 판정한 값이 추출 값과 엇갈린 항목이다 — 빈 칸이어도 사람이 본다.
+ */
 export function statusAfterExtraction(
   fields: ExtractedFields,
   confidence: ExtractionConfidence,
+  disputed: readonly (keyof ExtractedFields)[] = [],
 ): Extract<ImportStatus, "READY" | "REVIEW_REQUIRED"> {
-  return reviewFields(fields, confidence).some((f) => f.needsAttention)
+  return disputed.length > 0 || reviewFields(fields, confidence).some((f) => f.needsAttention)
     ? "REVIEW_REQUIRED"
     : "READY";
+}
+
+/**
+ * 보기가 정해진 항목. 추출과 따로 Decisions API 로 다시 물어 보정된 확률을 받는다.
+ * 구·시·군(보기 50여 개)과 MBTI(글자 그대로 적힌다)는 넣지 않는다.
+ */
+export const JUDGED_FIELDS = [
+  "gender",
+  "jobCategory",
+  "residenceRegion",
+  "workplaceRegion",
+  "religion",
+  "smoking",
+  "drinking",
+] as const satisfies readonly (keyof ExtractedFields)[];
+export type JudgedField = (typeof JUDGED_FIELDS)[number];
+
+/** 한 항목을 다시 판정한 결과. `null` 은 「원문에 적혀 있지 않다」를 고른 것이다. */
+export type FieldJudgement = {
+  choice: string | null;
+  probabilities: { value: string | null; probability: number }[];
+};
+
+export type FieldDispute = {
+  field: JudgedField;
+  extracted: string | null;
+  suggested: string | null;
+  probability: number;
+};
+
+/**
+ * 추출 모델이 스스로 매긴 신뢰도를 다시 판정한 확률로 바꾼다.
+ *
+ * 값이 있는 항목은 그 값의 확률이 곧 신뢰도다 — 자기 신고 점수보다 기준선(65%)에
+ * 맞춰 쓰기 좋다. 빈 항목의 신뢰도는 그대로 둔다(빈 칸 판정은 필수 여부가 정한다).
+ * 다시 판정한 값이 기준선 이상으로 추출 값과 다르면 엇갈림으로 돌려준다.
+ * **값은 바꾸지 않는다** — 고치는 것은 주선자다.
+ */
+export function calibrateConfidence(
+  fields: ExtractedFields,
+  confidence: ExtractionConfidence,
+  judgements: Partial<Record<JudgedField, FieldJudgement>>,
+): { confidence: ExtractionConfidence; disputes: FieldDispute[] } {
+  const next: ExtractionConfidence = { ...confidence };
+  const disputes: FieldDispute[] = [];
+  const probabilityOf = (j: FieldJudgement, value: string | null) =>
+    j.probabilities.find((p) => p.value === value)?.probability ?? 0;
+
+  for (const field of JUDGED_FIELDS) {
+    const judgement = judgements[field];
+    if (!judgement) continue;
+    const extracted = fields[field] ?? null;
+    if (extracted != null) next[field] = probabilityOf(judgement, extracted);
+    const suggestedProbability = probabilityOf(judgement, judgement.choice);
+    if (judgement.choice !== extracted && suggestedProbability >= LOW_CONFIDENCE_THRESHOLD) {
+      disputes.push({
+        field,
+        extracted,
+        suggested: judgement.choice,
+        probability: suggestedProbability,
+      });
+    }
+  }
+  return { confidence: next, disputes };
 }
 
 /** commit 가능 여부. 비어 있으면 안 되는 필드를 알려준다. */

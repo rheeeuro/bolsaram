@@ -8,8 +8,10 @@ import { withRls, type RlsContext, type Sql } from "@bolsaram/db";
 import {
   DomainError,
   assertCommittable,
+  calibrateConfidence,
   normalizeRawText,
   statusAfterExtraction,
+  type FieldDispute,
 } from "@bolsaram/domain";
 import {
   isIdealCriteriaEmpty,
@@ -21,7 +23,13 @@ import {
   type IdealCriteria,
   type ImportStatus,
 } from "@bolsaram/schemas";
-import { extractionProvider } from "../ai/index";
+import { FIELD_LABELS, label } from "../../lib/labels";
+import {
+  extractionProvider,
+  fieldJudge,
+  type ExtractionInput,
+  type FieldJudgeOutput,
+} from "../ai/index";
 import { writeAudit } from "../audit";
 import * as imports from "../repo/imports";
 
@@ -53,32 +61,48 @@ export async function analyzeSession(
   });
 
   try {
-    const result = await extractionProvider().extract({
-      text: normalizeRawText(prepared.rawText),
-    });
+    const input = { text: normalizeRawText(prepared.rawText) };
+    const [result, judged] = await Promise.all([
+      extractionProvider().extract(input),
+      judgeFields(input),
+    ]);
 
     // 「분당 거주」처럼 구·시·군만 적힌 글이면 광역을 거기서 채운다. 어긋나면 광역을 믿는다.
     const fields = reconcileResidenceFields(result.fields);
+    const { confidence, disputes } = judged
+      ? calibrateConfidence(fields, result.confidence, judged.judgements)
+      : { confidence: result.confidence, disputes: [] };
+    const notes = [...disputes.map(disputeNote), ...result.notes].slice(0, NOTES_MAX);
 
     return await withRls(ctx, async (sql) => {
       await imports.saveExtraction(sql, {
         sessionId,
         fields,
-        confidence: result.confidence,
-        notes: result.notes,
+        confidence,
+        notes,
         model: result.model,
         promptVersion: result.promptVersion,
         raw: result.raw,
       });
       // AI 결과는 자동 게시하지 않는다. 항상 사람 검토 단계로 넘어간다.
-      const next = statusAfterExtraction(fields, result.confidence);
+      const next = statusAfterExtraction(
+        fields,
+        confidence,
+        disputes.map((d) => d.field),
+      );
       await imports.setStatus(sql, sessionId, next);
       await writeAudit(sql, {
         actorUserId: ctx.userId,
         action: "import.analyze",
         entityType: "import_session",
         entityId: sessionId,
-        metadata: { model: result.model, promptVersion: result.promptVersion, status: next },
+        metadata: {
+          model: result.model,
+          promptVersion: result.promptVersion,
+          status: next,
+          judgeModel: judged?.model ?? null,
+          disputed: disputes.map((d) => d.field),
+        },
       });
       return { status: next };
     });
@@ -97,6 +121,50 @@ function messageOf(error: unknown): string {
   if (error instanceof DomainError) return error.message;
   return "분석 중 알 수 없는 오류가 발생했습니다.";
 }
+
+/** 검토 화면 「확인이 필요합니다」 상자에 싣는 줄 수 상한 (추출 스키마의 notes 상한과 같다). */
+const NOTES_MAX = 10;
+
+/**
+ * 열거형 항목 재판정. 보정용이라 실패해도 분석은 계속한다 — 그때는 추출 모델이 매긴
+ * 신뢰도로 검토하고, 실패는 status 만 로그에 남긴다(응답에 원문이 섞일 수 있다).
+ */
+async function judgeFields(input: ExtractionInput): Promise<FieldJudgeOutput | null> {
+  const judge = fieldJudge();
+  if (!judge) return null;
+  try {
+    return await judge.judge(input);
+  } catch (error) {
+    console.warn("AI 재판정 실패 — 추출 신뢰도로 검토합니다", {
+      message: error instanceof DomainError ? error.message : "알 수 없는 오류",
+      details: error instanceof DomainError ? error.details : undefined,
+    });
+    return null;
+  }
+}
+
+function disputeNote(dispute: FieldDispute): string {
+  const name = FIELD_LABELS[dispute.field] ?? dispute.field;
+  const shown = (value: string | null) =>
+    value == null ? null : (label[FIELD_LABEL_KIND[dispute.field]](value) ?? value);
+  const extracted = shown(dispute.extracted);
+  const suggested = shown(dispute.suggested);
+  const head = extracted == null ? `${name} (비어 있음)` : `${name} 「${extracted}」`;
+  const tail =
+    suggested == null ? "원문에 없는 값일 수 있습니다." : `「${suggested}」일 수 있습니다.`;
+  return `${head} — 다시 보니 ${tail}`;
+}
+
+/** 재판정 항목 → 값 라벨 조회 함수. 두 지역 항목은 같은 라벨을 쓴다. */
+const FIELD_LABEL_KIND = {
+  gender: "gender",
+  jobCategory: "jobCategory",
+  residenceRegion: "region",
+  workplaceRegion: "region",
+  religion: "religion",
+  smoking: "smoking",
+  drinking: "drinking",
+} as const satisfies Record<FieldDispute["field"], keyof typeof label>;
 
 /**
  * 검토로 채운 값을 반영한다.

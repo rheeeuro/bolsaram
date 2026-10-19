@@ -3,6 +3,7 @@
  * 구현체를 갈아끼울 수 있어야 하고, 테스트에서는 mock 을 쓴다.
  */
 import "server-only";
+import type { FieldJudgement, JudgedField } from "@bolsaram/domain";
 import {
   DRINKING_LABELS,
   DRINKING_LEVELS,
@@ -43,6 +44,17 @@ export type ExtractionOutput = ExtractionResult & {
 export interface ExtractionProvider {
   readonly name: string;
   extract(input: ExtractionInput): Promise<ExtractionOutput>;
+}
+
+/** 열거형 항목을 다시 판정한 결과. 판정하지 못한 항목은 빠진다. */
+export type FieldJudgeOutput = {
+  model: string;
+  judgements: Partial<Record<JudgedField, FieldJudgement>>;
+};
+
+/** 추출과 같은 원문으로 열거형 항목만 다시 묻는다. 입력도 텍스트뿐이다. */
+export interface FieldJudge {
+  judge(input: ExtractionInput): Promise<FieldJudgeOutput>;
 }
 
 /** 프롬프트를 고칠 때마다 올린다. 추출 결과에 함께 저장해 재현 가능하게 한다. */

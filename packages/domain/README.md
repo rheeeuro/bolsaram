@@ -25,7 +25,7 @@ packages/domain/src/
 ├── errors.ts       DomainError + HTTP status 매핑
 ├── match.ts        소개 신청 상태 기계 (누가·언제·무엇으로)
 ├── visibility.ts   단계적 정보 공개 (LIST / DETAIL / INTRODUCED / OWNER / ADMIN)
-├── import.ts       Import 상태 기계 · 원문 정규화 · 검토 판정 · 게시 게이트
+├── import.ts       Import 상태 기계 · 원문 정규화 · 검토 판정(재판정 보정) · 게시 게이트
 ├── filters.ts      Discover·주선자 목록 필터 → SQL 조각 · 커서 페이지네이션
 ├── telegram.ts     봇 대화 상태 기계 · 메시지 분류 · 원문 합치기 · 앨범 판정
 ├── notify.ts       알림 재시도 창·시도 상한 (발송과 정리가 같은 값을 본다)
@@ -106,6 +106,11 @@ REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
 
 `reviewFields()` 는 검토 화면의 항목을 `EXTRACTED_FIELD_REVIEW_ORDER` 순서로 늘어놓는다.
 저장된 JSONB 의 키 순서는 쓰지 않는다.
+
+`calibrateConfidence()` 는 열거형 일곱 항목(`JUDGED_FIELDS`)을 다시 판정한 확률로 신뢰도를
+바꾼다. 값이 있는 항목은 그 값의 확률이 신뢰도가 되고, 재판정이 다른 값(「원문에 없음」은
+`null`)을 기준선 이상으로 고르면 엇갈림(`FieldDispute`)으로 돌려준다. **값은 바꾸지 않는다.**
+엇갈린 항목을 `statusAfterExtraction()` 에 넘기면 빈 칸이어도 `REVIEW_REQUIRED` 다.
 
 `pickRealName()` 은 원문의 「이름: ○○○」 줄에서 이름을 꺼내 검토 화면의 이름 칸을 미리
 채운다. **AI 에 맡기지 않는다** — 이름은 추출 스키마에 없고, 줄머리가 없으면 추측하지
