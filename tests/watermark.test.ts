@@ -112,6 +112,37 @@ describe("합성", () => {
   it("열 수 없는 파일이면 null — 부르는 쪽이 원본을 낼지 정한다", async () => {
     expect(await watermarkImage(Buffer.from("not an image"), MARK)).toBeNull();
   });
+
+  // 기울인 격자에 글자를 직접 놓으므로, 놓는 범위가 모자라면 사진 가장자리가 빈다.
+  it.each([
+    [1200, 400],
+    [400, 1200],
+    [900, 900],
+  ])("%ix%i 사진의 네 귀퉁이까지 숨은 층이 덮는다", async (width, height) => {
+    const input = await sharp({
+      create: { width, height, channels: 3, background: { r: 200, g: 170, b: 150 } },
+    })
+      .png()
+      .toBuffer();
+    const before = await sharp(input).raw().toBuffer();
+    const after = await sharp((await watermarkImage(input, MARK))!).raw().toBuffer();
+    const side = Math.round(Math.min(width, height) / 4);
+    for (const [x0, y0] of [
+      [0, 0],
+      [width - side, 0],
+      [0, height - side],
+      [width - side, height - side],
+    ]) {
+      let darker = 0;
+      for (let y = y0!; y < y0! + side; y += 1) {
+        for (let x = x0!; x < x0! + side; x += 1) {
+          const p = (y * width + x) * 3;
+          if (after[p + 1]! < before[p + 1]! - 1) darker += 1;
+        }
+      }
+      expect(darker / (side * side), `귀퉁이 (${x0}, ${y0})`).toBeGreaterThan(0.05);
+    }
+  });
 });
 
 describe("숨은 층 판독", () => {

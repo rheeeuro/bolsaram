@@ -107,16 +107,11 @@ function visibleSvg(width: number, height: number, label: string): string {
   const tileW = font * 30;
   const tileH = font * 15;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-  <defs>
-    <pattern id="m" width="${tileW}" height="${tileH}" patternUnits="userSpaceOnUse" patternTransform="rotate(-24)">
-      <g font-family="DejaVu Sans, Arial, sans-serif" font-size="${font}" letter-spacing="${font * 0.08}"
-         fill="#ffffff" fill-opacity="0.13"
-         stroke="#000000" stroke-opacity="0.08" stroke-width="${(font * 0.05).toFixed(2)}" paint-order="stroke">
-        ${staggered(escapeXml(label), font, tileW, tileH / 2)}
-      </g>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#m)"/>
+  <g transform="rotate(-24)" font-family="DejaVu Sans, Arial, sans-serif" font-size="${font}" letter-spacing="${font * 0.08}"
+     fill="#ffffff" fill-opacity="0.13"
+     stroke="#000000" stroke-opacity="0.08" stroke-width="${(font * 0.05).toFixed(2)}" paint-order="stroke">
+    ${staggered(escapeXml(label), { x: font, tileW, rowGap: tileH / 2, angle: -24, width, height })}
+  </g>
 </svg>`;
 }
 
@@ -125,30 +120,54 @@ function hiddenSvg(width: number, height: number, font: number, label: string): 
   const tileW = Math.round(font * label.length * 0.75);
   const tileH = Math.round(font * 2);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-  <defs>
-    <pattern id="h" width="${tileW}" height="${tileH * 2}" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">
-      <g font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="${font}" fill="#ffffff">
-        ${staggered(escapeXml(label), 0, tileW, tileH)}
-      </g>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#h)"/>
+  <g transform="rotate(18)" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="${font}" fill="#ffffff">
+    ${staggered(escapeXml(label), { x: 0, tileW, rowGap: tileH, angle: 18, width, height })}
+  </g>
 </svg>`;
 }
 
 /**
- * 한 칸에 글자를 엇갈려 놓는다 — 가운데 줄 하나와 그 위·아래 줄을 반 칸씩 밀어서.
- * 칸 경계에 걸린 글자는 이웃 칸의 사본이 이어 그린다.
+ * 기울인 격자에 글자를 엇갈려 늘어놓는다 — 칸마다 가운데 줄 하나와, 반 칸 밀린 줄 하나.
+ * 회전된 `<pattern>` 은 librsvg 가 느린 길로 그려(1280px 사진에서 층마다 약 0.2초) 글자를
+ * 직접 놓는다. 기울인 좌표에서 사진 네 모서리를 감싸는 범위만 채운다.
  */
-function staggered(text: string, x: number, tileW: number, rowGap: number): string {
-  const at = (dx: number, y: number) => `<text x="${x + dx}" y="${y}">${text}</text>`;
-  return [
-    at(0, rowGap),
-    at(-tileW / 2, rowGap * 2),
-    at(tileW / 2, rowGap * 2),
-    at(-tileW / 2, 0),
-    at(tileW / 2, 0),
-  ].join("");
+function staggered(
+  text: string,
+  { x, tileW, rowGap, angle, width, height }: {
+    x: number;
+    tileW: number;
+    rowGap: number;
+    angle: number;
+    width: number;
+    height: number;
+  },
+): string {
+  const rad = (-angle * Math.PI) / 180;
+  const corners = [
+    [0, 0],
+    [width, 0],
+    [0, height],
+    [width, height],
+  ].map(([cx, cy]) => [
+    cx! * Math.cos(rad) - cy! * Math.sin(rad),
+    cx! * Math.sin(rad) + cy! * Math.cos(rad),
+  ]);
+  // 글자가 칸보다 길지 않으므로 한 칸 여유면 가장자리에 걸친 글자까지 그린다.
+  const xs = corners.map((c) => c[0]!);
+  const ys = corners.map((c) => c[1]!);
+  const [x0, x1] = [Math.min(...xs) - tileW, Math.max(...xs) + tileW];
+  const [y0, y1] = [Math.min(...ys) - tileW, Math.max(...ys) + tileW];
+  const period = rowGap * 2;
+  const out: string[] = [];
+  for (let j = Math.floor(y0 / period); j * period <= y1; j += 1) {
+    for (let i = Math.floor(x0 / tileW); i * tileW <= x1; i += 1) {
+      out.push(
+        `<text x="${x + i * tileW}" y="${rowGap + j * period}">${text}</text>`,
+        `<text x="${x + tileW / 2 + i * tileW}" y="${j * period}">${text}</text>`,
+      );
+    }
+  }
+  return out.join("");
 }
 
 function escapeXml(value: string): string {
