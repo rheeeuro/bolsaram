@@ -247,6 +247,59 @@ export function mergeRawText(
   };
 }
 
+// ── 다른 사람의 글 나누기 ─────────────────────────────────────
+
+/**
+ * 이어 온 글이 다른 사람의 소개일 확률이 이 값 이상이면 「새 사람으로 나누기」를 묻는다.
+ * 묻는 비용(메시지 하나)보다 놓치는 비용이 작지 않지만, 같은 사람의 자기소개를 이어 보낸
+ * 글도 0.7 대가 나온다(합성 원문 실측). 다른 사람의 소개는 0.99 이상이었다.
+ */
+export const TELEGRAM_SPLIT_SUGGEST_THRESHOLD = 0.9;
+
+export function suggestsSplit(probability: number): boolean {
+  return probability >= TELEGRAM_SPLIT_SUGGEST_THRESHOLD;
+}
+
+/**
+ * 글 앞부분의 확인값 (FNV-1a 32비트, 16진수 8자). 암호 용도가 아니다 —
+ * 버튼을 누르기 전에 원문이 바뀌었는지(웹에서 고침 등)만 가려낸다.
+ */
+export function textFingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/**
+ * 새 글을 붙이기 **전**의 원문으로 나눌 자리를 정한다. `mergeRawText` 는 기존 원문(trim)
+ * 뒤에 빈 줄을 두고 붙이므로, 기존 원문 길이가 곧 나눌 자리다. 기존 원문이 없으면
+ * 나눌 것이 없다.
+ */
+export function splitPointOf(current: string | null): { offset: number; check: string } | null {
+  const existing = current?.trim() ?? "";
+  if (existing.length === 0) return null;
+  return { offset: existing.length, check: textFingerprint(existing) };
+}
+
+/**
+ * 원문을 나눈 자리에서 둘로 가른다. 그 사이 원문이 바뀌어 앞부분이 확인값과 다르거나
+ * 어느 한쪽이 비면 null 이다 — 엉뚱한 자리에서 자르지 않는다.
+ */
+export function splitRawText(
+  rawText: string | null,
+  point: { offset: number; check: string },
+): { kept: string; moved: string } | null {
+  if (!rawText || rawText.length <= point.offset) return null;
+  const prefix = rawText.slice(0, point.offset);
+  if (textFingerprint(prefix) !== point.check) return null;
+  const kept = prefix.trim();
+  const moved = rawText.slice(point.offset).trim();
+  return kept && moved ? { kept, moved } : null;
+}
+
 // ── 앨범 ──────────────────────────────────────────────────────
 
 /**
@@ -315,10 +368,13 @@ export function parseRoomChoice(
 export type TelegramCallbackAction =
   | { kind: "gender"; sessionId: string; gender: Gender }
   /** 분석 결과를 그대로 등록·공개한다. 게시 조건은 commit 경로가 다시 판정한다. */
-  | { kind: "commit"; sessionId: string };
+  | { kind: "commit"; sessionId: string }
+  /** 나눌 자리 뒤의 글을 새 사람의 대화로 옮긴다(`s:<세션 UUID>:<자리>:<확인값>`, 53바이트 이하). */
+  | { kind: "split"; sessionId: string; offset: number; check: string };
 
 const GENDER_CALLBACK_PREFIX = "g";
 const COMMIT_CALLBACK_PREFIX = "c";
+const SPLIT_CALLBACK_PREFIX = "s";
 /** 성별 한 글자 ↔ enum. 값을 그대로 실으면 64바이트 안에서 여유가 줄어든다. */
 const GENDER_CALLBACK_CODES: Record<Gender, string> = { MALE: "M", FEMALE: "F" };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -335,6 +391,13 @@ export function encodeCommitCallback(sessionId: string): string {
   return `${COMMIT_CALLBACK_PREFIX}:${sessionId}`;
 }
 
+export function encodeSplitCallback(
+  sessionId: string,
+  point: { offset: number; check: string },
+): string {
+  return `${SPLIT_CALLBACK_PREFIX}:${sessionId}:${point.offset}:${point.check}`;
+}
+
 /**
  * 돌아온 버튼 값을 해석한다. **텔레그램이 준 값이므로 신뢰하지 않는다** —
  * 형태가 조금이라도 다르면 null 이고, 어댑터는 아무것도 하지 않는다.
@@ -347,6 +410,14 @@ export function parseTelegramCallback(data: string | null | undefined): Telegram
   if (!sessionId || !UUID_PATTERN.test(sessionId)) return null;
   if (prefix === COMMIT_CALLBACK_PREFIX) {
     return parts.length === 2 ? { kind: "commit", sessionId } : null;
+  }
+  if (prefix === SPLIT_CALLBACK_PREFIX) {
+    const [, , offsetText, check] = parts;
+    if (parts.length !== 4 || !offsetText || !check) return null;
+    if (!/^[1-9][0-9]{0,4}$/.test(offsetText) || !/^[0-9a-f]{8}$/.test(check)) return null;
+    const offset = Number(offsetText);
+    if (offset > TELEGRAM_RAW_TEXT_LIMIT) return null;
+    return { kind: "split", sessionId, offset, check };
   }
   if (prefix !== GENDER_CALLBACK_PREFIX || parts.length !== 3) return null;
   const code = parts[2];

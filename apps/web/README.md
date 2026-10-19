@@ -154,8 +154,8 @@ server/
 │   ├── types.ts              프로바이더 인터페이스 · 시스템 프롬프트(이상형 조건 포함) · PROMPT_VERSION
 │   ├── mock.ts               규칙 기반 추출기 (기본, API 키 불필요)
 │   ├── openai.ts             OpenAI multimodal + Structured Outputs
-│   ├── decisions.ts          열거형 항목 재판정 (OpenAI Decisions API) — 검토 신뢰도 보정용
-│   └── index.ts              AI_PROVIDER 로 선택 · 재판정기는 openai + AI_DECISIONS=on 일 때만
+│   ├── decisions.ts          OpenAI Decisions API — 열거형 항목 재판정 · 봇 글 이어받기 판정
+│   └── index.ts              AI_PROVIDER 로 선택 · 판정기 둘은 openai + AI_DECISIONS=on 일 때만
 ├── repo/                     SQL 접근 (모두 withRls 트랜잭션 안에서 호출된다)
 │   ├── users.ts              내 계정 — 표시 이름·프로필 사진
 │   ├── profiles.ts           Discover·상세·주선자 목록·수정
@@ -178,7 +178,7 @@ server/
 ├── notify/                   알림 아웃박스 → 텔레그램 발송
 │   ├── outbox.ts             미발송 알림 선점·기록 (owner)
 │   └── dispatch.ts           발송 루프 + 기동 시 주기 스윕
-├── services/import-service.ts  분석 실행(추출 ∥ 재판정 → 보정) + idempotent commit
+├── services/import-service.ts  분석 실행(추출 ∥ 재판정 → 보정, 봇은 원문이 바뀐 결과를 버림) + idempotent commit
 ├── services/recommend-service.ts  AI 추천 — 보는 멤버에게 추천인 사람 집합·한 사람 판정 (저장된 조건끼리 견주기, AI 호출 없음)
 ├── views/
 │   ├── profile-view.ts       공개 단계 판정·적용 + signed URL 부착
@@ -375,6 +375,12 @@ webhook
 
 대화 하나는 프로필 하나다. 글을 받은 뒤 오는 사진이나 등록된 Import 에 들어오는 입력은
 이전 대화를 `COMPLETED` 로 닫고 새 대화로 받는다(domain 의 `conversationRollover`).
+
+글은 READY 에서도 이어 붙는다. 앞 글이 있었으면 Decisions API 로 「다른 사람의 소개인가」를
+따로 묻고(webhook 응답과 분리), 0.9 이상이면 **나누기 버튼만** 보낸다 — 나누는 것은 주선자다.
+버튼을 누르면 나눌 자리 뒤의 글을 새 대화로 옮기고 둘 다 다시 분석한다. 앞 사람의 대화가
+지금 진행 중일 때만 나눈다. 봇의 분석은 `analyzeLatestText` 로 돌아, 모델을 기다리는 사이
+원문이 바뀌면(글이 더 왔거나 나뉨) 결과를 버린다 — 바뀐 원문의 분석이 따로 돌며 알린다.
 
 owner 커넥션은 신원 확인 구간에서만 쓴다 — webhook 에는 세션 쿠키가 없어 RLS 컨텍스트를
 만들 수 없기 때문이며, 신원이 정해진 뒤에는 일반 주선자 요청과 완전히 같다.

@@ -7,15 +7,21 @@ import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
 import { JUDGED_FIELDS, normalizeRawText } from "@bolsaram/domain";
 import {
   MockExtractionProvider,
+  setExtractionProvider,
   setFieldJudge,
   type FieldJudgeOutput,
 } from "../apps/web/src/server/ai/index";
-import { commitSession, analyzeSession } from "../apps/web/src/server/services/import-service";
+import {
+  analyzeLatestText,
+  analyzeSession,
+  commitSession,
+} from "../apps/web/src/server/services/import-service";
 import {
   countInbox,
   latestExtraction,
   listInbox,
   requireSession,
+  updateRawText,
 } from "../apps/web/src/server/repo/imports";
 import { runTag } from "./tags";
 
@@ -169,6 +175,24 @@ describe("analyze — 재판정 보정", () => {
     expect(extraction?.fields.religion).toBe("NONE");
     expect(extraction?.confidence.religion).toBe(0.1);
     expect(extraction?.notes[0]).toBe("종교 「무교」 — 다시 보니 「기독교」일 수 있습니다.");
+  });
+
+  it("텔레그램 분석은 기다리는 사이 원문이 바뀌면 결과를 버린다 — 새 원문의 분석이 따로 돈다", async () => {
+    const id = await newSession(SAMPLE_TEXT);
+    const mock = new MockExtractionProvider();
+    setExtractionProvider({
+      name: "changing",
+      extract: async (input) => {
+        await withRls(admin, (sql) => updateRawText(sql, id, `${SAMPLE_TEXT}\n\n키 168cm`));
+        return mock.extract(input);
+      },
+    });
+    try {
+      expect(await analyzeLatestText(admin, id)).toBeNull();
+      expect(await withRls(admin, (sql) => latestExtraction(sql, id))).toBeNull();
+    } finally {
+      setExtractionProvider(null);
+    }
   });
 
   it("재판정이 실패해도 분석은 끝난다 — 추출 신뢰도로 검토한다", async () => {

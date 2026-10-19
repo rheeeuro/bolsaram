@@ -23,12 +23,16 @@ import {
   conversationRollover,
   encodeCommitCallback,
   encodeGenderCallback,
+  encodeSplitCallback,
   mergeRawText,
   nextTelegramState,
   parseRoomChoice,
   parseTelegramCallback,
   pickRealName,
   shouldAnnounceMedia,
+  splitPointOf,
+  splitRawText,
+  suggestsSplit,
   type TelegramCallbackAction,
   type TelegramIntent,
 } from "@bolsaram/domain";
@@ -40,6 +44,7 @@ import {
   type TelegramCallbackQuery,
   type TelegramMessage,
 } from "@bolsaram/schemas";
+import { continuationJudge } from "../ai/index";
 import { writeAudit } from "../audit";
 import {
   claimTelegramUpdate,
@@ -55,7 +60,7 @@ import { env } from "../env";
 import * as imports from "../repo/imports";
 import * as conversations from "../repo/telegram";
 import {
-  analyzeSession,
+  analyzeLatestText,
   applyExtractionReview,
   commitSession,
 } from "../services/import-service";
@@ -353,7 +358,71 @@ async function routeCallback(callback: TelegramCallbackQuery): Promise<void> {
     case "commit":
       await applyCommit(ctx, callback, action);
       return;
+    case "split":
+      await applySplit(ctx, identity, callback, action);
+      return;
   }
+}
+
+/**
+ * 나눌 자리 뒤의 글을 새 사람의 대화로 옮기고 둘 다 다시 분석한다.
+ *
+ * 앞 사람의 대화가 **지금 진행 중인 대화**일 때만 나눈다 — 이미 다음 사람을 받고
+ * 있으면 새 대화를 열 자리가 없다. 사진은 앞 사람에 그대로 둔다(사진 → 글 순서로
+ * 받으므로 이어 온 글에는 사진이 없다). 원문이 그 사이 바뀌었으면 확인값이 어긋나
+ * 나누지 않는다.
+ */
+async function applySplit(
+  ctx: RlsContext,
+  identity: TelegramIdentity,
+  callback: TelegramCallbackQuery,
+  action: Extract<TelegramCallbackAction, { kind: "split" }>,
+): Promise<void> {
+  const outcome = await withRls(ctx, async (sql) => {
+    const session = await imports.requireSession(sql, action.sessionId);
+    if (session.status === "IMPORTED") return { refused: messages.splitImported } as const;
+    const parts = splitRawText(session.rawText, action);
+    if (!parts) return { refused: messages.splitStale } as const;
+    const conversation = await conversations.findConversationByImportSession(sql, session.id);
+    const active = await conversations.findActiveConversation(sql, identity.telegramUserId);
+    if (!conversation || !active || active.id !== conversation.id) {
+      return { refused: messages.splitBusy } as const;
+    }
+
+    await imports.updateRawText(sql, session.id, parts.kept);
+    await conversations.updateConversation(sql, conversation, { state: "COMPLETED" });
+    const next = await startConversation(sql, ctx, identity);
+    await imports.updateRawText(sql, next.importSessionId, parts.moved);
+    await conversations.updateConversation(sql, next, {
+      state: nextTelegramState({ current: next.state, assetCount: 0, hasText: true }),
+    });
+    await writeAudit(sql, {
+      actorUserId: ctx.userId,
+      action: "import.split",
+      entityType: "import_session",
+      entityId: session.id,
+      metadata: { source: "telegram", movedTo: next.importSessionId },
+    });
+    return { keptSessionId: session.id, newSessionId: next.importSessionId } as const;
+  });
+
+  if ("refused" in outcome) {
+    console.info("텔레그램 응답: 나누기 거절");
+    await answerCallbackQuery(callback.id, outcome.refused, true);
+    return;
+  }
+  console.info("텔레그램 응답: 나누기 완료");
+  await answerCallbackQuery(callback.id, messages.splitDone);
+  // 다시 누르지 않게 버튼을 걷는다. 실패해도 나눈 결과는 이미 남았다.
+  if (callback.message) {
+    await editMessageReplyMarkup(callback.message.chat.id, callback.message.message_id, []).catch(
+      () => {
+        console.warn("텔레그램 버튼 갱신 실패 (나누기는 완료)");
+      },
+    );
+  }
+  triggerAnalyze(ctx, identity, outcome.keptSessionId);
+  triggerAnalyze(ctx, identity, outcome.newSessionId);
 }
 
 /**
@@ -595,6 +664,9 @@ async function handleText(
     if (merged.changed) {
       await imports.updateRawText(sql, conversation.importSessionId, merged.rawText);
     }
+    // 앞 글이 있었으면 다른 사람의 소개인지 따로 묻는다. 잘린 글은 나눌 자리가 어긋난다.
+    const splitPoint =
+      merged.changed && !merged.truncated ? splitPointOf(session.rawText) : null;
     const assets = await imports.listAssets(sql, conversation.importSessionId);
     const uploadedCount = assets.filter((a) => a.uploadedAt != null).length;
     await conversations.updateConversation(sql, conversation, {
@@ -608,6 +680,8 @@ async function handleText(
       sessionId: conversation.importSessionId,
       truncated: merged.truncated,
       uploadedCount,
+      previousText: splitPoint ? (session.rawText ?? "").trim() : null,
+      splitPoint,
     };
   });
 
@@ -618,6 +692,58 @@ async function handleText(
       : messages.textReceived(result.uploadedCount),
   );
   triggerAnalyze(ctx, identity, result.sessionId);
+  if (result.splitPoint && result.previousText) {
+    triggerSplitCheck(identity, {
+      sessionId: result.sessionId,
+      previous: result.previousText,
+      incoming: text,
+      point: result.splitPoint,
+    });
+  }
+}
+
+/**
+ * 이어 온 글이 다른 사람의 소개 같으면 「새 사람으로 나누기」 버튼을 보낸다.
+ * 묻기만 하고 나누지 않는다. 판정기가 없거나 실패하면 아무것도 보내지 않는다 —
+ * 그때는 지금처럼 이어 붙은 채로 남는다. webhook 응답을 붙잡지 않도록 따로 띄운다.
+ */
+function triggerSplitCheck(
+  identity: TelegramIdentity,
+  input: {
+    sessionId: string;
+    previous: string;
+    incoming: string;
+    point: { offset: number; check: string };
+  },
+): void {
+  const judge = continuationJudge();
+  if (!judge) return;
+  void (async () => {
+    try {
+      const probability = await judge.differentPerson({
+        previous: input.previous,
+        incoming: input.incoming,
+      });
+      const suggest = suggestsSplit(probability);
+      console.info(`텔레그램 판정: 이어 온 글 · ${suggest ? "다른 사람 의심" : "같은 사람"}`);
+      if (!suggest) return;
+      await sendMessage(identity.telegramChatId, messages.splitSuggest, {
+        rows: [
+          [
+            {
+              text: messages.splitButton,
+              data: encodeSplitCallback(input.sessionId, input.point),
+            },
+          ],
+        ],
+      });
+    } catch (error) {
+      console.warn(
+        "텔레그램 글 이어받기 판정 실패",
+        error instanceof DomainError ? { code: error.code, details: error.details } : "알 수 없는 오류",
+      );
+    }
+  })();
 }
 
 // ── 대화 확보 ─────────────────────────────────────────────────
@@ -680,13 +806,18 @@ async function startConversation(
  * 분석을 webhook 응답과 분리해 띄운다(§10 「webhook 안에서 오래 실행하지 않는다」).
  *
  * 이 프로세스는 PM2 로 상시 떠 있으므로 응답 후에도 계속 돈다. 실패는
- * analyzeSession 이 세션을 FAILED 로 남기고, 여기서 봇에게 알린다.
+ * analyzeLatestText 가 세션을 FAILED 로 남기고, 여기서 봇에게 알린다.
  * await 하지 않으므로 rejection 을 반드시 붙잡아야 한다.
  */
 function triggerAnalyze(ctx: RlsContext, identity: TelegramIdentity, sessionId: string): void {
   void (async () => {
     try {
-      const result = await analyzeSession(ctx, sessionId);
+      const result = await analyzeLatestText(ctx, sessionId);
+      // 기다리는 사이 글이 더 왔거나 나뉘었다. 그 원문의 분석이 따로 돌며 결과를 알린다.
+      if (!result) {
+        console.info("텔레그램 응답: 지난 원문의 분석 결과는 버림");
+        return;
+      }
       // 방 이름은 **세션의 지금 값**으로 읽는다. 사진을 보내는 사이에 웹에서 방을
       // 옮겼을 수 있고, 그때 봇이 옛 방을 말하면 잘못 안내하는 셈이 된다.
       const { fields, groupName } = await withRls(ctx, async (sql) => {

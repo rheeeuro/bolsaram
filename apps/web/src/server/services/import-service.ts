@@ -45,6 +45,30 @@ export async function analyzeSession(
   ctx: RlsContext,
   sessionId: string,
 ): Promise<{ status: "READY" | "REVIEW_REQUIRED" }> {
+  const result = await runAnalysis(ctx, sessionId, false);
+  if (!result) throw new DomainError("INVALID_STATE", "분석 결과를 저장하지 못했습니다.");
+  return result;
+}
+
+/**
+ * 분석하되, 모델을 기다리는 사이 원문이 바뀌었으면 결과를 버리고 null 을 돌려준다.
+ *
+ * 텔레그램처럼 **원문이 바뀔 때마다 새 분석을 띄우는** 경로만 쓴다 — 늦게 끝난 옛
+ * 분석이 새 원문의 결과를 덮지 않게 한다(글 나누기 뒤의 섞인 원문 등). 바뀐 원문의
+ * 분석은 이미 따로 돌고 있으므로 상태도 건드리지 않는다.
+ */
+export async function analyzeLatestText(
+  ctx: RlsContext,
+  sessionId: string,
+): Promise<{ status: "READY" | "REVIEW_REQUIRED" } | null> {
+  return runAnalysis(ctx, sessionId, true);
+}
+
+async function runAnalysis(
+  ctx: RlsContext,
+  sessionId: string,
+  skipIfTextChanged: boolean,
+): Promise<{ status: "READY" | "REVIEW_REQUIRED" } | null> {
   const prepared = await withRls(ctx, async (sql) => {
     const session = await imports.requireSession(sql, sessionId);
     if (session.status === "IMPORTED") {
@@ -75,6 +99,10 @@ export async function analyzeSession(
     const notes = [...disputes.map(disputeNote), ...result.notes].slice(0, NOTES_MAX);
 
     return await withRls(ctx, async (sql) => {
+      if (skipIfTextChanged) {
+        const current = await imports.requireSession(sql, sessionId);
+        if (current.rawText !== prepared.rawText) return null;
+      }
       await imports.saveExtraction(sql, {
         sessionId,
         fields,

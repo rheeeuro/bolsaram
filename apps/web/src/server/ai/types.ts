@@ -57,6 +57,11 @@ export interface FieldJudge {
   judge(input: ExtractionInput): Promise<FieldJudgeOutput>;
 }
 
+/** 이어 온 글이 앞 글과 다른 사람의 소개일 확률(0..1)을 돌려준다. 입력은 텍스트뿐이다. */
+export interface ContinuationJudge {
+  differentPerson(input: { previous: string; incoming: string }): Promise<number>;
+}
+
 /** 프롬프트를 고칠 때마다 올린다. 추출 결과에 함께 저장해 재현 가능하게 한다. */
 export const PROMPT_VERSION = "2026-10-18.6";
 

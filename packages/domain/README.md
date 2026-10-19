@@ -27,7 +27,7 @@ packages/domain/src/
 ├── visibility.ts   단계적 정보 공개 (LIST / DETAIL / INTRODUCED / OWNER / ADMIN)
 ├── import.ts       Import 상태 기계 · 원문 정규화 · 검토 판정(재판정 보정) · 게시 게이트
 ├── filters.ts      Discover·주선자 목록 필터 → SQL 조각 · 커서 페이지네이션
-├── telegram.ts     봇 대화 상태 기계 · 메시지 분류 · 원문 합치기 · 앨범 판정
+├── telegram.ts     봇 대화 상태 기계 · 메시지 분류 · 원문 합치기 · 글 나누기 · 앨범 판정
 ├── notify.ts       알림 재시도 창·시도 상한 (발송과 정리가 같은 값을 본다)
 ├── bump.ts         프로필 끌어올리기 — 활성만·기다리는 시간(DB 트리거와 같은 값)
 ├── recommend.ts    이상형 추천 — 조건 견주기(맞음·다름·모름)·「꼭」 조건·양방향 순위
@@ -138,6 +138,12 @@ Import 상태와 축이 다르다 — 이건 "대화가 어디까지 왔는가",
 들어오는 사진은 다음 사람의 시작으로 보고, 이미 등록된(IMPORTED) Import 에는 무엇도
 붙이지 않는다. 둘 다 이전 대화를 `COMPLETED` 로 닫고 새 대화를 연다. 글은 READY 에서도
 이어 받는다.
+
+이어 받은 글이 다른 사람의 소개 같으면(판정 확률 `TELEGRAM_SPLIT_SUGGEST_THRESHOLD` 0.9 이상,
+`suggestsSplit`) 봇이 나누기 버튼만 보낸다. 나눌 자리는 붙이기 전 원문 길이와 그 앞부분의
+확인값이다(`splitPointOf`) — `mergeRawText` 가 기존 원문 뒤에 빈 줄을 두고 붙이므로 길이가
+곧 경계다. `splitRawText` 는 앞부분이 확인값과 다르면(그 사이 원문이 바뀜) null 을 돌려
+엉뚱한 자리에서 자르지 않는다. 버튼 값은 `s:<세션>:<자리>:<확인값>` 으로 64바이트 안이다.
 
 `shouldAnnounceMedia` 는 앨범 안내를 한 번만 보내기 위한 것이다. 사진을 하나로 묶는
 일은 대화 세션이 하므로 앨범 버퍼링·debounce 가 필요 없다.

@@ -1,9 +1,10 @@
 /**
- * OpenAI Decisions API 로 열거형 항목을 다시 판정한다.
+ * OpenAI Decisions API — 값을 뽑지 않고 확률만 받는 판정 두 가지.
  *
- * 추출(Structured Outputs)이 값을 정하고, 여기서는 같은 원문을 보고 보기마다의 확률만
- * 받는다. 그 확률로 검토 화면의 「확인 필요」를 정한다(`calibrateConfidence`).
- * 입력은 추출과 같은 원문 텍스트뿐이다 — 사진은 보내지 않는다.
+ *   OpenAiFieldJudge         열거형 항목 재판정 → 검토 화면의 「확인 필요」(`calibrateConfidence`)
+ *   OpenAiContinuationJudge  텔레그램으로 이어 온 글이 다른 사람의 소개인가 → 나누기 버튼
+ *
+ * 값은 추출(Structured Outputs)과 사람이 정한다. 입력은 원문 텍스트뿐이다 — 사진은 보내지 않는다.
  */
 import "server-only";
 import { z } from "zod";
@@ -22,7 +23,12 @@ import {
   SMOKING_LABELS,
 } from "@bolsaram/schemas";
 import { env } from "../env";
-import type { ExtractionInput, FieldJudge, FieldJudgeOutput } from "./types";
+import type {
+  ContinuationJudge,
+  ExtractionInput,
+  FieldJudge,
+  FieldJudgeOutput,
+} from "./types";
 
 const API_URL = "https://api.openai.com/v1/decisions";
 const TIMEOUT_MS = 30_000;
@@ -69,8 +75,14 @@ const choiceAnswerSchema = z.object({
   choice: z.string(),
   probabilities: z.array(z.object({ value: z.string(), probability: z.number().min(0).max(1) })),
 });
+const predicateAnswerSchema = z.object({
+  type: z.literal("predicate"),
+  name: z.string(),
+  probability: z.number().min(0).max(1),
+});
 const answerSchema = z.union([
   choiceAnswerSchema,
+  predicateAnswerSchema,
   // 거절은 그 항목만 판정 없이 둔다.
   z.object({ type: z.literal("refusal") }).loose(),
 ]);
@@ -102,13 +114,47 @@ function toJudgement(
   };
 }
 
+/** `/v1/decisions` 한 번 호출하고 응답을 검증한다. 원문이 섞일 수 있어 오류에는 status 만 싣는다. */
+async function requestDecisions(body: {
+  input: string;
+  questions: unknown[];
+}): Promise<z.infer<typeof responseSchema>> {
+  let response: Response;
+  try {
+    response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env().OPENAI_API_KEY ?? ""}`,
+      },
+      body: JSON.stringify({ model: env().OPENAI_DECISIONS_MODEL, ...body }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new DomainError("INVALID_STATE", "AI 판정 요청에 실패했습니다.", {
+      cause: String(error),
+    });
+  }
+  if (!response.ok) {
+    throw new DomainError("INVALID_STATE", "AI 판정 요청이 거절되었습니다.", {
+      status: response.status,
+    });
+  }
+
+  const validated = responseSchema.safeParse(await response.json());
+  if (!validated.success) {
+    throw new DomainError("INVALID_STATE", "AI 판정 응답이 형식과 맞지 않습니다.", {
+      issues: validated.error.issues.slice(0, 5).map((i) => i.path.join(".")),
+    });
+  }
+  return validated.data;
+}
+
 export class OpenAiFieldJudge implements FieldJudge {
   async judge(input: ExtractionInput): Promise<FieldJudgeOutput> {
-    const model = env().OPENAI_DECISIONS_MODEL;
-    if (!input.text?.trim()) return { model, judgements: {} };
+    if (!input.text?.trim()) return { model: env().OPENAI_DECISIONS_MODEL, judgements: {} };
 
-    const body = {
-      model,
+    const data = await requestDecisions({
       input: input.text,
       questions: JUDGED_FIELDS.map((field) => ({
         type: "choice",
@@ -122,44 +168,41 @@ export class OpenAiFieldJudge implements FieldJudge {
           { value: NOT_STATED, description: "원문에 적혀 있지 않다" },
         ],
       })),
-    };
-
-    let response: Response;
-    try {
-      response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${env().OPENAI_API_KEY ?? ""}`,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-    } catch (error) {
-      throw new DomainError("INVALID_STATE", "AI 판정 요청에 실패했습니다.", {
-        cause: String(error),
-      });
-    }
-    if (!response.ok) {
-      // 응답 본문에 원문이 섞일 수 있으므로 status 만 남긴다.
-      throw new DomainError("INVALID_STATE", "AI 판정 요청이 거절되었습니다.", {
-        status: response.status,
-      });
-    }
-
-    const validated = responseSchema.safeParse(await response.json());
-    if (!validated.success) {
-      throw new DomainError("INVALID_STATE", "AI 판정 응답이 형식과 맞지 않습니다.", {
-        issues: validated.error.issues.slice(0, 5).map((i) => i.path.join(".")),
-      });
-    }
+    });
 
     const judgements: FieldJudgeOutput["judgements"] = {};
-    for (const answer of validated.data.answers) {
+    for (const answer of data.answers) {
       if (answer.type !== "choice" || !isJudgedField(answer.name)) continue;
       const judgement = toJudgement(answer.name, answer);
       if (judgement) judgements[answer.name] = judgement;
     }
-    return { model: validated.data.model, judgements };
+    return { model: data.model, judgements };
+  }
+}
+
+const DIFFERENT_PERSON = "different_person";
+
+/**
+ * 텔레그램으로 이어 온 글이 다른 사람의 소개인지. 결과는 묻기만 한다 — 나누는 것은
+ * 주선자가 버튼을 눌렀을 때다. 거절하거나 답이 없으면 0(같은 사람으로 본다)이다.
+ */
+export class OpenAiContinuationJudge implements ContinuationJudge {
+  async differentPerson(input: { previous: string; incoming: string }): Promise<number> {
+    const data = await requestDecisions({
+      input: `[앞 글]\n${input.previous}\n\n[새 글]\n${input.incoming}`,
+      questions: [
+        {
+          type: "predicate",
+          name: DIFFERENT_PERSON,
+          instructions:
+            "주선자가 소개팅 프로필을 메시지 여러 개로 나눠 보낸다. [새 글]이 [앞 글]과 **다른 사람**을 소개하는 글이면 참이다. 같은 사람의 소개를 이어 쓰거나(이상형·자기소개 등) 고치는 글이면 거짓이다.",
+        },
+      ],
+    });
+    const answer = data.answers.find(
+      (a): a is z.infer<typeof predicateAnswerSchema> =>
+        a.type === "predicate" && a.name === DIFFERENT_PERSON,
+    );
+    return answer?.probability ?? 0;
   }
 }

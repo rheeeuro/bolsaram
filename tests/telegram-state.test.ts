@@ -26,6 +26,12 @@ import {
   parseTelegramCallback,
   nextTelegramState,
   shouldAnnounceMedia,
+  TELEGRAM_SPLIT_SUGGEST_THRESHOLD,
+  encodeSplitCallback,
+  splitPointOf,
+  splitRawText,
+  suggestsSplit,
+  textFingerprint,
 } from "@bolsaram/domain";
 import {
   TELEGRAM_CALLBACK_DATA_LIMIT,
@@ -432,5 +438,60 @@ describe("등록 버튼", () => {
     expect(parseTelegramCallback(`c:${SESSION_ID}:M`)).toBeNull();
     expect(parseTelegramCallback("c:not-a-uuid")).toBeNull();
     expect(parseTelegramCallback("c:")).toBeNull();
+  });
+});
+
+/**
+ * 이어 온 글이 다른 사람의 소개 같을 때 묻는 「새 사람으로 나누기」.
+ * 나눌 자리는 붙이기 전 원문 길이이고, 그 사이 원문이 바뀌면 나누지 않는다.
+ */
+describe("다른 사람의 글 나누기", () => {
+  const first = "93년생 여자 / 165cm\n분당 거주, 판교 개발자";
+  const second = "90년생 남자 / 182cm\n강남 거주, 회계사";
+
+  it("붙이기 전 원문 길이에서 잘라 앞 사람과 새 사람의 글로 되돌린다", () => {
+    const point = splitPointOf(`  ${first}  `)!;
+    const merged = mergeRawText(first, { source: "text", value: second });
+    expect(splitRawText(merged.rawText, point)).toEqual({ kept: first, moved: second });
+  });
+
+  it("앞 글이 없으면 나눌 자리가 없다", () => {
+    expect(splitPointOf(null)).toBeNull();
+    expect(splitPointOf("   ")).toBeNull();
+  });
+
+  it("그 사이 원문이 바뀌었으면 나누지 않는다", () => {
+    const point = splitPointOf(first)!;
+    const edited = `${first.replace("165", "166")}\n\n${second}`;
+    expect(splitRawText(edited, point)).toBeNull();
+    // 뒤쪽이 비면 옮길 것이 없다.
+    expect(splitRawText(first, point)).toBeNull();
+    expect(splitRawText(null, point)).toBeNull();
+  });
+
+  it("다른 사람일 확률이 0.9 이상일 때만 묻는다", () => {
+    expect(TELEGRAM_SPLIT_SUGGEST_THRESHOLD).toBe(0.9);
+    expect(suggestsSplit(0.99)).toBe(true);
+    expect(suggestsSplit(0.9)).toBe(true);
+    // 같은 사람의 자기소개를 이어 보낸 글도 0.7 대가 나온다.
+    expect(suggestsSplit(0.74)).toBe(false);
+  });
+
+  it("버튼 값은 세션·자리·확인값을 담고 Bot API 상한 안에 들어간다", () => {
+    const point = { offset: TELEGRAM_RAW_TEXT_LIMIT, check: textFingerprint(first) };
+    const data = encodeSplitCallback(SESSION_ID, point);
+    expect(data.length).toBeLessThanOrEqual(TELEGRAM_CALLBACK_DATA_LIMIT);
+    expect(parseTelegramCallback(data)).toEqual({ kind: "split", sessionId: SESSION_ID, ...point });
+  });
+
+  it("형태가 다른 값은 해석하지 않는다", () => {
+    const check = textFingerprint(first);
+    expect(parseTelegramCallback(`s:${SESSION_ID}:10`)).toBeNull();
+    expect(parseTelegramCallback(`s:${SESSION_ID}:0:${check}`)).toBeNull();
+    expect(parseTelegramCallback(`s:${SESSION_ID}:010:${check}`)).toBeNull();
+    expect(parseTelegramCallback(`s:${SESSION_ID}:${TELEGRAM_RAW_TEXT_LIMIT + 1}:${check}`)).toBeNull();
+    expect(parseTelegramCallback(`s:${SESSION_ID}:10:XYZ`)).toBeNull();
+    expect(parseTelegramCallback(`s:not-a-uuid:10:${check}`)).toBeNull();
+    expect(parseTelegramCallback(`s:${SESSION_ID}:10:${check}:extra`)).toBeNull();
   });
 });

@@ -2,9 +2,9 @@
 import "server-only";
 import { env } from "../env";
 import { MockExtractionProvider } from "./mock";
-import { OpenAiFieldJudge } from "./decisions";
+import { OpenAiContinuationJudge, OpenAiFieldJudge } from "./decisions";
 import { OpenAiExtractionProvider } from "./openai";
-import type { ExtractionProvider, FieldJudge } from "./types";
+import type { ContinuationJudge, ExtractionProvider, FieldJudge } from "./types";
 
 let cached: ExtractionProvider | null = null;
 
@@ -39,6 +39,21 @@ export function fieldJudge(): FieldJudge | null {
 /** 테스트에서 재판정기를 갈아끼울 때 쓴다. `undefined` 면 환경변수로 되돌린다. */
 export function setFieldJudge(judge: FieldJudge | null | undefined): void {
   judgeOverride = judge;
+}
+
+let continuationOverride: ContinuationJudge | null | undefined;
+
+/** 텔레그램 글 이어받기 판정기. 재판정기와 같은 조건(openai + AI_DECISIONS=on)에서만 있다. */
+export function continuationJudge(): ContinuationJudge | null {
+  if (continuationOverride !== undefined) return continuationOverride;
+  const config = env();
+  return config.AI_PROVIDER === "openai" && config.AI_DECISIONS === "on"
+    ? new OpenAiContinuationJudge()
+    : null;
+}
+
+export function setContinuationJudge(judge: ContinuationJudge | null | undefined): void {
+  continuationOverride = judge;
 }
 
 export * from "./types";

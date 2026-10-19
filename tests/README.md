@@ -37,11 +37,12 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `extraction.test.ts`           | 추출 스키마·strict JSON Schema·해시태그 정규화·mock 프로바이더·검토 순서·재판정 보정(값은 그대로·엇갈림·기준선) | –    | 31   |
 | `district.test.ts`             | 서울·경기 권역 표(구·시·군이 한 권역에만)·광역과 맞추기·원문에서 찾기(겹치는 낱말 제외)·권역 필터 SQL·지역 칩 선택(누르면 전체·권역으로 좁히기·전부 고르면 전체) | –    | 18   |
 | `rls.test.ts`                  | RLS 정책 강제·모임 소속 변경 차단·표시 이름·프로필 사진·등록한 주선자 조회 범위·거절·숨김·담당이 갈리는 신청·여러 명에게 동시 신청 | 필요 | 73 |
-| `import-commit.test.ts`        | 분석·재판정 보정(맞음·엇갈림·실패해도 분석 계속)·commit 멱등성·동시 호출·해시태그 정규 저장·이름/연락 방법·목록 칸 | 필요 | 16   |
+| `import-commit.test.ts`        | 분석·재판정 보정(맞음·엇갈림·실패해도 분석 계속)·봇 분석은 원문이 바뀌면 버림·commit 멱등성·동시 호출·해시태그 정규 저장·이름/연락 방법·목록 칸 | 필요 | 17   |
 | `import-duplicates.test.ts`    | 원문 중복 차단 — 공백·말머리 무시·한 글자 차이는 통과·짧은 글/글 없음 제외·원문 수정으로 같게 만들기 차단·등록된 쪽은 프로필 번호·동시 업로드도 하나만·남이 올린 글도 막되 **그 세션·프로필은 응답에 안 실림**·확인 함수는 주선자만 | 필요 | 8 |
 | `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 5 |
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 6    |
-| `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범    | –    | 40   |
+| `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범·글 나누기(자리·확인값·버튼 값·기준선) | –    | 54   |
+| `telegram-split.test.ts`       | webhook→버튼 「새 사람으로 나누기」(Bot API·판정기 가짜) — 나눔·다시 누름·다음 사람 진행 중·같은 사람은 묻지 않음 | 필요 | 4 |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기·권한 경계 | 필요 | 32 |
 | `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
 | `group-isolation.test.ts`      | 모임 간 격리·대행 중 풀 경계·claim 가로채기 차단 | 필요 | 22   |
@@ -121,6 +122,7 @@ docker exec bolsaram_postgres dropdb -U bolsaram_owner --force bolsaram_test
 | `telegram-import.test.ts` 「웹에서 보는 채널을 바꿔도」    | 봇이 담는 곳이 화면을 따라 움직이지 않음 |
 | `telegram-import.test.ts` 「속하지 않은 모임은 정책이」    | 봇 업로드 대상이 소속을 벗어나지 못함 |
 | `telegram-state.test.ts` 「직접 보낸 글이 …우선한다」      | 원문 우선순위(§5.4)                 |
+| `telegram-split.test.ts` 「다음 사람을 이미 받고 있으면」  | 옛 버튼이 진행 중인 다른 대화를 건드리지 않음 |
 | `oauth-login.test.ts` 「state 가 다르면 거절한다」         | 남이 시작한 로그인으로 세션을 못 만듦 |
 | `oauth-login.test.ts` 「쿠키를 고치면 …거절한다」          | 왕복 상태 위조 차단                 |
 | `admin-signup.test.ts` 「멤버 계정에는 …붙이지 않는다」    | 멤버 계정이 소셜 로그인으로 열리지 않음 |
