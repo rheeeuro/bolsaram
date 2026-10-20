@@ -55,7 +55,8 @@ export function DiscoverClient() {
   // 시트가 아니라 위 막대에 따로 둔다 — 한 번 눌러 켜고 끄는 것이 자연스럽다.
   const [aiOnly, setAiOnly] = useState(() => searchParams.get("ai") === "1");
   const [sheetOpen, setSheetOpen] = useState(false);
-  // 소개팅은 사진이 먼저다 — 처음에는 사진을 크게 깐다. 고른 방식은 기기에 남는다.
+  // 소개팅은 사진이 먼저다 — 들어올 때는 늘 사진을 크게 깐다. 고른 방식은 같은 탭 안에서만
+  // 기억한다(상세에서 돌아와도 유지). 기기에 남기면 한 번 고른 목록이 기본처럼 굳는다.
   const [view, setView] = useState<ViewMode>("grid");
 
   // 저장된 보기를 읽기 전에는 불러오지 않는다 — 원본 보기로 열 사람에게 카드부터 받아 오면 한 번 버린다.
@@ -110,7 +111,7 @@ export function DiscoverClient() {
   // 저장된 보기 방식은 mount 뒤에 읽는다 — 서버 렌더 결과와 어긋나면 hydration 이 깨진다.
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(VIEW_KEY);
+      const stored = window.sessionStorage.getItem(VIEW_KEY);
       if (stored === "list" || stored === "grid" || stored === "raw") setView(stored);
     } catch {
       // 저장소를 막아둔 브라우저에서는 기본값으로 둔다.
@@ -121,7 +122,7 @@ export function DiscoverClient() {
   function changeView(next: ViewMode): void {
     setView(next);
     try {
-      window.localStorage.setItem(VIEW_KEY, next);
+      window.sessionStorage.setItem(VIEW_KEY, next);
     } catch {
       // 기억하지 못할 뿐 보기 전환은 된다.
     }

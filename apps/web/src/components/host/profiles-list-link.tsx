@@ -8,13 +8,16 @@ const KEY = "bolsaram.host.profilesList";
 /**
  * 프로필 목록을 마지막으로 본 조건. 목록이 조건을 바꿀 때마다 부른다.
  *
- * 상세에서 「멤버」로 돌아가면 걸어 둔 조건(성별·나이·지역·검색어·보기)이 그대로
+ * 상세에서 「멤버」로 돌아가면 걸어 둔 조건(성별·나이·지역·검색어)이 그대로
  * 살아 있어야 한다 — 조건을 다시 거는 일이 카카오톡방 스크롤과 다를 바 없어진다.
+ * 보기(`view`)는 조건이 아니라 기억하지 않는다 — 「멤버」는 늘 카드로 보기로 연다.
  * 같은 탭 안에서만 기억하면 되므로 sessionStorage 에 둔다.
  */
 export function rememberProfilesList(query: string): void {
+  const search = new URLSearchParams(query);
+  search.delete("view");
   try {
-    window.sessionStorage.setItem(KEY, query);
+    window.sessionStorage.setItem(KEY, search.toString());
   } catch {
     // 저장소를 막아 둔 브라우저에서는 조건 없는 목록으로 돌아갈 뿐이다.
   }
