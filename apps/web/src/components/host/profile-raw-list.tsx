@@ -60,7 +60,10 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
             {!item.visible ? <Badge tone="neutral">비활성 · 멤버에게 안 보임</Badge> : null}
 
             <span className="ml-auto text-[11.5px] text-[var(--surface-text-muted)]">
-              {[item.source ? label.importSource(item.source) : null, item.at ? formatWhen(item.at) : null]
+              {[
+                item.source ? label.importSource(item.source) : null,
+                item.at ? formatWhen(item.at) : null,
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -69,12 +72,7 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
           {/* 사진이 왼쪽, 원문이 오른쪽. 좁은 화면에서는 사진 아래로 글이 내려온다. */}
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             {item.images.length > 0 ? (
-              <PhotoAlbum
-                href={`/profiles/${item.id}`}
-                images={item.images}
-                muted={!item.visible}
-                className="w-40 sm:w-52"
-              />
+              <PhotoAlbum images={item.images} muted={!item.visible} className="w-40 sm:w-52" />
             ) : (
               // 사진이 없어도 자리는 같게 둔다 — 줄마다 글 시작점이 달라지면 훑기 어렵다.
               <div className="flex aspect-3/4 w-40 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-ivory-200)] text-[12px] text-[var(--color-ink-700)] sm:w-52">
@@ -91,7 +89,9 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
               ) : item.summary ? (
                 // 원문 대신 정리된 내용을 같은 자리에 둔다. 원문이 아니라는 것은 머리말로 밝힌다.
                 <div className="rounded-lg bg-[var(--color-ivory-100)] px-3.5 py-3">
-                  <p className="text-[11.5px] text-[var(--surface-text-muted)]">{fallbackNote(item)}</p>
+                  <p className="text-[11.5px] text-[var(--surface-text-muted)]">
+                    {fallbackNote(item)}
+                  </p>
                   <p className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-[13px] leading-relaxed text-[var(--color-ink-800)]">
                     {item.summary}
                   </p>
@@ -116,5 +116,7 @@ function fallbackNote(item: RawListItem): string {
     : item.source
       ? "사진만 받았고 글은 없습니다."
       : "가져온 원본이 없습니다.";
-  return item.summary ? `${reason} 정리된 내용입니다.` : `${reason} 정리된 내용은 프로필에서 봅니다.`;
+  return item.summary
+    ? `${reason} 정리된 내용입니다.`
+    : `${reason} 정리된 내용은 프로필에서 봅니다.`;
 }

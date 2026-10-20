@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type CSSProperties } from "react";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { ProfileCode } from "@/components/ui/marks";
+import { PhotoZoom } from "@/components/ui/photo-zoom";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Empty } from "@/components/ui/empty";
@@ -200,16 +201,24 @@ function SignalRow({
       style={{ "--enter-i": index } as CSSProperties}
     >
       <div className="flex gap-3">
-        <Thumb href={href}>
-          {item.profile?.primaryImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.profile.primaryImage.url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : null}
-        </Thumb>
+        {item.profile?.primaryImage ? (
+          <PhotoZoom
+            photos={[item.profile.primaryImage]}
+            label={`${item.profile.code} 사진 크게 보기`}
+            className="shrink-0"
+          >
+            <span className={THUMB_BOX}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.profile.primaryImage.url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </span>
+          </PhotoZoom>
+        ) : (
+          <Thumb href={href} />
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -311,17 +320,17 @@ function SignalRow({
   );
 }
 
+const THUMB_BOX =
+  "block h-18 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--color-ivory-200)]";
+
 /**
- * 썸네일. 사진은 장식이라 접근명이 없으므로, 링크로 둘 때는 접근성 트리에서 감춘다 —
- * 옆의 공개 번호 링크가 같은 곳으로 가는 이름 있는 경로다.
+ * 사진이 없을 때의 빈 칸. 사진이 있으면 크게 보기 버튼이 이 자리에 온다.
+ * 링크로 둘 때는 접근성 트리에서 감춘다 — 옆의 공개 번호 링크가 같은 곳으로 가는 이름 있는 경로다.
  */
-function Thumb({ href, children }: { href: string | null; children: ReactNode }) {
-  const box = "h-18 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--color-ivory-200)]";
+function Thumb({ href }: { href: string | null }) {
   return href ? (
-    <Link href={href} aria-hidden tabIndex={-1} className={box}>
-      {children}
-    </Link>
+    <Link href={href} aria-hidden tabIndex={-1} className={THUMB_BOX} />
   ) : (
-    <div className={box}>{children}</div>
+    <div className={THUMB_BOX} />
   );
 }

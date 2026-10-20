@@ -99,7 +99,12 @@ export default async function HostHomePage() {
         const named = editable.has(p.id) || introduced.has(p.id);
         return [
           p.id,
-          { id: p.id, code: card.code, name: named ? p.realName : null, url: card.primaryImage?.url },
+          {
+            id: p.id,
+            code: card.code,
+            name: named ? p.realName : null,
+            url: card.primaryImage?.url,
+          },
         ];
       }),
     );
@@ -206,7 +211,10 @@ export default async function HostHomePage() {
                       className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-[var(--surface-border)] px-3 py-2.5"
                     >
                       <Party party={item.requester} />
-                      <span aria-label="에게" className="text-[13px] text-[var(--color-rose-400)]">
+                      <span
+                        aria-label="에게"
+                        className="text-[13px] text-[var(--color-rose-400)]"
+                      >
                         →
                       </span>
                       <Party party={item.target} />
@@ -289,9 +297,12 @@ function todoItems(todo: HostTodo): Task[] {
 
 /** 홈 첫 문장. 지금 손이 가야 할 것 하나만 말한다. */
 function greeting(todo: HostTodo, kpi: Kpi): string {
-  if (todo.intentsPending > 0) return `확인을 기다리는 요청이 ${todo.intentsPending}건 있습니다.`;
-  if (todo.requestsToRelay > 0) return `내 멤버에게 알릴 신청이 ${todo.requestsToRelay}건 있습니다.`;
-  if (todo.importsPending > 0) return `가져온 프로필 ${todo.importsPending}건이 검토를 기다립니다.`;
+  if (todo.intentsPending > 0)
+    return `확인을 기다리는 요청이 ${todo.intentsPending}건 있습니다.`;
+  if (todo.requestsToRelay > 0)
+    return `내 멤버에게 알릴 신청이 ${todo.requestsToRelay}건 있습니다.`;
+  if (todo.importsPending > 0)
+    return `가져온 프로필 ${todo.importsPending}건이 검토를 기다립니다.`;
   if (kpi.myProfiles === 0) return "첫 멤버를 등록해 보세요.";
   return "오늘은 조용합니다.";
 }
@@ -306,7 +317,9 @@ function TaskRow({ href, count, title, description, action }: Task) {
         {count > 99 ? "99+" : count}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[14px] font-medium text-[var(--surface-text)]">{title}</span>
+        <span className="block text-[14px] font-medium text-[var(--surface-text)]">
+          {title}
+        </span>
         <span className="mt-0.5 block text-[12.5px] text-[var(--surface-text-muted)]">
           {description}
         </span>
@@ -351,7 +364,10 @@ function StartSteps({ kpi }: { kpi: Kpi }) {
       title="시작하기"
       className="mb-6"
       action={
-        <Link href="/guide" className="text-[12.5px] text-[var(--color-rose-600)] hover:underline">
+        <Link
+          href="/guide"
+          className="text-[12.5px] text-[var(--color-rose-600)] hover:underline"
+        >
           화면 사진으로 보기
         </Link>
       }
@@ -431,9 +447,9 @@ function Party({ party }: { party: PartyView | null }) {
     );
   }
   return (
-    <Link href={`/profiles/${party.id}`} className="flex min-w-0 items-center gap-2 hover:opacity-80">
-      <Thumb url={party.url} size="sm" />
-      <span className="min-w-0">
+    <span className="flex min-w-0 items-center gap-2">
+      <Thumb url={party.url} size="sm" label={`${party.code} 사진 크게 보기`} />
+      <Link href={`/profiles/${party.id}`} className="min-w-0 hover:opacity-80">
         <span className="display block text-[14px] text-[var(--surface-text)]">
           {party.name ?? <ProfileCode code={party.code} />}
         </span>
@@ -442,8 +458,8 @@ function Party({ party }: { party: PartyView | null }) {
             <ProfileCode code={party.code} />
           </span>
         ) : null}
-      </span>
-    </Link>
+      </Link>
+    </span>
   );
 }
 

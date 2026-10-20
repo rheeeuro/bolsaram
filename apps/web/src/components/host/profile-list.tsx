@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { LoadMore } from "@/components/ui/load-more";
 import { ProfileCode } from "@/components/ui/marks";
+import { PhotoZoom } from "@/components/ui/photo-zoom";
 import { apiGet } from "@/lib/api-client";
 import { formatDay } from "@/lib/dates";
 import { label } from "@/lib/labels";
@@ -43,7 +44,9 @@ export function HostProfileList({
     const params = new URLSearchParams(query);
     params.set("cursor", page.nextCursor);
     if (page.mode === "raw") params.set("view", "raw");
-    const result = await apiGet<HostProfilePage>(`/api/admin/profiles/list?${params.toString()}`);
+    const result = await apiGet<HostProfilePage>(
+      `/api/admin/profiles/list?${params.toString()}`,
+    );
     inFlight.current = false;
     setLoading(false);
     if (!result.ok) {
@@ -97,38 +100,56 @@ export function HostProfileList({
 }
 
 function ProfileCard({ item }: { item: HostProfileCardItem }) {
+  const href = `/profiles/${item.id}`;
+  const photo = (
+    <div className="lift-shadow relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
+      {item.imageUrl ? (
+        // signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면
+        // URL 이 캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.imageUrl}
+          alt=""
+          loading="lazy"
+          className={cn(
+            "h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.02]",
+            // 비활성은 멤버에게 안 보인다 — 훑을 때 배지보다 먼저 눈에 걸리게 흑백으로 둔다.
+            !item.visible && "grayscale",
+          )}
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-700)]">
+          사진 없음
+        </div>
+      )}
+
+      {/* 상태는 둘뿐이고 활성이 평소 모습이다 — 예외인 비활성만 사진 위에 띄운다. */}
+      {!item.visible ? (
+        <span className="absolute left-2.5 top-2.5 rounded-[var(--radius-pill)] bg-[var(--color-ink-900)]/70 px-2.5 py-1 text-[11.5px] text-white backdrop-blur">
+          비활성 · 멤버에게 안 보임
+        </span>
+      ) : null}
+    </div>
+  );
+
+  // 사진을 누르면 크게 보고, 상세는 아래 이름 쪽으로 간다. 사진이 없으면 빈 칸도 상세로 간다.
   return (
-    <Link href={`/profiles/${item.id}`} className="lift-move group block">
-      <div className="lift-shadow relative aspect-3/4 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
-        {item.imageUrl ? (
-          // signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면
-          // URL 이 캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.imageUrl}
-            alt=""
-            loading="lazy"
-            className={cn(
-              "h-full w-full object-cover transition-transform duration-[var(--duration-base)] group-hover:scale-[1.02]",
-              // 비활성은 멤버에게 안 보인다 — 훑을 때 배지보다 먼저 눈에 걸리게 흑백으로 둔다.
-              !item.visible && "grayscale",
-            )}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[12px] text-[var(--color-ink-700)]">
-            사진 없음
-          </div>
-        )}
+    <div className="lift-move group">
+      {item.imageUrl ? (
+        <PhotoZoom
+          photos={[{ id: item.id, url: item.imageUrl }]}
+          label={`${item.name ?? item.code} 사진 크게 보기`}
+          className="w-full"
+        >
+          {photo}
+        </PhotoZoom>
+      ) : (
+        <Link href={href} aria-hidden tabIndex={-1} className="block">
+          {photo}
+        </Link>
+      )}
 
-        {/* 상태는 둘뿐이고 활성이 평소 모습이다 — 예외인 비활성만 사진 위에 띄운다. */}
-        {!item.visible ? (
-          <span className="absolute left-2.5 top-2.5 rounded-[var(--radius-pill)] bg-[var(--color-ink-900)]/70 px-2.5 py-1 text-[11.5px] text-white backdrop-blur">
-            비활성 · 멤버에게 안 보임
-          </span>
-        ) : null}
-      </div>
-
-      <div className="mt-2.5">
+      <Link href={href} className="mt-2.5 block">
         {/* 주선자는 번호가 아니라 이름으로 기억한다. 이름은 담당일 때만 온다. */}
         {item.name ? (
           <p className="display truncate text-[15px] text-[var(--color-ink-900)]">
@@ -169,7 +190,7 @@ function ProfileCard({ item }: { item: HostProfileCardItem }) {
             </>
           )}
         </p>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }

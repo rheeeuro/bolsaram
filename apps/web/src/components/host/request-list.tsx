@@ -6,6 +6,7 @@ import { useState } from "react";
 import { MATCH_REQUEST_STATUSES, MATCH_REQUEST_STATUS_LABELS } from "@bolsaram/schemas";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { ProfileCode } from "@/components/ui/marks";
+import { PhotoZoom } from "@/components/ui/photo-zoom";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/host/surface";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -262,7 +263,12 @@ function NotifyMember({
               : "새로 발급한 초대 링크입니다. 72시간 안에 처음 열어야 하고, 한 번 열면 그분의 입장 링크로 계속 쓰입니다."}
           </p>
           {joined ? (
-            <Button size="sm" variant="ghost" className="self-start" onClick={() => setOpen(false)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="self-start"
+              onClick={() => setOpen(false)}
+            >
               접기
             </Button>
           ) : null}
@@ -270,8 +276,8 @@ function NotifyMember({
       ) : (
         <>
           <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-700)]">
-            {target} 님은 아직 볼사람에 들어온 적이 없습니다. 초대 링크를 새로 발급해
-            문구에 붙입니다. 전에 보낸 링크가 있다면 더 이상 열리지 않습니다.
+            {target} 님은 아직 볼사람에 들어온 적이 없습니다. 초대 링크를 새로 발급해 문구에
+            붙입니다. 전에 보낸 링크가 있다면 더 이상 열리지 않습니다.
           </p>
           <div className="flex gap-2">
             <Button size="sm" disabled={busy || !profileId} onClick={() => void issueInvite()}>
@@ -291,15 +297,17 @@ function NotifyMember({
 type BehalfAction = "accept" | "reject" | "cancel";
 
 /** 되돌릴 수 없는 전이라 한 번 더 묻는다. 특히 수락은 그 자리에서 연락처를 공개한다. */
-const BEHALF_CONFIRM: Record<BehalfAction, (p: { requester: string; target: string }) => string> =
-  {
-    accept: ({ requester, target }) =>
-      `${target} 님이 수락했다고 기록할까요? 두 분이 연결되고 ${requester} 님과 서로의 이름·연락 방법이 공개됩니다.`,
-    reject: ({ target }) =>
-      `${target} 님이 거절했다고 기록할까요? 두 사람은 서로의 목록에서 빠지고 다시 신청할 수 없습니다.`,
-    cancel: ({ requester }) =>
-      `${requester} 님이 마음을 거뒀다고 기록할까요? 이 신청은 취소로 닫힙니다.`,
-  };
+const BEHALF_CONFIRM: Record<
+  BehalfAction,
+  (p: { requester: string; target: string }) => string
+> = {
+  accept: ({ requester, target }) =>
+    `${target} 님이 수락했다고 기록할까요? 두 분이 연결되고 ${requester} 님과 서로의 이름·연락 방법이 공개됩니다.`,
+  reject: ({ target }) =>
+    `${target} 님이 거절했다고 기록할까요? 두 사람은 서로의 목록에서 빠지고 다시 신청할 수 없습니다.`,
+  cancel: ({ requester }) =>
+    `${requester} 님이 마음을 거뒀다고 기록할까요? 이 신청은 취소로 닫힙니다.`,
+};
 
 const BEHALF_LABELS: Record<BehalfAction, string> = {
   accept: "수락",
@@ -375,35 +383,44 @@ function OnBehalf({
 
 function PartyCard({ party }: { party: Party }) {
   if (!party) {
-    return (
-      <span className="text-[13px] text-[var(--surface-text-muted)]">삭제된 프로필</span>
-    );
+    return <span className="text-[13px] text-[var(--surface-text-muted)]">삭제된 프로필</span>;
   }
+  const box =
+    "block h-14 w-11 shrink-0 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]";
+  // 사진은 크게 보기라 링크 밖에 둔다. 번호·이름 쪽이 상세로 간다.
   return (
-    <Link
-      href={`/profiles/${party.id}`}
-      className="flex min-w-0 shrink-0 items-center gap-2.5 transition-opacity hover:opacity-80"
-    >
-      <div className="h-14 w-11 shrink-0 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]">
-        {party.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={party.imageUrl}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-        ) : null}
-      </div>
-      <div className="min-w-0">
+    <span className="flex min-w-0 shrink-0 items-center gap-2.5">
+      {party.imageUrl ? (
+        <PhotoZoom
+          photos={[{ id: party.id, url: party.imageUrl }]}
+          label={`${party.code} 사진 크게 보기`}
+          className="shrink-0"
+        >
+          <span className={box}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={party.imageUrl}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          </span>
+        </PhotoZoom>
+      ) : (
+        <span className={box} />
+      )}
+      <Link
+        href={`/profiles/${party.id}`}
+        className="min-w-0 transition-opacity hover:opacity-80"
+      >
         <p className="display text-[15px] text-[var(--surface-text)]">
           <ProfileCode code={party.code} />
         </p>
         <p className="truncate text-[12px] text-[var(--surface-text-muted)]">
           {[party.name, `${party.birthYear}년생`].filter(Boolean).join(" · ")}
         </p>
-      </div>
-    </Link>
+      </Link>
+    </span>
   );
 }
 

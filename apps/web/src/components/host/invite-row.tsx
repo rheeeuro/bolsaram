@@ -43,12 +43,12 @@ export function InviteRow({
   return (
     <li className="px-5 py-3.5">
       <div className="flex items-center gap-4">
+        <Thumb url={imageUrl} size="sm" />
         <Link
           href={`/profiles/${profileId}`}
-          className="flex min-w-0 flex-1 items-center gap-4 transition-opacity hover:opacity-80"
+          className="min-w-0 flex-1 transition-opacity hover:opacity-80"
         >
-          <Thumb url={imageUrl} size="sm" />
-          <span className="min-w-0">
+          <span className="block min-w-0">
             <span className="display block text-[15px] text-[var(--surface-text)]">
               <ProfileCode code={`${code}번`} />
             </span>
@@ -90,17 +90,15 @@ export function InviteRow({
       {issued ? (
         <div className="mt-3 flex flex-col gap-2.5 rounded-[10px] bg-[var(--color-ivory-100)] p-3">
           <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
-            지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요. 한 번 열면 그분의 입장
-            링크로 계속 쓰입니다. 둘은 같은 것이고, 링크를 못 여는 분에게만 코드를 보냅니다.
+            지금만 볼 수 있습니다. 복사해서 카카오톡으로 보내세요. 한 번 열면 그분의 입장 링크로
+            계속 쓰입니다. 둘은 같은 것이고, 링크를 못 여는 분에게만 코드를 보냅니다.
           </p>
           <CopyField label="초대 링크" value={issued.url} />
           <CopyField label="입장코드" value={issued.code} />
         </div>
       ) : null}
 
-      {error ? (
-        <p className="mt-2 text-[12px] text-[var(--color-danger)]">{error}</p>
-      ) : null}
+      {error ? <p className="mt-2 text-[12px] text-[var(--color-danger)]">{error}</p> : null}
     </li>
   );
 }

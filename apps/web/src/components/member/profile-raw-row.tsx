@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 import { FavoriteButton } from "@/components/member/favorite-button";
-import { cardLines, enterProps, HeightNote, profileHref } from "@/components/member/profile-card";
+import {
+  cardLines,
+  enterProps,
+  HeightNote,
+  profileHref,
+} from "@/components/member/profile-card";
 import { AiRecommendBadge, ProfileCode } from "@/components/ui/marks";
 import { PhotoAlbum } from "@/components/ui/photo-album";
 import { cn } from "@/lib/cn";
@@ -31,7 +36,10 @@ export function ProfileRawRow({ profile, index }: { profile: ProfileRawView; ind
     >
       {/* 하트는 링크 안에 넣을 수 없어 형제로 겹친다. 오른쪽은 그 자리로 비워 둔다. */}
       <Link href={href} className="flex items-baseline gap-2 pr-10">
-        <ProfileCode code={profile.code} className="display text-[15px] text-[var(--color-ink-900)]" />
+        <ProfileCode
+          code={profile.code}
+          className="display text-[15px] text-[var(--color-ink-900)]"
+        />
         <span className="truncate text-[12.5px] text-[var(--color-ink-700)]">
           {lines.birth}
           <HeightNote height={lines.height} after={lines.birth} />
@@ -47,7 +55,7 @@ export function ProfileRawRow({ profile, index }: { profile: ProfileRawView; ind
       {/* 사진이 왼쪽, 글이 오른쪽. 좁은 화면에서는 사진 아래로 글이 내려온다. */}
       <div className="mt-3 flex flex-col gap-3 sm:flex-row">
         {profile.images.length > 0 ? (
-          <PhotoAlbum href={href} images={profile.images} className="w-44 sm:w-48" />
+          <PhotoAlbum images={profile.images} className="w-44 sm:w-48" />
         ) : (
           // 사진이 없어도 자리는 같게 둔다 — 줄마다 글 시작점이 달라지면 훑기 어렵다.
           <Link

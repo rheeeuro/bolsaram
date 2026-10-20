@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FavoriteButton } from "@/components/member/favorite-button";
 import { AiRecommendBadge, ProfileCode } from "@/components/ui/marks";
+import { PhotoZoom } from "@/components/ui/photo-zoom";
 import {
   cardLines,
   enterProps,
@@ -35,27 +36,24 @@ export function ProfileRow({
   const enter = enterProps(index);
   return (
     <article className={cn("relative", enter.className)} style={enter.style}>
-      {/* 하트는 링크 안에 넣을 수 없어 형제로 겹친다. 오른쪽 44px 는 그 자리로 비워 둔다. */}
-      <Link href={href} className="flex items-center gap-3 py-2.5 pr-12">
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
-          {profile.primaryImage ? (
-            // signed URL 은 매 요청마다 새로 발급된다. next/image 최적화를 쓰면
-            // URL 이 캐시되어 만료 후 깨지므로 img 를 그대로 쓴다.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={profile.primaryImage.url}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center px-1 text-center text-[10.5px] leading-tight text-[var(--color-ink-700)]">
-              사진 준비 중
-            </div>
-          )}
-        </div>
+      {/* 사진은 크게 보기, 글자 쪽은 상세로 간다. 하트는 링크 안에 넣을 수 없어 형제로 겹친다.
+          오른쪽 44px 는 그 자리로 비워 둔다. */}
+      <div className="flex items-center gap-3 py-2.5 pr-12">
+        {profile.primaryImage ? (
+          <PhotoZoom
+            photos={[profile.primaryImage]}
+            label={`${profile.code} 사진 크게 보기`}
+            className="shrink-0"
+          >
+            <RowThumb profile={profile} />
+          </PhotoZoom>
+        ) : (
+          <Link href={href} aria-hidden tabIndex={-1} className="shrink-0">
+            <RowThumb profile={profile} />
+          </Link>
+        )}
 
-        <div className="min-w-0 flex-1">
+        <Link href={href} className="flex min-w-0 flex-1 flex-col justify-center self-stretch">
           <p className="flex items-baseline gap-2">
             <ProfileCode
               code={profile.code}
@@ -70,8 +68,8 @@ export function ProfileRow({
             {lines.work}
             <HeightNote height={lines.height} after={lines.work} />
           </p>
-        </div>
-      </Link>
+        </Link>
+      </div>
 
       <FavoriteButton
         profileId={profile.id}
@@ -79,5 +77,27 @@ export function ProfileRow({
         className="right-0 top-1/2 -translate-y-1/2"
       />
     </article>
+  );
+}
+
+function RowThumb({ profile }: { profile: ProfileCardView }) {
+  return (
+    <div className="h-16 w-16 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-ivory-200)]">
+      {profile.primaryImage ? (
+        // signed URL 은 매 요청마다 새로 발급된다. next/image 최적화를 쓰면
+        // URL 이 캐시되어 만료 후 깨지므로 img 를 그대로 쓴다.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={profile.primaryImage.url}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center px-1 text-center text-[10.5px] leading-tight text-[var(--color-ink-700)]">
+          사진 준비 중
+        </div>
+      )}
+    </div>
   );
 }

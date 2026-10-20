@@ -9,7 +9,7 @@ import { withRls } from "@bolsaram/db";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { findProfilesByIds } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
-import { Blank, Count, PageHeader, Panel, Row, RowList, Thumb } from "@/components/host/surface";
+import { Blank, Count, PageHeader, Panel, RowList, Thumb } from "@/components/host/surface";
 import { InviteRow } from "@/components/host/invite-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
@@ -53,8 +53,7 @@ export default async function HostInvitesPage({
   const raw = await searchParams;
   const q = (typeof raw.q === "string" ? raw.q : "").trim().slice(0, 100);
   const parsedPage = Number(typeof raw.page === "string" ? raw.page : "1");
-  const requestedPage =
-    Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const requestedPage = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const numberQuery = q.replace(/[^0-9]/g, "");
 
   const listing = await withRls(rlsContextOf(viewer), async (sql) => {
@@ -226,20 +225,29 @@ export default async function HostInvitesPage({
               <div className="-mx-5 -my-5">
                 <RowList>
                   {joined.map((row) => (
-                    <Row key={row.profile_id} href={`/profiles/${row.profile_id}`}>
+                    // 사진은 크게 보기라 링크 밖에 두고, 나머지 줄 전체가 상세로 간다.
+                    <li
+                      key={row.profile_id}
+                      className="flex items-center gap-4 pl-5 transition-colors duration-[var(--duration-quick)] hover:bg-[var(--surface-muted)]"
+                    >
                       <Thumb url={row.imageUrl} size="sm" />
-                      <Identity code={row.public_code} name={row.real_name} />
-                      <div className="ml-auto flex items-center gap-3 text-[12.5px] text-[var(--surface-text-muted)]">
-                        {row.phone ? (
-                          <span className="hidden sm:inline">{maskPhone(row.phone)}</span>
-                        ) : null}
-                        <span>
-                          {row.last_login_at
-                            ? `${formatDay(row.last_login_at.toISOString())} 방문`
-                            : "방문 전"}
-                        </span>
-                      </div>
-                    </Row>
+                      <Link
+                        href={`/profiles/${row.profile_id}`}
+                        className="flex min-w-0 flex-1 items-center gap-4 py-3.5 pr-5"
+                      >
+                        <Identity code={row.public_code} name={row.real_name} />
+                        <div className="ml-auto flex items-center gap-3 text-[12.5px] text-[var(--surface-text-muted)]">
+                          {row.phone ? (
+                            <span className="hidden sm:inline">{maskPhone(row.phone)}</span>
+                          ) : null}
+                          <span>
+                            {row.last_login_at
+                              ? `${formatDay(row.last_login_at.toISOString())} 방문`
+                              : "방문 전"}
+                          </span>
+                        </div>
+                      </Link>
+                    </li>
                   ))}
                 </RowList>
               </div>
@@ -247,7 +255,10 @@ export default async function HostInvitesPage({
           ) : null}
 
           {listing.totalPages > 1 ? (
-            <nav aria-label="초대 목록 페이지" className="flex items-center justify-center gap-3">
+            <nav
+              aria-label="초대 목록 페이지"
+              className="flex items-center justify-center gap-3"
+            >
               {listing.page > 1 ? (
                 <Link
                   href={pageHref(listing.page - 1)}

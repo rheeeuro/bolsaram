@@ -65,13 +65,11 @@ export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
       className="mb-5 border-[var(--color-rose-200)]"
     >
       <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
-        멤버가 누른 것은 아직 상대에게 가지 않았습니다. 확인하면 그때 전달됩니다.
-        보고 있는 모임과 상관없이 맡은 분들의 요청을 모두 보여줍니다.
+        멤버가 누른 것은 아직 상대에게 가지 않았습니다. 확인하면 그때 전달됩니다. 보고 있는
+        모임과 상관없이 맡은 분들의 요청을 모두 보여줍니다.
       </p>
 
-      {error ? (
-        <p className="mb-3 text-[13px] text-[var(--color-danger)]">{error}</p>
-      ) : null}
+      {error ? <p className="mb-3 text-[13px] text-[var(--color-danger)]">{error}</p> : null}
 
       <ul className="stagger flex flex-col gap-2.5">
         {items.map((item) => (
@@ -126,7 +124,7 @@ function Who({ party }: { party: Party }) {
   }
   return (
     <span className="flex min-w-0 shrink-0 items-center gap-2">
-      <Thumb url={party.imageUrl} size="sm" />
+      <Thumb url={party.imageUrl} size="sm" label={`${party.code} 사진 크게 보기`} />
       <span className="min-w-0">
         <span className="display block text-[14px] text-[var(--surface-text)]">
           <ProfileCode code={party.code} />

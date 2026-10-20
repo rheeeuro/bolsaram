@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProfileCode } from "@/components/ui/marks";
+import { PhotoZoom } from "@/components/ui/photo-zoom";
 import { ProfilesListLink } from "@/components/host/profiles-list-link";
 import { cn } from "@/lib/cn";
 import type { ReactNode } from "react";
@@ -94,9 +95,7 @@ export function PageHeader({
 
 /** 목록 위에 붙는 건수 표시. 제목 옆에서 조용히 읽히게 둔다. */
 export function Count({ children }: { children: ReactNode }) {
-  return (
-    <span className="text-[13px] text-[var(--surface-text-muted)]">{children}</span>
-  );
+  return <span className="text-[13px] text-[var(--surface-text-muted)]">{children}</span>;
 }
 
 export function Panel({
@@ -214,28 +213,34 @@ export function Row({
   );
 }
 
-/** 목록/카드용 사진 썸네일. 사진이 없어도 자리를 지켜 목록이 흔들리지 않게 한다. */
+/**
+ * 목록/카드용 사진 썸네일. 사진이 없어도 자리를 지켜 목록이 흔들리지 않게 한다.
+ * 사진이 있으면 누를 때 크게 본다 — 그래서 링크 안에 넣지 않는다(`PhotoZoom`).
+ */
 export function Thumb({
   url,
   size = "md",
+  label,
 }: {
   url: string | null | undefined;
   size?: "sm" | "md";
+  /** 크게 보기 버튼의 접근명. */
+  label?: string;
 }) {
+  const box = cn(
+    "block shrink-0 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]",
+    size === "sm" ? "h-11 w-9" : "h-16 w-12",
+  );
+  if (!url) return <div className={box} />;
   return (
-    <div
-      className={cn(
-        "shrink-0 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]",
-        size === "sm" ? "h-11 w-9" : "h-16 w-12",
-      )}
-    >
-      {url ? (
-        // signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면 URL 이
-        // 캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다.
-        // eslint-disable-next-line @next/next/no-img-element
+    <PhotoZoom photos={[{ id: url, url }]} label={label} className="shrink-0">
+      <span className={box}>
+        {/* signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면 URL 이
+            캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
-      ) : null}
-    </div>
+      </span>
+    </PhotoZoom>
   );
 }
 
