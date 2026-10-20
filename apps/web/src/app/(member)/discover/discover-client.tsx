@@ -321,7 +321,7 @@ export function DiscoverClient() {
 
 
 /**
- * 한 줄 목록 · 사진 격자 · 원본 전환.
+ * 사진 격자 · 한 줄 목록 · 원본 전환. 처음 열리는 사진을 맨 앞에 둔다.
  * 사진을 크게 보고 싶은 사람도, 눌러 보지 않고 내용까지 훑고 싶은 사람도 있어서 고르게 둔다.
  */
 function ViewToggle({
@@ -343,6 +343,16 @@ function ViewToggle({
       )}
     >
       <ViewToggleButton
+        label="사진으로 보기"
+        active={value === "grid"}
+        onClick={() => onChange("grid")}
+      >
+        <path
+          d="M3.5 3.5h5.5v5.5H3.5zM11 3.5h5.5v5.5H11zM3.5 11h5.5v5.5H3.5zM11 11h5.5v5.5H11z"
+          fill="currentColor"
+        />
+      </ViewToggleButton>
+      <ViewToggleButton
         label="목록으로 보기"
         active={value === "list"}
         onClick={() => onChange("list")}
@@ -353,16 +363,6 @@ function ViewToggle({
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
-        />
-      </ViewToggleButton>
-      <ViewToggleButton
-        label="사진으로 보기"
-        active={value === "grid"}
-        onClick={() => onChange("grid")}
-      >
-        <path
-          d="M3.5 3.5h5.5v5.5H3.5zM11 3.5h5.5v5.5H11zM3.5 11h5.5v5.5H3.5zM11 11h5.5v5.5H11z"
-          fill="currentColor"
         />
       </ViewToggleButton>
       <ViewToggleButton
