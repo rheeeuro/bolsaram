@@ -204,6 +204,7 @@ function SignalRow({
         {item.profile?.primaryImage ? (
           <PhotoZoom
             photos={[item.profile.primaryImage]}
+            profileId={item.profile.id}
             label={`${item.profile.code} 사진 크게 보기`}
             className="shrink-0"
           >

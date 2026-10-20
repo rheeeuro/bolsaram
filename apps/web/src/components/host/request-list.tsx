@@ -393,6 +393,7 @@ function PartyCard({ party }: { party: Party }) {
       {party.imageUrl ? (
         <PhotoZoom
           photos={[{ id: party.id, url: party.imageUrl }]}
+          profileId={party.id}
           label={`${party.code} 사진 크게 보기`}
           className="shrink-0"
         >

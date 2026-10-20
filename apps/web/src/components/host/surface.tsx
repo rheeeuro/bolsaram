@@ -220,10 +220,13 @@ export function Row({
 export function Thumb({
   url,
   size = "md",
+  profileId,
   label,
 }: {
   url: string | null | undefined;
   size?: "sm" | "md";
+  /** 주면 크게 볼 때 그 사람의 사진 전체를 넘겨 본다. */
+  profileId?: string;
   /** 크게 보기 버튼의 접근명. */
   label?: string;
 }) {
@@ -233,7 +236,12 @@ export function Thumb({
   );
   if (!url) return <div className={box} />;
   return (
-    <PhotoZoom photos={[{ id: url, url }]} label={label} className="shrink-0">
+    <PhotoZoom
+      photos={[{ id: url, url }]}
+      profileId={profileId}
+      label={label}
+      className="shrink-0"
+    >
       <span className={box}>
         {/* signed URL 은 응답마다 새로 발급된다. next/image 최적화를 태우면 URL 이
             캐시되어 만료 뒤 깨지므로 img 를 그대로 쓴다. */}

@@ -230,7 +230,7 @@ export default async function HostInvitesPage({
                       key={row.profile_id}
                       className="flex items-center gap-4 pl-5 transition-colors duration-[var(--duration-quick)] hover:bg-[var(--surface-muted)]"
                     >
-                      <Thumb url={row.imageUrl} size="sm" />
+                      <Thumb url={row.imageUrl} profileId={row.profile_id} size="sm" />
                       <Link
                         href={`/profiles/${row.profile_id}`}
                         className="flex min-w-0 flex-1 items-center gap-4 py-3.5 pr-5"

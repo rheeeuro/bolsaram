@@ -124,7 +124,12 @@ function Who({ party }: { party: Party }) {
   }
   return (
     <span className="flex min-w-0 shrink-0 items-center gap-2">
-      <Thumb url={party.imageUrl} size="sm" label={`${party.code} 사진 크게 보기`} />
+      <Thumb
+        url={party.imageUrl}
+        profileId={party.id}
+        size="sm"
+        label={`${party.code} 사진 크게 보기`}
+      />
       <span className="min-w-0">
         <span className="display block text-[14px] text-[var(--surface-text)]">
           <ProfileCode code={party.code} />

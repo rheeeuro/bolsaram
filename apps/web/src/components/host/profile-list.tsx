@@ -138,6 +138,7 @@ function ProfileCard({ item }: { item: HostProfileCardItem }) {
       {item.imageUrl ? (
         <PhotoZoom
           photos={[{ id: item.id, url: item.imageUrl }]}
+          profileId={item.id}
           label={`${item.name ?? item.code} 사진 크게 보기`}
           className="w-full"
         >

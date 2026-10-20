@@ -42,6 +42,7 @@ export function ProfileRow({
         {profile.primaryImage ? (
           <PhotoZoom
             photos={[profile.primaryImage]}
+            profileId={profile.id}
             label={`${profile.code} 사진 크게 보기`}
             className="shrink-0"
           >

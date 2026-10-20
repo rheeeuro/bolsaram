@@ -80,6 +80,7 @@ export function ProfileCard({
       {profile.primaryImage ? (
         <PhotoZoom
           photos={[profile.primaryImage]}
+          profileId={profile.id}
           label={`${profile.code} 사진 크게 보기`}
           className="w-full"
         >

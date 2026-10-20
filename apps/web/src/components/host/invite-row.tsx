@@ -43,7 +43,7 @@ export function InviteRow({
   return (
     <li className="px-5 py-3.5">
       <div className="flex items-center gap-4">
-        <Thumb url={imageUrl} size="sm" />
+        <Thumb url={imageUrl} profileId={profileId} size="sm" />
         <Link
           href={`/profiles/${profileId}`}
           className="min-w-0 flex-1 transition-opacity hover:opacity-80"

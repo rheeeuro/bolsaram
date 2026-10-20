@@ -448,7 +448,12 @@ function Party({ party }: { party: PartyView | null }) {
   }
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <Thumb url={party.url} size="sm" label={`${party.code} 사진 크게 보기`} />
+      <Thumb
+        url={party.url}
+        profileId={party.id}
+        size="sm"
+        label={`${party.code} 사진 크게 보기`}
+      />
       <Link href={`/profiles/${party.id}`} className="min-w-0 hover:opacity-80">
         <span className="display block text-[14px] text-[var(--surface-text)]">
           {party.name ?? <ProfileCode code={party.code} />}
