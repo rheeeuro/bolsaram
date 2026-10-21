@@ -10,17 +10,22 @@ import { isR2Key, deleteR2Object } from "./r2.js";
  */
 import { rm } from "node:fs/promises";
 import path from "node:path";
-import { NOTIFICATION_RETRY_WINDOW_DAYS, TELEGRAM_SESSION_TTL_HOURS } from "@bolsaram/domain";
+import {
+  NOTIFICATION_RETRY_WINDOW_DAYS,
+  PENDING_IMPORT_TTL_HOURS,
+  TELEGRAM_SESSION_TTL_HOURS,
+} from "@bolsaram/domain";
 import type { Sql } from "./client.js";
 
-/** 보존 기간(일). 운영 정책이 정해지면 이 값을 조정한다. */
+/**
+ * 보존 기간(일). 운영 정책이 정해지면 이 값을 조정한다.
+ * 등록되지 않은 Import 세션은 시간 단위라 여기 없다 — `PENDING_IMPORT_TTL_HOURS`(도메인).
+ */
 export const RETENTION = {
   /** 만료·폐기된 세션 행 */
   sessions: 30,
   /** 회수된 초대(재발급·기한 초과). 연결된 개인 입장 링크는 살아 있는 동안 지우지 않는다 */
   invites: 90,
-  /** 등록되지 않은 채 방치된 Import 세션 — 원본 사진까지 지운다 */
-  abandonedImports: 30,
   /** 등록이 끝난 Import 세션의 모델 원문(raw_model_output) */
   rawModelOutput: 14,
   /** 감사 로그 */
@@ -157,7 +162,8 @@ export const STEPS: Step[] = [
 ];
 
 /**
- * 등록되지 않고 방치된 Import 세션과 그 원본 사진을 지운다.
+ * 등록되지 않고 방치된 Import 세션(검토 대기)과 그 원본 사진을 지운다.
+ * 마지막으로 손댄 뒤 `PENDING_IMPORT_TTL_HOURS` 가 지난 것이 대상이다.
  * 파일을 먼저 지우고 행을 지운다 — 반대로 하면 참조를 잃은 파일이 영원히 남는다.
  */
 export async function purgeAbandonedImports(
@@ -174,8 +180,8 @@ export async function purgeAbandonedImports(
        LEFT JOIN import_assets a ON a.import_session_id = s.id
       WHERE s.committed_profile_id IS NULL
         AND s.status <> 'IMPORTED'
-        AND s.updated_at < now() - make_interval(days => $1)`,
-    [RETENTION.abandonedImports],
+        AND s.updated_at < now() - make_interval(hours => $1)`,
+    [PENDING_IMPORT_TTL_HOURS],
   );
   if (candidates.rowCount === 0) return { sessions: 0, files: 0, skipped: 0 };
 

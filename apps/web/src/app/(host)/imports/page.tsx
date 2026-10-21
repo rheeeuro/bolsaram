@@ -10,6 +10,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { withRls } from "@bolsaram/db";
+import { PENDING_IMPORT_TTL_HOURS } from "@bolsaram/domain";
 import type { ExtractedFields } from "@bolsaram/schemas";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import { Badge, toneForStatus } from "@/components/ui/badge";
@@ -102,6 +103,12 @@ export default async function ImportInboxPage({
             <InboxTab href="/imports?tab=done" active={done} count={counts.done}>
               등록됨
             </InboxTab>
+            {/* 정리 작업이 지우는 기준과 같은 값이다(마지막으로 손댄 뒤부터 센다). */}
+            {!done ? (
+              <span className="ml-auto text-[12px] text-[var(--surface-text-muted)]">
+                {PENDING_IMPORT_TTL_HOURS}시간 지나면 자동 삭제
+              </span>
+            ) : null}
           </nav>
           {items.length === 0 ? (
             <Blank>

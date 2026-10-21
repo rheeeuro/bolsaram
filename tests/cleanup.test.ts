@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner, type Sql } from "@bolsaram/db";
+import { PENDING_IMPORT_TTL_HOURS } from "@bolsaram/domain";
 import { purgeAbandonedImports, runCleanup } from "../packages/db/src/cleanup";
 import { runTag } from "./tags";
 
@@ -27,10 +28,14 @@ async function seedFile(key: string): Promise<void> {
 
 /** updated_at 을 과거로 돌린다. set_updated_at 트리거가 되돌리므로 잠시 끈다. */
 async function ageSession(sql: Sql, id: string, days: number): Promise<void> {
+  await ageSessionHours(sql, id, days * 24);
+}
+
+async function ageSessionHours(sql: Sql, id: string, hours: number): Promise<void> {
   await sql.query(`ALTER TABLE import_sessions DISABLE TRIGGER import_sessions_set_updated_at`);
   await sql.query(
-    `UPDATE import_sessions SET updated_at = now() - make_interval(days => $2) WHERE id = $1`,
-    [id, days],
+    `UPDATE import_sessions SET updated_at = now() - make_interval(hours => $2) WHERE id = $1`,
+    [id, hours],
   );
   await sql.query(`ALTER TABLE import_sessions ENABLE TRIGGER import_sessions_set_updated_at`);
 }
@@ -128,6 +133,27 @@ describe("purgeAbandonedImports", () => {
 
       const still = await sql.query(`SELECT 1 FROM import_sessions WHERE id = $1`, [sessionId]);
       expect(still.rowCount).toBe(1);
+    });
+  });
+
+  it("검토 대기는 마지막으로 손댄 뒤 24시간이 지나면 지운다", async () => {
+    await withOwner(async (sql) => {
+      const expired = await newSession(sql);
+      const fresh = await newSession(sql);
+      const key = `import/${expired}/expired.png`;
+      await seedFile(key);
+      await addAsset(sql, expired, key);
+      await ageSessionHours(sql, expired, PENDING_IMPORT_TTL_HOURS + 1);
+      await ageSessionHours(sql, fresh, PENDING_IMPORT_TTL_HOURS - 1);
+
+      await purgeAbandonedImports(sql, STORAGE);
+
+      const left = await sql.query<{ id: string }>(
+        `SELECT id FROM import_sessions WHERE id = ANY($1)`,
+        [[expired, fresh]],
+      );
+      expect(left.rows.map((r) => r.id)).toEqual([fresh]);
+      expect(existsSync(path.join(STORAGE, key))).toBe(false);
     });
   });
 

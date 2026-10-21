@@ -109,8 +109,9 @@ COMMIT   (실패 시 ROLLBACK 후 원래 오류를 그대로 올린다)
 
 ## 정리 작업
 
-`cleanup.ts` 는 만료 세션·초대·감사 로그·보낸 알림을 지우고, 오래 방치된 Import 원본
-사진을 삭제한다.
+`cleanup.ts` 는 만료 세션·초대·감사 로그·보낸 알림을 지우고, 등록되지 않은 Import 세션
+(검토 대기)을 마지막으로 손댄 뒤 `PENDING_IMPORT_TTL_HOURS`(도메인, 24시간)가 지나면
+원본 사진과 함께 삭제한다. 정리는 하루 한 번이라 실제 삭제는 그 뒤 첫 실행 때다.
 
 못 보낸 알림은 재시도 창(`NOTIFICATION_RETRY_WINDOW_DAYS`)이 지나면 함께 지운다 —
 그 창을 넘기면 발송 대상이 아니므로 쌓이기만 한다. 창 값은 도메인에 하나만 두고
@@ -137,6 +138,7 @@ pnpm db:reset     # public 스키마 초기화 — 데이터가 전부 사라진
 
 - 새 테이블에는 `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY` + `GRANT ... TO bolsaram_app` 를
   함께 넣는다. 하나라도 빠지면 품질 게이트가 막는다.
-- 정리 보존기간은 `cleanup.ts` 의 `RETENTION` 한 곳에 모여 있다.
+- 정리 보존기간은 `cleanup.ts` 의 `RETENTION` 에 모여 있다. 검토 대기 Import 만 시간 단위라
+  도메인 `PENDING_IMPORT_TTL_HOURS` 를 쓴다(가져오기 화면 안내와 같은 값).
 - 검증: `pnpm --filter @bolsaram/db typecheck`,
   `npx vitest run tests/rls.test.ts tests/cleanup.test.ts`

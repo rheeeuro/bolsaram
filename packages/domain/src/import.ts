@@ -15,6 +15,12 @@ import {
 } from "@bolsaram/schemas";
 import { DomainError } from "./errors";
 
+/**
+ * 등록하지 않은 가져오기(검토 대기)를 남겨 두는 시간. 마지막으로 손댄 뒤 이만큼 지나면
+ * 정리 작업이 세션과 원본 사진을 지운다 — 미등록 원문·사진을 오래 쥐고 있지 않는다.
+ */
+export const PENDING_IMPORT_TTL_HOURS = 24;
+
 const ALLOWED_IMPORT_TRANSITIONS: Record<ImportStatus, readonly ImportStatus[]> = {
   RECEIVED: ["UPLOADING", "ANALYZING", "FAILED"],
   UPLOADING: ["UPLOADING", "ANALYZING", "RECEIVED", "FAILED"],

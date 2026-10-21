@@ -25,7 +25,7 @@ packages/domain/src/
 ├── errors.ts       DomainError + HTTP status 매핑
 ├── match.ts        소개 신청 상태 기계 (누가·언제·무엇으로)
 ├── visibility.ts   단계적 정보 공개 (LIST / DETAIL / INTRODUCED / OWNER / ADMIN)
-├── import.ts       Import 상태 기계 · 원문 정규화 · 검토 판정(재판정 보정) · 게시 게이트
+├── import.ts       Import 상태 기계 · 원문 정규화 · 검토 판정(재판정 보정) · 게시 게이트 · 검토 대기 보관 시간
 ├── filters.ts      Discover·주선자 목록 필터 → SQL 조각 · 커서 페이지네이션
 ├── telegram.ts     봇 대화 상태 기계 · 메시지 분류 · 원문 합치기 · 글 나누기 · 앨범 판정
 ├── notify.ts       알림 재시도 창·시도 상한 (발송과 정리가 같은 값을 본다)

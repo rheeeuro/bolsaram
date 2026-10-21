@@ -30,7 +30,11 @@ import {
   PROFILE_STATUS_LABELS,
   REQUIRED_FIELDS_FOR_COMMIT,
 } from "@bolsaram/schemas";
-import { TELEGRAM_COMMANDS, TELEGRAM_SESSION_TTL_HOURS } from "@bolsaram/domain";
+import {
+  PENDING_IMPORT_TTL_HOURS,
+  TELEGRAM_COMMANDS,
+  TELEGRAM_SESSION_TTL_HOURS,
+} from "@bolsaram/domain";
 import { TELEGRAM_MAX_FILE_BYTES } from "@bolsaram/schemas";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -300,13 +304,18 @@ describe("개인정보 처리방침이 실제 동작과 같다", () => {
     for (const [key, label] of [
       ["sessions", "30일"],
       ["invites", "90일"],
-      ["abandonedImports", "30일"],
       ["rawModelOutput", "14일"],
       ["auditLogs", "365일"],
     ] as const) {
       expect(days(key), `${key} 상수를 읽지 못했습니다`).toBeGreaterThan(0);
       expect(text, `${key} 보관 기간이 방침에 없습니다`).toContain(`${days(key)}일`);
     }
+  });
+
+  it("검토 대기 가져오기는 24시간 — 방침과 주선자 가이드가 같다", () => {
+    expect(PENDING_IMPORT_TTL_HOURS).toBe(24);
+    expect(privacy()).toContain(`${PENDING_IMPORT_TTL_HOURS}시간`);
+    expect(guide("admin.md")).toContain(`${PENDING_IMPORT_TTL_HOURS}시간`);
   });
 
   it("사진을 AI 에 보내지 않는다고 적혀 있다", () => {
