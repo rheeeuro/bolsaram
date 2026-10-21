@@ -194,21 +194,47 @@ export function assertCommittable(
  * 카카오톡에서 복사한 프로필 글을 분석에 넣기 전에 다듬는다.
  * - CRLF 정규화, 제로폭 문자 제거
  * - 카카오톡이 붙이는 `[이름] [오후 3:12]` 말머리 제거
+ * - 주선 방 공지(「🌸클린메세지🌸」 블록) 제거
  * - 3줄 이상 연속 공백 축약
  * 원문 자체는 별도 컬럼에 그대로 보관하고, 이 결과는 프롬프트 입력에만 쓴다.
  */
 export function normalizeRawText(input: string): string {
-  return (
-    input
-      .replace(/\r\n?/g, "\n")
-      // 제로폭 공백·결합자·BOM (U+200B–U+200D, U+FEFF)
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .split("\n")
-      .map((line) => line.replace(/^\[[^\]]{1,30}\]\s*\[[^\]]{1,20}\]\s*/, "").trimEnd())
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim()
-  );
+  const lines = input
+    .replace(/\r\n?/g, "\n")
+    // 제로폭 공백·결합자·BOM (U+200B–U+200D, U+FEFF)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .split("\n")
+    .map((line) => line.replace(/^\[[^\]]{1,30}\]\s*\[[^\]]{1,20}\]\s*/, "").trimEnd());
+  return stripHouseNotices(lines)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** 공지 머리줄. 「🌸클린메세지🌸」처럼 꾸밈 문자가 붙고 「메시지」로도 쓴다. */
+const NOTICE_HEADER = /^[^\p{L}\p{N}]*클린\s*메[세시]지[^\p{L}\p{N}]*$/u;
+/** 머리줄 뒤 공지 본문으로 보는 줄. 다음 사람 글이 빈 줄 없이 바로 이어 붙기도 해서 낱말로 가린다. */
+const NOTICE_BODY = /에티켓|매너|파투|잠수|노쇼|회신|답장|주선자에게/u;
+
+/**
+ * 주선 방이 프로필마다 붙이는 에티켓 공지를 뺀다. 그 사람의 소개가 아니라서 남겨 두면
+ * AI 가 자기소개나 이상형 조건(「빠른회신」을 바라고 「잠수」를 피한다)으로 옮긴다.
+ * 머리줄과, 그 바로 뒤에서 공지 낱말이 든 줄(최대 4줄)만 지운다.
+ */
+function stripHouseNotices(lines: string[]): string[] {
+  const kept: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!NOTICE_HEADER.test(lines[i]!)) {
+      kept.push(lines[i]!);
+      continue;
+    }
+    let skip = 0;
+    while (skip < 4 && i + 1 < lines.length && NOTICE_BODY.test(lines[i + 1]!)) {
+      i++;
+      skip++;
+    }
+  }
+  return kept;
 }
 
 /** 이름으로 읽을 줄머리. 카카오톡 프로필 양식에서 실제로 쓰는 표기만 둔다. */

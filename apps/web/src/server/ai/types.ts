@@ -63,7 +63,7 @@ export interface ContinuationJudge {
 }
 
 /** 프롬프트를 고칠 때마다 올린다. 추출 결과에 함께 저장해 재현 가능하게 한다. */
-export const PROMPT_VERSION = "2026-10-19.1";
+export const PROMPT_VERSION = "2026-10-21.1";
 
 /** 열거형 코드와 한글 이름. 이상형 조건에서 「수도권」「비흡연자」를 코드로 옮기게 한다. */
 const codes = (values: readonly string[], labels: Record<string, string>) =>
@@ -82,6 +82,8 @@ export const SYSTEM_PROMPT = [
   "- 각 필드의 confidence 를 0~1 로 매긴다. null 인 필드는 0 에 가깝게 둔다.",
   "- 애매하거나 사람이 확인해야 하는 부분은 notes 에 한국어 한 줄로 적는다.",
   "- 텍스트와 이미지가 충돌하면 텍스트를 우선한다.",
+  "- 주선 방이 모든 프로필에 붙이는 공지(「클린메세지」, 「상대방·주선자에게 기본 에티켓 필수」, 「당일파투·잠수 금지, 빠른회신」 같은",
+  "  참여 규칙)는 이 사람의 소개가 아니다. bio·idealTypeText·idealCriteria·hashtags 어디에도 옮기지 않는다.",
   "",
   "거주 구·시·군(residenceDistrict):",
   "- 서울이면 구, 경기면 시·군을 고른다. 다른 광역이거나 원문에 구·시·군·동네가 없으면 null 이다.",
