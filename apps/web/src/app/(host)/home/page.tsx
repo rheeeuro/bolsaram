@@ -335,6 +335,13 @@ function TaskRow({ href, count, title, description, action }: Task) {
 function StartSteps({ kpi }: { kpi: Kpi }) {
   const steps = [
     {
+      done: kpi.telegramLinked,
+      title: "텔레그램 봇 연결 (선택)",
+      description: "카카오톡에서 받은 프로필을 볼사람을 열지 않고 바로 보냅니다.",
+      href: "/account",
+      action: "연결",
+    },
+    {
       done: kpi.myProfiles > 0,
       title: "첫 멤버 등록",
       description: "카카오톡에서 받은 사진과 글을 올리면 AI가 항목을 채웁니다.",
@@ -347,13 +354,6 @@ function StartSteps({ kpi }: { kpi: Kpi }) {
       description: "등록한 분에게 링크를 보내면 그 링크로 멤버 화면에 들어옵니다.",
       href: "/invites",
       action: "초대",
-    },
-    {
-      done: kpi.telegramLinked,
-      title: "텔레그램 봇 연결 (선택)",
-      description: "카카오톡에서 받은 프로필을 볼사람을 열지 않고 바로 보냅니다.",
-      href: "/account",
-      action: "연결",
     },
   ];
   // 다음에 할 단계 하나만 버튼으로 강조한다.
