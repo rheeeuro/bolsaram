@@ -36,7 +36,7 @@ export default async function HostProfileDetailPage({
         viewerUserId={viewer.userId}
         bump={data.bump}
         invite={data.invite}
-        source={data.source}
+        original={data.original}
         memo={data.memo}
       />
     </>

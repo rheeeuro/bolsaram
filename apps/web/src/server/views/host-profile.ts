@@ -20,7 +20,12 @@ import {
   type ProfileMemo,
 } from "../repo/profiles";
 import { imageUrlFor } from "./image-url";
-import { disclosureFor, toDetailView, type ProfileDetailView } from "./profile-view";
+import {
+  disclosureFor,
+  profileSummaryText,
+  toDetailView,
+  type ProfileDetailView,
+} from "./profile-view";
 
 export type HostProfileData = {
   /** 등록한 주선자인가. 전체공개 풀은 모두가 보지만 고치는 것은 등록한 사람뿐이다(0011). */
@@ -49,10 +54,11 @@ export type HostProfileData = {
   /** 담당일 때만 읽는다. 초대는 등록한 주선자만 발급한다. */
   invite: { expiresAt: string; claimed: boolean } | null;
   /**
-   * 가져올 때 받은 카카오톡 원문. 담당일 때만 읽는다 — 원문에는 이름·연락처가 섞여
-   * 있을 수 있고, RLS 도 남의 전체공개 세션은 보여주지 않는다.
+   * 「받은 원본」 칸. 목록의 받은 원본 보기와 같은 글을 싣는다 — 원문이 있으면 원문,
+   * 없으면 정리된 줄글이다. 원문은 담당일 때만 읽는다 — 이름·연락처가 섞여 있을 수
+   * 있고, RLS 도 남의 전체공개 세션은 보여주지 않는다.
    */
-  source: { sessionId: string; rawText: string } | null;
+  original: HostProfileOriginal;
   /** 등록한 주선자만 보는 메모. 담당일 때만 읽는다 — RLS 도 남에게는 행을 주지 않는다. */
   memo: ProfileMemo | null;
   /**
@@ -60,6 +66,19 @@ export type HostProfileData = {
    * 따로 싣는다 — 이상형 글을 정리한 값이라 글을 볼 수 있는 주선자에게 새로 드러나는 것이 없다.
    */
   idealCriteria: IdealCriteria | null;
+};
+
+export type HostProfileOriginal = {
+  /** 가져오기 세션. 담당이고 가져오기로 들어왔을 때만 온다 — 받은 사진 전체를 여는 길이다. */
+  sessionId: string | null;
+  /** 가져온 경로(텔레그램·웹). 세션이 없으면 null. */
+  importSource: string | null;
+  committedAt: string | null;
+  rawText: string | null;
+  /** 담당이 아니라 원문을 읽을 수 없다 — 원문이 없는 것과 다르게 안내한다. */
+  sourceHidden: boolean;
+  /** 원문이 없을 때 대신 보여줄 정리된 줄글. 공개 단계를 통과한 값만 담는다. */
+  summary: string | null;
 };
 
 export async function loadHostProfile(
@@ -100,9 +119,11 @@ export async function loadHostProfile(
     const memo = canEdit ? await findProfileMemo(sql, profile.id) : null;
     const registrar = await findProfileRegistrar(sql, profile.id);
 
+    const view = toDetailView(profile, level);
+
     return {
       canEdit,
-      view: toDetailView(profile, level),
+      view,
       status: profile.status,
       claimed: profile.userId != null,
       lastVisitAt: visit?.rows[0]?.last_login_at?.toISOString() ?? null,
@@ -122,7 +143,14 @@ export async function loadHostProfile(
       invite: latest
         ? { expiresAt: latest.expires_at.toISOString(), claimed: latest.claimed_at != null }
         : null,
-      source: source?.rawText ? { sessionId: source.sessionId, rawText: source.rawText } : null,
+      original: {
+        sessionId: source?.sessionId ?? null,
+        importSource: source?.source ?? null,
+        committedAt: source?.committedAt?.toISOString() ?? null,
+        rawText: source?.rawText ?? null,
+        sourceHidden: !canEdit,
+        summary: profileSummaryText(view),
+      },
       memo,
       idealCriteria: profile.idealCriteria,
     };

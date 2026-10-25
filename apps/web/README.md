@@ -185,7 +185,7 @@ server/
 ├── services/recommend-service.ts  AI 추천 — 보는 멤버에게 추천인 사람 집합·한 사람 판정 (저장된 조건끼리 견주기, AI 호출 없음)
 ├── views/
 │   ├── profile-view.ts       공개 단계 판정·적용 + signed URL 부착
-│   ├── host-profile.ts       주선자 상세·편집이 함께 쓰는 프로필 하나 읽기 (권한·공개 단계·초대·등록한 주선자)
+│   ├── host-profile.ts       주선자 상세·편집이 함께 쓰는 프로필 하나 읽기 (권한·공개 단계·초대·등록한 주선자·받은 원본)
 │   ├── host-profile-list.ts  주선자 프로필 목록 한 페이지 (카드·원본) — 첫 화면과 이어 불러오기가 함께 쓴다
 │   ├── group-message.ts      채팅 메시지 → 화면 모양 (작성자 사진 키 → 단기 signed URL)
 │   └── image-url.ts          사진 하나짜리 저장 키 → 단기 signed URL (주선자·모임 사진)

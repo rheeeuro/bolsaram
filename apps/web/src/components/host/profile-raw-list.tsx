@@ -109,8 +109,13 @@ export function ProfileRawList({ items }: { items: RawListItem[] }) {
   );
 }
 
-/** 원문을 못 보여주는 이유. 정리된 내용이 있으면 그 머리말이 된다. */
-function fallbackNote(item: RawListItem): string {
+/**
+ * 원문을 못 보여주는 이유. 정리된 내용이 있으면 그 머리말이 된다.
+ * 프로필 상세의 「받은 원본」 칸도 같은 문구를 쓴다.
+ */
+export function fallbackNote(
+  item: Pick<RawListItem, "sourceHidden" | "source" | "summary">,
+): string {
   const reason = item.sourceHidden
     ? "원본은 등록한 주선자만 봅니다."
     : item.source

@@ -20,6 +20,8 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import type { ProfileDetailView } from "@/server/views/profile-view";
+import type { HostProfileOriginal } from "@/server/views/host-profile";
+import { fallbackNote } from "@/components/host/profile-raw-list";
 import { formatWhen } from "@/lib/dates";
 
 /** 어느 버튼에서 난 실패인가. 한 곳에 모아 두면 무엇이 실패했는지 짝을 잃는다. */
@@ -64,7 +66,7 @@ export function HostProfileDetail({
   viewerUserId,
   bump,
   invite,
-  source,
+  original,
   memo,
 }: {
   profile: ProfileDetailView;
@@ -82,8 +84,8 @@ export function HostProfileDetail({
   /** 마지막 끌어올림·다음 가능 시각(ISO)과 지금 못 하는 이유. */
   bump: { lastAt: string | null; nextAt: string | null; blockedReason: string | null };
   invite: { expiresAt: string; claimed: boolean } | null;
-  /** 가져올 때 받은 카카오톡 원문. 담당일 때만 온다. */
-  source: { sessionId: string; rawText: string } | null;
+  /** 「받은 원본」 칸 — 원문(담당일 때만) 또는 정리된 줄글. */
+  original: HostProfileOriginal;
   /** 등록한 주선자만 보는 메모. 담당일 때만 온다. */
   memo: { body: string; updatedAt: string } | null;
 }) {
@@ -428,22 +430,41 @@ export function HostProfileDetail({
             </Panel>
           ) : null}
 
-          {source ? (
-            <Panel title="카카오톡 원문">
-              <details>
-                <summary className="cursor-pointer text-[12.5px] text-[var(--surface-text-muted)] hover:text-[var(--color-rose-600)]">
-                  가져올 때 받은 글 그대로 보기
-                </summary>
-                <p className="mt-3 max-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--color-ivory-100)] px-3.5 py-3 text-[13px] leading-relaxed text-[var(--color-ink-800)]">
-                  {source.rawText}
+          {original.rawText || original.summary ? (
+            <Panel
+              title="받은 원본"
+              action={
+                <span className="text-[11.5px] text-[var(--surface-text-muted)]">
+                  {[
+                    original.importSource ? label.importSource(original.importSource) : null,
+                    original.committedAt ? formatWhen(original.committedAt) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              }
+            >
+              {/* 목록의 받은 원본 보기와 같은 글이다. 원문이 없으면 정리된 줄글을 같은 자리에 둔다. */}
+              {original.rawText ? null : (
+                <p className="mb-2 text-[11.5px] text-[var(--surface-text-muted)]">
+                  {fallbackNote({
+                    sourceHidden: original.sourceHidden,
+                    source: original.importSource,
+                    summary: original.summary,
+                  })}
                 </p>
+              )}
+              <p className="max-h-96 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--color-ivory-100)] px-3.5 py-3 text-[13px] leading-relaxed text-[var(--color-ink-800)]">
+                {original.rawText ?? original.summary}
+              </p>
+              {original.sessionId ? (
                 <Link
-                  href={`/imports/${source.sessionId}`}
+                  href={`/imports/${original.sessionId}`}
                   className="mt-2.5 inline-block text-[12.5px] text-[var(--color-rose-600)] hover:underline"
                 >
                   받은 사진까지 모두 보기
                 </Link>
-              </details>
+              ) : null}
             </Panel>
           ) : null}
         </div>
