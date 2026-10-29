@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MATCH_INTENT_KIND_LABELS, type MatchIntentKind } from "@bolsaram/schemas";
@@ -130,14 +131,18 @@ function Who({ party }: { party: Party }) {
         size="sm"
         label={`${party.code} 사진 크게 보기`}
       />
-      <span className="min-w-0">
+      {/* 사진은 크게 보기라 링크 밖에 둔다. 번호·생년 쪽이 상세로 간다. */}
+      <Link
+        href={`/profiles/${party.id}`}
+        className="min-w-0 transition-opacity hover:opacity-80"
+      >
         <span className="display block text-[14px] text-[var(--surface-text)]">
           <ProfileCode code={party.code} />
         </span>
         <span className="block truncate text-[11.5px] text-[var(--surface-text-muted)]">
           {[party.name, `${party.birthYear}년생`].filter(Boolean).join(" · ")}
         </span>
-      </span>
+      </Link>
     </span>
   );
 }
