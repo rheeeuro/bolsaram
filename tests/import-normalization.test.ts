@@ -132,6 +132,16 @@ describe("검토 판정", () => {
     );
   });
 
+  it("선택 필드는 신뢰도가 낮아도 강조만 하고 공개를 막지 않는다", () => {
+    const fields = { ...complete(), jobCategory: "IT" as const };
+    const confidence = { ...highConfidence(fields), jobCategory: 0.4 };
+    expect(reviewFields(fields, confidence).find((r) => r.key === "jobCategory")).toMatchObject({
+      needsAttention: true,
+      required: false,
+    });
+    expect(statusAfterExtraction(fields, confidence)).toBe("READY");
+  });
+
   it("값이 없는 선택 필드는 확인 대상이 아니다", () => {
     const fields = complete();
     const review = reviewFields(fields, highConfidence(fields));

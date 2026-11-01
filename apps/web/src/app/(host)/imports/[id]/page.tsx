@@ -5,6 +5,7 @@ import { withRls } from "@bolsaram/db";
 import { reviewFields } from "@bolsaram/domain";
 import { requireAdminPage, rlsContextOf } from "@/server/auth/guard";
 import {
+  effectiveConfidence,
   effectiveFields,
   latestExtraction,
   listAssets,
@@ -68,7 +69,7 @@ export default async function ImportDetailPage({
             notes: extraction.notes,
             model: extraction.model,
             promptVersion: extraction.promptVersion,
-            review: reviewFields(fields, extraction.confidence),
+            review: reviewFields(fields, effectiveConfidence(extraction)),
           }
         : null,
     };

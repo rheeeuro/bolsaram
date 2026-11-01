@@ -99,6 +99,9 @@ REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
 
 `assertCommittable(status, fields, { publish })` 가 AI 결과의 자동 게시를 막는다.
 확인이 필요한 항목이 남은 상태(`REVIEW_REQUIRED`)에서는 비공개 등록만 되고 공개는 거부된다.
+`statusAfterExtraction()` 은 **필수 항목**(`REQUIRED_FIELDS_FOR_COMMIT`)만 본다 — 비었거나
+신뢰도가 낮거나 엇갈린 필수 항목이 있으면 `REVIEW_REQUIRED` 다. 선택 항목은 신뢰도가 낮아도
+`reviewFields()` 의 `needsAttention` 으로 검토 화면에서 강조만 되고 공개를 막지 않는다.
 **이 판정은 UI 가 아니라 여기에 있다** — 화면을 우회한 API 호출도 막혀야 하기 때문이다.
 
 `normalizeRawText()` 는 카카오톡 말머리(`[이름] [오후 3:12]`)와 제로폭 문자를 정리하고,
@@ -112,7 +115,8 @@ REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
 `calibrateConfidence()` 는 열거형 일곱 항목(`JUDGED_FIELDS`)을 다시 판정한 확률로 신뢰도를
 바꾼다. 값이 있는 항목은 그 값의 확률이 신뢰도가 되고, 재판정이 다른 값(「원문에 없음」은
 `null`)을 기준선 이상으로 고르면 엇갈림(`FieldDispute`)으로 돌려준다. **값은 바꾸지 않는다.**
-엇갈린 항목을 `statusAfterExtraction()` 에 넘기면 빈 칸이어도 `REVIEW_REQUIRED` 다.
+엇갈린 필수 항목을 `statusAfterExtraction()` 에 넘기면 `REVIEW_REQUIRED` 다. 선택 항목의
+엇갈림은 검토 화면의 메모로만 남는다.
 
 `pickRealName()` 은 원문의 「이름: ○○○」 줄에서 이름을 꺼내 검토 화면의 이름 칸을 미리
 채운다. **AI 에 맡기지 않는다** — 이름은 추출 스키마에 없고, 줄머리가 없으면 추측하지

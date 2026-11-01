@@ -60,9 +60,10 @@ const photoSizes = [
 
 describe("메시지 분류", () => {
   it("사진은 가장 큰 해상도를 고른다", () => {
-    const intent = classifyTelegramMessage(message({ photo: photoSizes }));
+    const intent = classifyTelegramMessage(message({ message_id: 42, photo: photoSizes }));
     expect(intent).toMatchObject({
       kind: "photo",
+      messageId: 42,
       fileId: "large",
       mimeType: "image/jpeg",
       declaredSize: 240_000,

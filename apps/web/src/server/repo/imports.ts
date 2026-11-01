@@ -444,7 +444,11 @@ export async function upsertAsset(
  * 순서를 `MAX(sort_order) + 1` 로 정하므로 같은 세션에 동시 요청이 들어오면
  * 같은 번호를 잡을 수 있다. 앨범은 여러 webhook 으로 나뉘어 오므로 실제로 일어난다.
  * 그래서 세션 행을 먼저 잠가 직렬화한다 — UNIQUE 위반으로 재시도하는 대신
- * 도착 순서를 그대로 보존한다.
+ * 한 번에 하나씩 붙인다.
+ *
+ * 잠금 순서는 다운로드가 끝난 순서라 보낸 순서와 다르다. 텔레그램 메시지 번호
+ * (`sourceMessageId`)가 있으면 붙인 뒤 그 번호 순서로 자리를 다시 맞춘다 — 첫 장이
+ * 대표 사진이 되므로 보낸 순서가 곧 대표를 정한다.
  */
 export async function appendUploadedAsset(
   sql: Sql,
@@ -454,6 +458,7 @@ export async function appendUploadedAsset(
     filename: string | null;
     mimeType: string;
     byteSize: number;
+    sourceMessageId?: number | null;
   },
 ): Promise<ImportAssetRecord> {
   const locked = await sql.query(`SELECT id FROM import_sessions WHERE id = $1 FOR UPDATE`, [
@@ -466,13 +471,59 @@ export async function appendUploadedAsset(
   const result = await sql.query<AssetRow>(
     `INSERT INTO import_assets
        (import_session_id, storage_key, original_filename, mime_type, byte_size,
-        sort_order, uploaded_at)
-     SELECT $1, $2, $3, $4, $5, COALESCE(MAX(sort_order) + 1, 0), now()
+        sort_order, uploaded_at, source_message_id)
+     SELECT $1, $2, $3, $4, $5, COALESCE(MAX(sort_order) + 1, 0), now(), $6
        FROM import_assets WHERE import_session_id = $1
      RETURNING id, storage_key, original_filename, mime_type, byte_size, sort_order, uploaded_at`,
-    [input.sessionId, input.storageKey, input.filename, input.mimeType, input.byteSize],
+    [
+      input.sessionId,
+      input.storageKey,
+      input.filename,
+      input.mimeType,
+      input.byteSize,
+      input.sourceMessageId ?? null,
+    ],
   );
-  return toAsset(result.rows[0]!);
+  const inserted = toAsset(result.rows[0]!);
+  if (input.sourceMessageId == null) return inserted;
+
+  const moved = await reorderByMessageId(sql, input.sessionId);
+  const order = moved.get(inserted.id);
+  return order == null ? inserted : { ...inserted, sortOrder: order };
+}
+
+/**
+ * 메시지 번호가 있는 에셋끼리 차지한 자리를 메시지 번호 순서로 다시 나눈다.
+ * 웹 업로드처럼 번호가 없는 에셋의 자리는 건드리지 않는다.
+ *
+ * `(import_session_id, sort_order)` UNIQUE 가 즉시 검사되므로 자리를 맞바꾸는
+ * UPDATE 한 번으로는 중간에 충돌한다. 옮길 행을 음수 자리로 비켜 둔 뒤 놓는다.
+ * 호출하는 쪽이 세션 행을 잠가 두어야 한다. 옮긴 행의 새 자리를 돌려준다.
+ */
+async function reorderByMessageId(sql: Sql, sessionId: string): Promise<Map<string, number>> {
+  const rows = await sql.query<{ id: string; sort_order: number }>(
+    `SELECT id, sort_order FROM import_assets
+      WHERE import_session_id = $1 AND source_message_id IS NOT NULL
+      ORDER BY source_message_id, created_at`,
+    [sessionId],
+  );
+  const slots = rows.rows.map((r) => r.sort_order).sort((a, b) => a - b);
+  const moves = rows.rows
+    .map((row, index) => ({ id: row.id, from: row.sort_order, to: slots[index]! }))
+    .filter((move) => move.from !== move.to);
+  if (moves.length === 0) return new Map();
+
+  const ids = moves.map((m) => m.id);
+  await sql.query(`UPDATE import_assets SET sort_order = -1 - sort_order WHERE id = ANY($1)`, [
+    ids,
+  ]);
+  await sql.query(
+    `UPDATE import_assets a SET sort_order = m.to_order
+       FROM unnest($1::uuid[], $2::smallint[]) AS m(id, to_order)
+      WHERE a.id = m.id`,
+    [ids, moves.map((m) => m.to)],
+  );
+  return new Map(moves.map((m) => [m.id, m.to]));
 }
 
 export async function markAssetUploaded(sql: Sql, assetId: string): Promise<void> {
@@ -603,6 +654,21 @@ export function effectiveFields(extraction: ImportExtractionRecord | null): Extr
     ...extraction.fields,
     ...(extraction.reviewedFields ?? {}),
   });
+}
+
+/**
+ * 사람이 고치거나 확인한 항목은 신뢰도 1 로 본 최종 신뢰도. 상태 재판정과 검토 화면이
+ * 같은 값을 써야 저장한 뒤 화면이 이미 확인한 칸을 다시 강조하지 않는다.
+ */
+export function effectiveConfidence(
+  extraction: ImportExtractionRecord | null,
+): ExtractionConfidence {
+  if (!extraction) return {};
+  const confidence = { ...extraction.confidence };
+  for (const key of Object.keys(extraction.reviewedFields ?? {}) as (keyof ExtractedFields)[]) {
+    confidence[key] = 1;
+  }
+  return confidence;
 }
 
 export { statusAfterExtraction, normalizeRawText, assertCommittable, extractedFieldsSchema };

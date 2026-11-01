@@ -157,7 +157,7 @@ describe("analyze — 재판정 보정", () => {
     expect(extraction?.notes.some((n) => n.includes("다시 보니"))).toBe(false);
   });
 
-  it("엇갈리면 값은 두고 안내를 앞에 싣고 검토 단계로 보낸다", async () => {
+  it("선택 항목이 엇갈리면 값은 두고 안내를 앞에 싣되 공개를 막지 않는다", async () => {
     const output = await agreeing();
     output.judgements.religion = {
       choice: "CHRISTIAN",
@@ -170,7 +170,8 @@ describe("analyze — 재판정 보정", () => {
     const id = await newSession(SAMPLE_TEXT);
     const result = await analyzeSession(admin, id);
 
-    expect(result.status).toBe("REVIEW_REQUIRED");
+    // 종교는 필수가 아니라 검토 화면에서 강조만 한다.
+    expect(result.status).toBe("READY");
     const extraction = await withRls(admin, (sql) => latestExtraction(sql, id));
     expect(extraction?.fields.religion).toBe("NONE");
     expect(extraction?.confidence.religion).toBe(0.1);

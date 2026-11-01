@@ -75,15 +75,20 @@ export function reviewFields(
 }
 
 /**
- * AI 결과를 곧바로 게시하지 않기 위한 판정: 하나라도 확인 필요면 REVIEW_REQUIRED.
- * `disputed` 는 다시 판정한 값이 추출 값과 엇갈린 항목이다 — 빈 칸이어도 사람이 본다.
+ * 바로 공개해도 되는지의 판정: **필수 항목** 중 하나라도 비었거나 확신이 낮거나
+ * 다시 판정한 값과 엇갈리면 REVIEW_REQUIRED.
+ *
+ * 선택 항목(직업군·종교 등)은 확신이 낮아도 검토 화면에서 강조만 하고 막지 않는다 —
+ * 게시 조건은 필수 항목의 사람 확인이고, 공개 등록 자체는 늘 사람이 누른다.
  */
 export function statusAfterExtraction(
   fields: ExtractedFields,
   confidence: ExtractionConfidence,
   disputed: readonly (keyof ExtractedFields)[] = [],
 ): Extract<ImportStatus, "READY" | "REVIEW_REQUIRED"> {
-  return disputed.length > 0 || reviewFields(fields, confidence).some((f) => f.needsAttention)
+  const required = REQUIRED_FIELDS_FOR_COMMIT as readonly (keyof ExtractedFields)[];
+  return disputed.some((key) => required.includes(key)) ||
+    reviewFields(fields, confidence).some((f) => f.required && f.needsAttention)
     ? "REVIEW_REQUIRED"
     : "READY";
 }
@@ -184,7 +189,7 @@ export function assertCommittable(
   if (options.publish && status !== "READY") {
     throw new DomainError(
       "INVALID_STATE",
-      "확인이 필요한 항목이 남아 있어 바로 공개할 수 없습니다. 검토를 끝내거나 비공개로 등록해 주세요.",
+      "확인이 필요한 필수 항목이 남아 있어 바로 공개할 수 없습니다. 강조된 필수 칸을 확인하거나 비공개로 등록해 주세요.",
       { status },
     );
   }

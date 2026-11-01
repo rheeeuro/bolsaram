@@ -271,6 +271,8 @@ export function ImportReview({
     extraction?.review.filter((f) =>
       dirty.has(f.key) ? f.required && (values[f.key] ?? "").trim() === "" : f.needsAttention,
     ) ?? [];
+  // 공개를 막는 것은 필수 칸뿐이다. 나머지 강조 칸은 확인하지 않아도 공개할 수 있다.
+  const blocking = attention.filter((f) => f.required);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[400px_1fr]">
@@ -416,6 +418,7 @@ export function ImportReview({
               <p className="mb-3 text-[12px] text-[var(--surface-text-muted)]">
                 AI가 자신 없어 한 칸({Math.round(LOW_CONFIDENCE_THRESHOLD * 100)}% 미만)과 비어
                 있는 필수 칸(*)이 강조됩니다. 값이 틀리면 고치고, 맞으면 「맞아요」를 누르세요.
+                공개하려면 필수 칸만 확인하면 됩니다.
               </p>
 
               <div className="grid gap-2.5 sm:grid-cols-2">
@@ -512,7 +515,7 @@ export function ImportReview({
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     className={COMPACT_ON_PHONE}
-                    disabled={busy != null || attention.length > 0}
+                    disabled={busy != null || blocking.length > 0}
                     onClick={() => void commit(true)}
                   >
                     {busy === "commit" ? "등록 중…" : "등록하고 공개"}
@@ -534,9 +537,13 @@ export function ImportReview({
                     {busy === "review" ? "저장 중…" : "저장만 하기"}
                   </Button>
 
-                  {attention.length > 0 ? (
+                  {blocking.length > 0 ? (
                     <span className="text-[12px] text-[var(--color-warning)]">
-                      강조된 칸 {attention.length}개를 확인하면 공개할 수 있습니다.
+                      강조된 필수 칸 {blocking.length}개를 확인하면 공개할 수 있습니다.
+                    </span>
+                  ) : attention.length > 0 ? (
+                    <span className="text-[12px] text-[var(--surface-text-muted)]">
+                      강조된 칸 {attention.length}개는 확인하지 않아도 공개할 수 있습니다.
                     </span>
                   ) : dirty.size > 0 ? (
                     <span className="text-[12px] text-[var(--surface-text-muted)]">

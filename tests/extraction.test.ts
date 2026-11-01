@@ -314,11 +314,17 @@ describe("재판정 보정", () => {
     expect(disputes).toEqual([]);
   });
 
-  it("엇갈린 항목이 있으면 다른 항목이 모두 확실해도 검토 단계로 보낸다", () => {
+  it("필수 항목이 엇갈리면 다른 항목이 모두 확실해도 검토 단계로 보낸다", () => {
     const fields = base();
     const sure = Object.fromEntries(EXTRACTED_FIELD_KEYS.map((k) => [k, 1]));
     expect(statusAfterExtraction(fields, sure)).toBe("READY");
-    expect(statusAfterExtraction(fields, sure, ["smoking"])).toBe("REVIEW_REQUIRED");
+    expect(statusAfterExtraction(fields, sure, ["gender"])).toBe("REVIEW_REQUIRED");
+  });
+
+  it("선택 항목이 엇갈린 것만으로는 공개를 막지 않는다", () => {
+    const fields = base();
+    const sure = Object.fromEntries(EXTRACTED_FIELD_KEYS.map((k) => [k, 1]));
+    expect(statusAfterExtraction(fields, sure, ["smoking"])).toBe("READY");
   });
 
   it("보기가 정해진 항목만 재판정한다", () => {

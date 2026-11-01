@@ -10,6 +10,7 @@ import {
   assertCommittable,
   calibrateConfidence,
   normalizeRawText,
+  reviewFields,
   statusAfterExtraction,
   type FieldDispute,
 } from "@bolsaram/domain";
@@ -228,12 +229,9 @@ export async function applyExtractionReview(
   });
 
   // 사람이 채운 값을 반영해 다시 판정한다. 사람이 고친 필드는 신뢰도 1로 본다.
+  const reviewed = { ...extraction, reviewedFields: merged };
   const fields = { ...extraction.fields, ...merged };
-  const confidence = { ...extraction.confidence };
-  for (const key of Object.keys(merged) as (keyof typeof merged)[]) {
-    confidence[key] = 1;
-  }
-  const next = statusAfterExtraction(fields, confidence);
+  const next = statusAfterExtraction(fields, imports.effectiveConfidence(reviewed));
   if (next !== session.status) await imports.setStatus(sql, input.sessionId, next);
 
   await writeAudit(sql, {
@@ -249,6 +247,18 @@ export async function applyExtractionReview(
   });
 
   return { status: next, fields: imports.effectiveFields({ ...extraction, reviewedFields: merged }) };
+}
+
+/**
+ * 공개 등록을 막고 있는 필수 항목의 이름. 검토 화면이 공개 버튼을 잠그는 칸과 같은
+ * 판정이다 — 봇이 공개 등록을 거절할 때 어느 칸 때문인지 말해 주는 데 쓴다.
+ */
+export async function fieldsAwaitingReview(sql: Sql, sessionId: string): Promise<string[]> {
+  const extraction = await imports.latestExtraction(sql, sessionId);
+  if (!extraction) return [];
+  return reviewFields(imports.effectiveFields(extraction), imports.effectiveConfidence(extraction))
+    .filter((f) => f.required && f.needsAttention)
+    .map((f) => FIELD_LABELS[f.key] ?? f.key);
 }
 
 export type CommitResult = {

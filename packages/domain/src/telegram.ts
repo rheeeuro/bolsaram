@@ -125,6 +125,8 @@ export type TelegramIntent =
   | { kind: "command"; command: TelegramCommand; argument: string | null }
   | {
       kind: "photo";
+      /** 대화 안에서 보낸 순서대로 커지는 번호. 사진 순서를 이것으로 정한다. */
+      messageId: number;
       fileId: string;
       fileUniqueId: string;
       /** 텔레그램이 알려준 크기. 없으면 내려받은 뒤에 확인한다. */
@@ -171,6 +173,7 @@ export function classifyTelegramMessage(message: TelegramMessage): TelegramInten
     const largest = message.photo[message.photo.length - 1]!;
     return {
       kind: "photo",
+      messageId: message.message_id,
       fileId: largest.file_id,
       fileUniqueId: largest.file_unique_id,
       declaredSize: largest.file_size ?? null,
@@ -188,6 +191,7 @@ export function classifyTelegramMessage(message: TelegramMessage): TelegramInten
     }
     return {
       kind: "photo",
+      messageId: message.message_id,
       fileId: message.document.file_id,
       fileUniqueId: message.document.file_unique_id,
       declaredSize: message.document.file_size ?? null,

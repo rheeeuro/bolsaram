@@ -43,7 +43,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `cleanup.test.ts`              | 만료 정리·참조된 사진 보존·경로 탈출           | 필요 | 7    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범·글 나누기(자리·확인값·버튼 값·기준선) | –    | 54   |
 | `telegram-split.test.ts`       | webhook→버튼 「새 사람으로 나누기」(Bot API·판정기 가짜) — 나눔·다시 누름·다음 사람 진행 중·같은 사람은 묻지 않음 | 필요 | 4 |
-| `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기·권한 경계 | 필요 | 32 |
+| `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기(보낸 순서 유지)·권한 경계 | 필요 | 36 |
 | `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
 | `group-isolation.test.ts`      | 모임 간 격리·대행 중 풀 경계·claim 가로채기 차단 | 필요 | 22   |
 | `member-magic-link.test.ts`    | 초대 링크 로그인·계정 생성·replay·멤버 삭제    | 필요 | 8    |
@@ -117,6 +117,7 @@ docker exec bolsaram_postgres dropdb -U bolsaram_owner --force bolsaram_test
 | `telegram-import.test.ts` 「연결되지 않은 …신원이 없다」   | 검색으로 봇을 찾은 외부인 차단      |
 | `telegram-import.test.ts` 「멤버 계정으로는 …없다」        | 텔레그램은 주선자 전용 채널         |
 | `telegram-import.test.ts` 「같은 앨범이 동시에」           | 앨범 사진의 순서·번호 충돌 없음     |
+| `telegram-import.test.ts` 「동시에 들어와도 첫 장은 …」    | 대표가 되는 첫 장은 먼저 보낸 사진  |
 | `telegram-import.test.ts` 「런타임 롤은 …접근할 수 없다」  | 봇 연결 코드·webhook 이벤트 격리    |
 | `telegram-import.test.ts` 「모임이 없어도 …만든다」        | 모임 없는 주선자도 봇을 쓸 수 있음  |
 | `telegram-import.test.ts` 「웹에서 보는 채널을 바꿔도」    | 봇이 담는 곳이 화면을 따라 움직이지 않음 |

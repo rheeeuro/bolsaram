@@ -63,6 +63,7 @@ import {
   analyzeLatestText,
   applyExtractionReview,
   commitSession,
+  fieldsAwaitingReview,
 } from "../services/import-service";
 import { buildStorageKey, putObject } from "../storage/local";
 import {
@@ -491,9 +492,13 @@ async function applyCommit(
   } catch (error) {
     if (error instanceof DomainError && (error.code === "VALIDATION" || error.code === "INVALID_STATE")) {
       console.info(`텔레그램 응답: 등록 거절 · ${error.code}`);
+      const pending =
+        error.code === "INVALID_STATE"
+          ? await withRls(ctx, (sql) => fieldsAwaitingReview(sql, action.sessionId))
+          : [];
       await answerCallbackQuery(
         callback.id,
-        error.code === "VALIDATION" ? messages.commitMissing : messages.commitNeedsReview,
+        error.code === "VALIDATION" ? messages.commitMissing : messages.commitNeedsReview(pending),
         true,
       );
       return;
@@ -585,6 +590,7 @@ async function handlePhoto(
       filename: intent.filename,
       mimeType: downloaded.mimeType,
       byteSize: downloaded.byteSize,
+      sourceMessageId: intent.messageId,
     });
 
     const session = await imports.requireSession(sql, conversation.importSessionId);

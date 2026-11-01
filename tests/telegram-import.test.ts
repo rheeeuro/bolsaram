@@ -41,7 +41,11 @@ import {
   saveExtraction,
   setStatus,
 } from "../apps/web/src/server/repo/imports";
-import { applyExtractionReview } from "../apps/web/src/server/services/import-service";
+import {
+  applyExtractionReview,
+  commitSession,
+  fieldsAwaitingReview,
+} from "../apps/web/src/server/services/import-service";
 import { encodeGenderCallback, parseTelegramCallback } from "@bolsaram/domain";
 import { emptyExtractedFields } from "@bolsaram/schemas";
 import { runTag } from "./tags";
@@ -504,6 +508,67 @@ describe("대화와 사진 묶기", () => {
     await closeActive();
   });
 
+  it("다운로드가 늦게 끝난 사진도 보낸 순서 자리로 간다", async () => {
+    await closeActive();
+    const { importSessionId } = await newConversation();
+
+    // 보낸 순서는 m10 → m11 → m12 인데 받기는 m12, m10, m11 순으로 끝났다.
+    // 사이에 웹으로 올린 사진(번호 없음)이 한 장 끼어 있다.
+    const arrivals: [string, number | null][] = [
+      ["m12", 12],
+      ["web", null],
+      ["m10", 10],
+      ["m11", 11],
+    ];
+    await withRls(admin, async (sql) => {
+      for (const [name, messageId] of arrivals) {
+        await appendUploadedAsset(sql, {
+          sessionId: importSessionId,
+          storageKey: `import/${importSessionId}/${name}.jpg`,
+          filename: `${name}.jpg`,
+          mimeType: "image/jpeg",
+          byteSize: 1024,
+          sourceMessageId: messageId,
+        });
+      }
+    });
+
+    const assets = await withRls(admin, (sql) => listAssets(sql, importSessionId));
+    expect(assets.map((a) => a.sortOrder)).toEqual([0, 1, 2, 3]);
+    // 번호 없는 사진은 제자리(1)에 두고, 텔레그램 사진끼리 남은 자리를 나눈다.
+    expect(assets.map((a) => a.originalFilename)).toEqual(["m10.jpg", "web.jpg", "m11.jpg", "m12.jpg"]);
+    await closeActive();
+  });
+
+  it("동시에 들어와도 첫 장은 먼저 보낸 사진이다", async () => {
+    await closeActive();
+    const { importSessionId } = await newConversation();
+
+    await Promise.all(
+      [24, 21, 23, 22].map((messageId) =>
+        withRls(admin, (sql) =>
+          appendUploadedAsset(sql, {
+            sessionId: importSessionId,
+            storageKey: `import/${importSessionId}/m${messageId}.jpg`,
+            filename: `m${messageId}.jpg`,
+            mimeType: "image/jpeg",
+            byteSize: 2048,
+            sourceMessageId: messageId,
+          }),
+        ),
+      ),
+    );
+
+    const assets = await withRls(admin, (sql) => listAssets(sql, importSessionId));
+    expect(assets.map((a) => a.originalFilename)).toEqual([
+      "m21.jpg",
+      "m22.jpg",
+      "m23.jpg",
+      "m24.jpg",
+    ]);
+    await closeActive();
+  });
+
   it("대화를 ImportSession 으로 되찾을 수 있다", async () => {
     await closeActive();
     const { importSessionId } = await newConversation();
@@ -642,6 +707,81 @@ describe("봇 성별 버튼", () => {
     // AI 결과는 그대로 두고 수정본만 덧쌓인다.
     expect(stored?.fields.gender).toBeNull();
     expect(effectiveFields(stored).gender).toBe("FEMALE");
+  });
+
+  /** 성별은 비우고, 출생연도·직업군은 AI 가 확신하지 못한 분석 결과로 바꾼다. */
+  async function unsureSession() {
+    const sessionId = await analyzedSession(admin, adminId, groupId);
+    await withRls(admin, (sql) =>
+      saveExtraction(sql, {
+        sessionId,
+        fields: {
+          ...emptyExtractedFields(),
+          birthYear: 1995,
+          residenceRegion: "SEOUL",
+          jobCategory: "ENGINEERING",
+        },
+        confidence: { birthYear: 0.4, residenceRegion: 0.9, jobCategory: 0.4 },
+        notes: [],
+        model: "test",
+        promptVersion: "test",
+        raw: {},
+      }),
+    );
+    return sessionId;
+  }
+
+  it("성별을 골라도 확신 낮은 필수 항목이 남으면 막고, 그 항목 이름만 알려준다", async () => {
+    const sessionId = await unsureSession();
+    const afterGender = await withRls(admin, (sql) =>
+      applyExtractionReview(sql, {
+        sessionId,
+        fields: { gender: "FEMALE" },
+        reviewerUserId: adminId,
+        source: "telegram",
+      }),
+    );
+    expect(afterGender.status).toBe("REVIEW_REQUIRED");
+    // 직업군도 확신이 낮지만 필수가 아니라 막는 이유에 들지 않는다.
+    expect(await withRls(admin, (sql) => fieldsAwaitingReview(sql, sessionId))).toEqual([
+      "출생연도",
+    ]);
+
+    // 「맞아요」로 같은 값을 보내면 확인된 것으로 친다. 저장 뒤 다시 읽어도 남지 않는다.
+    const confirmed = await withRls(admin, (sql) =>
+      applyExtractionReview(sql, {
+        sessionId,
+        fields: { birthYear: 1995 },
+        reviewerUserId: adminId,
+        source: "web",
+      }),
+    );
+    expect(confirmed.status).toBe("READY");
+    expect(await withRls(admin, (sql) => fieldsAwaitingReview(sql, sessionId))).toEqual([]);
+  });
+
+  it("확신 낮은 선택 항목은 공개 등록을 막지 않는다", async () => {
+    const sessionId = await unsureSession();
+    await withRls(admin, (sql) =>
+      applyExtractionReview(sql, {
+        sessionId,
+        fields: { gender: "FEMALE", birthYear: 1995 },
+        reviewerUserId: adminId,
+        source: "telegram",
+      }),
+    );
+    const result = await commitSession(admin, {
+      sessionId,
+      idempotencyKey: `test:${sessionId}`,
+      publish: true,
+    });
+    expect(result.reused).toBe(false);
+    // 모임을 지우는 정리 단계가 프로필에 걸리지 않게 바로 걷는다. 세션이 프로필을
+    // 가리키므로 세션부터 지운다.
+    await withOwner(async (sql) => {
+      await sql.query(`DELETE FROM import_sessions WHERE id = $1`, [sessionId]);
+      await sql.query(`DELETE FROM profiles WHERE id = $1`, [result.profileId]);
+    });
   });
 
   it("다시 누르면 바꿀 수 있다", async () => {
