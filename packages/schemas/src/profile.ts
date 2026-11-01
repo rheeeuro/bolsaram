@@ -182,7 +182,8 @@ export type ProfileImageSlot = ImageSlot;
 
 export const profileImageConfirmSchema = imageConfirmSchema;
 
-export const profileImagePatchSchema = z.object({
-  /** 지금은 대표 지정만 바꾼다. 순서 변경은 아직 없다. */
-  primary: z.literal(true),
-});
+/** 대표로(맨 앞으로) 또는 한 칸 앞·뒤로. 대표는 언제나 첫 장이다. */
+export const profileImagePatchSchema = z.union([
+  z.object({ primary: z.literal(true) }),
+  z.object({ move: z.enum(["earlier", "later"]) }),
+]);

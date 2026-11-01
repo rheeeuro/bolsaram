@@ -1,15 +1,15 @@
 /**
- * PATCH  /api/profiles/:id/images/:imageId — 대표 사진 지정
+ * PATCH  /api/profiles/:id/images/:imageId — 대표로(맨 앞으로) · 한 칸 앞·뒤로
  * DELETE /api/profiles/:id/images/:imageId — 사진 삭제
  *
- * 대표가 없는 상태나 대표가 둘인 상태를 만들지 않는 것은 저장소가 지킨다.
+ * 대표가 없거나 둘인 상태, 대표가 첫 장이 아닌 상태를 만들지 않는 것은 저장소가 지킨다.
  */
 import { profileImagePatchSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
 import { asAdmin } from "@/server/http/context";
 import { ok, readJson, route } from "@/server/http/respond";
 import { assertCanEditProfile } from "@/server/repo/profiles";
-import { deleteImage, setPrimaryImage } from "@/server/repo/profile-images";
+import { deleteImage, moveImage, setPrimaryImage } from "@/server/repo/profile-images";
 import { deleteObject } from "@/server/storage/local";
 
 export const dynamic = "force-dynamic";
@@ -18,17 +18,21 @@ type Params = { params: Promise<{ id: string; imageId: string }> };
 
 export const PATCH = route(async (request: Request, { params }: Params) => {
   const { id, imageId } = await params;
-  await readJson(request, profileImagePatchSchema);
+  const body = await readJson(request, profileImagePatchSchema);
 
   return asAdmin(async (sql, viewer) => {
     await assertCanEditProfile(sql, id);
-    await setPrimaryImage(sql, { profileId: id, imageId });
+    if ("move" in body) {
+      await moveImage(sql, { profileId: id, imageId, direction: body.move });
+    } else {
+      await setPrimaryImage(sql, { profileId: id, imageId });
+    }
     await writeAudit(sql, {
       actorUserId: viewer.userId,
-      action: "profile.image.primary",
+      action: "move" in body ? "profile.image.move" : "profile.image.primary",
       entityType: "profile",
       entityId: id,
-      metadata: { imageId },
+      metadata: "move" in body ? { imageId, direction: body.move } : { imageId },
     });
     return ok({ ok: true });
   });

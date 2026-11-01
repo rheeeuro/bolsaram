@@ -13,9 +13,13 @@ type Image = { id: string; url: string; isPrimary: boolean };
  * 프로필 사진 관리.
  *
  * Import 로 들어온 뒤에도 사진은 바뀐다 — 대면에서 「이 사진 말고 다른 걸로」가
- * 나온다. 추가·대표 지정·삭제를 여기서 한다.
+ * 나온다. 추가·대표 지정·순서 바꾸기·삭제를 여기서 한다.
  *
- * 삭제는 되돌릴 수 없으므로 한 번 더 묻는다. 대표 지정은 되돌릴 수 있어 바로 적용한다.
+ * 대표는 언제나 첫 장이다. 「대표로」는 그 사진을 맨 앞으로 옮기고, 화살표로 한 칸씩
+ * 옮기다 첫 장이 되면 그 사진이 대표가 된다. 카카오톡에서 텔레그램으로 공유하면
+ * 순서가 바뀌어 오는데 서버는 원래 순서를 모른다 — 여기서 맞춘다.
+ *
+ * 삭제는 되돌릴 수 없으므로 한 번 더 묻는다. 대표 지정·순서는 되돌릴 수 있어 바로 적용한다.
  *
  * 고른 사진은 **한 장씩 영역을 정한 뒤** 올라간다(`ImageCropper`). 목록 카드와 상세가
  * 세로 3:4 로 잘라 보여주기 때문에, 자리를 맡기면 얼굴이 잘린 카드가 그대로 남는다.
@@ -106,7 +110,7 @@ export function ProfilePhotos({
         </p>
       ) : (
         <ul className="mb-3 grid grid-cols-2 gap-2">
-          {images.map((image) => (
+          {images.map((image, index) => (
             <li key={image.id}>
               <div className="relative aspect-3/4 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]">
                 {/* signed URL 은 응답마다 새로 발급된다 — next/image 최적화를 태우지 않는다. */}
@@ -116,6 +120,38 @@ export function ProfilePhotos({
                   <span className="absolute left-1 top-1 rounded bg-[var(--color-burgundy-900)]/75 px-1.5 py-0.5 text-[10px] text-white">
                     대표
                   </span>
+                ) : null}
+                {images.length > 1 ? (
+                  <div className="absolute inset-x-1 bottom-1 flex justify-between">
+                    <MoveButton
+                      label="앞으로"
+                      hidden={index === 0}
+                      disabled={busy != null}
+                      onClick={() =>
+                        void act("move", () =>
+                          apiPatch(`/api/profiles/${profileId}/images/${image.id}`, {
+                            move: "earlier",
+                          }),
+                        )
+                      }
+                    >
+                      ‹
+                    </MoveButton>
+                    <MoveButton
+                      label="뒤로"
+                      hidden={index === images.length - 1}
+                      disabled={busy != null}
+                      onClick={() =>
+                        void act("move", () =>
+                          apiPatch(`/api/profiles/${profileId}/images/${image.id}`, {
+                            move: "later",
+                          }),
+                        )
+                      }
+                    >
+                      ›
+                    </MoveButton>
+                  </div>
                 ) : null}
               </div>
 
@@ -205,8 +241,8 @@ export function ProfilePhotos({
       />
       <p className="mt-1.5 text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
         {room === 0
-          ? `사진은 최대 ${PROFILE_IMAGE_MAX_COUNT}장입니다. 바꾸려면 먼저 한 장을 지워주세요.`
-          : `고르면 쓸 영역을 정한 뒤 올라갑니다. 첫 사진이 대표가 됩니다. 최대 ${PROFILE_IMAGE_MAX_COUNT}장, 장당 25MB 까지 (${room}장 더 올릴 수 있습니다).`}
+          ? `사진은 최대 ${PROFILE_IMAGE_MAX_COUNT}장입니다. 바꾸려면 먼저 한 장을 지워주세요. ‹ › 로 순서를 바꿉니다.`
+          : `고르면 쓸 영역을 정한 뒤 올라갑니다. 첫 사진이 대표이고 ‹ › 로 순서를 바꿉니다. 최대 ${PROFILE_IMAGE_MAX_COUNT}장, 장당 25MB 까지 (${room}장 더 올릴 수 있습니다).`}
       </p>
 
       {queue[0] ? (
@@ -233,5 +269,33 @@ export function ProfilePhotos({
         <p className="mt-2 text-[11.5px] text-[var(--color-danger)]">{error}</p>
       ) : null}
     </div>
+  );
+}
+
+/** 사진 위 한 칸 이동 버튼. 끝 사진은 자리를 지켜 두 버튼의 위치가 흔들리지 않게 한다. */
+function MoveButton({
+  label,
+  hidden,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  hidden: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`grid h-7 w-7 place-items-center rounded-full bg-black/45 text-[17px] leading-none text-white disabled:opacity-40 ${hidden ? "invisible" : ""}`}
+    >
+      {children}
+    </button>
   );
 }

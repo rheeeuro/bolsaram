@@ -2,12 +2,14 @@
  * 프로필 사진 저장소.
  *
  * 사진은 Import 로 처음 들어오지만 그 뒤에도 바뀐다 — 대면에서 「이 사진 말고 다른
- * 걸로」가 나온다. 여기서 추가·삭제·대표 지정을 다룬다.
+ * 걸로」가 나온다. 여기서 추가·삭제·대표 지정·순서 바꾸기를 다룬다.
  *
  * 쓰기 권한은 RLS 가 `app_can_edit_profile` 로 판정한다(0034). 이 파일은 그 위에서
  * 순서와 대표 사진의 불변식만 지킨다:
  *   - 대표 사진은 프로필당 최대 하나 (`profile_images_one_primary`)
  *   - 사진이 하나라도 있으면 대표가 하나 있어야 한다
+ *   - 대표가 첫 장이다. 읽을 때도 대표를 맨 앞에 세우고(`IMAGE_ORDER`), 순서를 바꾸면
+ *     첫 장을 대표로 맞춘다
  *   - `sort_order` 는 프로필 안에서 유일 (`UNIQUE (profile_id, sort_order)`)
  *   - 한 프로필에 `PROFILE_IMAGE_MAX_COUNT` 장까지 (DB 트리거가 최종 판정, 0054)
  */
@@ -38,6 +40,9 @@ type Row = {
 
 const COLUMNS = `id, profile_id, storage_key, mime_type, byte_size, sort_order, is_primary`;
 
+/** 화면에 보이는 순서. 대표가 맨 앞이고 나머지는 저장된 순서다. */
+export const IMAGE_ORDER = `is_primary DESC, sort_order`;
+
 function toRecord(row: Row): ProfileImageRecord {
   return {
     id: row.id,
@@ -67,7 +72,7 @@ export async function findImageProfileId(sql: Sql, storageKey: string): Promise<
 
 export async function listImages(sql: Sql, profileId: string): Promise<ProfileImageRecord[]> {
   const result = await sql.query<Row>(
-    `SELECT ${COLUMNS} FROM profile_images WHERE profile_id = $1 ORDER BY sort_order`,
+    `SELECT ${COLUMNS} FROM profile_images WHERE profile_id = $1 ORDER BY ${IMAGE_ORDER}`,
     [profileId],
   );
   return result.rows.map(toRecord);
@@ -119,31 +124,75 @@ export async function addImage(
 }
 
 /**
- * 대표 사진을 옮긴다. 부분 유니크 인덱스가 있으므로 **먼저 내리고 올린다** —
- * 순서를 바꾸면 같은 트랜잭션 안에서 대표가 둘이 되는 순간이 생겨 인덱스가 막는다.
+ * 이 사진을 대표로 — 맨 앞으로 옮긴다. 대표와 첫 장이 어긋나면 목록 카드와 상세의
+ * 첫 사진이 달라진다.
  */
 export async function setPrimaryImage(
   sql: Sql,
   input: { profileId: string; imageId: string },
 ): Promise<void> {
-  const target = await sql.query(
-    `SELECT 1 FROM profile_images WHERE id = $1 AND profile_id = $2`,
-    [input.imageId, input.profileId],
-  );
-  if (target.rowCount === 0) throw new DomainError("NOT_FOUND", "사진을 찾을 수 없습니다.");
+  const ids = await orderedIds(sql, input.profileId, input.imageId);
+  await writeOrder(sql, input.profileId, [input.imageId, ...ids.filter((id) => id !== input.imageId)]);
+}
 
+/**
+ * 한 칸 앞이나 뒤로 옮긴다. 카카오톡에서 텔레그램으로 공유하면 순서가 바뀌어 오는데
+ * 서버는 원래 순서를 알 수 없다 — 주선자가 화면에서 맞춘다.
+ * 첫 장이 되면 대표가 된다. 끝에서 더 밀면 그대로 둔다.
+ */
+export async function moveImage(
+  sql: Sql,
+  input: { profileId: string; imageId: string; direction: "earlier" | "later" },
+): Promise<void> {
+  const ids = await orderedIds(sql, input.profileId, input.imageId);
+  const from = ids.indexOf(input.imageId);
+  const to = input.direction === "earlier" ? from - 1 : from + 1;
+  if (to < 0 || to >= ids.length) return;
+  [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+  await writeOrder(sql, input.profileId, ids);
+}
+
+/** 지금 화면 순서의 id 목록. 대상 사진이 이 프로필에 없으면 막는다. */
+async function orderedIds(sql: Sql, profileId: string, imageId: string): Promise<string[]> {
+  const result = await sql.query<{ id: string }>(
+    `SELECT id FROM profile_images WHERE profile_id = $1 ORDER BY ${IMAGE_ORDER}`,
+    [profileId],
+  );
+  const ids = result.rows.map((r) => r.id);
+  if (!ids.includes(imageId)) throw new DomainError("NOT_FOUND", "사진을 찾을 수 없습니다.");
+  return ids;
+}
+
+/**
+ * 순서를 0 부터 다시 매기고 첫 장을 대표로 한다.
+ *
+ * `(profile_id, sort_order)` UNIQUE 는 행마다 바로 검사되므로 먼저 전부 음수 자리로
+ * 비켜 둔다. 대표도 부분 유니크 인덱스가 있어 **먼저 내리고 올린다**.
+ */
+async function writeOrder(sql: Sql, profileId: string, ids: string[]): Promise<void> {
+  const moved = await sql.query(
+    `UPDATE profile_images SET sort_order = -1 - sort_order WHERE profile_id = $1`,
+    [profileId],
+  );
+  // RLS 가 막으면 0행이다. 조용히 성공으로 넘기지 않는다.
+  if (moved.rowCount !== ids.length) {
+    throw new DomainError("FORBIDDEN", "이 프로필의 사진을 다룰 권한이 없습니다.");
+  }
+  await sql.query(
+    `UPDATE profile_images p SET sort_order = o.position - 1
+       FROM unnest($2::uuid[]) WITH ORDINALITY AS o(id, position)
+      WHERE p.profile_id = $1 AND p.id = o.id`,
+    [profileId, ids],
+  );
   await sql.query(
     `UPDATE profile_images SET is_primary = false
       WHERE profile_id = $1 AND is_primary AND id <> $2`,
-    [input.profileId, input.imageId],
+    [profileId, ids[0]],
   );
-  const updated = await sql.query(
-    `UPDATE profile_images SET is_primary = true WHERE id = $1 AND profile_id = $2`,
-    [input.imageId, input.profileId],
-  );
-  if (updated.rowCount === 0) {
-    throw new DomainError("FORBIDDEN", "이 프로필의 사진을 다룰 권한이 없습니다.");
-  }
+  await sql.query(`UPDATE profile_images SET is_primary = true WHERE id = $1 AND profile_id = $2`, [
+    ids[0],
+    profileId,
+  ]);
 }
 
 /**

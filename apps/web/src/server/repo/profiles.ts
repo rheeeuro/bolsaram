@@ -32,6 +32,7 @@ import {
   type ProfileStatus,
   type ProfileUpdate,
 } from "@bolsaram/schemas";
+import { IMAGE_ORDER } from "./profile-images";
 
 const PROFILE_COLUMNS = `
   p.id, p.user_id, p.public_code, p.gender, p.birth_year, p.height,
@@ -154,7 +155,7 @@ async function imagesFor(
     `SELECT id, profile_id, storage_key, sort_order, is_primary
        FROM profile_images
       WHERE profile_id = ANY($1)
-      ORDER BY profile_id, sort_order`,
+      ORDER BY profile_id, ${IMAGE_ORDER}`,
     [profileIds],
   );
   for (const row of result.rows) {
