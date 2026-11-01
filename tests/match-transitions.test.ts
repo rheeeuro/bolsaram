@@ -54,8 +54,34 @@ describe("resolveTransition", () => {
     ).toBe("CLOSED");
   });
 
+  it("거절은 주선자만 거둘 수 있고, 거두면 연결이 아니라 철회로 닫힌다", () => {
+    expect(
+      resolveTransition({ action: "withdraw", current: "REJECTED", actor: "admin" }),
+    ).toEqual({ from: "REJECTED", to: "WITHDRAWN" });
+    // 멤버 화면에는 철회가 없다 — 거절과 철회를 오가며 상대를 흔들지 못한다.
+    for (const actor of ["requester", "target"] as const) {
+      expect(allowedActions("REJECTED", actor)).toEqual([]);
+      expect(() =>
+        resolveTransition({ action: "withdraw", current: "REJECTED", actor }),
+      ).toThrowError(/수행할 수 없는/);
+    }
+    // 거절된 신청을 그대로 수락으로 옮기는 길은 없다.
+    expect(() =>
+      resolveTransition({ action: "accept", current: "REJECTED", actor: "admin" }),
+    ).toThrowError(DomainError);
+  });
+
+  it("거절되지 않은 신청은 거둘 수 없다", () => {
+    for (const status of ["REQUESTED", "INTRODUCED", "CANCELED", "CLOSED"] as const) {
+      const error = catchError(() =>
+        resolveTransition({ action: "withdraw", current: status, actor: "admin" }),
+      );
+      expect((error as DomainError).code).toBe("INVALID_STATE");
+    }
+  });
+
   it("종결 상태에서는 어떤 전이도 불가능하다", () => {
-    for (const status of ["REJECTED", "CANCELED", "CLOSED"] as const) {
+    for (const status of ["CANCELED", "CLOSED", "WITHDRAWN"] as const) {
       expect(isTerminalStatus(status)).toBe(true);
       for (const actor of ["requester", "target", "admin"] as const) {
         expect(allowedActions(status, actor)).toEqual([]);

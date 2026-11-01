@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/match-requests/:id/accept|reject|cancel|close
+ * POST /api/admin/match-requests/:id/accept|reject|cancel|close|withdraw
  *
  * 주선자가 **당사자를 대신해** 상태를 옮긴다.
  *
@@ -14,6 +14,7 @@
  * **누구의 답인지가 누가 옮길 수 있는지를 정한다**(0038). 수락·거절은 받은 쪽 담당
  * 주선자만, 취소는 신청자 쪽 담당만 기록한다 — 수락은 연락처 상호 공개이고 그
  * 동의는 상대가 낸 것이어야 한다. 종료는 목록 정리이므로 양쪽 담당 누구나 한다.
+ * 거절을 거두는 것(withdraw)은 거절을 기록할 수 있는 받은 쪽 담당만 한다(0078).
  * RLS 가 같은 경계를 한 번 더 본다(`match_requests_admin_update`).
  */
 import { DomainError, type MatchAction } from "@bolsaram/domain";
@@ -27,7 +28,13 @@ import { assertCanEditProfile } from "@/server/repo/profiles";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_ACTIONS = new Set<MatchAction>(["accept", "reject", "cancel", "close"]);
+const ADMIN_ACTIONS = new Set<MatchAction>([
+  "accept",
+  "reject",
+  "cancel",
+  "close",
+  "withdraw",
+]);
 
 function asAction(value: string): MatchAction {
   if (!ADMIN_ACTIONS.has(value as MatchAction)) {

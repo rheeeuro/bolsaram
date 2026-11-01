@@ -33,6 +33,8 @@ export type HostRequestItem = {
   target: Party;
   /** 받는 쪽이 내 담당이고 답을 기다릴 때만 있다. `joined` 는 초대 링크로 들어온 적이 있는지. */
   notify: { joined: boolean } | null;
+  /** 받는 쪽이 내 담당인가. 거절을 거두는 것은 그 담당만 한다. */
+  targetManaged: boolean;
 };
 
 /**
@@ -69,7 +71,10 @@ export function HostRequestList({
    * 멤버는 초대 링크로만 세션이 생긴다 — 자기 폰을 쓰지 않거나 30일이 지난 멤버는
    * 스스로 누를 수 없다. 그 의사를 주선자가 확인해 여기서 기록한다.
    */
-  async function act(id: string, action: "accept" | "reject" | "cancel" | "close") {
+  async function act(
+    id: string,
+    action: "accept" | "reject" | "cancel" | "close" | "withdraw",
+  ) {
     setBusy(true);
     setError(null);
     const result = await apiPost(`/api/admin/match-requests/${id}/${action}`);
@@ -172,6 +177,23 @@ export function HostRequestList({
                     target={item.target?.code ?? "상대"}
                     requester={item.requester?.code ?? "신청자"}
                     onAct={(action) => void act(item.id, action)}
+                  />
+                ) : null}
+
+                {item.status === "REJECTED" && item.targetManaged ? (
+                  <WithdrawReject
+                    busy={busy}
+                    target={item.target?.code ?? "받은 분"}
+                    requester={item.requester?.code ?? "신청한 분"}
+                    onConfirm={() => void act(item.id, "withdraw")}
+                  />
+                ) : null}
+
+                {item.status === "WITHDRAWN" && item.targetManaged && item.target ? (
+                  <AfterWithdraw
+                    targetId={item.target.id}
+                    target={item.target.code}
+                    requester={item.requester?.code ?? "신청한 분"}
                   />
                 ) : null}
               </li>
@@ -377,6 +399,67 @@ function OnBehalf({
           </Button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 거절을 거두는 줄. 받은 분이 마음을 바꿨을 때 담당 주선자가 기록한다.
+ *
+ * 수락이 아니라는 점을 문구에 분명히 쓴다 — 이 신청은 닫히고 막힌 사이만 풀린다.
+ * 신청한 분은 이미 거절을 전해 들었으니, 연결은 새 신청과 그분의 수락으로만 된다.
+ */
+function WithdrawReject({
+  busy,
+  requester,
+  target,
+  onConfirm,
+}: {
+  busy: boolean;
+  requester: string;
+  target: string;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--surface-border)] pt-3">
+      <span className="text-[12px] text-[var(--surface-text-muted)]">
+        {target} 님이 마음을 바꿨다면 거절을 거둘 수 있습니다
+      </span>
+      <div className="ml-auto max-w-full">
+        <ConfirmButton
+          label="거절 철회"
+          confirmLabel="거절 철회"
+          message={`${target} 님이 거절을 거둔다고 기록할까요? 두 분이 다시 서로의 목록에 보이고 신청할 수 있게 됩니다. 바로 연결되지는 않습니다 — ${target} 님이 ${requester} 님께 새로 마음을 보내고 ${requester} 님이 수락해야 합니다.`}
+          disabled={busy}
+          onConfirm={onConfirm}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** 거절을 거둔 뒤 할 일. 새 신청은 받은 분 이름으로 나가야 해서 그분 화면으로 안내한다. */
+function AfterWithdraw({
+  targetId,
+  requester,
+  target,
+}: {
+  targetId: string;
+  requester: string;
+  target: string;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--surface-border)] pt-3">
+      <span className="min-w-0 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+        다음 — {target} 님이 {requester} 님께 새로 마음을 보내야 합니다. 본인 휴대폰에서
+        보내거나, 휴대폰을 쓰지 않는 분이면 대신 둘러보기로 보냅니다.
+      </span>
+      <Link
+        href={`/profiles/${targetId}`}
+        className="ml-auto shrink-0 text-[12.5px] text-[var(--color-rose-600)] underline-offset-2 hover:underline"
+      >
+        {target} 님 열기
+      </Link>
     </div>
   );
 }

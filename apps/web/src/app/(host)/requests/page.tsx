@@ -87,6 +87,8 @@ export default async function HostRequestsPage({
             request.status === "REQUESTED" && target && editable.has(target.id)
               ? { joined: target.userId != null }
               : null,
+          // 거절을 거두는 것은 거절을 기록할 수 있는 받은 쪽 담당만 한다(0078).
+          targetManaged: target ? editable.has(target.id) : false,
         };
       }),
       intents: pending.map((intent) => {

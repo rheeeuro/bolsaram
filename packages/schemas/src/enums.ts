@@ -182,6 +182,7 @@ export const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
 /**
  * 설계문서 §4 신청/수락 상태 기계.
  * 수락이 곧 연결이라 중간 상태가 없다 — DB enum 에는 쓰이지 않는 'ACCEPTED' 가 남아 있다.
+ * `WITHDRAWN` 은 받은 쪽이 거절을 거둔 신청이다. 막힌 사이를 풀 뿐 연결로 가지 않는다(0077).
  */
 export const MATCH_REQUEST_STATUSES = [
   "REQUESTED",
@@ -189,6 +190,7 @@ export const MATCH_REQUEST_STATUSES = [
   "CANCELED",
   "INTRODUCED",
   "CLOSED",
+  "WITHDRAWN",
 ] as const;
 export type MatchRequestStatus = (typeof MATCH_REQUEST_STATUSES)[number];
 export const MATCH_REQUEST_STATUS_LABELS: Record<MatchRequestStatus, string> = {
@@ -197,6 +199,7 @@ export const MATCH_REQUEST_STATUS_LABELS: Record<MatchRequestStatus, string> = {
   CANCELED: "취소됨",
   INTRODUCED: "연결됨",
   CLOSED: "종료",
+  WITHDRAWN: "거절 철회",
 };
 
 /** 같은 두 사람 사이에 동시에 하나만 존재할 수 있는 상태(설계문서 §4 활성 중복 신청 금지). */

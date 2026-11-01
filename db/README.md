@@ -109,6 +109,8 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0074_profile_registrar.sql` | `app_profile_registrar(profile)` — 프로필을 등록한 주선자의 표시 이름·사진 키만 돌려준다(SECURITY DEFINER). 그 프로필을 주선자로서 볼 수 있을 때만 답하고, 신원 칼럼은 열지 않는다 |
 | `0075_job_category_engineering.sql` | `job_category` 에 `ENGINEERING`(연구·엔지니어) 추가 — 반도체·전자·자동차·화학·제약·제조 회사의 연구·생산·설비·품질 직군. 소프트웨어 개발은 IT |
 | `0076_import_asset_message_order.sql` | `import_assets.source_message_id` — 텔레그램 메시지 번호. 봇으로 받은 사진끼리는 이 번호(보낸 순서)로 자리를 정한다. 웹 업로드는 비어 있다 |
+| `0077_match_reject_withdrawn.sql` | `match_request_status` 에 `WITHDRAWN`(거절 철회) 추가 — 받은 쪽이 거절을 거둔 신청. 막힘 판정은 `REJECTED` 만 보므로 상태가 바뀌면 사이가 풀린다. 연결로 가지 않는다 |
+| `0078_match_withdraw_scope.sql` | `match_requests_admin_update` 에 `WITHDRAWN` 추가 — 거절을 거두는 것은 거절을 기록할 수 있는 받은 쪽 담당만 |
 
 ## 테이블
 

@@ -942,6 +942,38 @@ describe("담당이 갈리는 신청 (전체공개 풀)", () => {
     expect(await move(adminX, await newRequest(), "REQUESTED", "CANCELED")).toBe("moved");
   });
 
+  it("거절을 거두는 것은 받는 쪽 담당만 한다", async () => {
+    const id = await newRequest();
+    expect(await move(adminY, id, "REQUESTED", "REJECTED")).toBe("moved");
+    // 신청자 쪽 담당이 거두면 상대가 거절한 사이를 상대 동의 없이 다시 연다.
+    expect(await move(adminX, id, "REJECTED", "WITHDRAWN")).toBe("blocked");
+    expect(await move(adminY, id, "REJECTED", "WITHDRAWN")).toBe("moved");
+  });
+
+  it("거절을 거두면 막힌 사이가 풀려 거절했던 쪽이 새로 신청할 수 있다", async () => {
+    const id = await newRequest();
+    expect(await move(adminY, id, "REQUESTED", "REJECTED")).toBe("moved");
+    expect(await move(adminY, id, "REJECTED", "WITHDRAWN")).toBe("moved");
+
+    const relation = await withRls(adminY, (sql) =>
+      sql.query<{ rejected: boolean }>(`SELECT app_is_rejected_between($1, $2) AS rejected`, [
+        pubA,
+        pubB,
+      ]),
+    );
+    expect(relation.rows[0]?.rejected).toBe(false);
+
+    // 반대 방향 새 신청이 트리거(0023)를 통과한다.
+    await withOwner(async (sql) => {
+      const r = await sql.query<{ id: string }>(
+        `INSERT INTO match_requests (requester_profile_id, target_profile_id)
+         VALUES ($1, $2) RETURNING id`,
+        [pubB, pubA],
+      );
+      await sql.query(`DELETE FROM match_requests WHERE id = $1`, [r.rows[0]!.id]);
+    });
+  });
+
   it("종료는 양쪽 담당 누구나 한다 — 목록 정리는 운영 행위다", async () => {
     const id = await newRequest();
     expect(await move(adminY, id, "REQUESTED", "INTRODUCED")).toBe("moved");

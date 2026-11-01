@@ -4,11 +4,15 @@
  *
  *   REQUESTED ─accept──► INTRODUCED ─close──► CLOSED
  *       │
- *       ├─reject──► REJECTED
+ *       ├─reject──► REJECTED ─withdraw──► WITHDRAWN
  *       └─cancel──► CANCELED
  *
  * 상대의 수락이 곧 연락처 공개 동의다. 그래서 수락은 바로 INTRODUCED 로 간다 —
  * 그 사이에 주선자 승인 단계를 두지 않는다.
+ *
+ * 거절을 거두는 것(withdraw)은 수락이 아니다. 막힌 사이만 풀고 이 신청은 닫힌다 —
+ * 신청자가 거절 통보를 받은 뒤에도 그 마음이 그대로인지 알 수 없으므로, 연결하려면
+ * 거절했던 쪽이 새로 마음을 보내고 신청자가 다시 수락해야 한다(0077).
  */
 import {
   ACTIVE_MATCH_REQUEST_STATUSES,
@@ -19,7 +23,7 @@ import {
 import { DomainError } from "./errors";
 import { assertOppositeGender } from "./visibility";
 
-export type MatchAction = "accept" | "reject" | "cancel" | "close";
+export type MatchAction = "accept" | "reject" | "cancel" | "close" | "withdraw";
 
 /** 행위 주체. 상태뿐 아니라 누가 하는지도 전이 조건이다. */
 export type MatchActor = "requester" | "target" | "admin";
@@ -35,12 +39,16 @@ const TRANSITIONS: Record<MatchAction, TransitionRule> = {
   reject: { from: ["REQUESTED"], to: "REJECTED", actors: ["target", "admin"] },
   cancel: { from: ["REQUESTED"], to: "CANCELED", actors: ["requester", "admin"] },
   close: { from: ["INTRODUCED"], to: "CLOSED", actors: ["admin"] },
+  // 멤버 화면에는 두지 않는다. 거절과 철회를 오가며 상대를 흔드는 일을 막으려고
+  // 받은 쪽 담당 주선자가 본인 뜻을 확인한 뒤에만 기록한다.
+  withdraw: { from: ["REJECTED"], to: "WITHDRAWN", actors: ["admin"] },
 };
 
+/** 나가는 전이가 없는 상태. 거절은 주선자가 거둘 수 있어 여기에 넣지 않는다. */
 export const TERMINAL_STATUSES: readonly MatchRequestStatus[] = [
-  "REJECTED",
   "CANCELED",
   "CLOSED",
+  "WITHDRAWN",
 ];
 
 export function isActiveStatus(status: MatchRequestStatus): boolean {
