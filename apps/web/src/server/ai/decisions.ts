@@ -50,11 +50,12 @@ const QUESTIONS: Record<JudgedField, { instructions: string; labels: Record<stri
   },
   residenceRegion: {
     instructions:
-      "프로필 주인공이 사는 광역 지역. 동네·구·시로 적혀 있으면 그곳이 속한 광역이다. 직장 위치는 보지 않는다.",
+      "프로필 주인공이 사는 광역 지역. 동네·구·시로 적혀 있으면 그곳이 속한 광역이다. 광역 없이 서울 구 이름만 적혔으면(「강서」) 서울이다. 직장 위치는 보지 않는다.",
     labels: REGION_LABELS,
   },
   workplaceRegion: {
-    instructions: "프로필 주인공의 직장이 있는 광역 지역. 회사·근무지 위치가 적혀 있을 때만 고른다.",
+    instructions:
+      "프로필 주인공의 직장이 있는 광역 지역. 회사·근무지 위치가 적혀 있을 때만 고른다. 광역 없이 서울 구 이름만 적혔으면(「강서」) 서울이다.",
     labels: REGION_LABELS,
   },
   religion: {
