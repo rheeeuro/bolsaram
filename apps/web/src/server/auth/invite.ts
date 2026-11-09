@@ -14,6 +14,15 @@
  * 그 사람의 **개인 입장 링크**가 되어, 쿠키가 사라져도(다른 브라우저·기기, 로그아웃)
  * 카카오톡의 같은 링크를 다시 누르면 들어온다. 주선자가 새로 발급할 때까지 유효하다.
  *
+ * 이미 계정이 있는 프로필에 발급하는 링크는 **처음부터 그 계정에 연결된 채로** 만든다.
+ * 새 계정을 만들 수 없고 그 계정으로만 들어가므로 열어 본 링크와 힘이 같다 — 기한을 두면
+ * 이전 링크는 회수됐는데 새 링크는 만료돼 그분이 들어올 길이 없어진다.
+ *
+ * **알림 링크**(`purpose = 'SIGNAL'`, 0079)는 받은 신청을 알릴 때 쓰는 두 번째 링크다.
+ * 이미 들어온 분에게만, 그 계정에 연결된 채로 만들고 기존 입장 링크·세션을 건드리지
+ * 않는다. 연결돼 있어도 `SIGNAL_LINK_DAYS` 가 지나면 끝난다 — 메시지마다 영구 로그인
+ * 링크가 쌓이지 않게 한다. 입장 링크를 다시 발급하면 함께 회수된다.
+ *
  * 링크를 가진 사람이 곧 그 멤버가 된다 — 주선자가 본인에게 직접 전달하는 것이 전제다.
  * 새면 주선자가 다시 발급한다. 그러면 이전 링크와 **그 멤버의 모든 세션**이 함께 끝난다.
  * 멤버의 마음 보내기·답은 주선자 확인을 거치므로(`match_intents`) 링크만으로 누구와
@@ -41,7 +50,10 @@ function hashToken(token: string): string {
  * 이미 연결된 링크는 기한을 보지 않는다 — 회수(재발급·프로필 삭제)만이 끝낸다.
  */
 const LIVE_INVITE = `i.revoked_at IS NULL
-          AND (i.claimed_at IS NOT NULL OR i.expires_at > now())`;
+          AND (i.expires_at > now() OR (i.claimed_at IS NOT NULL AND i.purpose = 'ENTRY'))`;
+
+/** 알림 링크가 열리는 기간. 지나면 그분은 원래 입장 링크로 들어온다. */
+export const SIGNAL_LINK_DAYS = 30;
 
 export async function issueInvite(input: {
   profileId: string;
@@ -68,12 +80,50 @@ export async function issueInvite(input: {
           AND user_id = (SELECT user_id FROM profiles WHERE id = $1)`,
       [input.profileId],
     );
+    // 이미 계정이 있으면 그 계정에 연결된 입장 링크로 만든다 — 기한을 보지 않는다.
+    // `consumeInvite` 의 연결된 링크 경로가 지금도 그 프로필의 주인인지 다시 확인한다.
     const result = await sql.query<{ id: string }>(
-      `INSERT INTO invites (profile_id, token_hash, expires_at, created_by)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
+      `INSERT INTO invites (profile_id, token_hash, expires_at, created_by, claimed_at, claimed_by)
+       SELECT $1, $2, $3, $4, CASE WHEN p.user_id IS NULL THEN NULL ELSE now() END, p.user_id
+         FROM profiles p WHERE p.id = $1
+       RETURNING id`,
       [input.profileId, hashToken(token), expiresAt, input.createdBy],
     );
+    if (result.rowCount === 0) throw new DomainError("NOT_FOUND", "대상 프로필을 찾을 수 없습니다.");
     return result.rows[0]!.id;
+  });
+
+  return { inviteId, token, expiresAt };
+}
+
+/**
+ * 받은 신청 알림 링크. 이미 계정이 있는 프로필에만 발급한다 — 들어온 적 없는 분은
+ * 입장 링크(`issueInvite`)가 곧 첫 로그인이다. 기존 링크와 세션은 그대로 둔다.
+ */
+export async function issueSignalLink(input: {
+  profileId: string;
+  createdBy: string;
+}): Promise<IssuedInvite> {
+  const token = randomToken(32);
+  const expiresAt = new Date(Date.now() + SIGNAL_LINK_DAYS * 86_400_000);
+
+  const inviteId = await withOwnerTx(async (sql) => {
+    const result = await sql.query<{ id: string }>(
+      `INSERT INTO invites (profile_id, token_hash, expires_at, created_by,
+                            claimed_at, claimed_by, purpose)
+       SELECT p.id, $2, $3, $4, now(), p.user_id, 'SIGNAL'
+         FROM profiles p WHERE p.id = $1 AND p.user_id IS NOT NULL
+       RETURNING id`,
+      [input.profileId, hashToken(token), expiresAt, input.createdBy],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new DomainError(
+        "CONFLICT",
+        "아직 볼사람에 들어온 적 없는 분입니다. 초대 링크를 발급해 주세요.",
+      );
+    }
+    return row.id;
   });
 
   return { inviteId, token, expiresAt };

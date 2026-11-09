@@ -210,8 +210,12 @@ export function HostRequestList({
  *
  * 멤버에게는 알림이 가지 않으므로 받은 신청은 담당 주선자가 카카오톡으로 전한다.
  * 프로필을 밖으로 내보내는 링크는 만들지 않는다 — 문구에는 공개 번호만, 링크는 받은
- * 시그널 화면이라 로그인한 본인만 상대를 본다. 들어온 적 없는 분은 그 화면에 갈 수
- * 없으니 초대 링크를 새로 발급해 같은 화면으로 이어 준다.
+ * 시그널 화면으로 이어지는 그분의 초대 링크다.
+ *
+ * 이미 들어온 분에게도 매번 링크를 낸다. 시그널 주소만 보내면 링크를 연 기기의
+ * 쿠키 계정으로 열려, 다른 멤버가 들어와 있는 휴대폰에서는 엉뚱한 사람의 목록이 보인다.
+ * 그분께는 **알림 링크**(`purpose: SIGNAL`)를 낸다 — 그분 계정으로 로그인시키지만 기존
+ * 입장 링크와 세션은 그대로 두고 30일만 열린다. 들어온 적 없는 분은 첫 초대 링크다.
  */
 function NotifyMember({
   joined,
@@ -231,13 +235,14 @@ function NotifyMember({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function issueInvite() {
+  async function issueLink() {
     if (!profileId) return;
     setBusy(true);
     setError(null);
     const result = await apiPost<{ url: string }>("/api/admin/invites", {
       profileId,
       expiresInHours: 72,
+      purpose: joined ? "SIGNAL" : "ENTRY",
     });
     setBusy(false);
     if (!result.ok) {
@@ -263,14 +268,11 @@ function NotifyMember({
     );
   }
 
-  const link = joined ? signalsUrl : inviteUrl;
-  const message = link
+  const message = inviteUrl
     ? [
         `볼사람에서 ${requester} 분이 마음을 보냈어요.`,
-        joined
-          ? "받은 시그널에서 프로필을 보고 수락이나 거절을 눌러 주세요."
-          : "아래 링크로 들어와 프로필을 보고 수락이나 거절을 눌러 주세요.",
-        link,
+        "아래 링크로 들어와 프로필을 보고 수락이나 거절을 눌러 주세요.",
+        inviteUrl,
       ].join("\n")
     : null;
 
@@ -281,29 +283,20 @@ function NotifyMember({
           <CopyField label="카카오톡으로 보낼 문구" value={message} multiline />
           <p className="text-[11.5px] leading-relaxed text-[var(--surface-text-muted)]">
             {joined
-              ? "로그인한 본인만 열 수 있는 링크입니다. 로그인이 풀린 분은 처음 받은 초대 링크나 입장코드를 넣으면 이 화면으로 돌아옵니다."
+              ? "이 알림용 링크입니다. 어느 휴대폰에서 열어도 그분 계정으로 들어갑니다. 30일 동안 열리고, 전에 보낸 입장 링크는 그대로 쓸 수 있습니다."
               : "새로 발급한 초대 링크입니다. 72시간 안에 처음 열어야 하고, 한 번 열면 그분의 입장 링크로 계속 쓰입니다."}
           </p>
-          {joined ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="self-start"
-              onClick={() => setOpen(false)}
-            >
-              접기
-            </Button>
-          ) : null}
         </>
       ) : (
         <>
           <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-700)]">
-            {target} 님은 아직 볼사람에 들어온 적이 없습니다. 초대 링크를 새로 발급해 문구에
-            붙입니다. 전에 보낸 링크가 있다면 더 이상 열리지 않습니다.
+            {joined
+              ? `${target} 님 계정으로 바로 들어가는 알림 링크를 발급해 문구에 붙입니다. 전에 보낸 입장 링크와 들어와 있는 기기는 그대로입니다.`
+              : `${target} 님은 아직 볼사람에 들어온 적이 없습니다. 초대 링크를 새로 발급해 문구에 붙입니다. 전에 보낸 링크가 있다면 더 이상 열리지 않습니다.`}
           </p>
           <div className="flex gap-2">
-            <Button size="sm" disabled={busy || !profileId} onClick={() => void issueInvite()}>
-              {busy ? "발급 중…" : "초대 링크 발급"}
+            <Button size="sm" disabled={busy || !profileId} onClick={() => void issueLink()}>
+              {busy ? "발급 중…" : joined ? "알림 링크 발급" : "초대 링크 발급"}
             </Button>
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>
               그만두기

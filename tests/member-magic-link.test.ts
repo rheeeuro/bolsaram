@@ -14,7 +14,12 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePools, withOwner } from "@bolsaram/db";
-import { consumeInvite, issueInvite, previewInvite } from "../apps/web/src/server/auth/invite";
+import {
+  consumeInvite,
+  issueInvite,
+  issueSignalLink,
+  previewInvite,
+} from "../apps/web/src/server/auth/invite";
 
 const TAG = `magiclink-${Date.now()}`;
 let adminId: string;
@@ -170,6 +175,25 @@ describe("개인 입장 링크", () => {
     await expect(consumeInvite({ token: fresh })).resolves.toMatchObject({ userId });
   });
 
+  it("이미 들어온 분에게 다시 발급한 링크는 열기 전에도 기한이 없다", async () => {
+    // 이전 링크는 회수됐는데 새 링크가 만료되면 들어올 길이 없어진다.
+    const profileId = await newProfile("재발급기한");
+    const { userId } = await consumeInvite({ token: await link(profileId) });
+    const fresh = await link(profileId);
+    await withOwner((sql) =>
+      sql.query(
+        `UPDATE invites SET expires_at = now() - interval '30 days'
+          WHERE profile_id = $1 AND revoked_at IS NULL`,
+        [profileId],
+      ),
+    );
+    await expect(consumeInvite({ token: fresh })).resolves.toEqual({
+      userId,
+      profileId,
+      firstTime: false,
+    });
+  });
+
   it("연결된 계정이 프로필에서 떨어지면 그 링크로 새 계정을 만들지 않는다", async () => {
     const profileId = await newProfile("분리");
     const token = await link(profileId);
@@ -178,6 +202,85 @@ describe("개인 입장 링크", () => {
       sql.query(`UPDATE profiles SET user_id = NULL WHERE id = $1`, [profileId]),
     );
     await expect(consumeInvite({ token })).rejects.toThrow(/만료되었거나 다시 발급되어/);
+  });
+});
+
+describe("받은 신청 알림 링크", () => {
+  async function signal(profileId: string): Promise<string> {
+    return (await issueSignalLink({ profileId, createdBy: adminId })).token;
+  }
+
+  it("받는 분 계정으로 들어가고 기존 입장 링크와 세션은 그대로다", async () => {
+    const profileId = await newProfile("알림");
+    const entry = await link(profileId);
+    const { userId } = await consumeInvite({ token: entry });
+    await withOwner((sql) =>
+      sql.query(
+        `INSERT INTO sessions (user_id, expires_at) VALUES ($1, now() + interval '30 days')`,
+        [userId],
+      ),
+    );
+
+    const token = await signal(profileId);
+    await expect(consumeInvite({ token })).resolves.toEqual({
+      userId,
+      profileId,
+      firstTime: false,
+    });
+    // 다시 눌러도 같은 계정이다.
+    await expect(consumeInvite({ token })).resolves.toMatchObject({ userId });
+    await expect(consumeInvite({ token: entry })).resolves.toMatchObject({ userId });
+
+    const alive = await withOwner(async (sql) => {
+      const r = await sql.query<{ count: number }>(
+        `SELECT count(*)::int AS count FROM sessions
+          WHERE user_id = $1 AND revoked_at IS NULL`,
+        [userId],
+      );
+      return r.rows[0]!.count;
+    });
+    expect(alive).toBe(1);
+  });
+
+  it("들어온 적 없는 분에게는 발급하지 않는다", async () => {
+    const profileId = await newProfile("알림미가입");
+    await expect(signal(profileId)).rejects.toThrow(/들어온 적 없는/);
+  });
+
+  it("연결돼 있어도 기한이 지나면 통하지 않는다", async () => {
+    const profileId = await newProfile("알림기한");
+    await consumeInvite({ token: await link(profileId) });
+    const token = await signal(profileId);
+    await withOwner((sql) =>
+      sql.query(
+        `UPDATE invites SET expires_at = now() - interval '1 minute'
+          WHERE profile_id = $1 AND purpose = 'SIGNAL'`,
+        [profileId],
+      ),
+    );
+    await expect(consumeInvite({ token })).rejects.toThrow(/만료되었거나 다시 발급되어/);
+    await expect(previewInvite(token)).rejects.toThrow(/만료되었거나 다시 발급되어/);
+  });
+
+  it("입장 링크를 다시 발급하면 알림 링크도 함께 끝난다", async () => {
+    const profileId = await newProfile("알림회수");
+    await consumeInvite({ token: await link(profileId) });
+    const token = await signal(profileId);
+    await link(profileId);
+    await expect(consumeInvite({ token })).rejects.toThrow(/만료되었거나 다시 발급되어/);
+  });
+
+  it("계정에 연결되지 않은 알림 링크는 DB 가 막는다", async () => {
+    const profileId = await newProfile("알림제약");
+    await expect(
+      withOwner((sql) =>
+        sql.query(
+          `INSERT INTO invites (profile_id, token_hash, expires_at, purpose)
+           VALUES ($1, $2, now() + interval '1 day', 'SIGNAL')`,
+          [profileId, `${TAG}-signal-unclaimed`],
+        ),
+      ),
+    ).rejects.toThrow(/invites_signal_claimed/);
   });
 });
 

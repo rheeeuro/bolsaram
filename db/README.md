@@ -111,6 +111,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `0076_import_asset_message_order.sql` | `import_assets.source_message_id` — 텔레그램 메시지 번호. 봇으로 받은 사진끼리는 이 번호(보낸 순서)로 자리를 정한다. 웹 업로드는 비어 있다 |
 | `0077_match_reject_withdrawn.sql` | `match_request_status` 에 `WITHDRAWN`(거절 철회) 추가 — 받은 쪽이 거절을 거둔 신청. 막힘 판정은 `REJECTED` 만 보므로 상태가 바뀌면 사이가 풀린다. 연결로 가지 않는다 |
 | `0078_match_withdraw_scope.sql` | `match_requests_admin_update` 에 `WITHDRAWN` 추가 — 거절을 거두는 것은 거절을 기록할 수 있는 받은 쪽 담당만 |
+| `0079_invite_signal_links.sql` | `invites.purpose` — `ENTRY`(입장 링크) · `SIGNAL`(받은 신청 알림 링크). 알림 링크는 이미 계정이 있는 프로필에 연결된 채로만 만들고(`invites_signal_claimed`) 기존 링크를 회수하지 않으며, 연결돼 있어도 기한이 지나면 끝난다 |
 
 ## 테이블
 
@@ -128,7 +129,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `favorites`                                    | 관심                                               | 본인만                              |
 | `profile_hides`                                | 숨긴 상대. 양방향으로 목록·신청을 막는다           | **숨긴 사람만** (상대·관리자 불가)  |
 | `match_intents`                                | 멤버가 낸 요청. 승인 전까지 **상대는 못 읽는다**   | 본인 + 담당 주선자                  |
-| `invites`                                      | **멤버 로그인 링크** (토큰 해시만 저장, 연결 후 회수 전까지 입장 링크) | 관리자만                            |
+| `invites`                                      | **멤버 로그인 링크** (토큰 해시만 저장). `ENTRY` 입장 링크는 연결 후 회수 전까지, `SIGNAL` 받은 신청 알림 링크는 연결된 채로 만들어 기한까지 | 관리자만                            |
 | `import_sessions` / `_assets` / `_extractions` | Import 파이프라인                                  | 관리자만                            |
 | `audit_logs`                                   | 감사 기록                                          | 쓰기는 인증된 누구나, 읽기는 관리자 |
 | `notifications`                                | 알림 아웃박스. 트리거가 만들고 디스패처가 보낸다   | 받는 사람이 **읽기만**              |
@@ -164,6 +165,7 @@ RLS 정책과 부분 인덱스를 직접 다뤄야 하기 때문이다.
 | `import_sessions_idempotency` (부분 유니크)          | 같은 키로 두 번 commit                        |
 | `import_sessions_commit_pair`                       | 짝이 안 맞는 commit 상태                      |
 | `invites_claim_pair`                                | 쓴 사람은 있는데 쓴 시각이 없는 상태          |
+| `invites_signal_claimed`                            | 계정에 연결되지 않은 알림 링크 (새 계정을 만드는 알림 링크) |
 | `telegram_import_sessions_one_active` (부분 유니크) | 한 텔레그램 사용자의 대화 두 개 — 사진이 한 세션에 묶이는 근거 |
 | `telegram_link_codes_one_open` (부분 유니크)        | 주선자당 살아 있는 연결 코드 두 개            |
 | `telegram_webhook_events.update_id` PK              | 같은 webhook update 두 번 처리                |

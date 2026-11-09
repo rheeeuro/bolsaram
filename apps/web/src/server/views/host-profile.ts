@@ -102,7 +102,7 @@ export async function loadHostProfile(
     const invite = canEdit
       ? await sql.query<{ expires_at: Date; claimed_at: Date | null }>(
           `SELECT expires_at, claimed_at FROM invites
-            WHERE profile_id = $1 AND revoked_at IS NULL
+            WHERE profile_id = $1 AND revoked_at IS NULL AND purpose = 'ENTRY'
             ORDER BY created_at DESC LIMIT 1`,
           [profile.id],
         )

@@ -43,7 +43,9 @@ export default async function ClaimPage({
             </AuthFooterLink>
             <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-500)]">
               처음 받은 링크는 72시간 안에 열어야 하고, 주선자가 새로 발급하면 이전 링크는
-              더 이상 열리지 않습니다. 주선자에게 새로 요청해 주세요.
+              더 이상 열리지 않습니다. 받은 신청을 알리는 링크는 30일 동안만 열리니, 지났다면
+              처음 받은 입장 링크로 들어와 시그널을 확인해 주세요. 그래도 안 되면 주선자에게
+              새로 요청해 주세요.
             </p>
           </>
         }

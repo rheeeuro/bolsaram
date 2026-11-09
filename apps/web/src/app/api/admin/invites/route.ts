@@ -1,8 +1,13 @@
-/** POST /api/admin/invites — 초대 링크 발급 */
+/**
+ * POST /api/admin/invites — 초대 링크 발급
+ *
+ * `purpose: "SIGNAL"` 이면 받은 신청 알림 링크다 — 이미 들어온 분에게만, 기존 입장
+ * 링크를 그대로 두고 며칠만 열리는 링크를 하나 더 낸다(`issueSignalLink`).
+ */
 import { inviteCreateSchema } from "@bolsaram/schemas";
 import { writeAudit } from "@/server/audit";
 import { requireAdmin, rlsContextOf } from "@/server/auth/guard";
-import { issueInvite, inviteUrl } from "@/server/auth/invite";
+import { issueInvite, issueSignalLink, inviteUrl } from "@/server/auth/invite";
 import { ok, readJson, route } from "@/server/http/respond";
 import { assertCanEditProfile } from "@/server/repo/profiles";
 import { withRls } from "@bolsaram/db";
@@ -18,16 +23,19 @@ export const POST = route(async (request: Request) => {
   // invites 정책(app_can_edit_profile)을 지나가므로 여기서 막는다.
   await withRls(rlsContextOf(viewer), (sql) => assertCanEditProfile(sql, input.profileId));
 
-  const invite = await issueInvite({
-    profileId: input.profileId,
-    expiresInHours: input.expiresInHours,
-    createdBy: viewer.userId,
-  });
+  const invite =
+    input.purpose === "SIGNAL"
+      ? await issueSignalLink({ profileId: input.profileId, createdBy: viewer.userId })
+      : await issueInvite({
+          profileId: input.profileId,
+          expiresInHours: input.expiresInHours,
+          createdBy: viewer.userId,
+        });
 
   await withRls(rlsContextOf(viewer), (sql) =>
     writeAudit(sql, {
       actorUserId: viewer.userId,
-      action: "invite.issue",
+      action: input.purpose === "SIGNAL" ? "invite.issue_signal" : "invite.issue",
       entityType: "invite",
       entityId: invite.inviteId,
       // 토큰은 남기지 않는다.

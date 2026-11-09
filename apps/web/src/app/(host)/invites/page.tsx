@@ -75,7 +75,7 @@ export default async function HostInvitesPage({
           LEFT JOIN users u ON u.id = p.user_id
           LEFT JOIN LATERAL (
             SELECT expires_at, claimed_at FROM invites
-             WHERE profile_id = p.id AND revoked_at IS NULL
+             WHERE profile_id = p.id AND revoked_at IS NULL AND purpose = 'ENTRY'
              ORDER BY created_at DESC LIMIT 1
           ) i ON true
          WHERE p.group_id IS NOT DISTINCT FROM $1

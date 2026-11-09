@@ -252,7 +252,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 멤버 요청 approve · decline          |
 | `/api/favorites`                          | GET / POST / DELETE | 멤버              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 멤버(프로필 필요) | 숨긴 사람 목록·토글                  |
-| `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰) |
+| `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰). `purpose: SIGNAL` 이면 받은 신청 알림 링크 (30일, 기존 링크 유지) |
 | `/api/imports`                            | GET / POST          | 주선자            | 가져오기 목록(현재 방, 기본 등록 전 · `done=1` 등록됨) / 세션 생성 + 업로드 슬롯 (`groupId` 필수) |
 | `/api/imports/[id]`                       | GET / DELETE        | 주선자            | 원본·추출 결과 / 세션 삭제           |
 | `/api/imports/[id]/assets`                | POST / DELETE       | 주선자            | 업로드 확정·슬롯 추가 / 제거         |

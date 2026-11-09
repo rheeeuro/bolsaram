@@ -79,7 +79,10 @@ afterAll(async () => {
   await withOwner(async (sql) => {
     await sql.query(`DELETE FROM import_sessions WHERE created_by = $1`, [adminId]);
     await sql.query(`DELETE FROM profiles WHERE created_by = $1`, [adminId]);
-    await sql.query(`DELETE FROM users WHERE id = $1`, [adminId]);
+    await sql.query(`DELETE FROM users WHERE id = $1 OR display_name LIKE $2`, [
+      adminId,
+      `${TAG}%`,
+    ]);
     await sql.query(`DELETE FROM groups WHERE name = $1`, [TAG]);
   });
   await rm(STORAGE, { recursive: true, force: true });
@@ -216,6 +219,37 @@ describe("runCleanup", () => {
         [profileId],
       );
       expect(row.rows[0]?.revoked_at).not.toBeNull();
+    });
+  });
+
+  it("기한이 지난 알림 링크는 연결돼 있어도 회수하고, 입장 링크는 남긴다", async () => {
+    await withOwner(async (sql) => {
+      const user = await sql.query<{ id: string }>(
+        `INSERT INTO users (role, display_name) VALUES ('MEMBER', $1) RETURNING id`,
+        [`${TAG}-알림멤버`],
+      );
+      const userId = user.rows[0]!.id;
+      const profile = await sql.query<{ id: string }>(
+        `INSERT INTO profiles (group_id, gender, birth_year, residence_region, created_by, user_id)
+         VALUES ($1,'FEMALE',1995,'JEJU',$2,$3) RETURNING id`,
+        [groupId, adminId, userId],
+      );
+      const profileId = profile.rows[0]!.id;
+      await sql.query(
+        `INSERT INTO invites (profile_id, token_hash, expires_at, claimed_at, claimed_by, purpose)
+         VALUES ($1, $2, now() - interval '1 day', now() - interval '40 days', $3, 'ENTRY'),
+                ($1, $4, now() - interval '1 day', now() - interval '31 days', $3, 'SIGNAL')`,
+        [profileId, `${TAG}-entry`, userId, `${TAG}-signal`],
+      );
+
+      await runCleanup(sql, STORAGE);
+      const rows = await sql.query<{ purpose: string; revoked_at: Date | null }>(
+        `SELECT purpose, revoked_at FROM invites WHERE profile_id = $1`,
+        [profileId],
+      );
+      const by = new Map(rows.rows.map((r) => [r.purpose, r.revoked_at]));
+      expect(by.get("ENTRY")).toBeNull();
+      expect(by.get("SIGNAL")).not.toBeNull();
     });
   });
 

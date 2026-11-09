@@ -167,6 +167,11 @@ describe("가이드에 적힌 정책 숫자가 코드와 같다", () => {
     expect(ALL).toMatch(/72시간/);
   });
 
+  it("받은 신청 알림 링크 30일", () => {
+    expect(constantOf("apps/web/src/server/auth/invite.ts", "SIGNAL_LINK_DAYS")).toBe(30);
+    expect(ALL).toMatch(/알림 링크[^\n]{0,40}30일/);
+  });
+
   it("사진 업로드 상한 25MB", () => {
     const source = readFileSync(
       path.join(ROOT, "apps/web/src/server/storage/local.ts"),

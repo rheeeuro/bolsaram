@@ -63,9 +63,11 @@ export const STEPS: Step[] = [
     label: "기한 지난 초대 회수",
     run: async (sql) => {
       // 만료됐지만 아직 열려 있는 초대를 닫는다. 행은 감사 목적으로 남긴다.
+      // 알림 링크(SIGNAL)는 연결된 채로 만들어지지만 기한이 지나면 끝이라 함께 닫는다.
       const r = await sql.query(
         `UPDATE invites SET revoked_at = now()
-          WHERE claimed_at IS NULL AND revoked_at IS NULL AND expires_at < now()`,
+          WHERE revoked_at IS NULL AND expires_at < now()
+            AND (claimed_at IS NULL OR purpose = 'SIGNAL')`,
       );
       return r.rowCount ?? 0;
     },

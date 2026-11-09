@@ -140,6 +140,11 @@ export const inviteCreateSchema = z.object({
     .min(1)
     .max(24 * 30)
     .default(72),
+  /**
+   * `ENTRY` 는 입장 링크(이전 링크를 모두 회수한다), `SIGNAL` 은 받은 신청 알림 링크
+   * (이미 들어온 분에게만, 기존 링크를 그대로 두고 정해진 기간만 열린다 — 기간은 서버가 정한다).
+   */
+  purpose: z.enum(["ENTRY", "SIGNAL"]).default("ENTRY"),
 });
 
 export const inviteClaimSchema = z.object({

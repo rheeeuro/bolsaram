@@ -44,7 +44,7 @@ export async function countHostTodo(sql: Sql, groupId: string | null): Promise<H
           AND NOT EXISTS (
             SELECT 1 FROM (
               SELECT expires_at, claimed_at FROM invites
-               WHERE profile_id = p.id AND revoked_at IS NULL
+               WHERE profile_id = p.id AND revoked_at IS NULL AND purpose = 'ENTRY'
                ORDER BY created_at DESC LIMIT 1
             ) i
              WHERE i.claimed_at IS NULL AND i.expires_at >= now()
