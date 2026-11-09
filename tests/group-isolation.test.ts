@@ -434,6 +434,24 @@ describe("대행 중에도 풀 경계는 그 멤버의 것이다", () => {
     expect(ids).not.toContain(publicTarget);
   });
 
+  it("대행 중 키워드 검색도 그 멤버의 풀 안에서만 찾는다", async () => {
+    await withOwner((sql) =>
+      sql.query(`UPDATE profiles SET bio = '주말마다 등산' WHERE id = ANY($1::uuid[])`, [
+        [sameGroupTarget, publicTarget],
+      ]),
+    );
+    const ids = await withRls(acting(), async (sql) => {
+      const page = await findDiscoverProfiles(
+        sql,
+        discoverQuerySchema.parse({ q: "등산" }),
+        A.profileId,
+      );
+      return page.items.map((p) => p.id);
+    });
+    expect(ids).toContain(sameGroupTarget);
+    expect(ids).not.toContain(publicTarget);
+  });
+
   it("풀 밖 상대는 상세에서도 가린다", async () => {
     const [outside, inside] = await withRls(acting(), async (sql) => [
       await isOutsidePoolForViewer(sql, A.profileId, publicTarget),

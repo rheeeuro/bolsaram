@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { normalizeHashtags } from "@bolsaram/schemas";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
+import { Input } from "@/components/ui/field";
 import { AiRecommendBadge, HashtagChip } from "@/components/ui/marks";
 import { ProfileCard } from "@/components/member/profile-card";
 import { ProfileRow } from "@/components/member/profile-row";
@@ -54,6 +55,10 @@ export function DiscoverClient() {
   // 「AI 추천만」. 나이·지역 같은 조건과 성격이 달라(서버가 내 이상형으로 고른다) 필터
   // 시트가 아니라 위 막대에 따로 둔다 — 한 번 눌러 켜고 끄는 것이 자연스럽다.
   const [aiOnly, setAiOnly] = useState(() => searchParams.get("ai") === "1");
+  // 자유 검색어. 소개글·직업·취미·태그를 훑는다(서버 `buildDiscoverWhere`). 입력 중에는
+  // 부르지 않고 「찾기」로 확정한다 — 한글 조합 중에 요청이 나가면 반쪽 글자로 찾는다.
+  const [q, setQ] = useState(() => (searchParams.get("q") ?? "").trim());
+  const [qDraft, setQDraft] = useState(q);
   const [sheetOpen, setSheetOpen] = useState(false);
   // 소개팅은 사진이 먼저다 — 들어올 때는 늘 사진을 크게 깐다. 고른 방식은 같은 탭 안에서만
   // 기억한다(상세에서 돌아와도 유지). 기기에 남기면 한 번 고른 목록이 기본처럼 굳는다.
@@ -79,6 +84,7 @@ export function DiscoverClient() {
       const generation = replace ? ++loadGeneration.current : loadGeneration.current;
       const params = filtersToParams(filters);
       if (aiOnly) params.set("ai", "1");
+      if (q) params.set("q", q);
       if (raw) params.set("view", "raw");
       if (nextCursor) params.set("cursor", nextCursor);
       const result = await apiGet<Page<ProfileCardView | ProfileRawView>>(
@@ -105,7 +111,7 @@ export function DiscoverClient() {
           : { raw: false, items: [...kept, ...items] };
       });
     },
-    [filters, aiOnly, raw],
+    [filters, aiOnly, q, raw],
   );
 
   // 저장된 보기 방식은 mount 뒤에 읽는다 — 서버 렌더 결과와 어긋나면 hydration 이 깨진다.
@@ -128,15 +134,28 @@ export function DiscoverClient() {
     }
   }
 
-  // 태그와 「AI 추천만」이 바뀌면 주소도 따라간다 — 상세에서 뒤로 왔을 때 같은 목록이어야 한다.
+  // 조건 시트의 「N명 보기」도 시트 밖 조건(검색어·AI 추천)을 함께 걸어야 목록 수와 맞는다.
+  const countUrl = useCallback(
+    (query: string) => {
+      const extra = new URLSearchParams(query);
+      if (aiOnly) extra.set("ai", "1");
+      if (q) extra.set("q", q);
+      extra.set("limit", "1");
+      return `/api/profiles?${extra.toString()}`;
+    },
+    [aiOnly, q],
+  );
+
+  // 검색어·태그·「AI 추천만」이 바뀌면 주소도 따라간다 — 상세에서 뒤로 왔을 때 같은 목록이어야 한다.
   // 뒤로 가기 이력을 남기지 않으려고 replace 를 쓴다.
   useEffect(() => {
     const params = new URLSearchParams();
+    if (q) params.set("q", q);
     if (filters.tags.length > 0) params.set("tags", filters.tags.join(","));
     if (aiOnly) params.set("ai", "1");
     const query = params.toString().replace(/%2C/g, ",");
     router.replace(query ? `/discover?${query}` : "/discover", { scroll: false });
-  }, [filters.tags, aiOnly, router]);
+  }, [q, filters.tags, aiOnly, router]);
 
   // 필터나 원본 보기 여부가 바뀌면 처음부터 다시 읽는다. 목록 ↔ 격자는 같은 응답이라 다시 읽지 않는다.
   useEffect(() => {
@@ -155,6 +174,13 @@ export function DiscoverClient() {
   // 원본으로 바꾼 직후에는 아직 카드 응답을 들고 있다 — 새 응답이 올 때까지 기다린다.
   const showLoading = loading || !viewReady || (raw && !loaded.raw);
   const filterCount = activeFilterCount(filters);
+  const anyCondition = filterCount > 0 || q.length > 0;
+
+  function clearAll(): void {
+    setFilters(DEFAULT_FILTERS);
+    setQ("");
+    setQDraft("");
+  }
 
   return (
     <main className="mx-auto max-w-3xl px-4">
@@ -207,8 +233,35 @@ export function DiscoverClient() {
         </button>
       </MemberSubBar>
 
+      <form
+        role="search"
+        className="flex items-center gap-2 pb-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setQ(qDraft.trim());
+        }}
+      >
+        <Input
+          type="search"
+          enterKeyHint="search"
+          maxLength={60}
+          placeholder="직업·취미·소개글로 찾기"
+          aria-label="키워드 검색"
+          value={qDraft}
+          onChange={(e) => {
+            setQDraft(e.target.value);
+            // 지우개(×)로 비우면 바로 전체로 돌아간다 — 빈 칸에서 「찾기」를 한 번 더 누르게 하지 않는다.
+            if (e.target.value === "" && q) setQ("");
+          }}
+          className="h-10 min-w-0 flex-1"
+        />
+        <Button type="submit" variant="secondary" className="h-10 shrink-0">
+          찾기
+        </Button>
+      </form>
+
       {filters.tags.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5 pb-3 pt-3">
+        <div className="flex flex-wrap items-center gap-1.5 pb-3">
           {filters.tags.map((tag) => (
             <HashtagChip
               key={tag}
@@ -225,7 +278,7 @@ export function DiscoverClient() {
       ) : null}
 
       {showLoading ? (
-        <div className="pt-3">
+        <div>
           <LoadingLabel />
           {view === "raw" ? (
             <RawRowsSkeleton />
@@ -260,8 +313,8 @@ export function DiscoverClient() {
           title="조건에 맞는 분이 없어요"
           description="조건을 조금 넓혀보시면 더 많은 분을 만날 수 있어요."
           action={
-            filterCount > 0 ? (
-              <Button variant="secondary" onClick={() => setFilters(DEFAULT_FILTERS)}>
+            anyCondition ? (
+              <Button variant="secondary" onClick={clearAll}>
                 조건 초기화
               </Button>
             ) : undefined
@@ -309,6 +362,7 @@ export function DiscoverClient() {
       <FilterSheet
         open={sheetOpen}
         initial={filters}
+        countUrl={countUrl}
         onClose={() => setSheetOpen(false)}
         onApply={(next) => {
           setFilters(next);
