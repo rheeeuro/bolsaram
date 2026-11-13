@@ -113,21 +113,25 @@ export function HostRequestList({
           </p>
         </Panel>
       ) : (
-        <ul className="stagger flex flex-col gap-3">
+        // 목록이 열을 정하고 각 카드가 subgrid 로 따른다. 사람 칸은 모든 줄에서 가장 긴 내용에
+        // 맞춰지므로 글 너비를 고정하지 않는다 — 고정하면 짧은 번호 뒤에 빈칸이 남아 화살표가
+        // 받는 사람 쪽으로 쏠린다. 좁은 화면에서는 시각·종료를 아래 줄로 내린다.
+        <ul className="stagger grid grid-cols-[minmax(0,max-content)_auto_minmax(0,max-content)_minmax(0,1fr)] gap-x-4 gap-y-3 sm:gap-x-5">
           {items.map((item) => {
             const connected = item.status === "INTRODUCED";
             return (
               <li
                 key={item.id}
                 className={cn(
-                  "rounded-[var(--radius-card)] border bg-[var(--surface-card)] p-4",
+                  "col-span-full grid grid-cols-subgrid items-center",
+                  "rounded-[var(--radius-card)] border bg-[var(--surface-card)] p-3.5 sm:p-4",
                   "shadow-[var(--shadow-card)]",
                   connected
                     ? "border-[var(--color-rose-300)]"
                     : "border-[var(--surface-border)]",
                 )}
               >
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="contents">
                   <PartyCard party={item.requester} />
 
                   <div className="flex shrink-0 flex-col items-center gap-1.5">
@@ -139,8 +143,8 @@ export function HostRequestList({
 
                   <PartyCard party={item.target} />
 
-                  <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
-                    <span className="text-[12px] text-[var(--surface-text-muted)]">
+                  <div className="col-span-full mt-3 flex min-w-0 flex-wrap items-center justify-end gap-3 sm:col-span-1 sm:mt-0">
+                    <span className="whitespace-nowrap text-[12px] tabular-nums text-[var(--surface-text-muted)]">
                       {formatWhen(item.requestedAt)}
                     </span>
                     {connected ? (
@@ -155,47 +159,49 @@ export function HostRequestList({
                   </div>
                 </div>
 
-                {item.message ? (
-                  <p className="mt-3 rounded-[10px] bg-[var(--color-ivory-100)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--color-ink-700)]">
-                    “{item.message}”
-                  </p>
-                ) : null}
+                <div className="col-span-full">
+                  {item.message ? (
+                    <p className="mt-3 rounded-[10px] bg-[var(--color-ivory-100)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--color-ink-700)]">
+                      “{item.message}”
+                    </p>
+                  ) : null}
 
-                {item.notify ? (
-                  <NotifyMember
-                    joined={item.notify.joined}
-                    profileId={item.target?.id ?? null}
-                    requester={item.requester?.code ?? "상대"}
-                    target={item.target?.code ?? "받는 분"}
-                    signalsUrl={signalsUrl}
-                  />
-                ) : null}
+                  {item.notify ? (
+                    <NotifyMember
+                      joined={item.notify.joined}
+                      profileId={item.target?.id ?? null}
+                      requester={item.requester?.code ?? "상대"}
+                      target={item.target?.code ?? "받는 분"}
+                      signalsUrl={signalsUrl}
+                    />
+                  ) : null}
 
-                {item.status === "REQUESTED" ? (
-                  <OnBehalf
-                    busy={busy}
-                    target={item.target?.code ?? "상대"}
-                    requester={item.requester?.code ?? "신청자"}
-                    onAct={(action) => void act(item.id, action)}
-                  />
-                ) : null}
+                  {item.status === "REQUESTED" ? (
+                    <OnBehalf
+                      busy={busy}
+                      target={item.target?.code ?? "상대"}
+                      requester={item.requester?.code ?? "신청자"}
+                      onAct={(action) => void act(item.id, action)}
+                    />
+                  ) : null}
 
-                {item.status === "REJECTED" && item.targetManaged ? (
-                  <WithdrawReject
-                    busy={busy}
-                    target={item.target?.code ?? "받은 분"}
-                    requester={item.requester?.code ?? "신청한 분"}
-                    onConfirm={() => void act(item.id, "withdraw")}
-                  />
-                ) : null}
+                  {item.status === "REJECTED" && item.targetManaged ? (
+                    <WithdrawReject
+                      busy={busy}
+                      target={item.target?.code ?? "받은 분"}
+                      requester={item.requester?.code ?? "신청한 분"}
+                      onConfirm={() => void act(item.id, "withdraw")}
+                    />
+                  ) : null}
 
-                {item.status === "WITHDRAWN" && item.targetManaged && item.target ? (
-                  <AfterWithdraw
-                    targetId={item.target.id}
-                    target={item.target.code}
-                    requester={item.requester?.code ?? "신청한 분"}
-                  />
-                ) : null}
+                  {item.status === "WITHDRAWN" && item.targetManaged && item.target ? (
+                    <AfterWithdraw
+                      targetId={item.target.id}
+                      target={item.target.code}
+                      requester={item.requester?.code ?? "신청한 분"}
+                    />
+                  ) : null}
+                </div>
               </li>
             );
           })}
@@ -457,15 +463,23 @@ function AfterWithdraw({
   );
 }
 
+/** 글 칸은 내용만큼만 차지하고, 긴 이름은 이 너비에서 말줄임한다. */
+const PARTY_TEXT = "min-w-0 max-w-28 sm:max-w-40";
+
 function PartyCard({ party }: { party: Party }) {
-  if (!party) {
-    return <span className="text-[13px] text-[var(--surface-text-muted)]">삭제된 프로필</span>;
-  }
   const box =
     "block h-14 w-11 shrink-0 overflow-hidden rounded-[10px] bg-[var(--color-ivory-200)]";
+  if (!party) {
+    return (
+      <span className="flex min-w-0 items-center gap-2 text-[13px] text-[var(--surface-text-muted)] sm:gap-2.5">
+        <span className={box} />
+        <span className={PARTY_TEXT}>삭제된 프로필</span>
+      </span>
+    );
+  }
   // 사진은 크게 보기라 링크 밖에 둔다. 번호·이름 쪽이 상세로 간다.
   return (
-    <span className="flex min-w-0 shrink-0 items-center gap-2.5">
+    <span className="flex min-w-0 items-center gap-2 sm:gap-2.5">
       {party.imageUrl ? (
         <PhotoZoom
           photos={[{ id: party.id, url: party.imageUrl }]}
@@ -488,9 +502,9 @@ function PartyCard({ party }: { party: Party }) {
       )}
       <Link
         href={`/profiles/${party.id}`}
-        className="min-w-0 transition-opacity hover:opacity-80"
+        className={cn(PARTY_TEXT, "transition-opacity hover:opacity-80")}
       >
-        <p className="display text-[15px] text-[var(--surface-text)]">
+        <p className="display truncate text-[15px] text-[var(--surface-text)]">
           <ProfileCode code={party.code} />
         </p>
         <p className="truncate text-[12px] text-[var(--surface-text-muted)]">

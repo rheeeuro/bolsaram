@@ -204,11 +204,14 @@ export default async function HostHomePage() {
                   아직 신청이 없습니다. 프로필을 공개하면 여기에 쌓입니다.
                 </p>
               ) : (
-                <ul className="stagger flex flex-col gap-2.5">
+                // 목록이 열을 정하고 각 줄이 subgrid 로 따른다. 사람 칸은 모든 줄에서 가장 긴
+                // 내용에 맞춰지므로 글 너비를 고정하지 않는다 — 고정하면 짧은 번호 뒤에 빈칸이
+                // 남아 화살표가 받는 사람 쪽으로 쏠린다. 상태·날짜는 오른쪽 끝.
+                <ul className="stagger grid grid-cols-[minmax(0,max-content)_auto_minmax(0,max-content)_minmax(max-content,1fr)] gap-x-3 gap-y-2.5 sm:gap-x-4">
                   {recent.map((item) => (
                     <li
                       key={item.id}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-[var(--surface-border)] px-3 py-2.5"
+                      className="col-span-full grid grid-cols-subgrid items-center rounded-[12px] border border-[var(--surface-border)] px-2.5 py-2.5 sm:px-3"
                     >
                       <Party party={item.requester} />
                       <span
@@ -218,11 +221,11 @@ export default async function HostHomePage() {
                         →
                       </span>
                       <Party party={item.target} />
-                      <div className="ml-auto flex items-center gap-2.5">
+                      <div className="flex flex-col items-end gap-1">
                         <Badge tone={toneForStatus(item.status)}>
                           {label.matchStatus(item.status)}
                         </Badge>
-                        <span className="text-[12px] text-[var(--surface-text-muted)]">
+                        <span className="whitespace-nowrap text-[12px] tabular-nums text-[var(--surface-text-muted)]">
                           {formatDay(item.requestedAt.toISOString())}
                         </span>
                       </div>
@@ -437,12 +440,15 @@ function StartSteps({ kpi }: { kpi: Kpi }) {
   );
 }
 
+/** 글 칸은 내용만큼만 차지하고, 긴 이름은 이 너비에서 말줄임한다. */
+const PARTY_TEXT = "min-w-0 max-w-24 sm:max-w-32";
+
 function Party({ party }: { party: PartyView | null }) {
   if (!party) {
     return (
-      <span className="flex items-center gap-2 text-[13px] text-[var(--surface-text-muted)]">
+      <span className="flex min-w-0 items-center gap-2 text-[13px] text-[var(--surface-text-muted)]">
         <Thumb url={undefined} size="sm" />
-        삭제됨
+        <span className={PARTY_TEXT}>삭제됨</span>
       </span>
     );
   }
@@ -454,12 +460,12 @@ function Party({ party }: { party: PartyView | null }) {
         size="sm"
         label={`${party.code} 사진 크게 보기`}
       />
-      <Link href={`/profiles/${party.id}`} className="min-w-0 hover:opacity-80">
-        <span className="display block text-[14px] text-[var(--surface-text)]">
+      <Link href={`/profiles/${party.id}`} className={cn(PARTY_TEXT, "hover:opacity-80")}>
+        <span className="display block truncate text-[14px] text-[var(--surface-text)]">
           {party.name ?? <ProfileCode code={party.code} />}
         </span>
         {party.name ? (
-          <span className="block text-[11.5px] text-[var(--surface-text-muted)]">
+          <span className="block truncate text-[11.5px] text-[var(--surface-text-muted)]">
             <ProfileCode code={party.code} />
           </span>
         ) : null}
