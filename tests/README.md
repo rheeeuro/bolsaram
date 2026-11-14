@@ -42,7 +42,7 @@ DB 통합 테스트가 있으므로 `pnpm db:up` 이 필요하다.
 | `r2-storage.test.ts` | R2 설정·키 분기·업로드·삭제·장애 전파 | 불필요 | 5 |
 | `cleanup.test.ts`              | 만료 정리(기한 지난 알림 링크 포함)·참조된 사진 보존·경로 탈출 | 필요 | 8    |
 | `telegram-state.test.ts`       | 봇 대화 상태·메시지 분류·원문 우선순위·앨범·글 나누기(자리·확인값·버튼 값·기준선) | –    | 54   |
-| `telegram-split.test.ts`       | webhook→버튼 「새 사람으로 나누기」(Bot API·판정기 가짜) — 나눔·다시 누름·다음 사람 진행 중·같은 사람은 묻지 않음 | 필요 | 4 |
+| `telegram-split.test.ts`       | webhook→버튼 「새 사람으로 나누기」(Bot API·판정기 가짜) — 나눔·다시 누름·다음 사람 진행 중·사라진 세션의 버튼·같은 사람은 묻지 않음 | 필요 | 5 |
 | `telegram-import.test.ts`      | webhook 멱등성·계정 연결·담을 모임·사진 묶기(보낸 순서 유지)·권한 경계 | 필요 | 36 |
 | `oauth-login.test.ts`          | 소셜 로그인 왕복 — state·PKCE·제공자 게이트    | –    | 8    |
 | `group-isolation.test.ts`      | 모임 간 격리·대행 중 풀 경계·claim 가로채기 차단 | 필요 | 22   |
@@ -124,6 +124,7 @@ docker exec bolsaram_postgres dropdb -U bolsaram_owner --force bolsaram_test
 | `telegram-import.test.ts` 「속하지 않은 모임은 정책이」    | 봇 업로드 대상이 소속을 벗어나지 못함 |
 | `telegram-state.test.ts` 「직접 보낸 글이 …우선한다」      | 원문 우선순위(§5.4)                 |
 | `telegram-split.test.ts` 「다음 사람을 이미 받고 있으면」  | 옛 버튼이 진행 중인 다른 대화를 건드리지 않음 |
+| `telegram-split.test.ts` 「정리돼 사라진 세션의 버튼」  | 지워진 세션의 버튼은 내부 오류 대신 이유를 알리고 버튼을 걷음 |
 | `oauth-login.test.ts` 「state 가 다르면 거절한다」         | 남이 시작한 로그인으로 세션을 못 만듦 |
 | `oauth-login.test.ts` 「쿠키를 고치면 …거절한다」          | 왕복 상태 위조 차단                 |
 | `admin-signup.test.ts` 「멤버 계정에는 …붙이지 않는다」    | 멤버 계정이 소셜 로그인으로 열리지 않음 |

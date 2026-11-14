@@ -28,6 +28,7 @@ vi.mock("../apps/web/src/server/telegram/client", async (importOriginal) => ({
 }));
 
 import { closePools, withOwner, withRls, type RlsContext } from "@bolsaram/db";
+import { encodeCommitCallback, encodeGenderCallback } from "@bolsaram/domain";
 import { setContinuationJudge } from "../apps/web/src/server/ai/index";
 import {
   consumeTelegramLinkCode,
@@ -202,6 +203,26 @@ describe("새 사람으로 나누기", () => {
     expect(bot.answered.at(-1)).toBe(messages.splitBusy);
     const untouched = await withRls(admin, (sql) => findSession(sql, merged.id));
     expect(untouched?.rawText).toBe(merged.rawText);
+  });
+
+  it("정리돼 사라진 세션의 버튼을 누르면 이유를 알리고 버튼을 걷는다", async () => {
+    setContinuationJudge({ differentPerson: async () => 0.1 });
+    await text("/new");
+    await text(FIRST.replace("165", "164"));
+    const gone = (await activeSession())!;
+    await settled(gone.id);
+    // 정리 작업이 지운 상태를 흉내 낸다.
+    await withOwner((sql) => sql.query(`DELETE FROM import_sessions WHERE id = $1`, [gone.id]));
+
+    const editReplyMarkup = vi.mocked(
+      (await import("../apps/web/src/server/telegram/client")).editMessageReplyMarkup,
+    );
+    editReplyMarkup.mockClear();
+    for (const data of [encodeCommitCallback(gone.id), encodeGenderCallback(gone.id, "MALE")]) {
+      await press(data);
+      expect(bot.answered.at(-1)).toBe(messages.sessionGone);
+    }
+    expect(editReplyMarkup).toHaveBeenCalledWith(TG, 1, []);
   });
 
   it("같은 사람 같으면 묻지 않는다", async () => {

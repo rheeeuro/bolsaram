@@ -6,6 +6,7 @@
  * 예외적으로 몇 줄만 보여주고, 자세한 내용은 볼사람 화면 링크로 넘긴다.
  */
 import "server-only";
+import { PENDING_IMPORT_TTL_HOURS } from "@bolsaram/domain";
 import {
   GENDER_LABELS,
   MATCH_INTENT_KIND_LABELS,
@@ -152,6 +153,10 @@ export const messages = {
     );
     // 방은 검토 화면에서 바꿀 수 있다. 다시 보내지 않아도 된다는 것을 알려준다.
     lines.push("등록할 모임은 검토 화면에서 바꿀 수 있습니다.");
+    // 등록하지 않은 가져오기는 정리 작업이 지운다. 늦게 눌러 헛걸음하지 않게 미리 알린다.
+    lines.push(
+      `${PENDING_IMPORT_TTL_HOURS}시간 안에 등록하지 않으면 받은 사진과 글은 지워집니다.`,
+    );
     return lines.join("\n");
   },
 
@@ -181,6 +186,12 @@ export const messages = {
 
   /** 우리가 만들지 않은 버튼이거나 형식이 깨진 값. 조용히 넘기지 않고 알린다. */
   buttonExpired: "이 버튼은 더 이상 쓸 수 없습니다. 볼사람에서 확인해 주세요.",
+
+  /**
+   * 버튼이 가리키는 가져오기가 없다 — 등록 전에 정리됐거나 볼사람에서 지웠다.
+   * 원본이 남아 있지 않으므로 다시 보내는 것 말고는 방법이 없다고 분명히 말한다.
+   */
+  sessionGone: `이 프로필은 남아 있지 않습니다. 등록하지 않은 채 ${PENDING_IMPORT_TTL_HOURS}시간이 지나 정리됐거나 볼사람에서 지운 것입니다. 사진과 글을 다시 보내 주세요.`,
 
   /** 누름에 대한 답은 짧아야 한다 — 연결 안내는 대화창이 아니라 알림으로 뜬다. */
   notLinkedShort: "연결되지 않은 계정입니다.",

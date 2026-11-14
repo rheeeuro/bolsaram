@@ -352,6 +352,22 @@ async function routeCallback(callback: TelegramCallbackQuery): Promise<void> {
   await touchTelegramConnection(callback.from.id);
 
   const ctx = rlsContextOfTelegram(identity);
+  // 버튼은 메시지에 남아 있지만 세션은 정리 작업이나 웹 폐기로 사라질 수 있다.
+  // 내부 오류 문구 대신 이유와 다음 할 일을 알리고, 다시 누르지 않게 버튼을 걷는다.
+  const session = await withRls(ctx, (sql) => imports.findSession(sql, action.sessionId));
+  if (!session) {
+    console.info(`텔레그램 응답: 세션 없음 · ${action.kind}`);
+    await answerCallbackQuery(callback.id, messages.sessionGone, true);
+    if (callback.message) {
+      await editMessageReplyMarkup(callback.message.chat.id, callback.message.message_id, []).catch(
+        () => {
+          console.warn("텔레그램 버튼 걷기 실패 (세션 없음)");
+        },
+      );
+    }
+    return;
+  }
+
   switch (action.kind) {
     case "gender":
       await applyGenderChoice(ctx, identity, callback, action);
