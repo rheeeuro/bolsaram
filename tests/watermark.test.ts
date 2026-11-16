@@ -6,7 +6,11 @@
  */
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { viewerMark, watermarkImage } from "../apps/web/src/server/storage/watermark";
+import {
+  embedHiddenMark,
+  viewerMark,
+  watermarkImage,
+} from "../apps/web/src/server/storage/watermark";
 import { defaultEnhanceOptions, enhanceTrace } from "../apps/web/src/lib/trace-enhance";
 import { hostViewerCode, parseTraceCode } from "../apps/web/src/lib/viewer-code";
 
@@ -182,23 +186,43 @@ describe("숨은 층 판독", () => {
   });
 
   it("숨은 층은 밝기를 2 단계 넘게 바꾸지 않는다", async () => {
-    // 보이는 층이 지나가지 않는 자리를 찾기 어려우므로, 바뀐 점 대부분이 2 이하인지 본다.
+    // 보이는 층은 일부러 눈에 띄게 하므로 떼어 놓고, 숨은 층만 raw 픽셀에서 잰다.
+    const width = 600;
+    const height = 600;
+    const data = Buffer.alloc(width * height * 3, 128);
+    await embedHiddenMark(data, { width, height, channels: 3 }, MARK.hidden);
+    let changed = 0;
+    let max = 0;
+    for (const v of data) {
+      if (v === 128) continue;
+      changed += 1;
+      max = Math.max(max, 128 - v);
+    }
+    expect(changed).toBeGreaterThan(0);
+    expect(max).toBeLessThanOrEqual(2);
+  });
+
+  it("보이는 층은 폰 목록 카드 크기로 줄여도 바탕과 갈린다", async () => {
+    // 720×1280 사진을 폰 2열 카드(가로 약 180pt × 3배)로 줄여 캡처한 것과 같은 크기.
     const input = await sharp({
-      create: { width: 600, height: 600, channels: 3, background: { r: 128, g: 128, b: 128 } },
+      create: { width: 720, height: 1280, channels: 3, background: { r: 128, g: 128, b: 128 } },
     })
       .png()
       .toBuffer();
-    const output = (await watermarkImage(input, MARK))!;
-    const before = await sharp(input).raw().toBuffer();
-    const after = await sharp(output).raw().toBuffer();
-    let changed = 0;
-    let small = 0;
-    for (let i = 0; i < before.length; i += 1) {
-      const d = Math.abs(before[i]! - after[i]!);
-      if (d === 0) continue;
-      changed += 1;
-      if (d <= 3) small += 1; // JPEG 반올림 1 단계 여유
+    const shot = await sharp((await watermarkImage(input, MARK))!)
+      .resize(540)
+      .jpeg({ quality: 80 })
+      .raw()
+      .toBuffer();
+    let bright = 0;
+    let dark = 0;
+    for (let i = 0; i < shot.length; i += 3) {
+      if (shot[i]! > 128 + 20) bright += 1;
+      if (shot[i]! < 128 - 8) dark += 1;
     }
-    expect(small / changed).toBeGreaterThan(0.8);
+    // 밝은 글자와 어두운 테두리가 함께 남아야 어느 바탕에서나 읽힌다.
+    // 짧은 변 1.6% · 불투명도 13% 글씨는 이 크기에서 둘 다 0 이다 — 바탕에 묻힌다.
+    expect(bright / (shot.length / 3)).toBeGreaterThan(0.007);
+    expect(dark / (shot.length / 3)).toBeGreaterThan(0.001);
   });
 });

@@ -68,15 +68,10 @@ export default async function HostLayout({ children }: { children: React.ReactNo
         />
         {/* 좁은 화면에서는 하단 탭이 본문 위에 떠 있다 — 그만큼 바닥을 비운다.
             넓은 화면에는 탭이 없고 사이드바가 왼쪽을 차지한다. 오른쪽 아래 채팅
-            버튼(56px + 여백)도 끝까지 내렸을 때 마지막 줄의 버튼을 덮지 않게 더 비운다. */}
-        <div className="lg:pl-64">
-          <main
-            className="mx-auto max-w-6xl px-5 pt-5 lg:pt-7"
-            style={{
-              paddingBottom:
-                "calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 5.5rem)",
-            }}
-          >
+            버튼(56px + 여백)도 끝까지 내렸을 때 마지막 줄의 버튼을 덮지 않게 더 비운다.
+            여백 값은 `.host-main` 에 있다 — 채팅 화면은 같은 자리에서 높이를 화면에 맞춘다. */}
+        <div className="host-body lg:pl-64">
+          <main className="host-main mx-auto max-w-6xl px-5 pt-5 lg:pt-7">
             {children}
           </main>
         </div>

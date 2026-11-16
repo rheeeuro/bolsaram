@@ -49,8 +49,9 @@ export default async function HostChatPage() {
     prefs: await readPrefs(sql, groupId, viewer.userId),
   }));
 
+  // 페이지가 아니라 대화만 스크롤된다 — 표식을 보고 레이아웃이 화면 높이에 맞춘다.
   return (
-    <>
+    <div data-chat-page className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title={groupName}
         kicker="채팅"
@@ -66,6 +67,6 @@ export default async function HostChatPage() {
         notify={prefs.notify}
         telegramLinked={prefs.telegramLinked}
       />
-    </>
+    </div>
   );
 }

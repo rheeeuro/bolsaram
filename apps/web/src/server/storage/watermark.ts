@@ -4,21 +4,28 @@
  * 웹에서는 캡처를 막을 수 없으므로 막는 대신 **누가 캡처했는지 남긴다.** CSS 로
  * 덮으면 개발자 도구로 걷어낼 수 있어 서버가 픽셀에 직접 합성한다.
  *
- *   보이는 층   작은 글씨를 넓은 간격으로 비스듬히. 「표시가 있다」는 것 자체로 억제한다.
- *              밝은 글자와 어두운 테두리를 아주 옅게 겹쳐 어느 바탕에서나 눈에 띄지 않게 한다.
+ *   보이는 층   굵은 글씨를 비스듬히 여러 줄. 「표시가 있다」는 것 자체로 억제하고, 폰에서
+ *              줄여 보다가 캡처해도 번호와 날짜가 맨눈으로 읽히게 한다. 밝은 글자와 어두운
+ *              테두리를 반투명하게 겹쳐 어느 바탕에서나 읽힌다.
  *   숨은 층     큰 글씨를 촘촘히, 밝기만 몇 단계 낮춘다. 맨눈으로는 보이지 않지만 얼굴만
  *              잘라도 몇 줄은 남고, 지우기 어렵다. 판독은 주선자 화면 「캡처본 확인」이
  *              주변 밝기를 빼고 차이를 키워서 한다(`lib/trace-enhance.ts`).
  *
- * 사진 감상을 방해하지 않는 것이 우선이다. 표시에는 보는 사람 표기(멤버는 공개 번호,
+ * 표시에는 보는 사람 표기(멤버는 공개 번호,
  * 주선자는 계정 코드)와 날짜만 싣고 이름·연락처는 넣지 않는다.
  */
 import "server-only";
 import sharp from "sharp";
 import { hostViewerCode, memberViewerCode } from "../../lib/viewer-code";
 
-/** 보이는 층 글씨 = 짧은 변 × 이 비율. 1280px 사진에서 약 15px 다. */
-const VISIBLE_FONT_RATIO = 0.016;
+/**
+ * 보이는 층 글씨 = 짧은 변 × 이 비율. 폰 화면은 사진을 크게 줄여 보여 주므로(목록 카드는
+ * 가로 약 180pt) 그 크기로 캡처해도 글자가 읽혀야 한다. 720px 사진에서 약 18px 다.
+ */
+const VISIBLE_FONT_RATIO = 0.025;
+/** 보이는 층 진하기. 밝은 글자와 어두운 테두리를 겹쳐 밝은 바탕·어두운 바탕 모두에서 읽힌다. */
+const VISIBLE_FILL_OPACITY = 0.2;
+const VISIBLE_STROKE_OPACITY = 0.13;
 /**
  * 숨은 층 글씨 = 짧은 변 × 이 비율. 획이 굵어야 축소·재압축 뒤에도 남는다 —
  * 가는 획은 JPEG 가 먼저 지운다.
@@ -74,19 +81,7 @@ export async function watermarkImage(input: Buffer, mark: ViewerMark): Promise<B
       .toBuffer({ resolveWithObject: true });
     const { width, height, channels } = info;
 
-    const hiddenFont = fontFor(width, height, HIDDEN_FONT_RATIO, 16, 96);
-    const hidden = await sharp(Buffer.from(hiddenSvg(width, height, hiddenFont, mark.hidden)))
-      .ensureAlpha()
-      .extractChannel(3)
-      .blur(Math.max(0.8, hiddenFont * HIDDEN_SOFTEN_RATIO))
-      .raw()
-      .toBuffer();
-    for (let i = 0, p = 0; i < hidden.length; i += 1, p += channels) {
-      const a = hidden[i]!;
-      if (a === 0) continue;
-      const delta = Math.round((HIDDEN_DEPTH * a) / 255);
-      for (let c = 0; c < channels; c += 1) data[p + c] = Math.max(0, data[p + c]! - delta);
-    }
+    await embedHiddenMark(data, { width, height, channels }, mark.hidden);
 
     return await sharp(data, { raw: { width, height, channels } })
       .composite([{ input: Buffer.from(visibleSvg(width, height, mark.visible)), top: 0, left: 0 }])
@@ -97,19 +92,43 @@ export async function watermarkImage(input: Buffer, mark: ViewerMark): Promise<B
   }
 }
 
+/**
+ * 숨은 층만 raw 픽셀(sRGB, 알파 없음)에 직접 새긴다 — 밝기를 최대 `HIDDEN_DEPTH` 만 낮춘다.
+ * 보이는 층과 떼어 둔 것은 이 깊이를 따로 검사하기 위해서다.
+ */
+export async function embedHiddenMark(
+  data: Buffer,
+  { width, height, channels }: { width: number; height: number; channels: number },
+  label: string,
+): Promise<void> {
+  const font = fontFor(width, height, HIDDEN_FONT_RATIO, 16, 96);
+  const hidden = await sharp(Buffer.from(hiddenSvg(width, height, font, label)))
+    .ensureAlpha()
+    .extractChannel(3)
+    .blur(Math.max(0.8, font * HIDDEN_SOFTEN_RATIO))
+    .raw()
+    .toBuffer();
+  for (let i = 0, p = 0; i < hidden.length; i += 1, p += channels) {
+    const a = hidden[i]!;
+    if (a === 0) continue;
+    const delta = Math.round((HIDDEN_DEPTH * a) / 255);
+    for (let c = 0; c < channels; c += 1) data[p + c] = Math.max(0, data[p + c]! - delta);
+  }
+}
+
 function fontFor(width: number, height: number, ratio: number, min: number, max: number) {
   return Math.round(Math.min(max, Math.max(min, Math.min(width, height) * ratio)));
 }
 
 function visibleSvg(width: number, height: number, label: string): string {
-  const font = fontFor(width, height, VISIBLE_FONT_RATIO, 9, 28);
-  // 칸을 넓게 잡아 한 화면에 몇 줄만 지나가게 한다. 줄마다 반 칸씩 엇갈린다.
-  const tileW = font * 30;
-  const tileH = font * 15;
+  const font = fontFor(width, height, VISIBLE_FONT_RATIO, 12, 46);
+  // 얼굴만 잘라도 한 줄은 걸리게 줄 간격을 잡는다. 줄마다 반 칸씩 엇갈린다.
+  const tileW = font * 28;
+  const tileH = font * 14;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-  <g transform="rotate(-24)" font-family="DejaVu Sans, Arial, sans-serif" font-size="${font}" letter-spacing="${font * 0.08}"
-     fill="#ffffff" fill-opacity="0.13"
-     stroke="#000000" stroke-opacity="0.08" stroke-width="${(font * 0.05).toFixed(2)}" paint-order="stroke">
+  <g transform="rotate(-24)" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="${font}" letter-spacing="${font * 0.07}"
+     fill="#ffffff" fill-opacity="${VISIBLE_FILL_OPACITY}"
+     stroke="#000000" stroke-opacity="${VISIBLE_STROKE_OPACITY}" stroke-width="${(font * 0.065).toFixed(2)}" paint-order="stroke">
     ${staggered(escapeXml(label), { x: font, tileW, rowGap: tileH / 2, angle: -24, width, height })}
   </g>
 </svg>`;

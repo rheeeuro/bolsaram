@@ -109,6 +109,41 @@
     color: var(--surface-text-muted);
   }
 
+  /* 주선자 본문 바닥 여백. 좁은 화면의 하단 탭과 오른쪽 아래 채팅 버튼이
+     마지막 줄을 덮지 않게 비운다. */
+  .host-main {
+    padding-bottom: calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 5.5rem);
+  }
+
+  /* 채팅 화면은 페이지가 아니라 대화만 스크롤된다. 표면을 화면 높이에 고정하고
+     본문을 세로 flex 로 이어 메시지 상자가 남는 높이를 다 쓴다. 이 화면에는 채팅
+     버튼이 없으니 바닥은 하단 탭(좁은 화면)만큼만 비운다. */
+  .host-surface:has([data-chat-page]) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+  .host-surface:has([data-chat-page]) .host-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .host-surface:has([data-chat-page]) .host-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    padding-bottom: calc(var(--host-tabbar-h) + env(safe-area-inset-bottom) + 1rem);
+  }
+
+  @media (min-width: 1024px) {
+    .host-surface:has([data-chat-page]) .host-main {
+      padding-bottom: 1.5rem;
+    }
+  }
+
   /* 주선자 화면 오른쪽 아래에 떠 있는 버튼(채팅).
      좁은 화면에서는 하단 탭 위로 올려야 가려지지 않는다. */
   .host-fab {

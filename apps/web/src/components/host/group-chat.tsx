@@ -78,7 +78,6 @@ export function GroupChat({
   const { subscribe, setViewing, markRead } = useChatStream();
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const mention = useMentionPicker({ groupId, value: draft, setValue: setDraft, inputRef });
@@ -132,20 +131,16 @@ export function GroupChat({
     if (compact && window.matchMedia("(min-width: 1024px)").matches) inputRef.current?.focus();
   }, [compact]);
 
-  // 새 메시지가 쌓이면 바닥으로 따라가고 읽음을 찍는다. 떠 있는 패널은 자기 안에서만
-  // 내린다 — `scrollIntoView` 는 뒤에 깔린 화면까지 움직인다.
+  // 새 메시지가 쌓이면 바닥으로 따라가고 읽음을 찍는다. 상자 안에서만 내린다 —
+  // `scrollIntoView` 는 뒤의 화면(페이지)까지 움직인다.
   useEffect(() => {
-    if (compact) {
-      const box = scrollRef.current;
-      if (box) box.scrollTop = box.scrollHeight;
-    } else {
-      bottomRef.current?.scrollIntoView({ block: "end" });
-    }
+    const box = scrollRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
     if (latestAt && markedRef.current !== latestAt) {
       markedRef.current = latestAt;
       markRead(groupId, latestAt);
     }
-  }, [compact, groupId, latestAt, markRead]);
+  }, [groupId, latestAt, markRead]);
 
   async function loadOlder() {
     const oldest = messages[0]?.createdAt;
@@ -208,7 +203,13 @@ export function GroupChat({
 
 
   return (
-    <div className={compact ? "flex h-full min-h-0 flex-col" : "grid max-w-3xl gap-3"}>
+    <div
+      className={
+        compact
+          ? "flex h-full min-h-0 flex-col"
+          : "flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-3"
+      }
+    >
       <div
         className={cn(
           "flex flex-wrap items-center gap-2",
@@ -251,11 +252,13 @@ export function GroupChat({
       <div
         ref={scrollRef}
         className={cn(
-          "flex flex-col gap-0.5 overflow-y-auto overscroll-contain",
+          // relative — 줄 안의 sr-only(absolute) 글자가 상자 밖 문서를 늘리지 않게 가둔다.
+          "relative flex flex-col gap-0.5 overflow-y-auto overscroll-contain",
           compact
             ? "min-h-0 flex-1 px-4 py-3"
             : [
-                "h-[58vh] min-h-80",
+                // 채팅 화면이 높이를 화면에 맞추므로 남는 높이를 다 쓴다.
+                "min-h-48 flex-1",
                 "rounded-[var(--radius-card)] border border-[var(--surface-border)]",
                 "bg-[var(--surface-card)] px-4 py-4 shadow-[var(--shadow-card)]",
               ],
@@ -298,7 +301,6 @@ export function GroupChat({
             )}
           </>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {compact ? (
