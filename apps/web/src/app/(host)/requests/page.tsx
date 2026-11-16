@@ -89,6 +89,8 @@ export default async function HostRequestsPage({
               : null,
           // 거절을 거두는 것은 거절을 기록할 수 있는 받은 쪽 담당만 한다(0078).
           targetManaged: target ? editable.has(target.id) : false,
+          // 신청 취소는 신청한 쪽 담당만 기록한다(0038).
+          requesterManaged: editable.has(request.requesterProfileId),
         };
       }),
       intents: pending.map((intent) => {

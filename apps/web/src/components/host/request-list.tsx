@@ -33,8 +33,10 @@ export type HostRequestItem = {
   target: Party;
   /** 받는 쪽이 내 담당이고 답을 기다릴 때만 있다. `joined` 는 초대 링크로 들어온 적이 있는지. */
   notify: { joined: boolean } | null;
-  /** 받는 쪽이 내 담당인가. 거절을 거두는 것은 그 담당만 한다. */
+  /** 받는 쪽이 내 담당인가. 수락·거절과 거절을 거두는 것은 그 담당만 한다. */
   targetManaged: boolean;
+  /** 신청한 쪽이 내 담당인가. 신청 취소는 그 담당만 기록한다. */
+  requesterManaged: boolean;
 };
 
 /**
@@ -176,9 +178,14 @@ export function HostRequestList({
                     />
                   ) : null}
 
-                  {item.status === "REQUESTED" ? (
+                  {item.status === "REQUESTED" &&
+                  (item.targetManaged || item.requesterManaged) ? (
                     <OnBehalf
                       busy={busy}
+                      actions={[
+                        ...(item.targetManaged ? (["accept", "reject"] as const) : []),
+                        ...(item.requesterManaged ? (["cancel"] as const) : []),
+                      ]}
                       target={item.target?.code ?? "상대"}
                       requester={item.requester?.code ?? "신청자"}
                       onAct={(action) => void act(item.id, action)}
@@ -344,11 +351,14 @@ const BEHALF_LABELS: Record<BehalfAction, string> = {
  */
 function OnBehalf({
   busy,
+  actions,
   requester,
   target,
   onAct,
 }: {
   busy: boolean;
+  /** 누구의 답인지가 누를 수 있는 사람을 정한다 — 수락·거절은 받은 쪽 담당, 취소는 신청한 쪽 담당. */
+  actions: readonly BehalfAction[];
   requester: string;
   target: string;
   onAct: (action: BehalfAction) => void;
@@ -383,10 +393,12 @@ function OnBehalf({
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--surface-border)] pt-3">
       <span className="text-[12px] text-[var(--surface-text-muted)]">
-        본인 대신 처리 — 카카오톡·대면으로 확인한 답을 기록합니다
+        {actions.includes("accept")
+          ? `${target} 님 대신 처리 — 카카오톡·대면으로 확인한 답을 기록합니다`
+          : `${requester} 님 대신 처리 — 마음을 거뒀다면 기록합니다`}
       </span>
       <div className="ml-auto flex gap-2">
-        {(["accept", "reject", "cancel"] as const).map((action) => (
+        {actions.map((action) => (
           <Button
             key={action}
             size="sm"
