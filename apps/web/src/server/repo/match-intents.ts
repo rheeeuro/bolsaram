@@ -168,6 +168,51 @@ export async function decideIntent(
   return toRecord(row);
 }
 
+/**
+ * 보류한 요청 목록. 확인 대기 큐에서 빠진 요청을 다시 찾아 되돌릴 수 있게 한다.
+ *
+ * 큐와 같은 이유로 보고 있는 채널로 좁히지 않는다 — RLS 가 담당 멤버의 것만 남긴다.
+ * 최근에 보류한 것부터 보여준다.
+ */
+export async function listDeclinedIntents(sql: Sql): Promise<MatchIntentRecord[]> {
+  const result = await sql.query<Row>(
+    `SELECT ${COLUMNS} FROM match_intents
+      WHERE status = 'DECLINED'
+      ORDER BY decided_at DESC
+      LIMIT 50`,
+  );
+  return result.rows.map(toRecord);
+}
+
+/**
+ * 보류를 풀고 확인 대기로 되돌린다. 보류는 「지금은 아니다」라서 되돌릴 수 있다(0030).
+ *
+ * 처리 기록(누가·언제·왜)을 함께 비운다 — `match_intents_decision_pair` 가 대기 상태에
+ * 결정 시각을 허용하지 않는다. `WHERE status = 'DECLINED'` 가 동시 처리를 막는다.
+ * 그사이 멤버가 같은 요청을 다시 냈다면 대기 중 하나만 허용하는 인덱스가 막는다.
+ */
+export async function reopenIntent(sql: Sql, id: string): Promise<MatchIntentRecord> {
+  try {
+    const result = await sql.query<Row>(
+      `UPDATE match_intents
+          SET status = 'PENDING', decided_by = NULL, decided_at = NULL, decline_reason = NULL
+        WHERE id = $1 AND status = 'DECLINED'
+        RETURNING ${COLUMNS}`,
+      [id],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new DomainError("CONFLICT", "보류 상태가 아닌 요청입니다.");
+    }
+    return toRecord(row);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new DomainError("CONFLICT", "같은 요청이 이미 확인을 기다리고 있습니다.");
+    }
+    throw error;
+  }
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === "object" &&

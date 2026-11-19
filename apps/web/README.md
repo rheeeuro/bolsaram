@@ -249,7 +249,7 @@ API 는 권한 경계를 경로에 드러내려고 `/api/admin/*` 을 유지한�
 | `/api/admin/me`                           | PATCH               | 주선자            | 내 표시 이름 바꾸기                  |
 | `/api/admin/me/avatar`                    | POST / DELETE       | 주선자            | 내 프로필 사진 올리기(슬롯·확정) / 지우기 |
 | `/api/admin/acting`                       | POST / DELETE       | 주선자            | 대행 시작 / 종료 (고칠 수 있는 프로필) |
-| `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 멤버 요청 approve · decline          |
+| `/api/admin/match-intents/[id]/[action]`  | POST                | 주선자            | 멤버 요청 approve · decline · reopen(보류 되돌리기) |
 | `/api/favorites`                          | GET / POST / DELETE | 멤버              | 관심 목록·토글                       |
 | `/api/hides`                              | GET / POST / DELETE | 멤버(프로필 필요) | 숨긴 사람 목록·토글                  |
 | `/api/admin/invites`                      | POST                | 주선자            | 초대 링크 · 입장코드 발급 (같은 토큰). `purpose: SIGNAL` 이면 받은 신청 알림 링크 (30일, 기존 링크 유지) |

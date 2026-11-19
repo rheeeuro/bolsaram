@@ -6,9 +6,13 @@ import { env } from "@/server/env";
 import { introducedWithManaged, listForAdmin } from "@/server/repo/matches";
 import { canEditProfiles, findProfilesByIds, type ProfileRecord } from "@/server/repo/profiles";
 import { toCardView } from "@/server/views/profile-view";
-import { listPendingIntents } from "@/server/repo/match-intents";
+import {
+  listDeclinedIntents,
+  listPendingIntents,
+  type MatchIntentRecord,
+} from "@/server/repo/match-intents";
 import { HostRequestList } from "@/components/host/request-list";
-import { HostIntentQueue } from "@/components/host/intent-queue";
+import { HostDeclinedIntents, HostIntentQueue } from "@/components/host/intent-queue";
 import { Count, PageHeader } from "@/components/host/surface";
 
 export const dynamic = "force-dynamic";
@@ -30,18 +34,21 @@ export default async function HostRequestsPage({
     ? [status as MatchRequestStatus]
     : undefined;
 
-  const { items, intents } = await withRls(rlsContextOf(viewer), async (sql) => {
+  const { items, intents, declined } = await withRls(rlsContextOf(viewer), async (sql) => {
     const requests = await listForAdmin(sql, {
       groupId: viewer.groupId,
       ...(filter ? { status: filter } : {}),
     });
     // 멤버가 낸 요청은 아직 신청이 아니다 — 승인해야 상대에게 간다(0026).
     const pending = await listPendingIntents(sql);
+    // 보류한 요청은 큐에서 빠지지만 되돌릴 수 있어야 한다(0030).
+    const declinedIntents = await listDeclinedIntents(sql);
+    const allIntents = [...pending, ...declinedIntents];
 
     const byRequestId = new Map(requests.map((r) => [r.id, r]));
     const ids = new Set([
       ...requests.flatMap((r) => [r.requesterProfileId, r.targetProfileId]),
-      ...pending.flatMap((i) => {
+      ...allIntents.flatMap((i) => {
         const request = i.matchRequestId ? byRequestId.get(i.matchRequestId) : undefined;
         return [
           i.profileId,
@@ -71,6 +78,26 @@ export default async function HostRequestsPage({
       };
     };
 
+    const describeIntent = (intent: MatchIntentRecord) => {
+      const request = intent.matchRequestId ? byRequestId.get(intent.matchRequestId) : undefined;
+      // 답이면 그 신청의 반대편이 상대다.
+      const otherId =
+        intent.targetProfileId ??
+        (request
+          ? request.requesterProfileId === intent.profileId
+            ? request.targetProfileId
+            : request.requesterProfileId
+          : null);
+      return {
+        id: intent.id,
+        kind: intent.kind,
+        message: intent.message,
+        createdAt: intent.createdAt.toISOString(),
+        from: describe(byId.get(intent.profileId)),
+        to: otherId ? describe(byId.get(otherId)) : null,
+      };
+    };
+
     return {
       items: requests.map((request) => {
         const target = byId.get(request.targetProfileId);
@@ -93,27 +120,13 @@ export default async function HostRequestsPage({
           requesterManaged: editable.has(request.requesterProfileId),
         };
       }),
-      intents: pending.map((intent) => {
-        const request = intent.matchRequestId
-          ? byRequestId.get(intent.matchRequestId)
-          : undefined;
-        // 답이면 그 신청의 반대편이 상대다.
-        const otherId =
-          intent.targetProfileId ??
-          (request
-            ? request.requesterProfileId === intent.profileId
-              ? request.targetProfileId
-              : request.requesterProfileId
-            : null);
-        return {
-          id: intent.id,
-          kind: intent.kind,
-          message: intent.message,
-          createdAt: intent.createdAt.toISOString(),
-          from: describe(byId.get(intent.profileId)),
-          to: otherId ? describe(byId.get(otherId)) : null,
-        };
-      }),
+      intents: pending.map(describeIntent),
+      declined: declinedIntents.map((intent) => ({
+        ...describeIntent(intent),
+        // 보류된 요청은 결정 시각이 반드시 있다(match_intents_decision_pair).
+        declinedAt: (intent.decidedAt ?? intent.createdAt).toISOString(),
+        declineReason: intent.declineReason,
+      })),
     };
   });
 
@@ -125,6 +138,7 @@ export default async function HostRequestsPage({
         aside={<Count>{items.length}건</Count>}
       />
       <HostIntentQueue items={intents} />
+      <HostDeclinedIntents items={declined} />
       <HostRequestList
         items={items}
         activeStatus={status ?? ""}

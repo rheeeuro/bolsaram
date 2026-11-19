@@ -27,6 +27,11 @@ export type HostIntentItem = {
   to: Party;
 };
 
+export type HostDeclinedIntentItem = HostIntentItem & {
+  declinedAt: string;
+  declineReason: string | null;
+};
+
 /** 승인하면 무슨 일이 일어나는지 한 문장으로 말한다. 되돌릴 수 없는 것부터 분명히. */
 const EFFECT: Record<MatchIntentKind, string> = {
   SEND: "승인하면 상대에게 신청이 전달됩니다. 그전까지 상대는 아무것도 모릅니다.",
@@ -67,7 +72,8 @@ export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
     >
       <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
         멤버가 누른 것은 아직 상대에게 가지 않았습니다. 확인하면 그때 전달됩니다. 보고 있는
-        모임과 상관없이 맡은 분들의 요청을 모두 보여줍니다.
+        모임과 상관없이 맡은 분들의 요청을 모두 보여줍니다. 보류한 요청은 아래 「보류한
+        요청」에서 다시 되돌릴 수 있습니다.
       </p>
 
       {error ? <p className="mb-3 text-[13px] text-[var(--color-danger)]">{error}</p> : null}
@@ -116,6 +122,102 @@ export function HostIntentQueue({ items }: { items: HostIntentItem[] }) {
         ))}
       </ul>
     </Panel>
+  );
+}
+
+/**
+ * 보류한 요청. 큐에서 빠진 요청이 어디 갔는지 보이게 하고, 되돌릴 수 있게 한다.
+ *
+ * 보류는 「지금은 아니다」라서 되돌릴 수 있다(0030). 되돌리면 확인 대기로 돌아갈 뿐
+ * 곧바로 전달하지 않는다 — 전달은 위 큐의 「확인하고 전달」 한 곳에서만 한다.
+ * 일감이 아니라 보관함이므로 접어 둔다.
+ */
+export function HostDeclinedIntents({ items }: { items: HostDeclinedIntentItem[] }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (items.length === 0) return null;
+
+  async function reopen(id: string) {
+    setBusy(true);
+    setError(null);
+    const result = await apiPost(`/api/admin/match-intents/${id}/reopen`);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <details className="group animate-enter mb-5 rounded-[var(--radius-card)] border border-[var(--surface-border)] bg-[var(--surface-card)] shadow-[var(--shadow-card)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 [&::-webkit-details-marker]:hidden">
+        <h2 className="display text-[15px] text-[var(--surface-text)]">
+          보류한 요청 {items.length}건
+        </h2>
+        <span
+          aria-hidden
+          className="text-[12px] text-[var(--surface-text-muted)] transition-transform group-open:rotate-180"
+        >
+          ▾
+        </span>
+      </summary>
+
+      <div className="border-t border-[var(--surface-border)] p-5">
+        <p className="mb-3.5 text-[12.5px] leading-relaxed text-[var(--surface-text-muted)]">
+          보류한 요청은 상대에게 전달되지 않았고, 요청한 멤버의 목록에서 그 상대가 빠져
+          있습니다. 되돌리면 위 확인 대기로 돌아가고 상대도 다시 보입니다. 전달은 되돌린 뒤
+          「확인하고 전달」을 눌러야 합니다.
+        </p>
+
+        {error ? <p className="mb-3 text-[13px] text-[var(--color-danger)]">{error}</p> : null}
+
+        <ul className="flex flex-col gap-2.5">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className="rounded-[12px] border border-[var(--surface-border)] px-3.5 py-3"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <Who party={item.from} />
+                <span className="shrink-0 rounded-[var(--radius-pill)] bg-[var(--surface-muted)] px-2.5 py-1 text-[12px] text-[var(--surface-text-muted)]">
+                  {MATCH_INTENT_KIND_LABELS[item.kind]}
+                </span>
+                <Who party={item.to} />
+                <span className="ml-auto text-[12px] text-[var(--surface-text-muted)]">
+                  보류 {formatWhen(item.declinedAt)}
+                </span>
+              </div>
+
+              {item.message ? (
+                <p className="mt-2.5 rounded-[10px] bg-[var(--color-ivory-100)] px-3 py-2 text-[12.5px] leading-relaxed text-[var(--color-ink-700)]">
+                  “{item.message}”
+                </p>
+              ) : null}
+
+              {item.declineReason ? (
+                <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--surface-text-muted)]">
+                  보류 사유: {item.declineReason}
+                </p>
+              ) : null}
+
+              <div className="mt-2.5 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void reopen(item.id)}
+                >
+                  확인 대기로 되돌리기
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }
 
